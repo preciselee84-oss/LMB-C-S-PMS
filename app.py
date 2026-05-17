@@ -1022,10 +1022,52 @@ def show_user_history():
 
     other_errors_df = pd.DataFrame(other_errors)
 
+    # 중복 방문 데이터
+    dup_my = pd.DataFrame()
+    if dup is not None and not dup.empty:
+        u_col_dup = find_col(dup, ["등록자", "담당자", "성명"], "담당자")
+        if u_col_dup and u_col_dup in dup.columns:
+            dup_my = dup[dup[u_col_dup] == st.session_state.user_name]
+        else:
+            dup_my = dup
+
+    # 개설완료일자 누락
+    missing_open = pd.DataFrame()
+    if "본사 개설완료일자" in df_user.columns:
+        missing_open = df_user[
+            pd.isna(df_user["본사 개설완료일자"]) | (df_user["본사 개설완료일자"].astype(str).str.strip() == "")
+        ]
+
+    # ERP연계일자 누락
+    missing_erp = pd.DataFrame()
+    if "본사 ERP연계일자" in df_user.columns:
+        if d_col and d_col in df_user.columns:
+            target = df_user[df_user[d_col].astype(str).str.contains("연계", na=False)]
+        else:
+            target = df_user
+        missing_erp = target[
+            pd.isna(target["본사 ERP연계일자"]) | (target["본사 ERP연계일자"].astype(str).str.strip() == "")
+        ]
+
+    # 검증 이슈 확인
+    has_validation_issues = (
+        not dup_my.empty or
+        not err_filtered.empty or
+        not missing_open.empty or
+        not missing_erp.empty or
+        not other_errors_df.empty
+    )
+
     # 경고 메시지 표시
     error_tabs = []
+    if not dup_my.empty:
+        error_tabs.append("중복 방문")
     if not err_filtered.empty:
         error_tabs.append("초과 방문")
+    if not missing_open.empty:
+        error_tabs.append("본사 개설완료일자 누락")
+    if not missing_erp.empty:
+        error_tabs.append("본사 ERP연계일자 누락")
     if not other_errors_df.empty:
         error_tabs.append("기타 오류")
 
@@ -1042,14 +1084,6 @@ def show_user_history():
     t1, t2, t3, t4, t5 = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
 
     with t1:
-        # 본인 데이터만 필터링
-        dup_my = pd.DataFrame()
-        if dup is not None and not dup.empty:
-            u_col_dup = find_col(dup, ["등록자", "담당자", "성명"], "담당자")
-            if u_col_dup and u_col_dup in dup.columns:
-                dup_my = dup[dup[u_col_dup] == st.session_state.user_name]
-            else:
-                dup_my = dup
         style_report_logic(dup_my)
 
     with t2:
@@ -1059,26 +1093,15 @@ def show_user_history():
             st.info("초과 방문 데이터가 없습니다.")
 
     with t3:
-        if "본사 개설완료일자" in df_user.columns:
-            missing_open = df_user[
-                pd.isna(df_user["본사 개설완료일자"]) | (df_user["본사 개설완료일자"].astype(str).str.strip() == "")
-            ]
+        if not missing_open.empty:
             style_report_logic(missing_open.drop(columns=["본사 ERP연계일자"], errors="ignore"))
-        else:
+        elif "본사 개설완료일자" not in df_user.columns:
             st.info("본사 구글시트에 개설완료일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
 
     with t4:
-        if "본사 ERP연계일자" in df_user.columns:
-            if d_col and d_col in df_user.columns:
-                target = df_user[df_user[d_col].astype(str).str.contains("연계", na=False)]
-            else:
-                target = df_user
-
-            missing_erp = target[
-                pd.isna(target["본사 ERP연계일자"]) | (target["본사 ERP연계일자"].astype(str).str.strip() == "")
-            ]
+        if not missing_erp.empty:
             style_report_logic(missing_erp.drop(columns=["본사 개설완료일자"], errors="ignore"))
-        else:
+        elif "본사 ERP연계일자" not in df_user.columns:
             st.info("본사 구글시트에 ERP연계일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
 
     with t5:
@@ -1149,7 +1172,7 @@ def show_user_history():
 
     _, save_col = st.columns([0.78, 0.22])
     with save_col:
-        save_and_check = st.button("저장 후 최종 실적 확인", use_container_width=True, type="primary")
+        save_and_check = st.button("저장 후 최종 실적 확인", use_container_width=True, type="primary", disabled=has_validation_issues)
 
     if save_and_check:
         db = load_db(PERF_FILE, {})
