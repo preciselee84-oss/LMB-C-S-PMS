@@ -6,6 +6,8 @@ import time
 import json
 import os
 import html
+import re
+from io import BytesIO
 from datetime import datetime, timedelta
 
 st.set_page_config(page_title="실적관리 시스템", layout="wide", initial_sidebar_state="expanded")
@@ -13,6 +15,7 @@ st.set_page_config(page_title="실적관리 시스템", layout="wide", initial_s
 DB_FILE = "users.json"
 PERF_FILE = "manual_perf.json"
 SENT_FILE = "sent_results.json"
+SENT_UPLOADS_FILE = "sent_uploads.json"
 
 DEFAULT_URL_ANALYSIS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9XPHqrqcaFf9bCOVya7yHORr-c1R4KCF0eEpdE3ESn8qJELP0BkqTOslur9bsGcVabRUIcyOa877R/pub?output=csv"
 DEFAULT_URL_SYNC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9F7R7oLA2B02H-I25kVv2JeYHFgWQq0CT7TeW61hrNpJLdHWJFhFR_iDQGCFAW044o8rRwBDeovKG/pub?gid=1533424484&single=true&output=csv"
@@ -31,6 +34,22 @@ def load_db(file_path, default_data):
 def save_db(file_path, data):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+
+
+def dataframe_to_upload_payload(df):
+    safe_df = strip_activity_time_columns(df).copy()
+    safe_df = safe_df.replace({np.nan: ""})
+    return {
+        "columns": [str(c) for c in safe_df.columns],
+        "rows": safe_df.astype(str).values.tolist(),
+        "saved_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+
+def upload_payload_to_dataframe(payload):
+    if not payload:
+        return pd.DataFrame()
+    return pd.DataFrame(payload.get("rows", []), columns=payload.get("columns", []))
 
 
 def init_state():
@@ -105,7 +124,25 @@ def clean_header_logic(df):
 
         keep = ~pd.Series(df.columns).astype(str).str.contains("^Unnamed|^nan", case=False, na=False).values
         df = df.loc[:, keep]
-        return df.dropna(how="all", axis=1).dropna(how="all", axis=0)
+        df = df.dropna(how="all", axis=1).dropna(how="all", axis=0)
+        return strip_activity_time_columns(df)
+    except Exception:
+        return df
+
+
+def strip_activity_time_columns(df):
+    try:
+        df = df.copy()
+        for col in df.columns:
+            col_name = str(col).replace(" ", "").replace("　", "")
+            if "활동일" not in col_name:
+                continue
+
+            converted = pd.to_datetime(df[col], errors="coerce")
+            valid = converted.notna()
+            if valid.any():
+                df.loc[valid, col] = converted.loc[valid].dt.strftime("%Y-%m-%d")
+        return df
     except Exception:
         return df
 
@@ -119,7 +156,20 @@ def find_col(df, keys, fallback=None):
 
 
 def normalize_biz(series):
-    return series.astype(str).str.replace(r"[^0-9]", "", regex=True)
+    def normalize_one(value):
+        if pd.isna(value):
+            return ""
+
+        text = str(value).strip().replace(",", "")
+        if re.fullmatch(r"\d+\.0+", text):
+            text = text.split(".", 1)[0]
+
+        digits = re.sub(r"[^0-9]", "", text)
+        if "." in str(value) and digits.endswith("0") and len(digits) == 11:
+            digits = digits[:-1]
+        return digits
+
+    return series.apply(normalize_one)
 
 
 def get_uploaded_month(df):
@@ -195,6 +245,72 @@ def criteria_df():
         ["추가활동", "운영활동(원격)", 10, 200],
     ]
     return pd.DataFrame(data, columns=["활동구분", "구분", "단위 점수", "월 최대점수"])
+
+
+def render_manual_perf_input_table(base):
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stElementToolbar"] {
+            display: none !important;
+        }
+        div[data-testid="stDataEditor"] {
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 10px !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+            overflow: hidden !important;
+            margin-bottom: 1rem !important;
+        }
+        div[data-testid="stDataEditor"] [role="columnheader"] {
+            background: #EDF2F7 !important;
+            color: #4A5568 !important;
+            font-weight: 800 !important;
+            font-size: 13px !important;
+            text-align: center !important;
+            border-bottom: 2px solid #E2E8F0 !important;
+            white-space: nowrap !important;
+        }
+        div[data-testid="stDataEditor"] [role="gridcell"] {
+            border-bottom: 1px solid #EDF2F7 !important;
+            color: #2D3748 !important;
+            font-size: 13px !important;
+            white-space: nowrap !important;
+        }
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="1"],
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="2"] {
+            text-align: center !important;
+        }
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="3"],
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="4"],
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="5"],
+        div[data-testid="stDataEditor"] input {
+            text-align: right !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    editor_df = base.copy()
+    editor_df["입력(건)"] = editor_df["입력(건)"].astype(int).astype(str)
+
+    return st.data_editor(
+        editor_df,
+        use_container_width=True,
+        hide_index=True,
+        height=565,
+        num_rows="fixed",
+        column_order=["활동구분", "구분", "단위 점수", "월 최대점수", "입력(건)"],
+        column_config={
+            "활동구분": st.column_config.TextColumn("활동구분", width="medium", disabled=True),
+            "구분": st.column_config.TextColumn("구분", width="large", disabled=True),
+            "단위 점수": st.column_config.NumberColumn("단위 점수", width="small", disabled=True),
+            "월 최대점수": st.column_config.TextColumn("월 최대점수", width="small", disabled=True),
+            "입력(건)": st.column_config.TextColumn("입력(건)", width="small"),
+        },
+        disabled=["활동구분", "구분", "단위 점수", "월 최대점수"],
+        key="manual_perf_editor",
+    )
 
 
 def manual_points_for_user(name):
@@ -412,6 +528,8 @@ def style_report_logic(df, compact=False):
         st.info("표시할 데이터가 없습니다.")
         return
 
+    df = strip_activity_time_columns(df)
+
     diff_cols = [c for c in df.columns if "전월대비" in str(c) or "증감" in str(c) or "대비" in str(c)]
     exclude_from_num = ["담당자", "직급", "전송시각", "등록월", "항목", "일치여부"] + [c for c in df.columns if "사업자번호" in str(c)]
     num_cols = [c for c in df.columns if c not in exclude_from_num + diff_cols]
@@ -462,14 +580,14 @@ def style_report_logic(df, compact=False):
     th_font = "12px" if compact else "13px"
     td_pad = "5px 6px" if compact else "8px 12px"
     td_font = "12px" if compact else "13px"
-    th = f"background:#EDF2F7;color:#4A5568;font-weight:800;font-size:{th_font};padding:{th_pad};text-align:center;border-bottom:2px solid #E2E8F0;" + ("white-space:normal;word-break:keep-all;" if compact else "white-space:nowrap;")
+    th = f"background:#EDF2F7;color:#4A5568;font-weight:800;font-size:{th_font};padding:{th_pad};text-align:center;border-bottom:2px solid #E2E8F0;white-space:nowrap;"
     headers = "".join(f"<th style='{th}'>{html.escape(format_col_name(c))}</th>" for c in df.columns)
 
     body = ""
     for i, row in df.reset_index(drop=True).iterrows():
         tds = ""
         for col in df.columns:
-            align = "right" if col in num_cols else "center"
+            align = "right" if col in num_cols or col in diff_cols else "center"
             bg = "#FFFFFF" if i % 2 == 0 else "#F7FAFC"
 
             if col == "일치여부":
@@ -481,7 +599,7 @@ def style_report_logic(df, compact=False):
             else:
                 value = "" if pd.isna(row[col]) else html.escape(str(row[col]))
 
-            _ws = "white-space:normal;word-break:keep-all;" if compact else "white-space:nowrap;"
+            _ws = "white-space:nowrap;"
             tds += (
                 f"<td style='background:{bg};padding:{td_pad};border-bottom:1px solid #EDF2F7;"
                 f"font-size:{td_font};color:#2D3748;text-align:{align};{_ws}'>{value}</td>"
@@ -773,6 +891,25 @@ def show_sidebar():
             st.rerun()
 
 
+def apply_global_table_css():
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stDataFrame"] th,
+        div[data-testid="stDataFrame"] td,
+        div[data-testid="stDataFrame"] [role="columnheader"],
+        div[data-testid="stDataFrame"] [role="gridcell"],
+        div[data-testid="stDataEditor"] [role="columnheader"],
+        div[data-testid="stDataEditor"] [role="gridcell"] {
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_page_title(menu):
     if st.session_state.get("_prev_menu") != menu:
         st.session_state._prev_menu = menu
@@ -794,6 +931,45 @@ def render_page_title(menu):
 
 def load_csv_to_state(url_key, state_key):
     st.session_state[state_key] = clean_header_logic(pd.read_csv(st.session_state[url_key]))
+
+
+def refresh_google_sheets_action():
+    load_csv_to_state("url_sync", "cloud_sheet_df")
+    load_csv_to_state("url_analysis", "analysis_lookup_df")
+    st.toast("구글시트 데이터를 다시 조회했습니다.")
+    time.sleep(0.3)
+    st.rerun()
+
+
+def validation_tabs_with_refresh(key):
+    st.markdown(
+        """
+        <style>
+        .refresh-tab-button div.stButton > button {
+            min-width: 42px !important;
+            height: 38px !important;
+            padding: 0 !important;
+            margin-top: 2px !important;
+            border-radius: 8px !important;
+            font-size: 18px !important;
+            font-weight: 900 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    tabs_col, refresh_col = st.columns([0.955, 0.045])
+    with tabs_col:
+        tabs = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
+    with refresh_col:
+        st.markdown("<div class='refresh-tab-button'>", unsafe_allow_html=True)
+        if st.button("↻", use_container_width=True, key=key, help="구글시트 데이터 다시 조회"):
+            try:
+                refresh_google_sheets_action()
+            except Exception as e:
+                st.error(f"구글시트 갱신 실패: {e}")
+        st.markdown("</div>", unsafe_allow_html=True)
+    return tabs
 
 
 def select_prev_month(state_key, widget_key):
@@ -1087,7 +1263,7 @@ def show_user_history():
             unsafe_allow_html=True,
         )
 
-    t1, t2, t3, t4, t5 = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
+    t1, t2, t3, t4, t5 = validation_tabs_with_refresh("refresh_google_sheets_user_history")
 
     with t1:
         style_report_logic(dup_my)
@@ -1120,87 +1296,9 @@ def show_user_history():
     saved = load_db(PERF_FILE, {}).get(st.session_state.user_name, {})
     base["입력(건)"] = base["구분"].map(saved).fillna(0).astype(int)
 
-    # 실적 예상치 검증 리포트와 동일한 디자인 적용
-    st.markdown("""
-        <style>
-        /* 전체 컨테이너 스타일 */
-        div[data-testid="stDataFrameResizable"] {
-            border: 1px solid #E2E8F0 !important;
-            border-radius: 10px !important;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
-            margin-bottom: 1rem !important;
-        }
+    edited = render_manual_perf_input_table(base)
 
-        /* 헤더 스타일 - 회색 배경, 굵은 글씨, 가운데 정렬 */
-        div[data-testid="stDataFrameResizable"] th {
-            background: #EDF2F7 !important;
-            color: #4A5568 !important;
-            font-weight: 800 !important;
-            font-size: 13px !important;
-            padding: 9px 12px !important;
-            text-align: center !important;
-            border-bottom: 2px solid #E2E8F0 !important;
-            white-space: nowrap !important;
-        }
-
-        /* 모든 셀 기본 스타일 */
-        div[data-testid="stDataFrameResizable"] td {
-            padding: 8px 12px !important;
-            border-bottom: 1px solid #EDF2F7 !important;
-            font-size: 13px !important;
-            color: #2D3748 !important;
-            white-space: nowrap !important;
-        }
-
-        /* 활동구분, 구분 컬럼 - 가운데 정렬 */
-        div[data-testid="stDataFrameResizable"] td:nth-child(1),
-        div[data-testid="stDataFrameResizable"] td:nth-child(2) {
-            text-align: center !important;
-        }
-
-        /* 단위 점수, 월 최대점수 - 오른쪽 정렬 */
-        div[data-testid="stDataFrameResizable"] td:nth-child(3),
-        div[data-testid="stDataFrameResizable"] td:nth-child(4) {
-            text-align: right !important;
-        }
-
-        /* 입력(건) 컬럼 - 가운데 정렬 (편집 가능) */
-        div[data-testid="stDataFrameResizable"] td:nth-child(5) {
-            text-align: center !important;
-        }
-
-        /* 입력 필드 스타일 */
-        div[data-testid="stDataFrameResizable"] input {
-            text-align: center !important;
-            font-size: 13px !important;
-        }
-
-        /* 행 배경색 교차 */
-        div[data-testid="stDataFrameResizable"] tbody tr:nth-child(even) {
-            background: #F7FAFC !important;
-        }
-        div[data-testid="stDataFrameResizable"] tbody tr:nth-child(odd) {
-            background: #FFFFFF !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    edited = st.data_editor(
-        base,
-        use_container_width=True,
-        hide_index=True,
-        num_rows="fixed",
-        column_config={
-            "활동구분": st.column_config.TextColumn("활동구분", width="small"),
-            "구분": st.column_config.TextColumn("구분", width="medium"),
-            "단위 점수": st.column_config.NumberColumn("단위 점수", disabled=True),
-            "월 최대점수": st.column_config.TextColumn("월 최대점수", disabled=True),
-            "입력(건)": st.column_config.NumberColumn("입력(건)", min_value=0, step=1, default=0, width="small"),
-        },
-        disabled=["활동구분", "구분", "단위 점수", "월 최대점수"],
-    )
-
-    edited["입력(건)"] = edited["입력(건)"].fillna(0).astype(int)
+    edited["입력(건)"] = pd.to_numeric(edited["입력(건)"], errors="coerce").fillna(0).astype(int).clip(lower=0)
     edited["계산점수"] = edited["단위 점수"] * edited["입력(건)"]
 
     limit_map = {
@@ -1671,7 +1769,7 @@ def show_final_check():
             unsafe_allow_html=True,
         )
 
-    t1, t2, t3, t4, t5 = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
+    t1, t2, t3, t4, t5 = validation_tabs_with_refresh("refresh_google_sheets_final_check")
 
     with t1:
         style_report_logic(dup_my)
@@ -1773,6 +1871,7 @@ def show_final_check():
 
     if do_send:
         sent_db = load_db(SENT_FILE, {})
+        sent_uploads_db = load_db(SENT_UPLOADS_FILE, {})
         row_data = my_res.iloc[0].to_dict()
         row_data["전송시각"] = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -1786,7 +1885,9 @@ def show_final_check():
             row_data[f"전월대비({prev_m})"] = row_data.pop("전월대비")
 
         sent_db[st.session_state.user_name] = row_data
+        sent_uploads_db[st.session_state.user_name] = dataframe_to_upload_payload(uploaded_df)
         save_db(SENT_FILE, sent_db)
+        save_db(SENT_UPLOADS_FILE, sent_uploads_db)
 
         st.success("전송 완료")
         time.sleep(0.5)
@@ -1812,11 +1913,186 @@ def sent_results_df():
     return sent_df
 
 
+def apply_admin_prev_diff(sent_df):
+    if sent_df.empty:
+        return sent_df
+
+    result_df = sent_df.copy()
+    result_df = result_df.drop(columns=[c for c in result_df.columns if "전월대비" in str(c)], errors="ignore")
+
+    selected_month = st.session_state.get("adm_prev_month", "선택안함")
+    prev_df = st.session_state.get("auto_prev_df")
+
+    if selected_month == "선택안함" or prev_df is None or prev_df.empty:
+        return result_df
+
+    prev_res, _, _ = process_performance_analysis(prev_df)
+    if not isinstance(prev_res, pd.DataFrame) or prev_res.empty:
+        return result_df
+
+    prev_pay_map = prev_res.set_index("담당자")["지급예상금액"].to_dict()
+
+    if "담당자" in result_df.columns and "지급예상금액" in result_df.columns:
+        result_df["전월대비"] = result_df.apply(
+            lambda r: int(float(r.get("지급예상금액", 0))) - int(float(prev_pay_map.get(r.get("담당자"), 0))),
+            axis=1,
+        )
+
+        cols = result_df.columns.tolist()
+        cols.remove("전월대비")
+        insert_at = cols.index("전송시각") if "전송시각" in cols else len(cols)
+        cols.insert(insert_at, "전월대비")
+        result_df = result_df[cols]
+
+    return result_df
+
+
+def dataframe_to_excel_bytes(sheets):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        for sheet_name, df in sheets.items():
+            safe_name = str(sheet_name)[:31] or "Sheet"
+            df.to_excel(writer, index=False, sheet_name=safe_name)
+    output.seek(0)
+    return output.getvalue()
+
+
+def sent_uploaded_files_excel_bytes():
+    sent_uploads_db = load_db(SENT_UPLOADS_FILE, {})
+    if not sent_uploads_db:
+        return dataframe_to_excel_bytes({
+            "안내": pd.DataFrame([{"내용": "아직 전송된 업로드 엑셀 파일이 없습니다. 직원이 실적 결과 전송을 다시 진행하면 이 파일에 포함됩니다."}])
+        })
+
+    sheets = {}
+    used_names = set()
+    for name, payload in sent_uploads_db.items():
+        df = upload_payload_to_dataframe(payload)
+        if df.empty:
+            continue
+
+        sheet_name = str(name)[:31] or "담당자"
+        base_name = sheet_name
+        suffix = 1
+        while sheet_name in used_names:
+            suffix_text = f"_{suffix}"
+            sheet_name = f"{base_name[:31 - len(suffix_text)]}{suffix_text}"
+            suffix += 1
+        used_names.add(sheet_name)
+        sheets[sheet_name] = df
+
+    if not sheets:
+        sheets["안내"] = pd.DataFrame([{"내용": "저장된 업로드 파일 데이터가 비어 있습니다."}])
+
+    return dataframe_to_excel_bytes(sheets)
+
+
+def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_label):
+    from pptx import Presentation
+    from pptx.util import Inches, Pt
+    from pptx.enum.text import PP_ALIGN
+    from pptx.dml.color import RGBColor
+
+    prs = Presentation()
+    prs.slide_width = Inches(13.333)
+    prs.slide_height = Inches(7.5)
+
+    def add_title(slide, title, subtitle=""):
+        title_box = slide.shapes.add_textbox(Inches(0.45), Inches(0.25), Inches(12.4), Inches(0.5))
+        tf = title_box.text_frame
+        tf.text = title
+        p = tf.paragraphs[0]
+        p.font.size = Pt(24)
+        p.font.bold = True
+        p.font.color.rgb = RGBColor(26, 32, 44)
+        if subtitle:
+            sub_box = slide.shapes.add_textbox(Inches(0.48), Inches(0.78), Inches(12), Inches(0.28))
+            sub_tf = sub_box.text_frame
+            sub_tf.text = subtitle
+            sub_p = sub_tf.paragraphs[0]
+            sub_p.font.size = Pt(10)
+            sub_p.font.color.rgb = RGBColor(113, 128, 150)
+
+    def set_cell(cell, text, bold=False, align=PP_ALIGN.CENTER, fill=None):
+        if fill:
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = fill
+        cell.text = str(text)
+        para = cell.text_frame.paragraphs[0]
+        para.alignment = align
+        para.font.size = Pt(8)
+        para.font.bold = bold
+        para.font.color.rgb = RGBColor(45, 55, 72)
+
+    def add_table_slide(title, df, subtitle=""):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        add_title(slide, title, subtitle)
+        show_df = df.head(18).copy()
+        rows = len(show_df) + 1
+        cols = len(show_df.columns)
+        table = slide.shapes.add_table(rows, cols, Inches(0.45), Inches(1.15), Inches(12.45), Inches(5.9)).table
+        for c, col in enumerate(show_df.columns):
+            set_cell(table.cell(0, c), col, bold=True, fill=RGBColor(237, 242, 247))
+        for r_idx, (_, row) in enumerate(show_df.iterrows(), start=1):
+            for c_idx, col in enumerate(show_df.columns):
+                value = row[col]
+                if isinstance(value, (int, float, np.integer, np.floating)):
+                    value = f"{int(value):,}"
+                    align = PP_ALIGN.RIGHT
+                else:
+                    align = PP_ALIGN.CENTER
+                fill = RGBColor(247, 250, 252) if r_idx % 2 == 0 else RGBColor(255, 255, 255)
+                set_cell(table.cell(r_idx, c_idx), value, align=align, fill=fill)
+        return slide
+
+    add_table_slide(f"{curr_month_label} 실적보고서", report_df, f"{prev_month_label} 비교 기준")
+    if not compare_df.empty:
+        add_table_slide("비교 리포트", compare_df, f"{prev_month_label} 대비 {curr_month_label}")
+
+    output = BytesIO()
+    prs.save(output)
+    output.seek(0)
+    return output.getvalue()
+
+
+def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_month_label):
+    st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        if st.button("실적파일 구글시트 전송", use_container_width=True):
+            st.warning("구글시트 쓰기용 API/인증 설정이 없어 아직 전송할 수 없습니다. 서비스 계정 또는 Apps Script 전송 URL을 연결하면 이 버튼에 전송 기능을 붙일 수 있습니다.")
+
+    excel_bytes = sent_uploaded_files_excel_bytes()
+    with c2:
+        st.download_button(
+            "실적파일 엑셀 다운로드",
+            data=excel_bytes,
+            file_name=f"sent_uploaded_files_{curr_month_label}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+
+    with c3:
+        try:
+            ppt_bytes = build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_label)
+            st.download_button(
+                "실적보고서 PPT 다운로드",
+                data=ppt_bytes,
+                file_name=f"performance_report_{curr_month_label}.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                use_container_width=True,
+            )
+        except Exception as e:
+            st.button("실적보고서 PPT 다운로드", use_container_width=True, disabled=True)
+            st.caption(f"PPT 생성 준비 중 오류: {e}")
+
+
 def show_admin_analysis():
     select_prev_month("auto_prev_df", "adm_prev_month")
 
     st.markdown("### 직원 전송 실적 내역")
-    sent_df = sent_results_df()
+    sent_df = apply_admin_prev_diff(sent_results_df())
 
     if sent_df.empty:
         st.info("아직 전송된 실적이 없습니다.")
@@ -1829,6 +2105,7 @@ def show_admin_analysis():
     with c1:
         if st.button("전송 내역 초기화"):
             save_db(SENT_FILE, {})
+            save_db(SENT_UPLOADS_FILE, {})
             st.success("초기화 완료")
             time.sleep(0.5)
             st.rerun()
@@ -1896,24 +2173,38 @@ def show_report():
     ]
 
     shared_cols = [c for c in compare_cols if c in report_df.columns and c in prev_res.columns]
+    compare_all_rows = []
 
-    for name in report_df["담당자"].tolist():
-        curr_row = report_df[report_df["담당자"] == name]
-        prev_row = prev_res[prev_res["담당자"] == name]
+    names = report_df["담당자"].tolist()
+    for start in range(0, len(names), 2):
+        person_cols = st.columns(2)
+        for person_col, name in zip(person_cols, names[start:start + 2]):
+            curr_row = report_df[report_df["담당자"] == name]
+            prev_row = prev_res[prev_res["담당자"] == name]
 
-        if curr_row.empty:
-            continue
+            if curr_row.empty:
+                continue
 
-        rank = curr_row.iloc[0].get("직급", "")
-        st.markdown(f"#### {name} ({rank})")
+            rank = curr_row.iloc[0].get("직급", "")
+            rows = []
+            for col in shared_cols:
+                c_val = int(float(curr_row.iloc[0][col]))
+                p_val = int(float(prev_row.iloc[0][col])) if not prev_row.empty else 0
+                rows.append({"항목": col, prev_month_label: p_val, curr_month_label: c_val, "증감": c_val - p_val})
+                compare_all_rows.append({
+                    "담당자": name,
+                    "직급": rank,
+                    "항목": col,
+                    prev_month_label: p_val,
+                    curr_month_label: c_val,
+                    "증감": c_val - p_val,
+                })
 
-        rows = []
-        for col in shared_cols:
-            c_val = int(float(curr_row.iloc[0][col]))
-            p_val = int(float(prev_row.iloc[0][col])) if not prev_row.empty else 0
-            rows.append({"항목": col, prev_month_label: p_val, curr_month_label: c_val, "증감": c_val - p_val})
+            with person_col:
+                st.markdown(f"#### {name} ({rank})")
+                style_report_logic(pd.DataFrame(rows), compact=True)
 
-        style_report_logic(pd.DataFrame(rows))
+    render_report_action_buttons(report_df, pd.DataFrame(compare_all_rows), curr_month_label, prev_month_label)
 
 
 def show_staff_admin():
@@ -1992,10 +2283,11 @@ def show_google_sync():
             st.error("불러오기 실패. URL을 확인해주세요.")
 
     if st.session_state.temp_cloud_df is not None:
-        st.dataframe(st.session_state.temp_cloud_df, use_container_width=True, hide_index=True)
+        st.dataframe(strip_activity_time_columns(st.session_state.temp_cloud_df), use_container_width=True, hide_index=True)
 
 
 def show_main():
+    apply_global_table_css()
     show_sidebar()
 
     menu = st.session_state.current_menu
