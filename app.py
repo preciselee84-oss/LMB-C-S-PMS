@@ -825,7 +825,7 @@ def select_prev_month(state_key, widget_key):
 
 
 def show_user_history():
-    col1, col2 = st.columns([1, 2])
+    col1, col2 = st.columns([1, 3])
     with col1:
         u_file = st.file_uploader("활동실적 엑셀 업로드", type=["xlsx"])
 
@@ -1218,7 +1218,7 @@ def show_final_check():
 
     st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
 
-    col1_reupload, col2_reupload = st.columns([1, 2])
+    col1_reupload, col2_reupload = st.columns([1, 3])
     with col1_reupload:
         new_file = st.file_uploader("엑셀 재업로드", type=["xlsx"], key="final_reupload")
 
