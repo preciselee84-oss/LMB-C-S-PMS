@@ -1095,6 +1095,7 @@ def show_user_history():
         base,
         use_container_width=True,
         hide_index=True,
+        num_rows="fixed",
         column_config={"입력(건)": st.column_config.NumberColumn("입력(건)", min_value=0, step=1, default=0)},
         disabled=["활동구분", "구분", "단위 점수", "월 최대점수"],
     )
