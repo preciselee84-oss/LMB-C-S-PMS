@@ -1003,9 +1003,9 @@ def show_final_check():
         ("개설포인트", "개설포인트", "compare"),
         ("연계건수", "연계건수", "compare"),
         ("연계포인트", "연계포인트", "compare"),
-        ("운영건수 (실제 활동)", "운영건수 (실제 활동)", "compare"),
-        ("운영포인트 (실제 활동)", "운영포인트 (실제 활동)", "compare"),
-        ("추가 등록건수", "운영건수 (추가 활동)", "compare"),
+        ("운영건수 (실제 활동)", "운영건수 (실제 활동)", "compare_no_match"),
+        ("운영포인트 (실제 활동)", "운영포인트 (실제 활동)", "compare_no_match"),
+        ("추가 등록건수", "운영건수 (추가 활동)", "compare_no_match"),
         ("최종 운영건수", None, "final_operation_count"),
         ("합계포인트", "합계포인트", "compare"),
         ("지급포인트", "지급포인트", "compare"),
@@ -1035,6 +1035,13 @@ def show_final_check():
 
             if uploaded_exists and source_col in uploaded_my_res.columns:
                 uploaded_value = int(float(uploaded_my_res.iloc[0].get(source_col, 0)))
+        elif mode == "compare_no_match":
+            if source_col in my_res.columns:
+                first_value = int(float(my_res.iloc[0].get(source_col, 0)))
+
+            if uploaded_exists and source_col in uploaded_my_res.columns:
+                uploaded_value = int(float(uploaded_my_res.iloc[0].get(source_col, 0)))
+            # match_value는 비워둠 (일치여부 체크 안함)
         else:
             if source_col in my_res.columns:
                 first_value = int(float(my_res.iloc[0].get(source_col, 0)))
@@ -1101,7 +1108,8 @@ def show_final_check():
             st.info("본사 구글시트에 ERP연계일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
 
     # ── 모든 항목 일치 여부 체크 ──
-    all_match = uploaded_exists and all(r.get("일치여부") == "일치" for r in cmp_rows)
+    # 일치여부가 빈 항목은 체크에서 제외 (compare_no_match 모드)
+    all_match = uploaded_exists and all(r.get("일치여부") in ["일치", ""] for r in cmp_rows)
 
     if not uploaded_exists:
         st.markdown(
