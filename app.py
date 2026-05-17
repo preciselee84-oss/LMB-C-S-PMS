@@ -1015,7 +1015,7 @@ def show_final_check():
             first_actual_count = int(float(my_res.iloc[0].get("운영건수 (실제 활동)", 0)))
             first_extra_count = int(float(my_res.iloc[0].get("운영건수 (추가 활동)", 0)))
             first_compare_value = first_actual_count + first_extra_count
-            first_value = ""
+            first_value = first_compare_value
 
             if uploaded_exists:
                 uploaded_actual_count = int(float(uploaded_my_res.iloc[0].get("운영건수 (실제 활동)", 0)))
