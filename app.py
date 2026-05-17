@@ -655,84 +655,89 @@ def show_auth_page():
         }
         [data-testid="stSidebar"] { display: none !important; }
         .stApp, [data-testid="stAppViewContainer"], .main {
-            background: linear-gradient(135deg, #F0EAFF 0%, #FFFFFF 72%) !important;
+            background: linear-gradient(150deg, #EAE4FF 0%, #F0ECFF 40%, #F8F6FF 100%) !important;
         }
         .main .block-container {
-            max-width: 1500px !important;
-            padding: 46px 5vw 40px !important;
+            max-width: 560px !important;
+            padding: 64px 24px 48px !important;
+            margin: 0 auto !important;
         }
-        .auth-brand {
+        .auth-logo-card {
+            background: #FFFFFF;
+            border-radius: 16px;
+            box-shadow: 0 2px 16px rgba(100,80,200,0.10);
+            text-align: center;
+            padding: 22px 32px 18px;
+            margin-bottom: 24px;
+        }
+        .auth-logo-title {
             color: #1E1A3A;
-            font-size: 34px;
+            font-size: 26px;
             font-weight: 900;
-            line-height: 1.15;
-            margin-bottom: 130px;
+            letter-spacing: -0.5px;
+            margin-bottom: 5px;
         }
-        .auth-brand span {
-            display: block;
-            color: #6F6A98;
-            font-size: 15px;
-            font-weight: 600;
-            margin-top: 10px;
-        }
-        .auth-copy-title {
-            color: #1E1A3A;
-            font-size: 54px;
-            line-height: 1.18;
-            font-weight: 900;
-            letter-spacing: 0;
-            margin-bottom: 28px;
-        }
-        .auth-copy-desc {
-            color: #574FA0;
-            font-size: 17px;
-            line-height: 1.8;
-            font-weight: 700;
-            margin-bottom: 120px;
-        }
-        .auth-footer {
-            color: #A19ACB;
+        .auth-logo-sub {
+            color: #7B79AA;
             font-size: 12px;
             font-weight: 600;
+            letter-spacing: 0.3px;
         }
-        .login-spacer { height: 170px; }
+        .auth-form-card {
+            background: #FFFFFF;
+            border-radius: 20px;
+            box-shadow: 0 4px 28px rgba(100,80,200,0.10);
+            padding: 36px 40px 32px;
+            margin-bottom: 0;
+        }
         .auth-small {
             text-align: center;
             color: #A09AC5;
             font-size: 14px;
-            margin: 14px 0 8px;
+            margin: 16px 0 8px;
         }
-        div[data-testid="stTextInput"] { margin-bottom: 12px !important; }
+        div[data-testid="stTextInput"] { margin-bottom: 14px !important; }
         div[data-testid="stTextInput"] label {
-            color: #242041 !important;
+            color: #3A3660 !important;
             font-size: 14px !important;
-            font-weight: 800 !important;
+            font-weight: 700 !important;
+            margin-bottom: 4px !important;
         }
         div[data-testid="stTextInput"] > div[data-baseweb="input"] {
-            min-height: 58px !important;
+            min-height: 52px !important;
             border-radius: 12px !important;
-            border: 1.5px solid #DFDAFF !important;
-            background: #F8F7FF !important;
+            border: none !important;
+            background: #F2F2F5 !important;
+            box-shadow: none !important;
         }
         div[data-testid="stTextInput"] input {
             color: #1E1A3A !important;
-            font-size: 16px !important;
+            font-size: 15px !important;
+            background: #F2F2F5 !important;
+        }
+        div[data-testid="stTextInput"] input::placeholder {
+            color: #AEACC8 !important;
         }
         [data-testid="InputInstructions"] { display: none !important; }
+        div[data-testid="stCheckbox"] {
+            margin-bottom: 16px !important;
+        }
         div[data-testid="stCheckbox"] label {
             color: #4B466D !important;
-            font-size: 15px !important;
-            font-weight: 650 !important;
+            font-size: 14px !important;
+            font-weight: 600 !important;
         }
         div.stButton > button {
-            height: 58px !important;
+            height: 54px !important;
             border-radius: 12px !important;
-            font-size: 16px !important;
-            font-weight: 800 !important;
+            font-size: 15px !important;
+            font-weight: 700 !important;
             background: #FFFFFF !important;
-            color: #5B51A8 !important;
-            border: 1.5px solid #DDD8FF !important;
-            box-shadow: 0 6px 18px rgba(104,91,190,0.14) !important;
+            color: #3D3580 !important;
+            border: 1.5px solid #D8D3F5 !important;
+            box-shadow: 0 2px 10px rgba(104,91,190,0.09) !important;
+            width: 100% !important;
+            transition: all 0.18s !important;
         }
         div.stButton > button:hover {
             background: #F3F0FF !important;
@@ -741,153 +746,138 @@ def show_auth_page():
         }
         hr {
             border: 0 !important;
-            border-top: 1px solid #E6E1FF !important;
-            margin: 20px 0 0 !important;
-        }
-        @media (max-width: 900px) {
-            .main .block-container { padding: 28px 24px 36px !important; }
-            .auth-brand { margin-bottom: 70px; }
-            .auth-copy-title, .auth-copy-desc, .auth-footer { display: none; }
-            .login-spacer { height: 36px; }
+            border-top: 1px solid #EDEBF8 !important;
+            margin: 18px 0 0 !important;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    left, _, right = st.columns([0.85, 0.18, 0.72], gap="large")
+    st.markdown(
+        """
+        <div class="auth-logo-card">
+            <div class="auth-logo-title">실적관리 시스템</div>
+            <div class="auth-logo-sub">Performance Management System</div>
+        </div>
+        <div class="auth-form-card">
+        """,
+        unsafe_allow_html=True,
+    )
 
-    with left:
-        st.markdown(
-            """
-            <div class="auth-brand">실적관리 시스템<span>Performance Management System</span></div>
-            <div class="auth-copy-title">팀의 실적,<br>하나의<br>시스템에서.</div>
-            <div class="auth-copy-desc">
-                개설·연계·운영 실적을 통합 관리하고,<br>
-                월별 포인트와 지급예상금액을<br>
-                실시간으로 확인하세요.
-            </div>
-            <div class="auth-footer">© 2026 CMS · 실적관리 시스템</div>
-            """,
-            unsafe_allow_html=True,
-        )
+    if st.session_state.auth_mode == "login":
+        sid = ""
+        if os.path.exists("saved_id.txt"):
+            try:
+                with open("saved_id.txt", "r", encoding="utf-8") as f:
+                    sid = f.read().strip()
+            except Exception:
+                pass
 
-    with right:
-        st.markdown("<div class='login-spacer'></div>", unsafe_allow_html=True)
+        u_id = st.text_input("아이디", value=sid, placeholder="아이디를 입력하세요", key="l_id")
+        u_pw = st.text_input("비밀번호", type="password", placeholder="비밀번호를 입력하세요", key="l_pw")
+        save_id_cb = st.checkbox("아이디 저장", value=bool(sid))
 
-        if st.session_state.auth_mode == "login":
-            sid = ""
-            if os.path.exists("saved_id.txt"):
-                try:
-                    with open("saved_id.txt", "r", encoding="utf-8") as f:
-                        sid = f.read().strip()
-                except Exception:
-                    pass
+        if st.button("로그인", use_container_width=True, type="primary"):
+            db = st.session_state.user_db
+            u_id_str = str(u_id).strip() if u_id else ""
+            u_pw_str = str(u_pw).strip() if u_pw else ""
 
-            u_id = st.text_input("아이디", value=sid, placeholder="아이디를 입력하세요", key="l_id")
-            u_pw = st.text_input("비밀번호", type="password", placeholder="비밀번호를 입력하세요", key="l_pw")
-            save_id_cb = st.checkbox("아이디 저장", value=bool(sid))
+            is_super = u_id_str == "1" and u_pw_str == "1"
+            is_user = (
+                u_id_str in db
+                and db[u_id_str].get("pw", "") == u_pw_str
+                and db[u_id_str].get("access") == "허용"
+            )
 
-            if st.button("로그인", use_container_width=True, type="primary"):
-                db = st.session_state.user_db
-                u_id_str = str(u_id).strip() if u_id else ""
-                u_pw_str = str(u_pw).strip() if u_pw else ""
+            if is_super or is_user:
+                if save_id_cb:
+                    try:
+                        with open("saved_id.txt", "w", encoding="utf-8") as f:
+                            f.write(u_id_str)
+                    except Exception:
+                        pass
+                elif os.path.exists("saved_id.txt"):
+                    try:
+                        os.remove("saved_id.txt")
+                    except Exception:
+                        pass
 
-                is_super = u_id_str == "1" and u_pw_str == "1"
-                is_user = (
-                    u_id_str in db
-                    and db[u_id_str].get("pw", "") == u_pw_str
-                    and db[u_id_str].get("access") == "허용"
-                )
+                user = db.get(u_id_str, {"role": "관리자", "name": "최고관리자"})
+                st.session_state.logged_in = True
+                st.session_state.user_role = user.get("role", "관리자")
+                st.session_state.user_name = user.get("name", "최고관리자")
+                st.session_state.login_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
 
-                if is_super or is_user:
-                    if save_id_cb:
-                        try:
-                            with open("saved_id.txt", "w", encoding="utf-8") as f:
-                                f.write(u_id_str)
-                        except Exception:
-                            pass
-                    elif os.path.exists("saved_id.txt"):
-                        try:
-                            os.remove("saved_id.txt")
-                        except Exception:
-                            pass
+                # 저장된 데이터 로드
+                saved_db = load_db(SAVED_STATE_FILE, {})
+                user_saved = saved_db.get(st.session_state.user_name)
+                if user_saved:
+                    if user_saved.get("user_excel_data"):
+                        st.session_state.user_excel_data = pd.DataFrame.from_dict(user_saved["user_excel_data"])
+                    if user_saved.get("final_reupload_df"):
+                        st.session_state.final_reupload_df = pd.DataFrame.from_dict(user_saved["final_reupload_df"])
+                    if user_saved.get("user_prev_month_sel"):
+                        st.session_state.user_prev_month_sel = user_saved["user_prev_month_sel"]
 
-                    user = db.get(u_id_str, {"role": "관리자", "name": "최고관리자"})
-                    st.session_state.logged_in = True
-                    st.session_state.user_role = user.get("role", "관리자")
-                    st.session_state.user_name = user.get("name", "최고관리자")
-                    st.session_state.login_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
-
-                    # 저장된 데이터 로드
-                    saved_db = load_db(SAVED_STATE_FILE, {})
-                    user_saved = saved_db.get(st.session_state.user_name)
-                    if user_saved:
-                        if user_saved.get("user_excel_data"):
-                            st.session_state.user_excel_data = pd.DataFrame.from_dict(user_saved["user_excel_data"])
-                        if user_saved.get("final_reupload_df"):
-                            st.session_state.final_reupload_df = pd.DataFrame.from_dict(user_saved["final_reupload_df"])
-                        if user_saved.get("user_prev_month_sel"):
-                            st.session_state.user_prev_month_sel = user_saved["user_prev_month_sel"]
-
-                    st.session_state.current_menu = "실적 분석/계산" if st.session_state.user_role == "관리자" else "이력확인 및 작성"
-                    st.rerun()
-                elif not u_id_str:
-                    st.error("아이디를 입력해주세요.")
-                elif not u_pw_str:
-                    st.error("비밀번호를 입력해주세요.")
-                else:
-                    st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
-
-            st.divider()
-            st.markdown("<div class='auth-small'>계정이 없으신가요?</div>", unsafe_allow_html=True)
-
-            if st.button("회원가입", use_container_width=True):
-                st.session_state.auth_mode = "signup"
+                st.session_state.current_menu = "실적 분석/계산" if st.session_state.user_role == "관리자" else "이력확인 및 작성"
                 st.rerun()
+            elif not u_id_str:
+                st.error("아이디를 입력해주세요.")
+            elif not u_pw_str:
+                st.error("비밀번호를 입력해주세요.")
+            else:
+                st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
 
-        else:
-            st.markdown("<div style='height:80px'></div>", unsafe_allow_html=True)
+        st.divider()
+        st.markdown("<div class='auth-small'>계정이 없으신가요?</div>", unsafe_allow_html=True)
 
-            r_id = st.text_input("아이디", key="r_id")
-            if r_id:
-                if r_id in st.session_state.user_db:
-                    st.error("이미 사용 중인 아이디입니다.")
-                else:
-                    st.success("사용 가능한 아이디입니다.")
+        if st.button("회원가입", use_container_width=True):
+            st.session_state.auth_mode = "signup"
+            st.rerun()
 
-            r_name = st.text_input("성명", key="r_name")
-            r_email = st.text_input("메일주소", key="r_email")
-            r_pw = st.text_input("비밀번호", type="password", key="r_pw")
-            r_pw2 = st.text_input("비밀번호 확인", type="password", key="r_pw2")
+    else:
+        r_id = st.text_input("아이디", key="r_id")
+        if r_id:
+            if r_id in st.session_state.user_db:
+                st.error("이미 사용 중인 아이디입니다.")
+            else:
+                st.success("사용 가능한 아이디입니다.")
 
-            if st.button("회원가입", use_container_width=True, type="primary"):
-                if not r_id or not r_name or not r_email or not r_pw or not r_pw2:
-                    st.error("모든 항목을 입력해주세요.")
-                elif r_pw != r_pw2:
-                    st.error("비밀번호가 일치하지 않습니다.")
-                elif r_id in st.session_state.user_db:
-                    st.error("이미 존재하는 아이디입니다.")
-                else:
-                    st.session_state.user_db[r_id] = {
-                        "pw": r_pw,
-                        "name": r_name,
-                        "email": r_email,
-                        "access": "불가",
-                        "role": "사용자",
-                        "staff_type": "정규직",
-                        "outsource": "아니오",
-                        "outsource_period": "해당없음",
-                    }
-                    save_db(DB_FILE, st.session_state.user_db)
-                    st.success("신청 완료. 관리자 승인 후 로그인 가능합니다.")
-                    time.sleep(1.5)
-                    st.session_state.auth_mode = "login"
-                    st.rerun()
+        r_name = st.text_input("성명", key="r_name")
+        r_email = st.text_input("메일주소", key="r_email")
+        r_pw = st.text_input("비밀번호", type="password", key="r_pw")
+        r_pw2 = st.text_input("비밀번호 확인", type="password", key="r_pw2")
 
-            if st.button("로그인으로 돌아가기", use_container_width=True):
+        if st.button("회원가입", use_container_width=True, type="primary"):
+            if not r_id or not r_name or not r_email or not r_pw or not r_pw2:
+                st.error("모든 항목을 입력해주세요.")
+            elif r_pw != r_pw2:
+                st.error("비밀번호가 일치하지 않습니다.")
+            elif r_id in st.session_state.user_db:
+                st.error("이미 존재하는 아이디입니다.")
+            else:
+                st.session_state.user_db[r_id] = {
+                    "pw": r_pw,
+                    "name": r_name,
+                    "email": r_email,
+                    "access": "불가",
+                    "role": "사용자",
+                    "staff_type": "정규직",
+                    "outsource": "아니오",
+                    "outsource_period": "해당없음",
+                }
+                save_db(DB_FILE, st.session_state.user_db)
+                st.success("신청 완료. 관리자 승인 후 로그인 가능합니다.")
+                time.sleep(1.5)
                 st.session_state.auth_mode = "login"
                 st.rerun()
+
+        if st.button("로그인으로 돌아가기", use_container_width=True):
+            st.session_state.auth_mode = "login"
+            st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def show_sidebar():
