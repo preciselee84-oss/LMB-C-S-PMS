@@ -1201,19 +1201,27 @@ def show_final_check():
     # ── 중복방문/초과방문/누락 확인 탭 ──
     t1, t2, t3, t4 = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락"])
 
+    # 각 탭의 데이터 존재 여부 확인
+    has_dup_data = False
+    has_err_data = False
+    has_missing_open = False
+    has_missing_erp = False
+
     with t1:
         # 본인 데이터만 필터링
+        dup_my = pd.DataFrame()
         if dup is not None and not dup.empty:
             u_col_dup = find_col(dup, ["등록자", "담당자", "성명"], "담당자")
             if u_col_dup and u_col_dup in dup.columns:
                 dup_my = dup[dup[u_col_dup] == st.session_state.user_name]
-                style_report_logic(dup_my)
             else:
-                style_report_logic(dup)
-        else:
-            style_report_logic(dup)
+                dup_my = dup
+
+        has_dup_data = not dup_my.empty
+        style_report_logic(dup_my)
 
     with t2:
+        err_filtered = pd.DataFrame()
         if err is not None and not err.empty:
             # 본인 데이터만 필터링
             if "담당자" in err.columns:
@@ -1222,20 +1230,30 @@ def show_final_check():
                 err_my = err.copy()
 
             err_filtered = err_my[(err_my["일방문"] >= 5) | (err_my["월총방문"] >= 60)].copy()
-            monthly_map = err_filtered.groupby("담당자")["월총방문"].first().to_dict() if "담당자" in err_filtered.columns else {}
 
             style_report_logic(err_filtered.drop(columns=["월총방문"], errors="ignore"))
 
-            if monthly_map:
-                parts = "　｜　".join([f"<b>{name}</b>: {cnt:,}회" for name, cnt in monthly_map.items()])
+            # 최종 실적 표시
+            if not err_filtered.empty and not my_res.empty:
+                개설건수 = int(my_res.iloc[0].get("개설건수", 0))
+                연계건수 = int(my_res.iloc[0].get("연계건수", 0))
+                운영건수_실제 = int(my_res.iloc[0].get("운영건수 (실제 활동)", 0))
+                운영건수_추가 = int(my_res.iloc[0].get("운영건수 (추가 활동)", 0))
+                운영건수 = min(60, 운영건수_실제 + 운영건수_추가)
+                지급예상금액 = int(my_res.iloc[0].get("지급예상금액", 0))
+
                 st.markdown(
-                    f"<div style='margin-top:8px;padding:10px 16px;background:#EBF8FF;border-radius:8px;font-size:13px;color:#2B6CB0;'>월총방문　{parts}</div>",
+                    f"<div style='margin-top:8px;padding:10px 16px;background:#EBF8FF;border-radius:8px;font-size:13px;color:#2B6CB0;'>"
+                    f"<b>{html.escape(uname)}</b>님의 최종 실적은 개설 <b>{개설건수}</b>개, 연계 <b>{연계건수}</b>개, 운영 <b>{운영건수}</b>개 에 금액은 <b>{지급예상금액:,}</b>원 입니다.</div>",
                     unsafe_allow_html=True,
                 )
         else:
             st.info("초과 방문 데이터가 없습니다.")
 
+        has_err_data = not err_filtered.empty
+
     with t3:
+        missing_open = pd.DataFrame()
         if "본사 개설완료일자" in df_user.columns:
             missing_open = df_user[
                 pd.isna(df_user["본사 개설완료일자"]) | (df_user["본사 개설완료일자"].astype(str).str.strip() == "")
@@ -1244,7 +1262,10 @@ def show_final_check():
         else:
             st.info("본사 구글시트에 개설완료일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
 
+        has_missing_open = not missing_open.empty
+
     with t4:
+        missing_erp = pd.DataFrame()
         if "본사 ERP연계일자" in df_user.columns:
             if d_col and d_col in df_user.columns:
                 target = df_user[df_user[d_col].astype(str).str.contains("연계", na=False)]
@@ -1258,14 +1279,40 @@ def show_final_check():
         else:
             st.info("본사 구글시트에 ERP연계일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
 
+        has_missing_erp = not missing_erp.empty
+
     # ── 모든 항목 일치 여부 체크 ──
     # 일치여부가 빈 항목은 체크에서 제외 (compare_no_match 모드)
     all_match = uploaded_exists and all(r.get("일치여부") in ["일치", ""] for r in cmp_rows)
+
+    # 검증 이슈 체크 (중복/초과 방문, 누락 데이터)
+    has_validation_issues = has_dup_data or has_err_data or has_missing_open or has_missing_erp
+
+    # 전송 가능 여부
+    can_send = all_match and not has_validation_issues
 
     if not uploaded_exists:
         st.markdown(
             "<div style='margin-top:8px;padding:10px 16px;background:#FFFBEB;border:1px solid #F6AD55;border-radius:8px;font-size:13px;color:#92400E;font-weight:700;'>"
             "📂 엑셀을 재업로드하여 검증을 완료한 후 실적을 전송할 수 있습니다.</div>",
+            unsafe_allow_html=True,
+        )
+    elif has_validation_issues:
+        issues = []
+        if has_dup_data:
+            issues.append("중복 방문")
+        if has_err_data:
+            issues.append("초과 방문")
+        if has_missing_open:
+            issues.append("본사 개설완료일자 누락")
+        if has_missing_erp:
+            issues.append("본사 ERP연계일자 누락")
+
+        issues_text = ", ".join(issues)
+        st.markdown(
+            f"<div style='margin-top:8px;padding:10px 16px;background:#FFF5F5;border:1px solid #FC8181;border-radius:8px;font-size:13px;color:#C53030;font-weight:700;'>"
+            f"⚠️ 다음 항목을 수정해주세요: <b>{issues_text}</b><br>"
+            f"위 탭에서 문제를 해결한 후 엑셀을 다시 업로드해주세요.</div>",
             unsafe_allow_html=True,
         )
     elif not all_match:
@@ -1285,7 +1332,7 @@ def show_final_check():
 
     _, send_col = st.columns([0.78, 0.22])
     with send_col:
-        do_send = st.button("실적 결과 전송", use_container_width=True, type="primary", disabled=not all_match)
+        do_send = st.button("실적 결과 전송", use_container_width=True, type="primary", disabled=not can_send)
 
     if do_send:
         sent_db = load_db(SENT_FILE, {})
