@@ -6,6 +6,7 @@ import time
 import json
 import os
 import html
+from io import BytesIO
 from datetime import datetime, timedelta
 
 st.set_page_config(page_title="실적관리 시스템", layout="wide", initial_sidebar_state="expanded")
@@ -1911,6 +1912,120 @@ def apply_admin_prev_diff(sent_df):
     return result_df
 
 
+def dataframe_to_excel_bytes(sheets):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        for sheet_name, df in sheets.items():
+            safe_name = str(sheet_name)[:31] or "Sheet"
+            df.to_excel(writer, index=False, sheet_name=safe_name)
+    output.seek(0)
+    return output.getvalue()
+
+
+def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_label):
+    from pptx import Presentation
+    from pptx.util import Inches, Pt
+    from pptx.enum.text import PP_ALIGN
+    from pptx.dml.color import RGBColor
+
+    prs = Presentation()
+    prs.slide_width = Inches(13.333)
+    prs.slide_height = Inches(7.5)
+
+    def add_title(slide, title, subtitle=""):
+        title_box = slide.shapes.add_textbox(Inches(0.45), Inches(0.25), Inches(12.4), Inches(0.5))
+        tf = title_box.text_frame
+        tf.text = title
+        p = tf.paragraphs[0]
+        p.font.size = Pt(24)
+        p.font.bold = True
+        p.font.color.rgb = RGBColor(26, 32, 44)
+        if subtitle:
+            sub_box = slide.shapes.add_textbox(Inches(0.48), Inches(0.78), Inches(12), Inches(0.28))
+            sub_tf = sub_box.text_frame
+            sub_tf.text = subtitle
+            sub_p = sub_tf.paragraphs[0]
+            sub_p.font.size = Pt(10)
+            sub_p.font.color.rgb = RGBColor(113, 128, 150)
+
+    def set_cell(cell, text, bold=False, align=PP_ALIGN.CENTER, fill=None):
+        if fill:
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = fill
+        cell.text = str(text)
+        para = cell.text_frame.paragraphs[0]
+        para.alignment = align
+        para.font.size = Pt(8)
+        para.font.bold = bold
+        para.font.color.rgb = RGBColor(45, 55, 72)
+
+    def add_table_slide(title, df, subtitle=""):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        add_title(slide, title, subtitle)
+        show_df = df.head(18).copy()
+        rows = len(show_df) + 1
+        cols = len(show_df.columns)
+        table = slide.shapes.add_table(rows, cols, Inches(0.45), Inches(1.15), Inches(12.45), Inches(5.9)).table
+        for c, col in enumerate(show_df.columns):
+            set_cell(table.cell(0, c), col, bold=True, fill=RGBColor(237, 242, 247))
+        for r_idx, (_, row) in enumerate(show_df.iterrows(), start=1):
+            for c_idx, col in enumerate(show_df.columns):
+                value = row[col]
+                if isinstance(value, (int, float, np.integer, np.floating)):
+                    value = f"{int(value):,}"
+                    align = PP_ALIGN.RIGHT
+                else:
+                    align = PP_ALIGN.CENTER
+                fill = RGBColor(247, 250, 252) if r_idx % 2 == 0 else RGBColor(255, 255, 255)
+                set_cell(table.cell(r_idx, c_idx), value, align=align, fill=fill)
+        return slide
+
+    add_table_slide(f"{curr_month_label} 실적보고서", report_df, f"{prev_month_label} 비교 기준")
+    if not compare_df.empty:
+        add_table_slide("비교 리포트", compare_df, f"{prev_month_label} 대비 {curr_month_label}")
+
+    output = BytesIO()
+    prs.save(output)
+    output.seek(0)
+    return output.getvalue()
+
+
+def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_month_label):
+    st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        if st.button("실적파일 구글시트 전송", use_container_width=True):
+            st.warning("구글시트 쓰기용 API/인증 설정이 없어 아직 전송할 수 없습니다. 서비스 계정 또는 Apps Script 전송 URL을 연결하면 이 버튼에 전송 기능을 붙일 수 있습니다.")
+
+    excel_bytes = dataframe_to_excel_bytes({
+        "실적보고서": report_df,
+        "비교리포트": compare_df,
+    })
+    with c2:
+        st.download_button(
+            "실적파일 엑셀 다운로드",
+            data=excel_bytes,
+            file_name=f"performance_report_{curr_month_label}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+
+    with c3:
+        try:
+            ppt_bytes = build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_label)
+            st.download_button(
+                "실적보고서 PPT 다운로드",
+                data=ppt_bytes,
+                file_name=f"performance_report_{curr_month_label}.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                use_container_width=True,
+            )
+        except Exception as e:
+            st.button("실적보고서 PPT 다운로드", use_container_width=True, disabled=True)
+            st.caption(f"PPT 생성 준비 중 오류: {e}")
+
+
 def show_admin_analysis():
     select_prev_month("auto_prev_df", "adm_prev_month")
 
@@ -1995,6 +2110,7 @@ def show_report():
     ]
 
     shared_cols = [c for c in compare_cols if c in report_df.columns and c in prev_res.columns]
+    compare_all_rows = []
 
     names = report_df["담당자"].tolist()
     for start in range(0, len(names), 2):
@@ -2012,10 +2128,20 @@ def show_report():
                 c_val = int(float(curr_row.iloc[0][col]))
                 p_val = int(float(prev_row.iloc[0][col])) if not prev_row.empty else 0
                 rows.append({"항목": col, prev_month_label: p_val, curr_month_label: c_val, "증감": c_val - p_val})
+                compare_all_rows.append({
+                    "담당자": name,
+                    "직급": rank,
+                    "항목": col,
+                    prev_month_label: p_val,
+                    curr_month_label: c_val,
+                    "증감": c_val - p_val,
+                })
 
             with person_col:
                 st.markdown(f"#### {name} ({rank})")
                 style_report_logic(pd.DataFrame(rows), compact=True)
+
+    render_report_action_buttons(report_df, pd.DataFrame(compare_all_rows), curr_month_label, prev_month_label)
 
 
 def show_staff_admin():
