@@ -655,7 +655,7 @@ def show_auth_page():
         }
         [data-testid="stSidebar"] { display: none !important; }
         .stApp, [data-testid="stAppViewContainer"], .main {
-            background: linear-gradient(150deg, #EAE4FF 0%, #F0ECFF 40%, #F8F6FF 100%) !important;
+            background: #FFFFFF !important;
         }
         .main .block-container {
             max-width: 100% !important;
@@ -683,13 +683,6 @@ def show_auth_page():
             font-size: 12px;
             font-weight: 600;
             letter-spacing: 0.3px;
-        }
-        .auth-form-card {
-            background: #FFFFFF;
-            border-radius: 20px;
-            box-shadow: 0 4px 28px rgba(100,80,200,0.10);
-            padding: 36px 40px 32px;
-            margin-bottom: 0;
         }
         .auth-small {
             text-align: center;
@@ -764,7 +757,6 @@ def show_auth_page():
                 <div class="auth-logo-title">실적관리 시스템</div>
                 <div class="auth-logo-sub">Performance Management System</div>
             </div>
-            <div class="auth-form-card">
             """,
             unsafe_allow_html=True,
         )
@@ -880,8 +872,6 @@ def show_auth_page():
             if st.button("로그인으로 돌아가기", use_container_width=True):
                 st.session_state.auth_mode = "login"
                 st.rerun()
-
-        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def show_sidebar():
