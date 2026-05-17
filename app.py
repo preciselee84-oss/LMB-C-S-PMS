@@ -160,6 +160,13 @@ def normalize_biz(series):
         if pd.isna(value):
             return ""
 
+        # 숫자 타입이면 정수로 변환 (과학적 표기법 방지)
+        if isinstance(value, (int, float, np.integer, np.floating)):
+            try:
+                value = int(float(value))
+            except (ValueError, OverflowError):
+                pass
+
         text = str(value).strip().replace(",", "")
         if re.fullmatch(r"\d+\.0+", text):
             text = text.split(".", 1)[0]
