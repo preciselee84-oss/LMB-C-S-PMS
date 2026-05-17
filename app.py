@@ -16,6 +16,7 @@ DB_FILE = "users.json"
 PERF_FILE = "manual_perf.json"
 SENT_FILE = "sent_results.json"
 SENT_UPLOADS_FILE = "sent_uploads.json"
+SAVED_STATE_FILE = "saved_state.json"
 
 DEFAULT_URL_ANALYSIS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9XPHqrqcaFf9bCOVya7yHORr-c1R4KCF0eEpdE3ESn8qJELP0BkqTOslur9bsGcVabRUIcyOa877R/pub?output=csv"
 DEFAULT_URL_SYNC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9F7R7oLA2B02H-I25kVv2JeYHFgWQq0CT7TeW61hrNpJLdHWJFhFR_iDQGCFAW044o8rRwBDeovKG/pub?gid=1533424484&single=true&output=csv"
@@ -802,6 +803,18 @@ def show_auth_page():
                     st.session_state.user_role = user.get("role", "관리자")
                     st.session_state.user_name = user.get("name", "최고관리자")
                     st.session_state.login_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
+
+                    # 저장된 데이터 로드
+                    saved_db = load_db(SAVED_STATE_FILE, {})
+                    user_saved = saved_db.get(st.session_state.user_name)
+                    if user_saved:
+                        if user_saved.get("user_excel_data"):
+                            st.session_state.user_excel_data = pd.DataFrame.from_dict(user_saved["user_excel_data"])
+                        if user_saved.get("final_reupload_df"):
+                            st.session_state.final_reupload_df = pd.DataFrame.from_dict(user_saved["final_reupload_df"])
+                        if user_saved.get("user_prev_month_sel"):
+                            st.session_state.user_prev_month_sel = user_saved["user_prev_month_sel"]
+
                     st.session_state.current_menu = "실적 분석/계산" if st.session_state.user_role == "관리자" else "이력확인 및 작성"
                     st.rerun()
                 elif not u_id_str:
@@ -1886,9 +1899,27 @@ def show_final_check():
 
     st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
 
-    _, send_col = st.columns([0.78, 0.22])
+    _, save_col, send_col = st.columns([0.56, 0.22, 0.22])
+
+    with save_col:
+        do_save = st.button("저장", use_container_width=True, type="secondary")
+
     with send_col:
         do_send = st.button("실적 결과 전송", use_container_width=True, type="primary", disabled=not can_send)
+
+    if do_save:
+        saved_db = load_db(SAVED_STATE_FILE, {})
+        user_saved = {
+            "user_excel_data": st.session_state.user_excel_data.to_dict() if st.session_state.user_excel_data is not None else None,
+            "final_reupload_df": st.session_state.final_reupload_df.to_dict() if st.session_state.final_reupload_df is not None else None,
+            "user_prev_month_sel": st.session_state.get("user_prev_month_sel", "선택안함"),
+            "saved_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
+        }
+        saved_db[st.session_state.user_name] = user_saved
+        save_db(SAVED_STATE_FILE, saved_db)
+        st.success("저장 완료")
+        time.sleep(0.5)
+        st.rerun()
 
     if do_send:
         sent_db = load_db(SENT_FILE, {})
