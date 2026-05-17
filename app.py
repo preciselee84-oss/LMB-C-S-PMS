@@ -1110,26 +1110,77 @@ def show_user_history():
     st.divider()
     st.markdown("### 추가 실적 입력")
 
-    # 스크롤바 제거 및 정렬 CSS
+    # 스크롤바 제거 및 디자인 개선 CSS
     st.markdown("""
         <style>
-        /* data_editor 스크롤바 제거 */
-        [data-testid="stDataFrameResizable"] {
+        /* data_editor 스크롤바 완전 제거 */
+        div[data-testid="stDataFrameResizable"] {
+            height: auto !important;
+            max-height: none !important;
             overflow: visible !important;
         }
-        [data-testid="stDataFrameResizable"] > div {
+        div[data-testid="stDataFrameResizable"] > div {
+            height: auto !important;
+            max-height: none !important;
             overflow: visible !important;
         }
-        /* 셀 정렬: 문자 가운데, 숫자 오른쪽 */
-        [data-testid="stDataFrameResizable"] td:nth-child(1),
-        [data-testid="stDataFrameResizable"] td:nth-child(2) {
+        div[data-testid="stDataFrameResizable"] > div > div {
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+        }
+        div[data-testid="stDataFrameResizable"] > div > div > div {
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+        }
+
+        /* 실적 예상치 검증 리포트 스타일 적용 */
+        div[data-testid="stDataFrameResizable"] {
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 10px !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+        }
+
+        /* 헤더 스타일 */
+        div[data-testid="stDataFrameResizable"] th {
+            background: #EDF2F7 !important;
+            color: #4A5568 !important;
+            font-weight: 800 !important;
+            font-size: 13px !important;
+            padding: 9px 12px !important;
+            text-align: center !important;
+            border-bottom: 2px solid #E2E8F0 !important;
+        }
+
+        /* 셀 정렬 및 스타일 */
+        div[data-testid="stDataFrameResizable"] td {
+            padding: 8px 12px !important;
+            border-bottom: 1px solid #EDF2F7 !important;
+            font-size: 13px !important;
+            color: #2D3748 !important;
+        }
+
+        /* 문자 컬럼 가운데 정렬 */
+        div[data-testid="stDataFrameResizable"] td:nth-child(1),
+        div[data-testid="stDataFrameResizable"] td:nth-child(2) {
             text-align: center !important;
         }
-        [data-testid="stDataFrameResizable"] td:nth-child(3),
-        [data-testid="stDataFrameResizable"] td:nth-child(4),
-        [data-testid="stDataFrameResizable"] td:nth-child(5),
-        [data-testid="stDataFrameResizable"] td:nth-child(6) {
+
+        /* 숫자 컬럼 오른쪽 정렬 */
+        div[data-testid="stDataFrameResizable"] td:nth-child(3),
+        div[data-testid="stDataFrameResizable"] td:nth-child(4),
+        div[data-testid="stDataFrameResizable"] td:nth-child(5),
+        div[data-testid="stDataFrameResizable"] td:nth-child(6) {
             text-align: right !important;
+        }
+
+        /* 행 배경색 교차 */
+        div[data-testid="stDataFrameResizable"] tbody tr:nth-child(even) {
+            background: #F7FAFC !important;
+        }
+        div[data-testid="stDataFrameResizable"] tbody tr:nth-child(odd) {
+            background: #FFFFFF !important;
         }
         </style>
     """, unsafe_allow_html=True)
