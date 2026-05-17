@@ -901,13 +901,14 @@ def show_sidebar():
                 letter-spacing: -0.5px;
             }
             [data-testid="stSidebar"] div.stButton {
-                margin-bottom: 0 !important;
+                margin-bottom: -12px !important;
                 padding-bottom: 0 !important;
             }
             [data-testid="stSidebar"] div.stButton > button {
                 margin-bottom: 0 !important;
-                padding-top: 4px !important;
-                padding-bottom: 4px !important;
+                padding-top: 2px !important;
+                padding-bottom: 2px !important;
+                height: 36px !important;
             }
             [data-testid="stSidebar"] .sidebar-user {
                 text-align: center;
