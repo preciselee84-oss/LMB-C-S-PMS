@@ -748,7 +748,7 @@ def show_auth_page():
         unsafe_allow_html=True,
     )
 
-    _, center, _ = st.columns([1, 1.2, 1])
+    _, center, _ = st.columns([2, 1, 2])
 
     with center:
         st.markdown(
