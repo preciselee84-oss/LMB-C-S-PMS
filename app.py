@@ -1954,14 +1954,18 @@ def show_final_check():
 
         # 본인 이름에 맞는 이력만 저장
         if uploaded_df is not None:
+            st.info(f"📊 엑셀 재업로드 데이터 확인: {len(uploaded_df)}행, {len(uploaded_df.columns)}개 컬럼")
             u_col = find_col(uploaded_df, ["등록자", "담당자", "성명"], "등록자")
             if u_col and u_col in uploaded_df.columns:
                 user_only_df = uploaded_df[uploaded_df[u_col] == st.session_state.user_name].copy()
-                # 디버깅: 컬럼 정보 출력
-                st.info(f"전송되는 컬럼 목록 ({len(user_only_df.columns)}개): {', '.join(user_only_df.columns.tolist())}")
+                st.info(f"✅ 전송되는 컬럼 목록 ({len(user_only_df.columns)}개): {', '.join(user_only_df.columns.tolist())}")
                 sent_uploads_db[st.session_state.user_name] = dataframe_to_upload_payload(user_only_df)
             else:
+                st.warning(f"⚠️ 등록자 컬럼을 찾을 수 없어 전체 데이터 전송 ({len(uploaded_df.columns)}개 컬럼)")
+                st.info(f"컬럼 목록: {', '.join(uploaded_df.columns.tolist())}")
                 sent_uploads_db[st.session_state.user_name] = dataframe_to_upload_payload(uploaded_df)
+        else:
+            st.warning("⚠️ 엑셀 재업로드 데이터가 없습니다.")
 
         save_db(SENT_FILE, sent_db)
         save_db(SENT_UPLOADS_FILE, sent_uploads_db)
