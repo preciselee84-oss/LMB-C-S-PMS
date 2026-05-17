@@ -780,12 +780,11 @@ def load_csv_to_state(url_key, state_key):
 
 
 def select_prev_month(state_key, widget_key):
-    # 구글시트 자동 조회 (analysis_lookup_df가 없을 때만)
-    if st.session_state.analysis_lookup_df is None:
-        try:
-            load_csv_to_state("url_analysis", "analysis_lookup_df")
-        except Exception:
-            pass
+    # 구글시트 최신 데이터 자동 조회
+    try:
+        load_csv_to_state("url_analysis", "analysis_lookup_df")
+    except Exception:
+        pass
 
     if st.session_state.analysis_lookup_df is not None:
         c_df = st.session_state.analysis_lookup_df.copy()
