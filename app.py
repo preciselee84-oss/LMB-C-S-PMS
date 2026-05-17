@@ -1957,6 +1957,8 @@ def show_final_check():
             u_col = find_col(uploaded_df, ["등록자", "담당자", "성명"], "등록자")
             if u_col and u_col in uploaded_df.columns:
                 user_only_df = uploaded_df[uploaded_df[u_col] == st.session_state.user_name].copy()
+                # 디버깅: 컬럼 정보 출력
+                st.info(f"전송되는 컬럼 목록 ({len(user_only_df.columns)}개): {', '.join(user_only_df.columns.tolist())}")
                 sent_uploads_db[st.session_state.user_name] = dataframe_to_upload_payload(user_only_df)
             else:
                 sent_uploads_db[st.session_state.user_name] = dataframe_to_upload_payload(uploaded_df)
