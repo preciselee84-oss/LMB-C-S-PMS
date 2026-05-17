@@ -1940,7 +1940,16 @@ def show_final_check():
             row_data[f"전월대비({prev_m})"] = row_data.pop("전월대비")
 
         sent_db[st.session_state.user_name] = row_data
-        sent_uploads_db[st.session_state.user_name] = dataframe_to_upload_payload(uploaded_df)
+
+        # 본인 이름에 맞는 이력만 저장
+        if uploaded_df is not None:
+            u_col = find_col(uploaded_df, ["등록자", "담당자", "성명"], "등록자")
+            if u_col and u_col in uploaded_df.columns:
+                user_only_df = uploaded_df[uploaded_df[u_col] == st.session_state.user_name].copy()
+                sent_uploads_db[st.session_state.user_name] = dataframe_to_upload_payload(user_only_df)
+            else:
+                sent_uploads_db[st.session_state.user_name] = dataframe_to_upload_payload(uploaded_df)
+
         save_db(SENT_FILE, sent_db)
         save_db(SENT_UPLOADS_FILE, sent_uploads_db)
 
@@ -2154,6 +2163,27 @@ def show_admin_analysis():
         return
 
     style_report_logic(sent_df)
+
+    # 전송된 엑셀 데이터 표시
+    st.markdown("### 전송된 활동 이력")
+    sent_uploads_db = load_db(SENT_UPLOADS_FILE, {})
+
+    if sent_uploads_db:
+        # 모든 사용자의 데이터를 합치기
+        all_data = []
+        for name, payload in sent_uploads_db.items():
+            df = upload_payload_to_dataframe(payload)
+            if df is not None and not df.empty:
+                all_data.append(df)
+
+        if all_data:
+            combined_df = pd.concat(all_data, ignore_index=True)
+            st.write(f"**총 {len(combined_df)}건의 활동 이력**")
+            style_report_logic(combined_df, compact=True)
+        else:
+            st.info("전송된 활동 이력이 없습니다.")
+    else:
+        st.info("전송된 활동 이력이 없습니다.")
 
     c1, c2 = st.columns([0.78, 0.22])
 
