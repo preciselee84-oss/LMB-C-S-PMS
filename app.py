@@ -409,7 +409,7 @@ def style_report_logic(df, compact=False):
         st.info("표시할 데이터가 없습니다.")
         return
 
-    diff_cols = [c for c in df.columns if "전월대비" in str(c)]
+    diff_cols = [c for c in df.columns if "전월대비" in str(c) or "증감" in str(c) or "대비" in str(c)]
     num_cols = [c for c in df.columns if c not in ["담당자", "직급", "전송시각", "등록월", "항목", "일치여부"] + diff_cols]
 
     def fmt_diff(x):
