@@ -2281,7 +2281,8 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
             if align is not None:
                 paragraph.alignment = align
             for run in paragraph.runs:
-                run.font.size = Pt(8)
+                run.font.name = "맑은 고딕"
+                run.font.size = Pt(14)
 
     def slide_tables(slide):
         return [shape.table for shape in slide.shapes if getattr(shape, "has_table", False)]
