@@ -1202,11 +1202,26 @@ def show_final_check():
     t1, t2, t3, t4 = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락"])
 
     with t1:
-        style_report_logic(dup)
+        # 본인 데이터만 필터링
+        if dup is not None and not dup.empty:
+            u_col_dup = find_col(dup, ["등록자", "담당자", "성명"], "담당자")
+            if u_col_dup and u_col_dup in dup.columns:
+                dup_my = dup[dup[u_col_dup] == st.session_state.user_name]
+                style_report_logic(dup_my)
+            else:
+                style_report_logic(dup)
+        else:
+            style_report_logic(dup)
 
     with t2:
         if err is not None and not err.empty:
-            err_filtered = err[(err["일방문"] >= 5) | (err["월총방문"] >= 60)].copy()
+            # 본인 데이터만 필터링
+            if "담당자" in err.columns:
+                err_my = err[err["담당자"] == st.session_state.user_name].copy()
+            else:
+                err_my = err.copy()
+
+            err_filtered = err_my[(err_my["일방문"] >= 5) | (err_my["월총방문"] >= 60)].copy()
             monthly_map = err_filtered.groupby("담당자")["월총방문"].first().to_dict() if "담당자" in err_filtered.columns else {}
 
             style_report_logic(err_filtered.drop(columns=["월총방문"], errors="ignore"))
