@@ -1477,6 +1477,21 @@ def show_final_check():
             unsafe_allow_html=True,
         )
     else:
+        # 최종 실적 표시
+        if not my_res.empty:
+            개설건수 = int(my_res.iloc[0].get("개설건수", 0))
+            연계건수 = int(my_res.iloc[0].get("연계건수", 0))
+            운영건수_실제 = int(my_res.iloc[0].get("운영건수 (실제 활동)", 0))
+            운영건수_추가 = int(my_res.iloc[0].get("운영건수 (추가 활동)", 0))
+            운영건수 = min(60, 운영건수_실제 + 운영건수_추가)
+            지급예상금액 = int(my_res.iloc[0].get("지급예상금액", 0))
+
+            st.markdown(
+                f"<div style='margin-top:8px;padding:10px 16px;background:#EBF8FF;border-radius:8px;font-size:13px;color:#2B6CB0;'>"
+                f"<b>{html.escape(uname)}</b>님의 최종 실적은 개설 <b>{개설건수}</b>개, 연계 <b>{연계건수}</b>개, 운영 <b>{운영건수}</b>개 에 금액은 <b>{지급예상금액:,}</b>원 입니다.</div>",
+                unsafe_allow_html=True,
+            )
+
         st.markdown(
             "<div style='margin-top:8px;padding:10px 16px;background:#F0FFF4;border:1px solid #9AE6B4;border-radius:8px;font-size:13px;color:#276749;font-weight:700;'>"
             "✅ 모든 항목이 일치합니다. 실적 결과를 전송할 수 있습니다.</div>",
