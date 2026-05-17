@@ -1038,8 +1038,8 @@ def show_final_check():
         cmp_rows.append(
             {
                 "항목": label,
-                "최초 예상치": first_value,
-                "업로드 후 예상치": uploaded_value,
+                "업로드 후 예상치": first_value,
+                "업로드 후 결과": uploaded_value,
                 "일치여부": match_value,
             }
         )
