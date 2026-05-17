@@ -105,7 +105,25 @@ def clean_header_logic(df):
 
         keep = ~pd.Series(df.columns).astype(str).str.contains("^Unnamed|^nan", case=False, na=False).values
         df = df.loc[:, keep]
-        return df.dropna(how="all", axis=1).dropna(how="all", axis=0)
+        df = df.dropna(how="all", axis=1).dropna(how="all", axis=0)
+        return strip_activity_time_columns(df)
+    except Exception:
+        return df
+
+
+def strip_activity_time_columns(df):
+    try:
+        df = df.copy()
+        for col in df.columns:
+            col_name = str(col).replace(" ", "").replace("　", "")
+            if "활동일" not in col_name:
+                continue
+
+            converted = pd.to_datetime(df[col], errors="coerce")
+            valid = converted.notna()
+            if valid.any():
+                df.loc[valid, col] = converted.loc[valid].dt.strftime("%Y-%m-%d")
+        return df
     except Exception:
         return df
 
@@ -412,6 +430,8 @@ def style_report_logic(df, compact=False):
         st.info("표시할 데이터가 없습니다.")
         return
 
+    df = strip_activity_time_columns(df)
+
     diff_cols = [c for c in df.columns if "전월대비" in str(c) or "증감" in str(c) or "대비" in str(c)]
     num_cols = [c for c in df.columns if c not in ["담당자", "직급", "전송시각", "등록월", "항목", "일치여부"] + diff_cols]
 
@@ -461,7 +481,7 @@ def style_report_logic(df, compact=False):
     th_font = "12px" if compact else "13px"
     td_pad = "5px 6px" if compact else "8px 12px"
     td_font = "12px" if compact else "13px"
-    th = f"background:#EDF2F7;color:#4A5568;font-weight:800;font-size:{th_font};padding:{th_pad};text-align:center;border-bottom:2px solid #E2E8F0;" + ("white-space:normal;word-break:keep-all;" if compact else "white-space:nowrap;")
+    th = f"background:#EDF2F7;color:#4A5568;font-weight:800;font-size:{th_font};padding:{th_pad};text-align:center;border-bottom:2px solid #E2E8F0;white-space:nowrap;"
     headers = "".join(f"<th style='{th}'>{html.escape(format_col_name(c))}</th>" for c in df.columns)
 
     body = ""
@@ -480,7 +500,7 @@ def style_report_logic(df, compact=False):
             else:
                 value = "" if pd.isna(row[col]) else html.escape(str(row[col]))
 
-            _ws = "white-space:normal;word-break:keep-all;" if compact else "white-space:nowrap;"
+            _ws = "white-space:nowrap;"
             tds += (
                 f"<td style='background:{bg};padding:{td_pad};border-bottom:1px solid #EDF2F7;"
                 f"font-size:{td_font};color:#2D3748;text-align:{align};{_ws}'>{value}</td>"
@@ -770,6 +790,25 @@ def show_sidebar():
             st.session_state.logged_in = False
             st.session_state.auth_mode = "login"
             st.rerun()
+
+
+def apply_global_table_css():
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stDataFrame"] th,
+        div[data-testid="stDataFrame"] td,
+        div[data-testid="stDataFrame"] [role="columnheader"],
+        div[data-testid="stDataFrame"] [role="gridcell"],
+        div[data-testid="stDataEditor"] [role="columnheader"],
+        div[data-testid="stDataEditor"] [role="gridcell"] {
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_page_title(menu):
@@ -1202,14 +1241,14 @@ def show_user_history():
             text-align: right !important;
         }
 
-        /* 입력(건) 컬럼 - 가운데 정렬 (편집 가능) */
+        /* 입력(건) 컬럼 - 숫자 오른쪽 정렬 */
         div[data-testid="stDataFrameResizable"] td:nth-child(5) {
-            text-align: center !important;
+            text-align: right !important;
         }
 
         /* 입력 필드 스타일 */
         div[data-testid="stDataFrameResizable"] input {
-            text-align: center !important;
+            text-align: right !important;
             font-size: 13px !important;
         }
 
@@ -1236,12 +1275,30 @@ def show_user_history():
             font-size: 13px !important;
             text-align: center !important;
             border-bottom: 2px solid #E2E8F0 !important;
+            white-space: nowrap !important;
         }
 
         div[data-testid="stDataEditor"] [role="gridcell"] {
             border-bottom: 1px solid #EDF2F7 !important;
             color: #2D3748 !important;
             font-size: 13px !important;
+            white-space: nowrap !important;
+        }
+
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="1"],
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="2"] {
+            text-align: center !important;
+        }
+
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="3"],
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="4"],
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="5"] {
+            text-align: right !important;
+        }
+
+        div[data-testid="stDataEditor"] input {
+            text-align: right !important;
+            white-space: nowrap !important;
         }
 
         div[data-testid="stDataEditor"] [role="row"]:nth-child(even) [role="gridcell"] {
@@ -2063,10 +2120,11 @@ def show_google_sync():
             st.error("불러오기 실패. URL을 확인해주세요.")
 
     if st.session_state.temp_cloud_df is not None:
-        st.dataframe(st.session_state.temp_cloud_df, use_container_width=True, hide_index=True)
+        st.dataframe(strip_activity_time_columns(st.session_state.temp_cloud_df), use_container_width=True, hide_index=True)
 
 
 def show_main():
+    apply_global_table_css()
     show_sidebar()
 
     menu = st.session_state.current_menu
