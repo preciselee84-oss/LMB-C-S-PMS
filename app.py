@@ -2164,7 +2164,7 @@ def show_admin_analysis():
 
     style_report_logic(sent_df)
 
-    c1, c2 = st.columns([0.78, 0.22])
+    c1, c2, c3 = st.columns([0.56, 0.22, 0.22])
 
     with c1:
         if st.button("전송 내역 초기화"):
@@ -2175,6 +2175,21 @@ def show_admin_analysis():
             st.rerun()
 
     with c2:
+        if st.button("저장", use_container_width=True, type="secondary"):
+            # 현재 전송된 실적 데이터를 임시 저장
+            admin_saved = {
+                "sent_df": sent_df.to_dict(),
+                "sent_uploads_db": load_db(SENT_UPLOADS_FILE, {}),
+                "saved_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
+            }
+            saved_db = load_db(SAVED_STATE_FILE, {})
+            saved_db["admin_analysis"] = admin_saved
+            save_db(SAVED_STATE_FILE, saved_db)
+            st.success("저장 완료")
+            time.sleep(0.5)
+            st.rerun()
+
+    with c3:
         if st.button("마감", use_container_width=True, type="primary"):
             st.session_state.deadline_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
             st.session_state.analysis_result = sent_df.copy()
