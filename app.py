@@ -890,12 +890,18 @@ def show_sidebar():
                 font-weight: 900;
                 color: #FFFFFF !important;
                 text-align: center;
-                padding: 16px 0 4px;
+                padding: 4px 0 4px;
                 letter-spacing: -0.5px;
             }
             [data-testid="stSidebar"] .sidebar-user {
                 text-align: center;
                 padding: 6px 0 2px;
+            }
+            [data-testid="stSidebar"] .sidebar-user .name-row {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
             }
             [data-testid="stSidebar"] .sidebar-user .name {
                 font-size: 15px;
@@ -905,7 +911,6 @@ def show_sidebar():
             [data-testid="stSidebar"] .sidebar-user .greet {
                 font-size: 13px;
                 color: #A0AEC0 !important;
-                margin-top: 2px;
             }
             [data-testid="stSidebar"] .sidebar-user .login-time {
                 font-size: 11px;
@@ -945,8 +950,10 @@ def show_sidebar():
         st.markdown(
             f"<div class='sidebar-title'>실적관리 시스템</div>"
             f"<div class='sidebar-user'>"
-            f"<div class='name'>{st.session_state.user_name}</div>"
-            f"<div class='greet'>반갑습니다.</div>"
+            f"<div class='name-row'>"
+            f"<span class='name'>{st.session_state.user_name}님</span>"
+            f"<span class='greet'>반갑습니다.</span>"
+            f"</div>"
             f"<div class='login-time'>접속 {_lt}</div>"
             f"</div>",
             unsafe_allow_html=True,
