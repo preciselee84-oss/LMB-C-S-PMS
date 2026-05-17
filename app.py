@@ -1006,6 +1006,7 @@ def show_final_check():
         ("운영건수 (실제 활동)", "운영건수 (실제 활동)", "compare_no_match"),
         ("운영포인트 (실제 활동)", "운영포인트 (실제 활동)", "compare_no_match"),
         ("추가 등록건수", "운영건수 (추가 활동)", "compare_no_match"),
+        ("추가운영포인트", "운영포인트(추가 활동)", "compare_no_match"),
         ("최종 운영건수", None, "final_operation_count"),
         ("합계포인트", "합계포인트", "compare"),
         ("지급포인트", "지급포인트", "compare"),
@@ -1035,8 +1036,8 @@ def show_final_check():
                     user_data = uploaded_df_calc[uploaded_df_calc[u_col_calc] == st.session_state.user_name]
                     operation_count = user_data[user_data[d_col_calc].astype(str).str.contains("운영|방문|점검", na=False)].shape[0]
                     uploaded_value = operation_count  # 실제 건수 표시 (캡 없음)
-                    # 비교는 60건 상한 적용
-                    match_value = "일치" if first_compare_value == min(60, operation_count) else "불일치"
+                    # 표시값이 다르면 불일치
+                    match_value = "일치" if first_compare_value == operation_count else "불일치"
                 else:
                     uploaded_value = 0
                     match_value = "불일치"
