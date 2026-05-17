@@ -680,7 +680,7 @@ def show_auth_page():
         }
         .auth-logo-sub {
             color: #7B79AA;
-            font-size: 30px;
+            font-size: 20px;
             font-weight: 600;
             letter-spacing: 0.3px;
         }
