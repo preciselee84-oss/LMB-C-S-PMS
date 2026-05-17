@@ -1016,8 +1016,7 @@ def show_final_check():
     cmp_rows = []
 
     for label, source_col, mode in report_items:
-        before_value = ""
-        first_value = ""
+        expected_value = ""
         uploaded_value = ""
         match_value = ""
 
@@ -1026,10 +1025,8 @@ def show_final_check():
             first_extra_count = int(float(my_res.iloc[0].get("운영건수 (추가 활동)", 0)))
             first_compare_value = min(60, first_actual_count + first_extra_count)
 
-            # 업로드 전: 실제 활동 건수만
-            before_value = first_actual_count
-            # 업로드 후 예상: 실제 + 추가 (최대 60)
-            first_value = first_compare_value
+            # 업로드 전 예상치: 실제 + 추가 (최대 60)
+            expected_value = first_compare_value
 
             if uploaded_exists:
                 # 재업로드 Excel에서 직접 계산 (운영+방문+점검 모두 포함)
@@ -1047,22 +1044,13 @@ def show_final_check():
                     uploaded_value = 0
                     match_value = "불일치"
         elif mode == "compare_upload_only":
-            before_value = ""
-            first_value = ""
+            expected_value = ""
 
             if uploaded_exists and source_col in uploaded_my_res.columns:
                 uploaded_value = int(float(uploaded_my_res.iloc[0].get(source_col, 0)))
         elif mode == "compare_no_match":
             if source_col in my_res.columns:
-                first_value = int(float(my_res.iloc[0].get(source_col, 0)))
-
-            # 업로드 전 예상치 설정
-            if label in ["운영건수 (실제 활동)", "운영포인트 (실제 활동)"]:
-                # 실제 활동은 추가 활동과 무관하므로 동일
-                before_value = first_value
-            elif label in ["추가 등록건수", "추가운영포인트"]:
-                # 추가 활동은 업로드 전에는 0
-                before_value = 0
+                expected_value = int(float(my_res.iloc[0].get(source_col, 0)))
 
             # 운영건수/포인트(실제 활동)은 재업로드 파일에서 "운영"만 카운트
             if uploaded_exists:
@@ -1086,46 +1074,16 @@ def show_final_check():
             # match_value는 비워둠 (일치여부 체크 안함)
         else:
             if source_col in my_res.columns:
-                first_value = int(float(my_res.iloc[0].get(source_col, 0)))
-
-            # 업로드 전 예상치 설정
-            if label in ["개설건수", "개설포인트", "연계건수", "연계포인트"]:
-                # 개설/연계는 추가 활동과 무관하므로 동일
-                before_value = first_value
-            elif label == "합계포인트":
-                # 업로드 전: 개설 + 연계 + 운영(실제)만
-                o_p = int(float(my_res.iloc[0].get("개설포인트", 0)))
-                l_p = int(float(my_res.iloc[0].get("연계포인트", 0)))
-                v_p = int(float(my_res.iloc[0].get("운영포인트 (실제 활동)", 0)))
-                before_value = min(2800, min(1000, o_p + l_p) + min(1800, v_p))
-            elif label == "지급포인트":
-                # 업로드 전 합계포인트 기준
-                o_p = int(float(my_res.iloc[0].get("개설포인트", 0)))
-                l_p = int(float(my_res.iloc[0].get("연계포인트", 0)))
-                v_p = int(float(my_res.iloc[0].get("운영포인트 (실제 활동)", 0)))
-                before_total = min(2800, min(1000, o_p + l_p) + min(1800, v_p))
-                before_value = max(0, before_total - 1000)
-            elif label == "지급예상금액":
-                # 업로드 전 지급포인트 기준
-                o_p = int(float(my_res.iloc[0].get("개설포인트", 0)))
-                l_p = int(float(my_res.iloc[0].get("연계포인트", 0)))
-                v_p = int(float(my_res.iloc[0].get("운영포인트 (실제 활동)", 0)))
-                before_total = min(2800, min(1000, o_p + l_p) + min(1800, v_p))
-                before_pay_point = max(0, before_total - 1000)
-                # 팀장 보너스 고려
-                rank = my_res.iloc[0].get("직급", "")
-                leader_bonus = 500 if rank == "팀장" else 0
-                before_value = int((before_pay_point + leader_bonus) * 500)
+                expected_value = int(float(my_res.iloc[0].get(source_col, 0)))
 
             if uploaded_exists and source_col in uploaded_my_res.columns:
                 uploaded_value = int(float(uploaded_my_res.iloc[0].get(source_col, 0)))
-                match_value = "일치" if first_value == uploaded_value else "불일치"
+                match_value = "일치" if expected_value == uploaded_value else "불일치"
 
         cmp_rows.append(
             {
                 "항목": label,
-                "업로드 전 예상치": before_value,
-                "업로드 후 예상치": first_value,
+                "업로드 전 예상치": expected_value,
                 "업로드 후 결과": uploaded_value,
                 "일치여부": match_value,
             }
