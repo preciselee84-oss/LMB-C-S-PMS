@@ -373,7 +373,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
                     "연계포인트": stats["l_p"],
                     "운영건수 (실제 활동)": int(row["v"]),
                     "운영포인트 (실제 활동)": stats["v_actual_p"],
-                    "운영건수 (추가 활동)": int(np.ceil(effective_manual_p / 30.0)),
+                    "운영건수 (추가 활동)": min(int(np.ceil(stats["manual_p"] / 30.0)), int(stats["p_sum"] / 30)),
                     "운영포인트(추가 활동)": effective_manual_p,
                     "합계포인트": stats["p_sum"],
                     "지급포인트": max(0, stats["p_sum"] - 1000),
