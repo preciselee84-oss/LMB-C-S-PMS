@@ -1366,6 +1366,17 @@ def show_user_history():
 
 
 def show_final_check():
+    # 저장된 데이터가 있으면 로드
+    if st.session_state.user_excel_data is None:
+        saved_db = load_db(SAVED_STATE_FILE, {})
+        user_saved = saved_db.get(st.session_state.user_name)
+        if user_saved and user_saved.get("user_excel_data"):
+            st.session_state.user_excel_data = pd.DataFrame.from_dict(user_saved["user_excel_data"])
+            if user_saved.get("final_reupload_df"):
+                st.session_state.final_reupload_df = pd.DataFrame.from_dict(user_saved["final_reupload_df"])
+            if user_saved.get("user_prev_month_sel"):
+                st.session_state.user_prev_month_sel = user_saved["user_prev_month_sel"]
+
     select_prev_month("auto_prev_df", "user_prev_month_sel")
 
     if st.session_state.user_excel_data is None:
