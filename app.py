@@ -1110,31 +1110,9 @@ def show_user_history():
     st.divider()
     st.markdown("### 추가 실적 입력")
 
-    # 스크롤바 제거 및 디자인 개선 CSS
+    # 디자인 개선 CSS (스크롤바는 유지)
     st.markdown("""
         <style>
-        /* data_editor 스크롤바 완전 제거 */
-        div[data-testid="stDataFrameResizable"] {
-            height: auto !important;
-            max-height: none !important;
-            overflow: visible !important;
-        }
-        div[data-testid="stDataFrameResizable"] > div {
-            height: auto !important;
-            max-height: none !important;
-            overflow: visible !important;
-        }
-        div[data-testid="stDataFrameResizable"] > div > div {
-            height: auto !important;
-            max-height: none !important;
-            overflow: visible !important;
-        }
-        div[data-testid="stDataFrameResizable"] > div > div > div {
-            height: auto !important;
-            max-height: none !important;
-            overflow: visible !important;
-        }
-
         /* 실적 예상치 검증 리포트 스타일 적용 */
         div[data-testid="stDataFrameResizable"] {
             border: 1px solid #E2E8F0 !important;
