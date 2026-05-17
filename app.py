@@ -796,9 +796,19 @@ def load_csv_to_state(url_key, state_key):
 
 
 def refresh_google_sheets_button(key):
-    _, refresh_col = st.columns([0.78, 0.22])
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stButton"] button[kind="secondary"]:has(div[data-testid="stMarkdownContainer"] p:only-child) {
+            min-width: 42px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    _, refresh_col = st.columns([0.94, 0.06])
     with refresh_col:
-        if st.button("구글시트 갱신", use_container_width=True, key=key):
+        if st.button("↻", use_container_width=True, key=key, help="구글시트 데이터 다시 조회"):
             try:
                 load_csv_to_state("url_sync", "cloud_sheet_df")
                 load_csv_to_state("url_analysis", "analysis_lookup_df")
