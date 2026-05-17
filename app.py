@@ -795,28 +795,43 @@ def load_csv_to_state(url_key, state_key):
     st.session_state[state_key] = clean_header_logic(pd.read_csv(st.session_state[url_key]))
 
 
-def refresh_google_sheets_button(key):
+def refresh_google_sheets_action():
+    load_csv_to_state("url_sync", "cloud_sheet_df")
+    load_csv_to_state("url_analysis", "analysis_lookup_df")
+    st.toast("구글시트 데이터를 다시 조회했습니다.")
+    time.sleep(0.3)
+    st.rerun()
+
+
+def validation_tabs_with_refresh(key):
     st.markdown(
         """
         <style>
-        div[data-testid="stButton"] button[kind="secondary"]:has(div[data-testid="stMarkdownContainer"] p:only-child) {
+        .refresh-tab-button div.stButton > button {
             min-width: 42px !important;
+            height: 38px !important;
+            padding: 0 !important;
+            margin-top: 2px !important;
+            border-radius: 8px !important;
+            font-size: 18px !important;
+            font-weight: 900 !important;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
-    _, refresh_col = st.columns([0.94, 0.06])
+    tabs_col, refresh_col = st.columns([0.955, 0.045])
+    with tabs_col:
+        tabs = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
     with refresh_col:
+        st.markdown("<div class='refresh-tab-button'>", unsafe_allow_html=True)
         if st.button("↻", use_container_width=True, key=key, help="구글시트 데이터 다시 조회"):
             try:
-                load_csv_to_state("url_sync", "cloud_sheet_df")
-                load_csv_to_state("url_analysis", "analysis_lookup_df")
-                st.toast("구글시트 데이터를 다시 조회했습니다.")
-                time.sleep(0.3)
-                st.rerun()
+                refresh_google_sheets_action()
             except Exception as e:
                 st.error(f"구글시트 갱신 실패: {e}")
+        st.markdown("</div>", unsafe_allow_html=True)
+    return tabs
 
 
 def select_prev_month(state_key, widget_key):
@@ -1110,8 +1125,7 @@ def show_user_history():
             unsafe_allow_html=True,
         )
 
-    refresh_google_sheets_button("refresh_google_sheets_user_history")
-    t1, t2, t3, t4, t5 = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
+    t1, t2, t3, t4, t5 = validation_tabs_with_refresh("refresh_google_sheets_user_history")
 
     with t1:
         style_report_logic(dup_my)
@@ -1206,6 +1220,37 @@ def show_user_history():
         div[data-testid="stDataFrameResizable"] tbody tr:nth-child(odd) {
             background: #FFFFFF !important;
         }
+
+        div[data-testid="stDataEditor"] {
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 10px !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+            overflow: hidden !important;
+            margin-bottom: 1rem !important;
+        }
+
+        div[data-testid="stDataEditor"] [role="columnheader"] {
+            background: #EDF2F7 !important;
+            color: #4A5568 !important;
+            font-weight: 800 !important;
+            font-size: 13px !important;
+            text-align: center !important;
+            border-bottom: 2px solid #E2E8F0 !important;
+        }
+
+        div[data-testid="stDataEditor"] [role="gridcell"] {
+            border-bottom: 1px solid #EDF2F7 !important;
+            color: #2D3748 !important;
+            font-size: 13px !important;
+        }
+
+        div[data-testid="stDataEditor"] [role="row"]:nth-child(even) [role="gridcell"] {
+            background: #F7FAFC !important;
+        }
+
+        div[data-testid="stDataEditor"] [role="row"]:nth-child(odd) [role="gridcell"] {
+            background: #FFFFFF !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -1213,13 +1258,14 @@ def show_user_history():
         base,
         use_container_width=True,
         hide_index=True,
-        height=620,
+        height=565,
         num_rows="fixed",
+        column_order=["활동구분", "구분", "단위 점수", "월 최대점수", "입력(건)"],
         column_config={
-            "활동구분": st.column_config.TextColumn("활동구분", width="small"),
-            "구분": st.column_config.TextColumn("구분", width="medium"),
-            "단위 점수": st.column_config.NumberColumn("단위 점수", disabled=True),
-            "월 최대점수": st.column_config.TextColumn("월 최대점수", disabled=True),
+            "활동구분": st.column_config.TextColumn("활동구분", width="medium"),
+            "구분": st.column_config.TextColumn("구분", width="large"),
+            "단위 점수": st.column_config.NumberColumn("단위 점수", disabled=True, width="small"),
+            "월 최대점수": st.column_config.TextColumn("월 최대점수", disabled=True, width="small"),
             "입력(건)": st.column_config.NumberColumn("입력(건)", min_value=0, step=1, default=0, width="small"),
         },
         disabled=["활동구분", "구분", "단위 점수", "월 최대점수"],
@@ -1696,8 +1742,7 @@ def show_final_check():
             unsafe_allow_html=True,
         )
 
-    refresh_google_sheets_button("refresh_google_sheets_final_check")
-    t1, t2, t3, t4, t5 = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
+    t1, t2, t3, t4, t5 = validation_tabs_with_refresh("refresh_google_sheets_final_check")
 
     with t1:
         style_report_logic(dup_my)
