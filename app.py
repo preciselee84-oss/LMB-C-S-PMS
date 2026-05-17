@@ -673,14 +673,14 @@ def show_auth_page():
         }
         .auth-logo-title {
             color: #1E1A3A;
-            font-size: 26px;
+            font-size: 50px;
             font-weight: 900;
             letter-spacing: -0.5px;
             margin-bottom: 5px;
         }
         .auth-logo-sub {
             color: #7B79AA;
-            font-size: 12px;
+            font-size: 30px;
             font-weight: 600;
             letter-spacing: 0.3px;
         }
