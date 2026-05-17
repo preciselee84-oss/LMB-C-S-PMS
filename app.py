@@ -798,12 +798,17 @@ def select_prev_month(state_key, widget_key):
 
 
 def show_user_history():
-    u_file = st.file_uploader("활동실적 엑셀 업로드", type=["xlsx"])
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        u_file = st.file_uploader("활동실적 엑셀 업로드", type=["xlsx"])
 
-    if st.button("조회"):
-        if not u_file:
-            st.warning("엑셀 파일을 먼저 업로드해주세요.")
-        else:
+    # 파일 업로드 시 자동 처리
+    if u_file is not None:
+        file_key = f"{u_file.name}_{u_file.size}"
+
+        # 파일이 변경되었을 때만 처리
+        if st.session_state.get("user_excel_file_key") != file_key:
+            st.session_state.user_excel_file_key = file_key
             with st.spinner("분석 중입니다."):
                 try:
                     load_csv_to_state("url_sync", "cloud_sheet_df")
@@ -812,7 +817,8 @@ def show_user_history():
                 st.session_state.user_excel_data = clean_header_logic(pd.read_excel(u_file, sheet_name=0))
                 st.session_state.final_reupload_df = None
                 st.session_state.final_reupload_key = ""
-                st.success("분석 완료")
+                st.toast("업로드 완료. 분석이 자동으로 시작됩니다.")
+                st.rerun()
 
     if st.session_state.user_excel_data is None:
         return
@@ -1180,7 +1186,10 @@ def show_final_check():
     )
 
     st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
-    new_file = st.file_uploader("엑셀 재업로드", type=["xlsx"], key="final_reupload")
+
+    col1_reupload, col2_reupload = st.columns([1, 2])
+    with col1_reupload:
+        new_file = st.file_uploader("엑셀 재업로드", type=["xlsx"], key="final_reupload")
 
     if new_file is not None:
         file_key = f"{new_file.name}_{new_file.size}"
