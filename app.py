@@ -205,7 +205,7 @@ def attach_cloud_dates(user_df, debug=False):
     biz_col_user = find_col(df, ["사업자번호"])
     biz_col_cloud = find_col(cloud, ["사업자번호"])
     open_col = find_col(cloud, ["개설완료일자", "개설일"])
-    erp_col = find_col(cloud, ["ERP연계일자", "ERP", "연계일자"])
+    erp_col = find_col(cloud, ["ERP연계일자", "연계일자"])
 
     if debug:
         with st.expander("🔍 본사 데이터 매칭 디버그 정보", expanded=True):
