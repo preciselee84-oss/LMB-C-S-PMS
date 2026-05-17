@@ -1399,7 +1399,7 @@ def show_final_check():
     style_report_logic(cmp_df)
 
     # ── 중복방문/초과방문/누락 확인 탭 ──
-    # 재업로드한 파일이 있으면 그 파일로 오류 체크
+    # 재업로드한 파일이 있을 때만 오류 체크
     if uploaded_df is not None:
         check_df = uploaded_df.copy()
         u_col_check = find_col(check_df, ["등록자", "담당자", "성명"], "등록자")
@@ -1407,11 +1407,12 @@ def show_final_check():
         df_user_check = attach_cloud_dates(df_user_check)
         _, err_check, dup_check = process_performance_analysis(check_df, st.session_state.get("auto_prev_df"))
     else:
-        df_user_check = df_user
-        err_check = err
-        dup_check = dup
+        # 재업로드하지 않았을 때는 검증하지 않음
+        df_user_check = pd.DataFrame()
+        err_check = None
+        dup_check = None
 
-    # 탭 데이터 미리 계산 (경고 메시지 표시용)
+    # 탭 데이터 미리 계산 (경고 메시지 표시용 - 재업로드한 경우만)
     # 중복 방문
     dup_my = pd.DataFrame()
     if dup_check is not None and not dup_check.empty:
