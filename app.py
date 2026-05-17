@@ -78,6 +78,7 @@ def init_state():
         "temp_cloud_df": None,
         "auto_prev_df": None,
         "deadline_time": "",
+        "login_time": "",
         "_prev_menu": None,
     }
 
@@ -403,7 +404,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         return f"ERR: {str(e)}", None, None
 
 
-def style_report_logic(df):
+def style_report_logic(df, compact=False):
     if df is None or df.empty:
         st.info("표시할 데이터가 없습니다.")
         return
@@ -440,7 +441,11 @@ def style_report_logic(df):
             return "<span style='color:#2F855A;font-weight:900;'>일치</span>"
         return html.escape(text)
 
-    th = "background:#EDF2F7;color:#4A5568;font-weight:800;font-size:13px;padding:9px 12px;text-align:center;border-bottom:2px solid #E2E8F0;white-space:nowrap;"
+    th_pad = "5px 6px" if compact else "9px 12px"
+    th_font = "12px" if compact else "13px"
+    td_pad = "5px 6px" if compact else "8px 12px"
+    td_font = "12px" if compact else "13px"
+    th = f"background:#EDF2F7;color:#4A5568;font-weight:800;font-size:{th_font};padding:{th_pad};text-align:center;border-bottom:2px solid #E2E8F0;" + ("white-space:normal;word-break:keep-all;" if compact else "white-space:nowrap;")
     headers = "".join(f"<th style='{th}'>{html.escape(str(c))}</th>" for c in df.columns)
 
     body = ""
@@ -459,16 +464,19 @@ def style_report_logic(df):
             else:
                 value = "" if pd.isna(row[col]) else html.escape(str(row[col]))
 
+            _ws = "white-space:normal;word-break:keep-all;" if compact else "white-space:nowrap;"
             tds += (
-                f"<td style='background:{bg};padding:8px 12px;border-bottom:1px solid #EDF2F7;"
-                f"font-size:13px;color:#2D3748;text-align:{align};white-space:nowrap;'>{value}</td>"
+                f"<td style='background:{bg};padding:{td_pad};border-bottom:1px solid #EDF2F7;"
+                f"font-size:{td_font};color:#2D3748;text-align:{align};{_ws}'>{value}</td>"
             )
         body += f"<tr>{tds}</tr>"
 
+    _ov = "visible" if compact else "auto"
+    _tbl_style = "width:100%;border-collapse:collapse;table-layout:fixed;" if compact else "width:100%;border-collapse:collapse;"
     st.markdown(
         f"""
-        <div style="overflow-x:auto;border:1px solid #E2E8F0;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:1rem;">
-            <table style="width:100%;border-collapse:collapse;">
+        <div style="overflow-x:{_ov};border:1px solid #E2E8F0;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:1rem;">
+            <table style="{_tbl_style}">
                 <thead><tr>{headers}</tr></thead>
                 <tbody>{body}</tbody>
             </table>
@@ -651,6 +659,7 @@ def show_auth_page():
                     st.session_state.logged_in = True
                     st.session_state.user_role = user.get("role", "관리자")
                     st.session_state.user_name = user.get("name", "최고관리자")
+                    st.session_state.login_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
                     st.session_state.current_menu = "실적 분석/계산" if st.session_state.user_role == "관리자" else "이력확인 및 작성"
                     st.rerun()
                 elif not u_id_str:
@@ -713,8 +722,18 @@ def show_auth_page():
 
 def show_sidebar():
     with st.sidebar:
-        st.markdown("### 실적관리 시스템")
-        st.caption(st.session_state.user_name)
+        st.markdown(
+            "<div style='font-size:26px;font-weight:900;color:#1A202C;letter-spacing:-0.5px;padding:8px 0 4px;'>실적관리 시스템</div>",
+            unsafe_allow_html=True,
+        )
+        _lt = st.session_state.get("login_time", "")
+        st.markdown(
+            f"<div style='display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#4A5568;padding:0 2px 8px;'>"
+            f"<span style='font-weight:700;'>{st.session_state.user_name}</span>"
+            f"<span style='color:#718096;font-size:12px;'>접속 {_lt}</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
         st.divider()
 
         if st.session_state.user_role == "관리자":
@@ -811,7 +830,7 @@ def show_user_history():
     if isinstance(res, pd.DataFrame) and not res.empty:
         my_res = res[res["담당자"] == st.session_state.user_name].copy()
         drop_cols = [c for c in my_res.columns if "전월대비" in c]
-        style_report_logic(my_res.drop(columns=drop_cols, errors="ignore"))
+        style_report_logic(my_res.drop(columns=drop_cols, errors="ignore"), compact=True)
     elif isinstance(res, str):
         st.error(res)
 
@@ -1020,11 +1039,34 @@ def show_final_check():
             }
         )
 
-    style_report_logic(pd.DataFrame(cmp_rows))
+    cmp_df = pd.DataFrame(cmp_rows)
+    style_report_logic(cmp_df)
+
+    # ── 모든 항목 일치 여부 체크 ──
+    all_match = uploaded_exists and all(r.get("일치여부") == "일치" for r in cmp_rows)
+
+    if not uploaded_exists:
+        st.markdown(
+            "<div style='margin-top:8px;padding:10px 16px;background:#FFFBEB;border:1px solid #F6AD55;border-radius:8px;font-size:13px;color:#92400E;font-weight:700;'>"
+            "📂 엑셀을 재업로드하여 검증을 완료한 후 실적을 전송할 수 있습니다.</div>",
+            unsafe_allow_html=True,
+        )
+    elif not all_match:
+        st.markdown(
+            "<div style='margin-top:8px;padding:10px 16px;background:#FFF5F5;border:1px solid #FC8181;border-radius:8px;font-size:13px;color:#C53030;font-weight:700;'>"
+            "❌ 일치하지 않는 항목이 있습니다. 모든 항목이 일치해야 실적 결과를 전송할 수 있습니다.</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            "<div style='margin-top:8px;padding:10px 16px;background:#F0FFF4;border:1px solid #9AE6B4;border-radius:8px;font-size:13px;color:#276749;font-weight:700;'>"
+            "✅ 모든 항목이 일치합니다. 실적 결과를 전송할 수 있습니다.</div>",
+            unsafe_allow_html=True,
+        )
 
     _, send_col = st.columns([0.78, 0.22])
     with send_col:
-        do_send = st.button("실적 결과 전송", use_container_width=True, type="primary")
+        do_send = st.button("실적 결과 전송", use_container_width=True, type="primary", disabled=not all_match)
 
     if do_send:
         sent_db = load_db(SENT_FILE, {})
