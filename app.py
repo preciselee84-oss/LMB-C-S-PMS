@@ -2022,6 +2022,9 @@ def dataframe_to_excel_bytes(sheets):
 
 
 def sent_uploaded_files_excel_bytes():
+    from openpyxl import Workbook
+    from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+
     sent_uploads_db = load_db(SENT_UPLOADS_FILE, {})
     if not sent_uploads_db:
         return dataframe_to_excel_bytes({
@@ -2031,13 +2034,11 @@ def sent_uploaded_files_excel_bytes():
     # 실적보고서(마감된 실적)에 있는 사람들의 이름 목록 가져오기
     analysis_result = st.session_state.get("analysis_result")
     if analysis_result is not None and not analysis_result.empty:
-        # 담당자 컬럼에서 이름 목록 추출
         if "담당자" in analysis_result.columns:
             report_names = set(analysis_result["담당자"].unique())
         else:
             report_names = set(sent_uploads_db.keys())
     else:
-        # 마감되지 않았으면 모든 사람
         report_names = set(sent_uploads_db.keys())
 
     # 실적보고서 명단에 있는 사람들의 데이터만 합치기
@@ -2048,13 +2049,77 @@ def sent_uploaded_files_excel_bytes():
             if not df.empty:
                 all_data.append(df)
 
-    if all_data:
-        combined_df = pd.concat(all_data, ignore_index=True)
-        sheets = {"전체 활동 이력": combined_df}
-    else:
-        sheets = {"안내": pd.DataFrame([{"내용": "저장된 업로드 파일 데이터가 비어 있습니다."}])}
+    if not all_data:
+        return dataframe_to_excel_bytes({
+            "안내": pd.DataFrame([{"내용": "저장된 업로드 파일 데이터가 비어 있습니다."}])
+        })
 
-    return dataframe_to_excel_bytes(sheets)
+    combined_df = pd.concat(all_data, ignore_index=True)
+
+    # 엑셀 워크북 생성
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "전체 활동 이력"
+
+    # 템플릿 헤더 정의
+    headers = ["직서", "성명", "업체명", "사업자번호", "총포주", "물품별",
+               "방문횟수 (시 군 구까지)", "물품구분", "물품상세",
+               "보유포인트 (적립 사유별 비고 및 물품별 적립점)", "비고", "방문일자"]
+
+    # 첫 번째 행: 빈 행
+    ws.append([])
+
+    # 두 번째 행: 노란색 헤더
+    ws.append(headers)
+
+    # 노란색 배경 스타일 적용
+    yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+    bold_font = Font(bold=True)
+    center_alignment = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin")
+    )
+
+    for col_idx in range(1, len(headers) + 1):
+        cell = ws.cell(row=2, column=col_idx)
+        cell.fill = yellow_fill
+        cell.font = bold_font
+        cell.alignment = center_alignment
+        cell.border = thin_border
+
+    # 데이터 매핑 및 추가
+    for _, row_data in combined_df.iterrows():
+        # 컬럼 매핑
+        u_col = find_col(combined_df, ["등록자", "담당자", "성명"])
+        comp_col = find_col(combined_df, ["업체명", "상호"])
+        biz_col = find_col(combined_df, ["사업자번호"])
+        detail_col = find_col(combined_df, ["활동상세", "활동내용"])
+        date_col = find_col(combined_df, ["활동일", "일자"])
+
+        row = [
+            "",  # 직서
+            row_data.get(u_col, "") if u_col else "",  # 성명
+            row_data.get(comp_col, "") if comp_col else "",  # 업체명
+            row_data.get(biz_col, "") if biz_col else "",  # 사업자번호
+            "",  # 총포주
+            "",  # 물품별
+            "",  # 방문횟수
+            "",  # 물품구분
+            row_data.get(detail_col, "") if detail_col else "",  # 물품상세
+            "",  # 보유포인트
+            "",  # 비고
+            row_data.get(date_col, "") if date_col else "",  # 방문일자
+        ]
+        ws.append(row)
+
+    # 엑셀 파일을 바이트로 변환
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output.getvalue()
 
 
 def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_label):
