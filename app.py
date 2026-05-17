@@ -1188,6 +1188,7 @@ def show_user_history():
         base,
         use_container_width=True,
         hide_index=True,
+        height=620,
         num_rows="fixed",
         column_config={
             "활동구분": st.column_config.TextColumn("활동구분", width="small"),
