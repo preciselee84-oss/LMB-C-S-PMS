@@ -1019,8 +1019,8 @@ def show_final_check():
 
             if uploaded_exists:
                 uploaded_actual_count = int(float(uploaded_my_res.iloc[0].get("운영건수 (실제 활동)", 0)))
-                uploaded_extra_count = int(float(uploaded_my_res.iloc[0].get("운영건수 (추가 활동)", 0)))
-                uploaded_value = min(60, uploaded_actual_count + uploaded_extra_count)
+                # 재업로드 Excel의 실제 활동건수만 사용 (추가 등록분이 실제 활동으로 반영된 결과)
+                uploaded_value = min(60, uploaded_actual_count)
                 match_value = "일치" if first_compare_value == uploaded_value else "불일치"
         elif mode == "compare_upload_only":
             first_value = ""
