@@ -919,9 +919,9 @@ def show_sidebar():
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
-                color: #CBD5E0 !important;
-                font-size: 14px !important;
-                font-weight: 600 !important;
+                color: #FFFFFF !important;
+                font-size: 20px !important;
+                font-weight: 800 !important;
                 text-align: left !important;
                 padding: 8px 12px !important;
                 border-radius: 8px !important;
@@ -931,11 +931,10 @@ def show_sidebar():
                 color: #FFFFFF !important;
             }
             [data-testid="stSidebarContent"] [data-testid="stMarkdownContainer"] p {
-                color: #718096 !important;
-                font-size: 11px !important;
-                font-weight: 700 !important;
-                text-transform: uppercase !important;
-                letter-spacing: 0.8px !important;
+                color: #FFFFFF !important;
+                font-size: 20px !important;
+                font-weight: 800 !important;
+                letter-spacing: 0.3px !important;
                 margin: 12px 0 4px 4px !important;
             }
             </style>
