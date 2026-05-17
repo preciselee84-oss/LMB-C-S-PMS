@@ -1069,6 +1069,8 @@ def show_final_check():
             unsafe_allow_html=True,
         )
 
+    st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
+
     _, send_col = st.columns([0.78, 0.22])
     with send_col:
         do_send = st.button("실적 결과 전송", use_container_width=True, type="primary", disabled=not all_match)
