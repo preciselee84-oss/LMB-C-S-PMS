@@ -191,7 +191,7 @@ def get_uploaded_month(df):
     return ""
 
 
-def attach_cloud_dates(user_df):
+def attach_cloud_dates(user_df, debug=False):
     df = user_df.copy()
     cloud = st.session_state.get("cloud_sheet_df")
 
@@ -206,6 +206,14 @@ def attach_cloud_dates(user_df):
     biz_col_cloud = find_col(cloud, ["사업자번호"])
     open_col = find_col(cloud, ["개설완료일자", "개설일"])
     erp_col = find_col(cloud, ["ERP연계일자", "ERP", "연계일자"])
+
+    if debug:
+        with st.expander("🔍 본사 데이터 매칭 디버그 정보", expanded=True):
+            st.write(f"**본사 구글시트 행 수:** {len(cloud)}")
+            st.write(f"**사용자 엑셀 컬럼 (사업자번호):** {biz_col_user}")
+            st.write(f"**본사 시트 컬럼 (사업자번호):** {biz_col_cloud}")
+            st.write(f"**본사 시트 컬럼 (개설완료일자):** {open_col}")
+            st.write(f"**본사 시트 컬럼 (ERP연계일자):** {erp_col}")
 
     if not biz_col_user or not biz_col_cloud:
         return df
@@ -226,10 +234,37 @@ def attach_cloud_dates(user_df):
     df["_biz_key"] = normalize_biz(df[biz_col_user])
     cloud["_biz_key"] = normalize_biz(cloud[biz_col_cloud])
 
+    if debug:
+        # 샘플 사업자번호 매칭 확인
+        sample_biz = df["_biz_key"].iloc[0] if not df.empty else None
+        if sample_biz:
+            with st.expander("🔍 사업자번호 매칭 샘플", expanded=True):
+                st.write(f"**사용자 엑셀 원본:** {df[biz_col_user].iloc[0]}")
+                st.write(f"**사용자 엑셀 정규화:** {sample_biz}")
+                matched = cloud[cloud["_biz_key"] == sample_biz]
+                if not matched.empty:
+                    st.write(f"**본사 시트 매칭 성공:** {len(matched)}건")
+                    st.write(f"**본사 시트 원본 사업자번호:** {matched[biz_col_cloud].iloc[0]}")
+                    if erp_col:
+                        st.write(f"**본사 시트 ERP연계일자:** {matched[erp_col].iloc[0]}")
+                    if open_col:
+                        st.write(f"**본사 시트 개설완료일자:** {matched[open_col].iloc[0]}")
+                else:
+                    st.write("**⚠️ 본사 시트에서 매칭된 데이터 없음**")
+                    st.write(f"**본사 시트 전체 사업자번호 샘플 (정규화):** {cloud['_biz_key'].head(10).tolist()}")
+
     cloud_map = cloud[["_biz_key"] + [c for c in cloud_cols if c != biz_col_cloud]].rename(columns=rename_map)
     cloud_map = cloud_map.drop_duplicates("_biz_key")
 
     df = pd.merge(df, cloud_map, on="_biz_key", how="left")
+
+    if debug:
+        with st.expander("🔍 Merge 결과", expanded=True):
+            result_sample = df.iloc[0] if not df.empty else None
+            if result_sample is not None:
+                st.write(f"**본사 개설완료일자:** {result_sample.get('본사 개설완료일자', 'N/A')}")
+                st.write(f"**본사 ERP연계일자:** {result_sample.get('본사 ERP연계일자', 'N/A')}")
+
     return df.drop(columns=["_biz_key"], errors="ignore")
 
 
@@ -1051,7 +1086,7 @@ def show_user_history():
     d_col = find_col(df, ["활동상세", "활동내용"], "활동상세")
 
     df_user = df[df[u_col] == st.session_state.user_name].copy() if u_col in df.columns else pd.DataFrame()
-    df_user = attach_cloud_dates(df_user)
+    df_user = attach_cloud_dates(df_user, debug=True)
 
     st.markdown("### 담당자 활동 수치")
     res, err, dup = process_performance_analysis(df_user, st.session_state.get("auto_prev_df"))
