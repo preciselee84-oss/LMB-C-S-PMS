@@ -112,7 +112,8 @@ def clean_header_logic(df):
 
 def find_col(df, keys, fallback=None):
     for c in df.columns:
-        if any(k in str(c) for k in keys):
+        c_normalized = str(c).replace(" ", "").replace("　", "").lower()
+        if any(k.replace(" ", "").replace("　", "").lower() in c_normalized for k in keys):
             return c
     return fallback
 
@@ -138,6 +139,8 @@ def attach_cloud_dates(user_df):
     cloud = st.session_state.get("cloud_sheet_df")
 
     if cloud is None or df.empty:
+        if cloud is None and not df.empty:
+            st.warning("⚠️ 본사 구글시트 데이터를 불러올 수 없습니다. 관리자 > 본사 URL 설정에서 URL을 확인해주세요.")
         return df
 
     cloud = clean_header_logic(cloud.copy())
@@ -844,10 +847,12 @@ def show_user_history():
         if st.session_state.get("user_excel_file_key") != file_key:
             st.session_state.user_excel_file_key = file_key
             with st.spinner("분석 중입니다."):
-                try:
-                    load_csv_to_state("url_sync", "cloud_sheet_df")
-                except Exception:
-                    pass
+                # cloud_sheet_df가 없을 때만 로드 시도
+                if st.session_state.get("cloud_sheet_df") is None:
+                    try:
+                        load_csv_to_state("url_sync", "cloud_sheet_df")
+                    except Exception as e:
+                        st.warning(f"⚠️ 본사 구글시트를 불러오는데 실패했습니다: {str(e)}")
                 st.session_state.user_excel_data = clean_header_logic(pd.read_excel(u_file, sheet_name=0))
                 st.session_state.final_reupload_df = None
                 st.session_state.final_reupload_key = ""
@@ -1237,6 +1242,13 @@ def show_final_check():
     if st.session_state.user_excel_data is None:
         st.info("먼저 이력확인 및 작성 메뉴에서 엑셀을 업로드해주세요.")
         return
+
+    # cloud_sheet_df가 없을 때만 로드 시도
+    if st.session_state.get("cloud_sheet_df") is None:
+        try:
+            load_csv_to_state("url_sync", "cloud_sheet_df")
+        except Exception as e:
+            st.warning(f"⚠️ 본사 구글시트를 불러오는데 실패했습니다: {str(e)}")
 
     original_df = st.session_state.user_excel_data
 
