@@ -6,6 +6,7 @@ import time
 import json
 import os
 import html
+import re
 from io import BytesIO
 from datetime import datetime, timedelta
 
@@ -155,7 +156,20 @@ def find_col(df, keys, fallback=None):
 
 
 def normalize_biz(series):
-    return series.astype(str).str.replace(r"[^0-9]", "", regex=True)
+    def normalize_one(value):
+        if pd.isna(value):
+            return ""
+
+        text = str(value).strip().replace(",", "")
+        if re.fullmatch(r"\d+\.0+", text):
+            text = text.split(".", 1)[0]
+
+        digits = re.sub(r"[^0-9]", "", text)
+        if "." in str(value) and digits.endswith("0") and len(digits) == 11:
+            digits = digits[:-1]
+        return digits
+
+    return series.apply(normalize_one)
 
 
 def get_uploaded_month(df):
