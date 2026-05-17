@@ -413,7 +413,8 @@ def style_report_logic(df, compact=False):
         return
 
     diff_cols = [c for c in df.columns if "전월대비" in str(c) or "증감" in str(c) or "대비" in str(c)]
-    num_cols = [c for c in df.columns if c not in ["담당자", "직급", "전송시각", "등록월", "항목", "일치여부"] + diff_cols]
+    exclude_from_num = ["담당자", "직급", "전송시각", "등록월", "항목", "일치여부"] + [c for c in df.columns if "사업자번호" in str(c)]
+    num_cols = [c for c in df.columns if c not in exclude_from_num + diff_cols]
 
     def fmt_diff(x):
         try:
