@@ -2199,11 +2199,22 @@ def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_m
             st.warning("구글시트 쓰기용 API/인증 설정이 없어 아직 전송할 수 없습니다. 서비스 계정 또는 Apps Script 전송 URL을 연결하면 이 버튼에 전송 기능을 붙일 수 있습니다.")
 
     excel_bytes = sent_uploaded_files_excel_bytes()
+
+    # 파일명 생성
+    ym = get_uploaded_month(st.session_state.user_excel_data) if st.session_state.user_excel_data is not None else ""
+    if ym:
+        year_month = ym.replace("-", "")  # YYYY-MM -> YYYYMM
+    else:
+        year_month = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
+
+    download_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m%d_%H%M%S")
+    file_name = f"LMB월간 활동실적__{year_month}_{download_time}.xlsx"
+
     with c2:
         st.download_button(
             "실적파일 엑셀 다운로드",
             data=excel_bytes,
-            file_name=f"sent_uploaded_files_{curr_month_label}.xlsx",
+            file_name=file_name,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
