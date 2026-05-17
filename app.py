@@ -1095,7 +1095,6 @@ def show_user_history():
         base,
         use_container_width=True,
         hide_index=True,
-        height=520,
         column_config={"입력(건)": st.column_config.NumberColumn("입력(건)", min_value=0, step=1, default=0)},
         disabled=["활동구분", "구분", "단위 점수", "월 최대점수"],
     )
@@ -1123,7 +1122,11 @@ def show_user_history():
 
     st.metric("추가 실적 합산 점수", f"{total:,} PT")
 
-    if st.button("저장 후 최종 실적 확인", type="primary"):
+    _, save_col = st.columns([0.78, 0.22])
+    with save_col:
+        save_and_check = st.button("저장 후 최종 실적 확인", use_container_width=True, type="primary")
+
+    if save_and_check:
         db = load_db(PERF_FILE, {})
         db[st.session_state.user_name] = edited.set_index("구분")["입력(건)"].to_dict()
         save_db(PERF_FILE, db)
@@ -1712,7 +1715,7 @@ def show_admin_analysis():
 
     style_report_logic(sent_df)
 
-    c1, c2 = st.columns([1, 1])
+    c1, c2 = st.columns([0.78, 0.22])
 
     with c1:
         if st.button("전송 내역 초기화"):
@@ -1722,7 +1725,7 @@ def show_admin_analysis():
             st.rerun()
 
     with c2:
-        if st.button("마감", type="primary"):
+        if st.button("마감", use_container_width=True, type="primary"):
             st.session_state.deadline_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
             st.session_state.analysis_result = sent_df.copy()
             st.success("마감 처리 완료")
