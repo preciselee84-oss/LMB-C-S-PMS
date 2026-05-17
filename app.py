@@ -877,14 +877,78 @@ def show_auth_page():
 def show_sidebar():
     with st.sidebar:
         st.markdown(
-            "<div style='font-size:26px;font-weight:900;color:#1A202C;letter-spacing:-0.5px;padding:8px 0 4px;'>실적관리 시스템</div>",
+            """
+            <style>
+            [data-testid="stSidebar"] {
+                background-color: #2D2D2D !important;
+            }
+            [data-testid="stSidebar"] * {
+                color: #E2E8F0 !important;
+            }
+            [data-testid="stSidebar"] .sidebar-title {
+                font-size: 22px;
+                font-weight: 900;
+                color: #FFFFFF !important;
+                text-align: center;
+                padding: 16px 0 4px;
+                letter-spacing: -0.5px;
+            }
+            [data-testid="stSidebar"] .sidebar-user {
+                text-align: center;
+                padding: 6px 0 2px;
+            }
+            [data-testid="stSidebar"] .sidebar-user .name {
+                font-size: 15px;
+                font-weight: 700;
+                color: #FFFFFF !important;
+            }
+            [data-testid="stSidebar"] .sidebar-user .greet {
+                font-size: 13px;
+                color: #A0AEC0 !important;
+                margin-top: 2px;
+            }
+            [data-testid="stSidebar"] .sidebar-user .login-time {
+                font-size: 11px;
+                color: #718096 !important;
+                margin-top: 2px;
+            }
+            [data-testid="stSidebar"] hr {
+                border-color: #4A4A4A !important;
+            }
+            [data-testid="stSidebar"] div.stButton > button {
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                color: #CBD5E0 !important;
+                font-size: 14px !important;
+                font-weight: 600 !important;
+                text-align: left !important;
+                padding: 8px 12px !important;
+                border-radius: 8px !important;
+            }
+            [data-testid="stSidebar"] div.stButton > button:hover {
+                background: #3D3D3D !important;
+                color: #FFFFFF !important;
+            }
+            [data-testid="stSidebarContent"] [data-testid="stMarkdownContainer"] p {
+                color: #718096 !important;
+                font-size: 11px !important;
+                font-weight: 700 !important;
+                text-transform: uppercase !important;
+                letter-spacing: 0.8px !important;
+                margin: 12px 0 4px 4px !important;
+            }
+            </style>
+            """,
             unsafe_allow_html=True,
         )
         _lt = st.session_state.get("login_time", "")
         st.markdown(
-            f"<div style='display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#4A5568;padding:0 2px 8px;'>"
-            f"<span style='font-weight:700;'>{st.session_state.user_name}</span>"
-            f"<span style='color:#718096;font-size:12px;'>접속 {_lt}</span>"
+            f"<div class='sidebar-title'>실적관리 시스템</div>"
+            f"<div class='sidebar-user'>"
+            f"<div class='name'>{st.session_state.user_name}</div>"
+            f"<div class='greet'>반갑습니다.</div>"
+            f"<div class='login-time'>접속 {_lt}</div>"
             f"</div>",
             unsafe_allow_html=True,
         )
