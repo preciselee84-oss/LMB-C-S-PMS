@@ -1240,6 +1240,18 @@ def show_final_check():
     style_report_logic(cmp_df)
 
     # ── 중복방문/초과방문/누락 확인 탭 ──
+    # 재업로드한 파일이 있으면 그 파일로 오류 체크
+    if uploaded_df is not None:
+        check_df = uploaded_df.copy()
+        u_col_check = find_col(check_df, ["등록자", "담당자", "성명"], "등록자")
+        df_user_check = check_df[check_df[u_col_check] == st.session_state.user_name].copy() if u_col_check in check_df.columns else pd.DataFrame()
+        df_user_check = attach_cloud_dates(df_user_check)
+        _, err_check, dup_check = process_performance_analysis(check_df, st.session_state.get("auto_prev_df"))
+    else:
+        df_user_check = df_user
+        err_check = err
+        dup_check = dup
+
     t1, t2, t3, t4, t5 = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
 
     # 각 탭의 데이터 존재 여부 확인
@@ -1252,24 +1264,24 @@ def show_final_check():
     with t1:
         # 본인 데이터만 필터링
         dup_my = pd.DataFrame()
-        if dup is not None and not dup.empty:
-            u_col_dup = find_col(dup, ["등록자", "담당자", "성명"], "담당자")
-            if u_col_dup and u_col_dup in dup.columns:
-                dup_my = dup[dup[u_col_dup] == st.session_state.user_name]
+        if dup_check is not None and not dup_check.empty:
+            u_col_dup = find_col(dup_check, ["등록자", "담당자", "성명"], "담당자")
+            if u_col_dup and u_col_dup in dup_check.columns:
+                dup_my = dup_check[dup_check[u_col_dup] == st.session_state.user_name]
             else:
-                dup_my = dup
+                dup_my = dup_check
 
         has_dup_data = not dup_my.empty
         style_report_logic(dup_my)
 
     with t2:
         err_filtered = pd.DataFrame()
-        if err is not None and not err.empty:
+        if err_check is not None and not err_check.empty:
             # 본인 데이터만 필터링
-            if "담당자" in err.columns:
-                err_my = err[err["담당자"] == st.session_state.user_name].copy()
+            if "담당자" in err_check.columns:
+                err_my = err_check[err_check["담당자"] == st.session_state.user_name].copy()
             else:
-                err_my = err.copy()
+                err_my = err_check.copy()
 
             err_filtered = err_my[(err_my["일방문"] >= 5) | (err_my["월총방문"] >= 60)].copy()
 
@@ -1296,9 +1308,9 @@ def show_final_check():
 
     with t3:
         missing_open = pd.DataFrame()
-        if "본사 개설완료일자" in df_user.columns:
-            missing_open = df_user[
-                pd.isna(df_user["본사 개설완료일자"]) | (df_user["본사 개설완료일자"].astype(str).str.strip() == "")
+        if "본사 개설완료일자" in df_user_check.columns:
+            missing_open = df_user_check[
+                pd.isna(df_user_check["본사 개설완료일자"]) | (df_user_check["본사 개설완료일자"].astype(str).str.strip() == "")
             ]
             style_report_logic(missing_open.drop(columns=["본사 ERP연계일자"], errors="ignore"))
         else:
@@ -1308,11 +1320,12 @@ def show_final_check():
 
     with t4:
         missing_erp = pd.DataFrame()
-        if "본사 ERP연계일자" in df_user.columns:
-            if d_col and d_col in df_user.columns:
-                target = df_user[df_user[d_col].astype(str).str.contains("연계", na=False)]
+        if "본사 ERP연계일자" in df_user_check.columns:
+            d_col_check = find_col(df_user_check, ["활동상세", "활동내용"], "활동상세")
+            if d_col_check and d_col_check in df_user_check.columns:
+                target = df_user_check[df_user_check[d_col_check].astype(str).str.contains("연계", na=False)]
             else:
-                target = df_user
+                target = df_user_check
 
             missing_erp = target[
                 pd.isna(target["본사 ERP연계일자"]) | (target["본사 ERP연계일자"].astype(str).str.strip() == "")
@@ -1327,16 +1340,16 @@ def show_final_check():
         # 기타 오류 체크
         other_errors = []
 
-        if not df_user.empty:
-            date_col_user = find_col(df_user, ["활동일", "일자"], "활동일")
-            detail_col = find_col(df_user, ["활동상세", "활동내용"], "활동상세")
-            biz_col_user = find_col(df_user, ["사업자번호"], "사업자번호")
-            comp_col_user = find_col(df_user, ["업체명", "상호"], "업체명")
-            user_col = find_col(df_user, ["등록자", "담당자", "성명"], "등록자")
+        if not df_user_check.empty:
+            date_col_user = find_col(df_user_check, ["활동일", "일자"], "활동일")
+            detail_col = find_col(df_user_check, ["활동상세", "활동내용"], "활동상세")
+            biz_col_user = find_col(df_user_check, ["사업자번호"], "사업자번호")
+            comp_col_user = find_col(df_user_check, ["업체명", "상호"], "업체명")
+            user_col = find_col(df_user_check, ["등록자", "담당자", "성명"], "등록자")
 
-            if date_col_user and date_col_user in df_user.columns:
-                df_check = df_user.copy()
-                df_check[date_col_user] = pd.to_datetime(df_check[date_col_user], errors="coerce")
+            if date_col_user and date_col_user in df_user_check.columns:
+                df_check_errors = df_user_check.copy()
+                df_check_errors[date_col_user] = pd.to_datetime(df_check_errors[date_col_user], errors="coerce")
 
                 # 1. 주말/공휴일 체크
                 # 2026년 한국 공휴일 (예시)
@@ -1346,7 +1359,7 @@ def show_final_check():
                 ]
                 holiday_dates = pd.to_datetime(holidays)
 
-                for idx, row in df_check.iterrows():
+                for idx, row in df_check_errors.iterrows():
                     activity_date = row[date_col_user]
                     if pd.isna(activity_date):
                         continue
@@ -1384,7 +1397,7 @@ def show_final_check():
                         prev_link_biz = prev_df[prev_detail_col].astype(str).str.contains("연계", na=False)
                         prev_link_biz = prev_df[prev_link_biz][prev_biz_col].unique()
 
-                        for idx, row in df_check.iterrows():
+                        for idx, row in df_check_errors.iterrows():
                             biz_num = str(row.get(biz_col_user, "")).strip()
                             activity_detail = str(row.get(detail_col, ""))
 
