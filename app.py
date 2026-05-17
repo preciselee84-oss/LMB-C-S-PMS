@@ -1269,6 +1269,13 @@ def show_user_history():
             f"</div>",
             unsafe_allow_html=True,
         )
+    else:
+        st.markdown(
+            f"<div style='margin-top:12px;margin-bottom:12px;padding:12px 16px;background:#D4EDDA;border-left:4px solid #28A745;border-radius:4px;'>"
+            f"<div style='font-size:14px;color:#155724;'><b>✓ 잘못된 데이터가 없습니다.</b></div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
     t1, t2, t3, t4, t5 = validation_tabs_with_refresh("refresh_google_sheets_user_history")
 
@@ -1772,6 +1779,13 @@ def show_final_check():
             f"<div style='margin-top:12px;margin-bottom:12px;padding:12px 16px;background:#FFF3CD;border-left:4px solid #FFC107;border-radius:4px;'>"
             f"<div style='font-size:14px;color:#856404;'><b>⚠️ 다음 항목을 수정해주세요:</b> {error_list}</div>"
             f"<div style='margin-top:4px;font-size:13px;color:#856404;'>위 탭에서 문제를 해결한 후 엑셀을 다시 업로드해주세요.</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f"<div style='margin-top:12px;margin-bottom:12px;padding:12px 16px;background:#D4EDDA;border-left:4px solid #28A745;border-radius:4px;'>"
+            f"<div style='font-size:14px;color:#155724;'><b>✓ 잘못된 데이터가 없습니다.</b></div>"
             f"</div>",
             unsafe_allow_html=True,
         )
