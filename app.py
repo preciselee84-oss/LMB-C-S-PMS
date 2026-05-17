@@ -2164,27 +2164,6 @@ def show_admin_analysis():
 
     style_report_logic(sent_df)
 
-    # 전송된 엑셀 데이터 표시
-    st.markdown("### 전송된 활동 이력")
-    sent_uploads_db = load_db(SENT_UPLOADS_FILE, {})
-
-    if sent_uploads_db:
-        # 모든 사용자의 데이터를 합치기
-        all_data = []
-        for name, payload in sent_uploads_db.items():
-            df = upload_payload_to_dataframe(payload)
-            if df is not None and not df.empty:
-                all_data.append(df)
-
-        if all_data:
-            combined_df = pd.concat(all_data, ignore_index=True)
-            st.write(f"**총 {len(combined_df)}건의 활동 이력**")
-            style_report_logic(combined_df, compact=True)
-        else:
-            st.info("전송된 활동 이력이 없습니다.")
-    else:
-        st.info("전송된 활동 이력이 없습니다.")
-
     c1, c2 = st.columns([0.78, 0.22])
 
     with c1:
