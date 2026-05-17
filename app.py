@@ -795,6 +795,20 @@ def load_csv_to_state(url_key, state_key):
     st.session_state[state_key] = clean_header_logic(pd.read_csv(st.session_state[url_key]))
 
 
+def refresh_google_sheets_button(key):
+    _, refresh_col = st.columns([0.78, 0.22])
+    with refresh_col:
+        if st.button("구글시트 갱신", use_container_width=True, key=key):
+            try:
+                load_csv_to_state("url_sync", "cloud_sheet_df")
+                load_csv_to_state("url_analysis", "analysis_lookup_df")
+                st.toast("구글시트 데이터를 다시 조회했습니다.")
+                time.sleep(0.3)
+                st.rerun()
+            except Exception as e:
+                st.error(f"구글시트 갱신 실패: {e}")
+
+
 def select_prev_month(state_key, widget_key):
     # 초기 로드 시 구글시트 자동 조회
     prev_sel_key = f"{widget_key}_prev"
@@ -1086,6 +1100,7 @@ def show_user_history():
             unsafe_allow_html=True,
         )
 
+    refresh_google_sheets_button("refresh_google_sheets_user_history")
     t1, t2, t3, t4, t5 = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
 
     with t1:
@@ -1671,6 +1686,7 @@ def show_final_check():
             unsafe_allow_html=True,
         )
 
+    refresh_google_sheets_button("refresh_google_sheets_final_check")
     t1, t2, t3, t4, t5 = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
 
     with t1:
