@@ -1877,11 +1877,45 @@ def sent_results_df():
     return sent_df
 
 
+def apply_admin_prev_diff(sent_df):
+    if sent_df.empty:
+        return sent_df
+
+    result_df = sent_df.copy()
+    result_df = result_df.drop(columns=[c for c in result_df.columns if "전월대비" in str(c)], errors="ignore")
+
+    selected_month = st.session_state.get("adm_prev_month", "선택안함")
+    prev_df = st.session_state.get("auto_prev_df")
+
+    if selected_month == "선택안함" or prev_df is None or prev_df.empty:
+        return result_df
+
+    prev_res, _, _ = process_performance_analysis(prev_df)
+    if not isinstance(prev_res, pd.DataFrame) or prev_res.empty:
+        return result_df
+
+    prev_pay_map = prev_res.set_index("담당자")["지급예상금액"].to_dict()
+
+    if "담당자" in result_df.columns and "지급예상금액" in result_df.columns:
+        result_df["전월대비"] = result_df.apply(
+            lambda r: int(float(r.get("지급예상금액", 0))) - int(float(prev_pay_map.get(r.get("담당자"), 0))),
+            axis=1,
+        )
+
+        cols = result_df.columns.tolist()
+        cols.remove("전월대비")
+        insert_at = cols.index("전송시각") if "전송시각" in cols else len(cols)
+        cols.insert(insert_at, "전월대비")
+        result_df = result_df[cols]
+
+    return result_df
+
+
 def show_admin_analysis():
     select_prev_month("auto_prev_df", "adm_prev_month")
 
     st.markdown("### 직원 전송 실적 내역")
-    sent_df = sent_results_df()
+    sent_df = apply_admin_prev_diff(sent_results_df())
 
     if sent_df.empty:
         st.info("아직 전송된 실적이 없습니다.")
