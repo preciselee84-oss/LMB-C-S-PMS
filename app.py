@@ -219,130 +219,66 @@ def render_manual_perf_input_table(base):
     st.markdown(
         """
         <style>
-        .manual-perf-table {
-            border: 1px solid #E2E8F0;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            overflow: hidden;
-            margin-bottom: 1rem;
-        }
-        .manual-perf-head {
-            background: #EDF2F7;
-            color: #4A5568;
-            font-weight: 800;
-            font-size: 13px;
-            padding: 9px 12px;
-            text-align: center;
-            border-bottom: 2px solid #E2E8F0;
-            border-right: 1px solid #E2E8F0;
-            white-space: nowrap;
-            min-height: 38px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .manual-perf-cell {
-            color: #2D3748;
-            font-size: 13px;
-            padding: 8px 12px;
-            border-bottom: 1px solid #EDF2F7;
-            border-right: 1px solid #E2E8F0;
-            white-space: nowrap;
-            min-height: 38px;
-            display: flex;
-            align-items: center;
-        }
-        .manual-perf-center { justify-content: center; text-align: center; }
-        .manual-perf-right { justify-content: flex-end; text-align: right; }
-        .manual-perf-input div[data-testid="stTextInput"] {
-            margin: 0 !important;
-        }
-        .manual-perf-input div[data-testid="stTextInput"] label {
+        div[data-testid="stElementToolbar"] {
             display: none !important;
         }
-        .manual-perf-input input {
-            text-align: right !important;
+        div[data-testid="stDataEditor"] {
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 10px !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+            overflow: hidden !important;
+            margin-bottom: 1rem !important;
+        }
+        div[data-testid="stDataEditor"] [role="columnheader"] {
+            background: #EDF2F7 !important;
+            color: #4A5568 !important;
+            font-weight: 800 !important;
             font-size: 13px !important;
-            height: 38px !important;
-            padding: 8px 12px !important;
-            border: 0 !important;
-            box-shadow: none !important;
-            background: transparent !important;
+            text-align: center !important;
+            border-bottom: 2px solid #E2E8F0 !important;
+            white-space: nowrap !important;
         }
-        .manual-perf-input button {
-            display: none !important;
+        div[data-testid="stDataEditor"] [role="gridcell"] {
+            border-bottom: 1px solid #EDF2F7 !important;
+            color: #2D3748 !important;
+            font-size: 13px !important;
+            white-space: nowrap !important;
+        }
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="1"],
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="2"] {
+            text-align: center !important;
+        }
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="3"],
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="4"],
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="5"],
+        div[data-testid="stDataEditor"] input {
+            text-align: right !important;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    def is_number_like(value):
-        try:
-            if pd.isna(value):
-                return False
-            float(str(value).replace(",", ""))
-            return True
-        except Exception:
-            return False
+    editor_df = base.copy()
+    editor_df["입력(건)"] = editor_df["입력(건)"].astype(int).astype(str)
 
-    def fmt_value(value):
-        if pd.isna(value):
-            return ""
-        if is_number_like(value):
-            return f"{int(float(str(value).replace(',', ''))):,}"
-        return html.escape(str(value))
-
-    st.markdown("<div class='manual-perf-table'>", unsafe_allow_html=True)
-    headers = ["활동구분", "구분", "단위 점수", "월 최대점수", "입력(건)"]
-    header_cols = st.columns([0.22, 0.36, 0.14, 0.14, 0.14], gap=None)
-    for col, header in zip(header_cols, headers):
-        with col:
-            st.markdown(f"<div class='manual-perf-head'>{header}</div>", unsafe_allow_html=True)
-
-    edited_rows = []
-    for idx, row in base.reset_index(drop=True).iterrows():
-        bg = "#FFFFFF" if idx % 2 == 0 else "#F7FAFC"
-        row_cols = st.columns([0.22, 0.36, 0.14, 0.14, 0.14], gap=None)
-        values = [row["활동구분"], row["구분"], row["단위 점수"], row["월 최대점수"]]
-
-        for cell_col, value in zip(row_cols[:4], values):
-            align = "manual-perf-right" if is_number_like(value) else "manual-perf-center"
-            with cell_col:
-                st.markdown(
-                    f"<div class='manual-perf-cell {align}' style='background:{bg};'>{fmt_value(value)}</div>",
-                    unsafe_allow_html=True,
-                )
-
-        input_key = f"manual_perf_input_{idx}_{row['구분']}"
-        text_input_key = f"{input_key}_text"
-        if text_input_key not in st.session_state:
-            st.session_state[text_input_key] = str(int(row.get("입력(건)", 0)))
-
-        with row_cols[4]:
-            st.markdown(
-                f"<div class='manual-perf-input' style='background:{bg};border-bottom:1px solid #EDF2F7;'>",
-                unsafe_allow_html=True,
-            )
-            input_raw = st.text_input(
-                f"입력(건) {row['구분']}",
-                key=text_input_key,
-                label_visibility="collapsed",
-            )
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        try:
-            input_count = max(0, int(float(str(input_raw).replace(",", "").strip() or "0")))
-        except Exception:
-            input_count = 0
-        st.session_state[input_key] = input_count
-
-        edited_row = row.to_dict()
-        edited_row["입력(건)"] = input_count
-        edited_rows.append(edited_row)
-
-    st.markdown("</div>", unsafe_allow_html=True)
-    return pd.DataFrame(edited_rows)
+    return st.data_editor(
+        editor_df,
+        use_container_width=True,
+        hide_index=True,
+        height=565,
+        num_rows="fixed",
+        column_order=["활동구분", "구분", "단위 점수", "월 최대점수", "입력(건)"],
+        column_config={
+            "활동구분": st.column_config.TextColumn("활동구분", width="medium", disabled=True),
+            "구분": st.column_config.TextColumn("구분", width="large", disabled=True),
+            "단위 점수": st.column_config.NumberColumn("단위 점수", width="small", disabled=True),
+            "월 최대점수": st.column_config.TextColumn("월 최대점수", width="small", disabled=True),
+            "입력(건)": st.column_config.TextColumn("입력(건)", width="small"),
+        },
+        disabled=["활동구분", "구분", "단위 점수", "월 최대점수"],
+        key="manual_perf_editor",
+    )
 
 
 def manual_points_for_user(name):
@@ -1329,7 +1265,7 @@ def show_user_history():
 
     edited = render_manual_perf_input_table(base)
 
-    edited["입력(건)"] = edited["입력(건)"].fillna(0).astype(int)
+    edited["입력(건)"] = pd.to_numeric(edited["입력(건)"], errors="coerce").fillna(0).astype(int).clip(lower=0)
     edited["계산점수"] = edited["단위 점수"] * edited["입력(건)"]
 
     limit_map = {
