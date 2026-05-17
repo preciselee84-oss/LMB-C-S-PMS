@@ -323,7 +323,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
             l_p = int(row["l"]) * 120
             v_actual_p = int(row["v"]) * 30
             manual_p = manual_points_for_user(name)
-            p_sum = min(1000, o_p + l_p) + min(1800, v_actual_p + manual_p)
+            p_sum = min(2800, min(1000, o_p + l_p) + min(1800, v_actual_p + manual_p))
 
             member_stats[name] = {
                 "o_p": o_p,
@@ -373,7 +373,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
                     "연계포인트": stats["l_p"],
                     "운영건수 (실제 활동)": int(row["v"]),
                     "운영포인트 (실제 활동)": stats["v_actual_p"],
-                    "운영건수 (추가 활동)": min(int(np.ceil(stats["manual_p"] / 30.0)), int(stats["p_sum"] / 30)),
+                    "운영건수 (추가 활동)": min(int(np.ceil(stats["manual_p"] / 30.0)), int(stats["p_sum"] / 30), max(0, 60 - int(row["v"]))),
                     "운영포인트(추가 활동)": effective_manual_p,
                     "합계포인트": stats["p_sum"],
                     "지급포인트": max(0, stats["p_sum"] - 1000),
@@ -997,7 +997,7 @@ def show_final_check():
         ("연계포인트", "연계포인트", "compare"),
         ("운영건수 (실제 활동)", "운영건수 (실제 활동)", "compare"),
         ("운영포인트 (실제 활동)", "운영포인트 (실제 활동)", "compare"),
-        ("추가 등록건수", "운영건수 (추가 활동)", "compare_upload_only"),
+        ("추가 등록건수", "운영건수 (추가 활동)", "compare"),
         ("최종 운영건수", None, "final_operation_count"),
         ("합계포인트", "합계포인트", "compare"),
         ("지급포인트", "지급포인트", "compare"),
@@ -1014,13 +1014,13 @@ def show_final_check():
         if mode == "final_operation_count":
             first_actual_count = int(float(my_res.iloc[0].get("운영건수 (실제 활동)", 0)))
             first_extra_count = int(float(my_res.iloc[0].get("운영건수 (추가 활동)", 0)))
-            first_compare_value = first_actual_count + first_extra_count
+            first_compare_value = min(60, first_actual_count + first_extra_count)
             first_value = first_compare_value
 
             if uploaded_exists:
                 uploaded_actual_count = int(float(uploaded_my_res.iloc[0].get("운영건수 (실제 활동)", 0)))
                 uploaded_extra_count = int(float(uploaded_my_res.iloc[0].get("운영건수 (추가 활동)", 0)))
-                uploaded_value = uploaded_actual_count + uploaded_extra_count
+                uploaded_value = min(60, uploaded_actual_count + uploaded_extra_count)
                 match_value = "일치" if first_compare_value == uploaded_value else "불일치"
         elif mode == "compare_upload_only":
             first_value = ""
