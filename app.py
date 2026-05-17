@@ -1199,13 +1199,14 @@ def show_final_check():
     style_report_logic(cmp_df)
 
     # ── 중복방문/초과방문/누락 확인 탭 ──
-    t1, t2, t3, t4 = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락"])
+    t1, t2, t3, t4, t5 = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
 
     # 각 탭의 데이터 존재 여부 확인
     has_dup_data = False
     has_err_data = False
     has_missing_open = False
     has_missing_erp = False
+    has_other_errors = False
 
     with t1:
         # 본인 데이터만 필터링
@@ -1281,12 +1282,110 @@ def show_final_check():
 
         has_missing_erp = not missing_erp.empty
 
+    with t5:
+        # 기타 오류 체크
+        other_errors = []
+
+        if not df_user.empty:
+            date_col_user = find_col(df_user, ["활동일", "일자"], "활동일")
+            detail_col = find_col(df_user, ["활동상세", "활동내용"], "활동상세")
+            biz_col_user = find_col(df_user, ["사업자번호"], "사업자번호")
+            comp_col_user = find_col(df_user, ["업체명", "상호"], "업체명")
+            user_col = find_col(df_user, ["등록자", "담당자", "성명"], "등록자")
+
+            if date_col_user and date_col_user in df_user.columns:
+                df_check = df_user.copy()
+                df_check[date_col_user] = pd.to_datetime(df_check[date_col_user], errors="coerce")
+
+                # 1. 주말/공휴일 체크
+                # 2026년 한국 공휴일 (예시)
+                holidays = [
+                    "2026-01-01", "2026-03-01", "2026-05-05", "2026-06-06",
+                    "2026-08-15", "2026-10-03", "2026-10-09", "2026-12-25"
+                ]
+                holiday_dates = pd.to_datetime(holidays)
+
+                for idx, row in df_check.iterrows():
+                    activity_date = row[date_col_user]
+                    if pd.isna(activity_date):
+                        continue
+
+                    error_reason = None
+
+                    # 주말 체크 (토요일=5, 일요일=6)
+                    if activity_date.weekday() in [5, 6]:
+                        day_name = "토요일" if activity_date.weekday() == 5 else "일요일"
+                        error_reason = f"주말 활동 ({day_name})"
+
+                    # 공휴일 체크
+                    if activity_date.normalize() in holiday_dates:
+                        error_reason = "공휴일 활동"
+
+                    if error_reason:
+                        other_errors.append({
+                            "업체명": row.get(comp_col_user, "") if comp_col_user else "",
+                            "사업자번호": row.get(biz_col_user, "") if biz_col_user else "",
+                            "등록자": row.get(user_col, "") if user_col else "",
+                            "활동일": activity_date.strftime("%Y-%m-%d"),
+                            "활동상세": row.get(detail_col, "") if detail_col else "",
+                            "오류 사유": error_reason
+                        })
+
+                # 2. 전월 대비 중복 개설/연계 체크
+                prev_df = st.session_state.get("auto_prev_df")
+                if prev_df is not None and not prev_df.empty and biz_col_user and detail_col:
+                    prev_biz_col = find_col(prev_df, ["사업자번호"], "사업자번호")
+                    prev_detail_col = find_col(prev_df, ["활동상세", "활동내용"], "활동상세")
+
+                    if prev_biz_col and prev_detail_col:
+                        # 전월에 개설/연계가 있었던 사업자번호 목록
+                        prev_open_biz = prev_df[prev_df[prev_detail_col].astype(str).str.contains("개설", na=False)][prev_biz_col].unique()
+                        prev_link_biz = prev_df[prev_detail_col].astype(str).str.contains("연계", na=False)
+                        prev_link_biz = prev_df[prev_link_biz][prev_biz_col].unique()
+
+                        for idx, row in df_check.iterrows():
+                            biz_num = str(row.get(biz_col_user, "")).strip()
+                            activity_detail = str(row.get(detail_col, ""))
+
+                            if not biz_num:
+                                continue
+
+                            # 현재 활동이 개설이고, 전월에도 개설이 있었던 경우
+                            if "개설" in activity_detail and biz_num in prev_open_biz:
+                                activity_date = row[date_col_user]
+                                if pd.notna(activity_date):
+                                    other_errors.append({
+                                        "업체명": row.get(comp_col_user, "") if comp_col_user else "",
+                                        "사업자번호": biz_num,
+                                        "등록자": row.get(user_col, "") if user_col else "",
+                                        "활동일": activity_date.strftime("%Y-%m-%d"),
+                                        "활동상세": activity_detail,
+                                        "오류 사유": "전월에 이미 개설 기록 존재"
+                                    })
+
+                            # 현재 활동이 연계이고, 전월에도 연계가 있었던 경우
+                            if "연계" in activity_detail and biz_num in prev_link_biz:
+                                activity_date = row[date_col_user]
+                                if pd.notna(activity_date):
+                                    other_errors.append({
+                                        "업체명": row.get(comp_col_user, "") if comp_col_user else "",
+                                        "사업자번호": biz_num,
+                                        "등록자": row.get(user_col, "") if user_col else "",
+                                        "활동일": activity_date.strftime("%Y-%m-%d"),
+                                        "활동상세": activity_detail,
+                                        "오류 사유": "전월에 이미 연계 기록 존재"
+                                    })
+
+        other_errors_df = pd.DataFrame(other_errors)
+        has_other_errors = not other_errors_df.empty
+        style_report_logic(other_errors_df)
+
     # ── 모든 항목 일치 여부 체크 ──
     # 일치여부가 빈 항목은 체크에서 제외 (compare_no_match 모드)
     all_match = uploaded_exists and all(r.get("일치여부") in ["일치", ""] for r in cmp_rows)
 
-    # 검증 이슈 체크 (중복/초과 방문, 누락 데이터)
-    has_validation_issues = has_dup_data or has_err_data or has_missing_open or has_missing_erp
+    # 검증 이슈 체크 (중복/초과 방문, 누락 데이터, 기타 오류)
+    has_validation_issues = has_dup_data or has_err_data or has_missing_open or has_missing_erp or has_other_errors
 
     # 전송 가능 여부
     can_send = all_match and not has_validation_issues
@@ -1307,6 +1406,8 @@ def show_final_check():
             issues.append("본사 개설완료일자 누락")
         if has_missing_erp:
             issues.append("본사 ERP연계일자 누락")
+        if has_other_errors:
+            issues.append("기타 오류")
 
         issues_text = ", ".join(issues)
         st.markdown(
