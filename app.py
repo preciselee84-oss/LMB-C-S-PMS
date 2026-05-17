@@ -17,6 +17,7 @@ PERF_FILE = "manual_perf.json"
 SENT_FILE = "sent_results.json"
 SENT_UPLOADS_FILE = "sent_uploads.json"
 SAVED_STATE_FILE = "saved_state.json"
+PPT_TEMPLATE_FILE = os.path.join(os.path.dirname(__file__), "templates", "LMB활동실적보고서_202605_하나지사.pptx")
 
 DEFAULT_URL_ANALYSIS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9XPHqrqcaFf9bCOVya7yHORr-c1R4KCF0eEpdE3ESn8qJELP0BkqTOslur9bsGcVabRUIcyOa877R/pub?output=csv"
 DEFAULT_URL_SYNC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9F7R7oLA2B02H-I25kVv2JeYHFgWQq0CT7TeW61hrNpJLdHWJFhFR_iDQGCFAW044o8rRwBDeovKG/pub?gid=1533424484&single=true&output=csv"
@@ -2094,67 +2095,280 @@ def sent_uploaded_files_excel_bytes():
     return dataframe_to_excel_bytes({"전체 활동 이력": combined_df})
 
 
+def report_month_info(report_df):
+    ym = ""
+    if "등록월" in report_df.columns:
+        months = report_df["등록월"].dropna().astype(str)
+        months = months[months.str.match(r"^\d{4}-\d{2}$", na=False)]
+        if not months.empty:
+            ym = months.value_counts().idxmax()
+    if not ym:
+        ym = get_uploaded_month(st.session_state.user_excel_data) if st.session_state.user_excel_data is not None else ""
+    if not ym:
+        ym = datetime.utcnow().strftime("%Y-%m")
+    year = int(ym.split("-")[0])
+    month = int(ym.split("-")[1])
+    return ym, year, month
+
+
+def as_date_series(series):
+    return pd.to_datetime(series, errors="coerce")
+
+
+def cloud_customer_counts(name=None):
+    cloud = st.session_state.get("cloud_sheet_df")
+    if cloud is None:
+        try:
+            load_csv_to_state("url_sync", "cloud_sheet_df")
+            cloud = st.session_state.get("cloud_sheet_df")
+        except Exception:
+            cloud = None
+
+    ym, year, _ = report_month_info(st.session_state.analysis_result if st.session_state.analysis_result is not None else pd.DataFrame())
+    empty_counts = {
+        "manage_total": 0, "manage_link": 0,
+        "year_open": 0, "year_link": 0,
+        "month_open": 0, "month_link": 0,
+    }
+    if cloud is None or cloud.empty:
+        return empty_counts
+
+    df = clean_header_logic(cloud.copy())
+    owner_col = find_col(df, ["담당자", "등록자", "성명"])
+    if name and owner_col and owner_col in df.columns:
+        df = df[df[owner_col].astype(str).str.strip() == str(name).strip()].copy()
+
+    status_col = find_col(df, ["상태항목", "상태"])
+    open_col = find_col(df, ["개설완료일자", "개설일"])
+    erp_col = find_col(df, ["ERP연계일자", "ERP연계", "연계일자"])
+
+    if status_col and status_col in df.columns:
+        status = df[status_col].astype(str).str.strip()
+        manage_total = int(status.isin(["대기", "완료"]).sum())
+        manage_link = int(((status == "완료") & as_date_series(df[erp_col]).notna()).sum()) if erp_col and erp_col in df.columns else 0
+    else:
+        manage_total = 0
+        manage_link = int(as_date_series(df[erp_col]).notna().sum()) if erp_col and erp_col in df.columns else 0
+
+    open_dates = as_date_series(df[open_col]) if open_col and open_col in df.columns else pd.Series(dtype="datetime64[ns]")
+    erp_dates = as_date_series(df[erp_col]) if erp_col and erp_col in df.columns else pd.Series(dtype="datetime64[ns]")
+
+    return {
+        "manage_total": manage_total,
+        "manage_link": manage_link,
+        "year_open": int((open_dates.dt.year == year).sum()) if not open_dates.empty else 0,
+        "year_link": int((erp_dates.dt.year == year).sum()) if not erp_dates.empty else 0,
+        "month_open": int((open_dates.dt.strftime("%Y-%m") == ym).sum()) if not open_dates.empty else 0,
+        "month_link": int((erp_dates.dt.strftime("%Y-%m") == ym).sum()) if not erp_dates.empty else 0,
+    }
+
+
+def sent_activity_counts(report_df, name=None):
+    df = report_df.copy()
+    if name and "담당자" in df.columns:
+        df = df[df["담당자"].astype(str).str.strip() == str(name).strip()]
+
+    def sum_col(col):
+        return int(pd.to_numeric(df[col], errors="coerce").fillna(0).sum()) if col in df.columns else 0
+
+    open_count = sum_col("개설건수")
+    link_count = sum_col("연계건수")
+    operation_col = "운영건수 (실제 활동)" if "운영건수 (실제 활동)" in df.columns else "운영건수"
+    operation_count = sum_col(operation_col)
+    total_count = open_count + link_count + operation_count
+
+    unique_customers = uploaded_activity_customer_count(name)
+    if unique_customers == 0:
+        unique_customers = total_count
+
+    return {
+        "open": open_count,
+        "link": link_count,
+        "operation": operation_count,
+        "total": total_count,
+        "unique_customers": unique_customers,
+    }
+
+
+def uploaded_activity_customer_count(name=None):
+    sent_uploads_db = load_db(SENT_UPLOADS_FILE, {})
+    biz_keys = set()
+
+    for saved_name, payload in sent_uploads_db.items():
+        df = upload_payload_to_dataframe(payload)
+        if df.empty:
+            continue
+        u_col = find_col(df, ["등록자", "담당자", "성명"])
+        d_col = find_col(df, ["활동상세", "활동내용"])
+        biz_col = find_col(df, ["사업자번호"])
+        if name and str(saved_name).strip() != str(name).strip():
+            if not u_col or u_col not in df.columns:
+                continue
+            df = df[df[u_col].astype(str).str.strip() == str(name).strip()].copy()
+        if d_col and d_col in df.columns:
+            df = df[df[d_col].astype(str).str.contains("개설|연계|운영|방문|점검", na=False)]
+        if biz_col and biz_col in df.columns:
+            biz_keys.update([v for v in normalize_biz(df[biz_col]).tolist() if v])
+
+    return len(biz_keys)
+
+
+def uploaded_major_rows(name, keyword, row_type):
+    payload = load_db(SENT_UPLOADS_FILE, {}).get(name)
+    df = upload_payload_to_dataframe(payload)
+    if df.empty:
+        return []
+
+    u_col = find_col(df, ["등록자", "담당자", "성명"])
+    d_col = find_col(df, ["활동상세", "활동내용"])
+    comp_col = find_col(df, ["업체명", "상호", "고객명"])
+    product_col = find_col(df, ["상품"])
+    system_col = find_col(df, ["내부시스템", "ERP", "시스템"])
+    report_col = find_col(df, ["구축보고서"])
+    note_col = find_col(df, ["활동내용", "비고", "제목", "활동상세"])
+
+    if u_col and u_col in df.columns:
+        df = df[df[u_col].astype(str).str.strip() == str(name).strip()]
+    if d_col and d_col in df.columns:
+        df = df[df[d_col].astype(str).str.contains(keyword, na=False)]
+
+    rows = []
+    for _, row in df.iterrows():
+        rows.append([
+            row.get(comp_col, "") if comp_col else "",
+            row_type,
+            row.get(product_col, "통합CMS") if product_col else "통합CMS",
+            row.get(system_col, "") if system_col else "",
+            row.get(report_col, "X") if report_col else "X",
+            row.get(note_col, "") if note_col else "",
+        ])
+    return rows
+
+
 def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_label):
     from pptx import Presentation
-    from pptx.util import Inches, Pt
     from pptx.enum.text import PP_ALIGN
-    from pptx.dml.color import RGBColor
+    from pptx.util import Pt
+    from copy import deepcopy
 
-    prs = Presentation()
-    prs.slide_width = Inches(13.333)
-    prs.slide_height = Inches(7.5)
+    prs = Presentation(PPT_TEMPLATE_FILE)
+    ym, _, _ = report_month_info(report_df)
 
-    def add_title(slide, title, subtitle=""):
-        title_box = slide.shapes.add_textbox(Inches(0.45), Inches(0.25), Inches(12.4), Inches(0.5))
-        tf = title_box.text_frame
-        tf.text = title
-        p = tf.paragraphs[0]
-        p.font.size = Pt(24)
-        p.font.bold = True
-        p.font.color.rgb = RGBColor(26, 32, 44)
-        if subtitle:
-            sub_box = slide.shapes.add_textbox(Inches(0.48), Inches(0.78), Inches(12), Inches(0.28))
-            sub_tf = sub_box.text_frame
-            sub_tf.text = subtitle
-            sub_p = sub_tf.paragraphs[0]
-            sub_p.font.size = Pt(10)
-            sub_p.font.color.rgb = RGBColor(113, 128, 150)
+    def fmt(value):
+        if value == "":
+            return ""
+        if value is None:
+            return "-"
+        try:
+            if pd.isna(value):
+                return ""
+        except Exception:
+            pass
+        try:
+            if isinstance(value, str) and value.strip() == "-":
+                return "-"
+            if isinstance(value, (int, float, np.integer, np.floating)):
+                return f"{int(value):,}"
+            if str(value).replace(",", "").replace("-", "").isdigit():
+                return f"{int(str(value).replace(',', '')):,}"
+        except Exception:
+            pass
+        return str(value)
 
-    def set_cell(cell, text, bold=False, align=PP_ALIGN.CENTER, fill=None):
-        if fill:
-            cell.fill.solid()
-            cell.fill.fore_color.rgb = fill
-        cell.text = str(text)
-        para = cell.text_frame.paragraphs[0]
-        para.alignment = align
-        para.font.size = Pt(8)
-        para.font.bold = bold
-        para.font.color.rgb = RGBColor(45, 55, 72)
+    def set_cell_text(cell, value, align=None):
+        cell.text = fmt(value)
+        for paragraph in cell.text_frame.paragraphs:
+            if align is not None:
+                paragraph.alignment = align
+            for run in paragraph.runs:
+                run.font.size = Pt(8)
 
-    def add_table_slide(title, df, subtitle=""):
-        slide = prs.slides.add_slide(prs.slide_layouts[6])
-        add_title(slide, title, subtitle)
-        show_df = df.head(18).copy()
-        rows = len(show_df) + 1
-        cols = len(show_df.columns)
-        table = slide.shapes.add_table(rows, cols, Inches(0.45), Inches(1.15), Inches(12.45), Inches(5.9)).table
-        for c, col in enumerate(show_df.columns):
-            set_cell(table.cell(0, c), col, bold=True, fill=RGBColor(237, 242, 247))
-        for r_idx, (_, row) in enumerate(show_df.iterrows(), start=1):
-            for c_idx, col in enumerate(show_df.columns):
-                value = row[col]
-                if isinstance(value, (int, float, np.integer, np.floating)):
-                    value = f"{int(value):,}"
-                    align = PP_ALIGN.RIGHT
-                else:
-                    align = PP_ALIGN.CENTER
-                fill = RGBColor(247, 250, 252) if r_idx % 2 == 0 else RGBColor(255, 255, 255)
-                set_cell(table.cell(r_idx, c_idx), value, align=align, fill=fill)
-        return slide
+    def slide_tables(slide):
+        return [shape.table for shape in slide.shapes if getattr(shape, "has_table", False)]
 
-    add_table_slide(f"{curr_month_label} 실적보고서", report_df, f"{prev_month_label} 비교 기준")
-    if not compare_df.empty:
-        add_table_slide("비교 리포트", compare_df, f"{prev_month_label} 대비 {curr_month_label}")
+    def ensure_rows(table, required_rows):
+        while len(table.rows) < required_rows:
+            new_tr = deepcopy(table._tbl.tr_lst[-1])
+            table._tbl.append(new_tr)
+            for cell in table.rows[-1].cells:
+                cell.text = ""
+
+    def fill_table_row(table, row_idx, values):
+        ensure_rows(table, row_idx + 1)
+        for col_idx, value in enumerate(values):
+            if col_idx < len(table.columns):
+                set_cell_text(table.cell(row_idx, col_idx), value, PP_ALIGN.RIGHT if isinstance(value, (int, float, np.integer, np.floating)) else PP_ALIGN.CENTER)
+
+    def fill_stats_slide(slide, counts, cloud_counts):
+        tables = slide_tables(slide)
+        if len(tables) < 4:
+            return
+
+        fill_table_row(tables[0], 1, ["-", counts["open"], counts["link"], counts["operation"]])
+        fill_table_row(tables[2], 1, [counts["unique_customers"], counts["total"], counts["total"], "-", "-", "-"])
+        fill_table_row(tables[3], 2, [
+            cloud_counts["manage_total"],
+            cloud_counts["manage_link"],
+            "-",
+            cloud_counts["year_open"],
+            cloud_counts["year_link"],
+            "-",
+            cloud_counts["month_open"],
+            cloud_counts["month_link"],
+        ])
+
+    def fill_major_slide(slide, rows):
+        tables = slide_tables(slide)
+        if not tables:
+            return
+        table = tables[0]
+        ensure_rows(table, len(rows) + 1)
+        for r in range(1, len(table.rows)):
+            for c in range(len(table.columns)):
+                set_cell_text(table.cell(r, c), "")
+        for r_idx, row_values in enumerate(rows, start=1):
+            for c_idx, value in enumerate(row_values[:len(table.columns)]):
+                set_cell_text(table.cell(r_idx, c_idx), value, PP_ALIGN.CENTER)
+
+    def delete_slide(index):
+        slide_id_list = prs.slides._sldIdLst
+        slide_id = slide_id_list[index]
+        prs.part.drop_rel(slide_id.rId)
+        del slide_id_list[index]
+
+    # 전체 브랜치 서비스(BS성과)_운영: 4페이지
+    fill_stats_slide(prs.slides[3], sent_activity_counts(report_df), cloud_customer_counts())
+
+    sections = {
+        "이성환": [5, 6, 7, 8],
+        "임인지": [9, 10, 11, 12],
+        "전준수": [13, 14, 15, 16],
+        "이수현": [17, 18, 19, 20],
+        "하성춘": [21, 22, 23, 24],
+        "길민종": [25, 26, 27],
+    }
+    sent_names = set(report_df["담당자"].dropna().astype(str)) if "담당자" in report_df.columns else set()
+
+    for name, idxs in sections.items():
+        if name not in sent_names:
+            continue
+        stats_idx = idxs[1]
+        open_idx = idxs[2] if len(idxs) > 2 else None
+        link_idx = idxs[3] if len(idxs) > 3 else None
+        fill_stats_slide(prs.slides[stats_idx], sent_activity_counts(report_df, name), cloud_customer_counts(name))
+        if open_idx is not None:
+            fill_major_slide(prs.slides[open_idx], uploaded_major_rows(name, "개설", "일반 개설"))
+        if link_idx is not None:
+            fill_major_slide(prs.slides[link_idx], uploaded_major_rows(name, "연계", "추가 연계"))
+
+    # 전송된 담당자 외 개인성과 섹션은 제거
+    remove_indices = []
+    for name, idxs in sections.items():
+        if name not in sent_names:
+            remove_indices.extend(idxs)
+    for idx in sorted(remove_indices, reverse=True):
+        if idx < len(prs.slides):
+            delete_slide(idx)
 
     output = BytesIO()
     prs.save(output)
