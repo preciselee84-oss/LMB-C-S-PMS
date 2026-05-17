@@ -315,8 +315,9 @@ def render_manual_perf_input_table(base):
                 )
 
         input_key = f"manual_perf_input_{idx}_{row['구분']}"
-        if input_key not in st.session_state:
-            st.session_state[input_key] = int(row.get("입력(건)", 0))
+        text_input_key = f"{input_key}_text"
+        if text_input_key not in st.session_state:
+            st.session_state[text_input_key] = str(int(row.get("입력(건)", 0)))
 
         with row_cols[4]:
             st.markdown(
@@ -325,8 +326,7 @@ def render_manual_perf_input_table(base):
             )
             input_raw = st.text_input(
                 f"입력(건) {row['구분']}",
-                value=str(int(st.session_state[input_key])),
-                key=input_key,
+                key=text_input_key,
                 label_visibility="collapsed",
             )
             st.markdown("</div>", unsafe_allow_html=True)
