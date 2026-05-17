@@ -829,6 +829,13 @@ def show_user_history():
     with col1:
         u_file = st.file_uploader("활동실적 엑셀 업로드", type=["xlsx"])
 
+    # 파일이 제거되면 데이터 초기화
+    if u_file is None:
+        if st.session_state.get("user_excel_data") is not None:
+            st.session_state.user_excel_data = None
+            st.session_state.user_excel_file_key = None
+            st.rerun()
+
     # 파일 업로드 시 자동 처리
     if u_file is not None:
         file_key = f"{u_file.name}_{u_file.size}"
