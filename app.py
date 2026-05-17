@@ -780,12 +780,12 @@ def load_csv_to_state(url_key, state_key):
 
 
 def select_prev_month(state_key, widget_key):
-    if st.button("구글시트 최신 조회"):
+    # 구글시트 자동 조회 (analysis_lookup_df가 없을 때만)
+    if st.session_state.analysis_lookup_df is None:
         try:
             load_csv_to_state("url_analysis", "analysis_lookup_df")
-            st.success("동기화 완료")
         except Exception:
-            st.error("구글시트 URL을 확인해주세요.")
+            pass
 
     if st.session_state.analysis_lookup_df is not None:
         c_df = st.session_state.analysis_lookup_df.copy()
