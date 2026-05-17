@@ -1039,8 +1039,25 @@ def show_final_check():
             if source_col in my_res.columns:
                 first_value = int(float(my_res.iloc[0].get(source_col, 0)))
 
-            if uploaded_exists and source_col in uploaded_my_res.columns:
-                uploaded_value = int(float(uploaded_my_res.iloc[0].get(source_col, 0)))
+            # 운영건수/포인트(실제 활동)은 재업로드 파일에서 "운영"만 카운트
+            if uploaded_exists:
+                if label in ["운영건수 (실제 활동)", "운영포인트 (실제 활동)"]:
+                    uploaded_df_calc = uploaded_df.copy()
+                    u_col_calc = find_col(uploaded_df_calc, ["등록자", "담당자", "성명"], "등록자")
+                    d_col_calc = find_col(uploaded_df_calc, ["활동상세", "활동내용"], "활동상세")
+
+                    if u_col_calc in uploaded_df_calc.columns and d_col_calc in uploaded_df_calc.columns:
+                        user_data = uploaded_df_calc[uploaded_df_calc[u_col_calc] == st.session_state.user_name]
+                        operation_count = user_data[user_data[d_col_calc].astype(str).str.contains("운영", na=False)].shape[0]
+
+                        if label == "운영건수 (실제 활동)":
+                            uploaded_value = operation_count
+                        else:  # 운영포인트 (실제 활동)
+                            uploaded_value = operation_count * 30
+                    else:
+                        uploaded_value = 0
+                elif source_col in uploaded_my_res.columns:
+                    uploaded_value = int(float(uploaded_my_res.iloc[0].get(source_col, 0)))
             # match_value는 비워둠 (일치여부 체크 안함)
         else:
             if source_col in my_res.columns:
