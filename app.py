@@ -2028,25 +2028,18 @@ def sent_uploaded_files_excel_bytes():
             "안내": pd.DataFrame([{"내용": "아직 전송된 업로드 엑셀 파일이 없습니다. 직원이 실적 결과 전송을 다시 진행하면 이 파일에 포함됩니다."}])
         })
 
-    sheets = {}
-    used_names = set()
+    # 모든 사용자의 데이터를 하나의 시트로 합치기
+    all_data = []
     for name, payload in sent_uploads_db.items():
         df = upload_payload_to_dataframe(payload)
-        if df.empty:
-            continue
+        if not df.empty:
+            all_data.append(df)
 
-        sheet_name = str(name)[:31] or "담당자"
-        base_name = sheet_name
-        suffix = 1
-        while sheet_name in used_names:
-            suffix_text = f"_{suffix}"
-            sheet_name = f"{base_name[:31 - len(suffix_text)]}{suffix_text}"
-            suffix += 1
-        used_names.add(sheet_name)
-        sheets[sheet_name] = df
-
-    if not sheets:
-        sheets["안내"] = pd.DataFrame([{"내용": "저장된 업로드 파일 데이터가 비어 있습니다."}])
+    if all_data:
+        combined_df = pd.concat(all_data, ignore_index=True)
+        sheets = {"전체 활동 이력": combined_df}
+    else:
+        sheets = {"안내": pd.DataFrame([{"내용": "저장된 업로드 파일 데이터가 비어 있습니다."}])}
 
     return dataframe_to_excel_bytes(sheets)
 
