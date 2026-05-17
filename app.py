@@ -780,11 +780,14 @@ def load_csv_to_state(url_key, state_key):
 
 
 def select_prev_month(state_key, widget_key):
-    # 구글시트 최신 데이터 자동 조회
-    try:
-        load_csv_to_state("url_analysis", "analysis_lookup_df")
-    except Exception:
-        pass
+    # 초기 로드 시 구글시트 자동 조회
+    prev_sel_key = f"{widget_key}_prev"
+
+    if st.session_state.analysis_lookup_df is None:
+        try:
+            load_csv_to_state("url_analysis", "analysis_lookup_df")
+        except Exception:
+            pass
 
     if st.session_state.analysis_lookup_df is not None:
         c_df = st.session_state.analysis_lookup_df.copy()
@@ -793,6 +796,18 @@ def select_prev_month(state_key, widget_key):
             c_df[d_col] = pd.to_datetime(c_df[d_col], errors="coerce")
             opts = sorted(c_df[d_col].dropna().dt.strftime("%Y-%m").unique(), reverse=True)
             sel = st.selectbox("비교할 전월 선택", ["선택안함"] + list(opts), key=widget_key)
+
+            # 선택값이 변경되었을 때 구글시트 재조회
+            prev_sel = st.session_state.get(prev_sel_key)
+            if prev_sel != sel and prev_sel is not None:
+                try:
+                    load_csv_to_state("url_analysis", "analysis_lookup_df")
+                    c_df = st.session_state.analysis_lookup_df.copy()
+                    c_df[d_col] = pd.to_datetime(c_df[d_col], errors="coerce")
+                except Exception:
+                    pass
+
+            st.session_state[prev_sel_key] = sel
             st.session_state[state_key] = c_df[c_df[d_col].dt.strftime("%Y-%m") == sel] if sel != "선택안함" else None
 
 
@@ -1575,6 +1590,10 @@ def show_final_check():
     else:
         # 최종 실적 표시
         if not my_res.empty:
+            # 실적 표 표시 (전송시각 제외)
+            display_res = my_res.drop(columns=["전송시각"], errors="ignore")
+            style_report_logic(display_res, compact=True)
+
             개설건수 = int(my_res.iloc[0].get("개설건수", 0))
             연계건수 = int(my_res.iloc[0].get("연계건수", 0))
             운영건수_실제 = int(my_res.iloc[0].get("운영건수 (실제 활동)", 0))
