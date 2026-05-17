@@ -215,6 +215,131 @@ def criteria_df():
     return pd.DataFrame(data, columns=["활동구분", "구분", "단위 점수", "월 최대점수"])
 
 
+def render_manual_perf_input_table(base):
+    st.markdown(
+        """
+        <style>
+        .manual-perf-table {
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+        .manual-perf-head {
+            background: #EDF2F7;
+            color: #4A5568;
+            font-weight: 800;
+            font-size: 13px;
+            padding: 9px 12px;
+            text-align: center;
+            border-bottom: 2px solid #E2E8F0;
+            border-right: 1px solid #E2E8F0;
+            white-space: nowrap;
+            min-height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .manual-perf-cell {
+            color: #2D3748;
+            font-size: 13px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #EDF2F7;
+            border-right: 1px solid #E2E8F0;
+            white-space: nowrap;
+            min-height: 38px;
+            display: flex;
+            align-items: center;
+        }
+        .manual-perf-center { justify-content: center; text-align: center; }
+        .manual-perf-right { justify-content: flex-end; text-align: right; }
+        .manual-perf-input div[data-testid="stNumberInput"] {
+            margin: 0 !important;
+        }
+        .manual-perf-input div[data-testid="stNumberInput"] label {
+            display: none !important;
+        }
+        .manual-perf-input input {
+            text-align: right !important;
+            font-size: 13px !important;
+            height: 38px !important;
+            padding: 8px 12px !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            background: transparent !important;
+        }
+        .manual-perf-input button {
+            display: none !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    def is_number_like(value):
+        try:
+            if pd.isna(value):
+                return False
+            float(str(value).replace(",", ""))
+            return True
+        except Exception:
+            return False
+
+    def fmt_value(value):
+        if pd.isna(value):
+            return ""
+        if is_number_like(value):
+            return f"{int(float(str(value).replace(',', ''))):,}"
+        return html.escape(str(value))
+
+    st.markdown("<div class='manual-perf-table'>", unsafe_allow_html=True)
+    headers = ["활동구분", "구분", "단위 점수", "월 최대점수", "입력(건)"]
+    header_cols = st.columns([0.22, 0.36, 0.14, 0.14, 0.14], gap=None)
+    for col, header in zip(header_cols, headers):
+        with col:
+            st.markdown(f"<div class='manual-perf-head'>{header}</div>", unsafe_allow_html=True)
+
+    edited_rows = []
+    for idx, row in base.reset_index(drop=True).iterrows():
+        bg = "#FFFFFF" if idx % 2 == 0 else "#F7FAFC"
+        row_cols = st.columns([0.22, 0.36, 0.14, 0.14, 0.14], gap=None)
+        values = [row["활동구분"], row["구분"], row["단위 점수"], row["월 최대점수"]]
+
+        for cell_col, value in zip(row_cols[:4], values):
+            align = "manual-perf-right" if is_number_like(value) else "manual-perf-center"
+            with cell_col:
+                st.markdown(
+                    f"<div class='manual-perf-cell {align}' style='background:{bg};'>{fmt_value(value)}</div>",
+                    unsafe_allow_html=True,
+                )
+
+        input_key = f"manual_perf_input_{idx}_{row['구분']}"
+        if input_key not in st.session_state:
+            st.session_state[input_key] = int(row.get("입력(건)", 0))
+
+        with row_cols[4]:
+            st.markdown(
+                f"<div class='manual-perf-input' style='background:{bg};border-bottom:1px solid #EDF2F7;'>",
+                unsafe_allow_html=True,
+            )
+            input_count = st.number_input(
+                f"입력(건) {row['구분']}",
+                min_value=0,
+                step=1,
+                key=input_key,
+                label_visibility="collapsed",
+            )
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        edited_row = row.to_dict()
+        edited_row["입력(건)"] = int(input_count)
+        edited_rows.append(edited_row)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+    return pd.DataFrame(edited_rows)
+
+
 def manual_points_for_user(name):
     perf_db = load_db(PERF_FILE, {})
     saved = perf_db.get(name, {})
@@ -1197,136 +1322,7 @@ def show_user_history():
     saved = load_db(PERF_FILE, {}).get(st.session_state.user_name, {})
     base["입력(건)"] = base["구분"].map(saved).fillna(0).astype(int)
 
-    # 실적 예상치 검증 리포트와 동일한 디자인 적용
-    st.markdown("""
-        <style>
-        /* 전체 컨테이너 스타일 */
-        div[data-testid="stDataFrameResizable"] {
-            border: 1px solid #E2E8F0 !important;
-            border-radius: 10px !important;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
-            margin-bottom: 1rem !important;
-        }
-
-        /* 헤더 스타일 - 회색 배경, 굵은 글씨, 가운데 정렬 */
-        div[data-testid="stDataFrameResizable"] th {
-            background: #EDF2F7 !important;
-            color: #4A5568 !important;
-            font-weight: 800 !important;
-            font-size: 13px !important;
-            padding: 9px 12px !important;
-            text-align: center !important;
-            border-bottom: 2px solid #E2E8F0 !important;
-            white-space: nowrap !important;
-        }
-
-        /* 모든 셀 기본 스타일 */
-        div[data-testid="stDataFrameResizable"] td {
-            padding: 8px 12px !important;
-            border-bottom: 1px solid #EDF2F7 !important;
-            font-size: 13px !important;
-            color: #2D3748 !important;
-            white-space: nowrap !important;
-        }
-
-        /* 활동구분, 구분 컬럼 - 가운데 정렬 */
-        div[data-testid="stDataFrameResizable"] td:nth-child(1),
-        div[data-testid="stDataFrameResizable"] td:nth-child(2) {
-            text-align: center !important;
-        }
-
-        /* 단위 점수, 월 최대점수 - 오른쪽 정렬 */
-        div[data-testid="stDataFrameResizable"] td:nth-child(3),
-        div[data-testid="stDataFrameResizable"] td:nth-child(4) {
-            text-align: right !important;
-        }
-
-        /* 입력(건) 컬럼 - 숫자 오른쪽 정렬 */
-        div[data-testid="stDataFrameResizable"] td:nth-child(5) {
-            text-align: right !important;
-        }
-
-        /* 입력 필드 스타일 */
-        div[data-testid="stDataFrameResizable"] input {
-            text-align: right !important;
-            font-size: 13px !important;
-        }
-
-        /* 행 배경색 교차 */
-        div[data-testid="stDataFrameResizable"] tbody tr:nth-child(even) {
-            background: #F7FAFC !important;
-        }
-        div[data-testid="stDataFrameResizable"] tbody tr:nth-child(odd) {
-            background: #FFFFFF !important;
-        }
-
-        div[data-testid="stDataEditor"] {
-            border: 1px solid #E2E8F0 !important;
-            border-radius: 10px !important;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
-            overflow: hidden !important;
-            margin-bottom: 1rem !important;
-        }
-
-        div[data-testid="stDataEditor"] [role="columnheader"] {
-            background: #EDF2F7 !important;
-            color: #4A5568 !important;
-            font-weight: 800 !important;
-            font-size: 13px !important;
-            text-align: center !important;
-            border-bottom: 2px solid #E2E8F0 !important;
-            white-space: nowrap !important;
-        }
-
-        div[data-testid="stDataEditor"] [role="gridcell"] {
-            border-bottom: 1px solid #EDF2F7 !important;
-            color: #2D3748 !important;
-            font-size: 13px !important;
-            white-space: nowrap !important;
-        }
-
-        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="1"],
-        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="2"] {
-            text-align: center !important;
-        }
-
-        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="3"],
-        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="4"],
-        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="5"] {
-            text-align: right !important;
-        }
-
-        div[data-testid="stDataEditor"] input {
-            text-align: right !important;
-            white-space: nowrap !important;
-        }
-
-        div[data-testid="stDataEditor"] [role="row"]:nth-child(even) [role="gridcell"] {
-            background: #F7FAFC !important;
-        }
-
-        div[data-testid="stDataEditor"] [role="row"]:nth-child(odd) [role="gridcell"] {
-            background: #FFFFFF !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    edited = st.data_editor(
-        base,
-        use_container_width=True,
-        hide_index=True,
-        height=565,
-        num_rows="fixed",
-        column_order=["활동구분", "구분", "단위 점수", "월 최대점수", "입력(건)"],
-        column_config={
-            "활동구분": st.column_config.TextColumn("활동구분", width="medium"),
-            "구분": st.column_config.TextColumn("구분", width="large"),
-            "단위 점수": st.column_config.NumberColumn("단위 점수", disabled=True, width="small"),
-            "월 최대점수": st.column_config.TextColumn("월 최대점수", disabled=True, width="small"),
-            "입력(건)": st.column_config.NumberColumn("입력(건)", min_value=0, step=1, default=0, width="small"),
-        },
-        disabled=["활동구분", "구분", "단위 점수", "월 최대점수"],
-    )
+    edited = render_manual_perf_input_table(base)
 
     edited["입력(건)"] = edited["입력(건)"].fillna(0).astype(int)
     edited["계산점수"] = edited["단위 점수"] * edited["입력(건)"]
@@ -2025,23 +2021,26 @@ def show_report():
 
     shared_cols = [c for c in compare_cols if c in report_df.columns and c in prev_res.columns]
 
-    for name in report_df["담당자"].tolist():
-        curr_row = report_df[report_df["담당자"] == name]
-        prev_row = prev_res[prev_res["담당자"] == name]
+    names = report_df["담당자"].tolist()
+    for start in range(0, len(names), 2):
+        person_cols = st.columns(2)
+        for person_col, name in zip(person_cols, names[start:start + 2]):
+            curr_row = report_df[report_df["담당자"] == name]
+            prev_row = prev_res[prev_res["담당자"] == name]
 
-        if curr_row.empty:
-            continue
+            if curr_row.empty:
+                continue
 
-        rank = curr_row.iloc[0].get("직급", "")
-        st.markdown(f"#### {name} ({rank})")
+            rank = curr_row.iloc[0].get("직급", "")
+            rows = []
+            for col in shared_cols:
+                c_val = int(float(curr_row.iloc[0][col]))
+                p_val = int(float(prev_row.iloc[0][col])) if not prev_row.empty else 0
+                rows.append({"항목": col, prev_month_label: p_val, curr_month_label: c_val, "증감": c_val - p_val})
 
-        rows = []
-        for col in shared_cols:
-            c_val = int(float(curr_row.iloc[0][col]))
-            p_val = int(float(prev_row.iloc[0][col])) if not prev_row.empty else 0
-            rows.append({"항목": col, prev_month_label: p_val, curr_month_label: c_val, "증감": c_val - p_val})
-
-        style_report_logic(pd.DataFrame(rows))
+            with person_col:
+                st.markdown(f"#### {name} ({rank})")
+                style_report_logic(pd.DataFrame(rows), compact=True)
 
 
 def show_staff_admin():
