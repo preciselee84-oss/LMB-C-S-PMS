@@ -1110,18 +1110,25 @@ def show_user_history():
     st.divider()
     st.markdown("### 추가 실적 입력")
 
-    # 디자인 개선 CSS (스크롤바는 유지)
-    st.markdown("""
+    base = criteria_df()
+    saved = load_db(PERF_FILE, {}).get(st.session_state.user_name, {})
+    base["입력(건)"] = base["구분"].map(saved).fillna(0).astype(int)
+
+    # 행 수에 맞는 높이 계산 (헤더 50px + 행당 45px)
+    table_height = 50 + len(base) * 45
+
+    # 디자인 개선 CSS
+    st.markdown(f"""
         <style>
         /* 실적 예상치 검증 리포트 스타일 적용 */
-        div[data-testid="stDataFrameResizable"] {
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] {{
             border: 1px solid #E2E8F0 !important;
             border-radius: 10px !important;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
-        }
+        }}
 
         /* 헤더 스타일 */
-        div[data-testid="stDataFrameResizable"] th {
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] thead th {{
             background: #EDF2F7 !important;
             color: #4A5568 !important;
             font-weight: 800 !important;
@@ -1129,48 +1136,59 @@ def show_user_history():
             padding: 9px 12px !important;
             text-align: center !important;
             border-bottom: 2px solid #E2E8F0 !important;
-        }
+        }}
 
-        /* 셀 정렬 및 스타일 */
-        div[data-testid="stDataFrameResizable"] td {
+        /* 셀 기본 스타일 */
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td {{
             padding: 8px 12px !important;
             border-bottom: 1px solid #EDF2F7 !important;
             font-size: 13px !important;
             color: #2D3748 !important;
-        }
+        }}
 
-        /* 문자 컬럼 가운데 정렬 */
-        div[data-testid="stDataFrameResizable"] td:nth-child(1),
-        div[data-testid="stDataFrameResizable"] td:nth-child(2) {
+        /* 문자 컬럼 가운데 정렬 (활동구분, 구분) */
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(1),
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(2) {{
             text-align: center !important;
-        }
+        }}
 
-        /* 숫자 컬럼 오른쪽 정렬 */
-        div[data-testid="stDataFrameResizable"] td:nth-child(3),
-        div[data-testid="stDataFrameResizable"] td:nth-child(4),
-        div[data-testid="stDataFrameResizable"] td:nth-child(5),
-        div[data-testid="stDataFrameResizable"] td:nth-child(6) {
+        /* 입력 필드도 가운데 정렬 */
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(1) input,
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(2) input {{
+            text-align: center !important;
+        }}
+
+        /* 숫자 컬럼 오른쪽 정렬 (단위 점수, 월 최대점수, 입력(건), 계산점수) */
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(3),
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(4),
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(5),
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(6) {{
             text-align: right !important;
-        }
+        }}
+
+        /* 숫자 입력 필드도 오른쪽 정렬 */
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(3) input,
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(4) input,
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(5) input,
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(6) input {{
+            text-align: right !important;
+        }}
 
         /* 행 배경색 교차 */
-        div[data-testid="stDataFrameResizable"] tbody tr:nth-child(even) {
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody tr:nth-child(even) {{
             background: #F7FAFC !important;
-        }
-        div[data-testid="stDataFrameResizable"] tbody tr:nth-child(odd) {
+        }}
+        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody tr:nth-child(odd) {{
             background: #FFFFFF !important;
-        }
+        }}
         </style>
     """, unsafe_allow_html=True)
-
-    base = criteria_df()
-    saved = load_db(PERF_FILE, {}).get(st.session_state.user_name, {})
-    base["입력(건)"] = base["구분"].map(saved).fillna(0).astype(int)
 
     edited = st.data_editor(
         base,
         use_container_width=True,
         hide_index=True,
+        height=table_height,
         num_rows="fixed",
         column_config={"입력(건)": st.column_config.NumberColumn("입력(건)", min_value=0, step=1, default=0)},
         disabled=["활동구분", "구분", "단위 점수", "월 최대점수"],
