@@ -1601,9 +1601,20 @@ def show_final_check():
             운영건수 = min(60, 운영건수_실제 + 운영건수_추가)
             지급예상금액 = int(my_res.iloc[0].get("지급예상금액", 0))
 
+            # 전월대비 정보
+            전월대비_text = ""
+            전월대비_col = next((c for c in my_res.columns if "전월대비" in c), None)
+            if 전월대비_col:
+                전월대비 = int(my_res.iloc[0].get(전월대비_col, 0))
+                if 전월대비 > 0:
+                    전월대비_text = f" 전월대비 <b>{전월대비:,}</b>원 증가하였습니다."
+                elif 전월대비 < 0:
+                    전월대비_text = f" 전월대비 <b>{abs(전월대비):,}</b>원 감소하였습니다."
+
             st.markdown(
                 f"<div style='margin-top:8px;padding:10px 16px;background:#EBF8FF;border-radius:8px;font-size:13px;color:#2B6CB0;'>"
-                f"<b>{html.escape(uname)}</b>님의 최종 실적은 개설 <b>{개설건수}</b>개, 연계 <b>{연계건수}</b>개, 운영 <b>{운영건수}</b>개 에 금액은 <b>{지급예상금액:,}</b>원 입니다.</div>",
+                f"<b>{html.escape(uname)}</b>님의 최종 실적은 개설 <b>{개설건수}</b>개, 연계 <b>{연계건수}</b>개, 운영 <b>{운영건수}</b>개 에 금액은 <b>{지급예상금액:,}</b>원 입니다."
+                f"{전월대비_text}</div>",
                 unsafe_allow_html=True,
             )
 
