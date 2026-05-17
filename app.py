@@ -894,6 +894,117 @@ def show_user_history():
     elif isinstance(res, str):
         st.error(res)
 
+    # 탭 데이터 미리 계산 (경고 메시지 표시용)
+    # 초과 방문 데이터 계산
+    err_filtered = pd.DataFrame()
+    if err is not None and not err.empty:
+        if "담당자" in err.columns:
+            err_my = err[err["담당자"] == st.session_state.user_name].copy()
+        else:
+            err_my = err.copy()
+        err_filtered = err_my[err_my["일방문"] >= 5].copy()
+
+    # 기타 오류 데이터 계산
+    other_errors = []
+    if not df_user.empty:
+        date_col_user = find_col(df_user, ["활동일", "일자"], "활동일")
+        detail_col = find_col(df_user, ["활동상세", "활동내용"], "활동상세")
+        biz_col_user = find_col(df_user, ["사업자번호"], "사업자번호")
+        comp_col_user = find_col(df_user, ["업체명", "상호"], "업체명")
+        user_col = find_col(df_user, ["등록자", "담당자", "성명"], "등록자")
+
+        if date_col_user and date_col_user in df_user.columns:
+            df_check_errors = df_user.copy()
+            df_check_errors[date_col_user] = pd.to_datetime(df_check_errors[date_col_user], errors="coerce")
+
+            holidays = [
+                "2026-01-01", "2026-03-01", "2026-05-05", "2026-06-06",
+                "2026-08-15", "2026-10-03", "2026-10-09", "2026-12-25"
+            ]
+            holiday_dates = pd.to_datetime(holidays)
+
+            for idx, row in df_check_errors.iterrows():
+                activity_date = row[date_col_user]
+                if pd.isna(activity_date):
+                    continue
+
+                error_reason = None
+                if activity_date.weekday() in [5, 6]:
+                    day_name = "토요일" if activity_date.weekday() == 5 else "일요일"
+                    error_reason = f"주말 활동 ({day_name})"
+                if activity_date.normalize() in holiday_dates:
+                    error_reason = "공휴일 활동"
+
+                if error_reason:
+                    other_errors.append({
+                        "업체명": row.get(comp_col_user, "") if comp_col_user else "",
+                        "사업자번호": row.get(biz_col_user, "") if biz_col_user else "",
+                        "등록자": row.get(user_col, "") if user_col else "",
+                        "활동일": activity_date.strftime("%Y-%m-%d"),
+                        "활동상세": row.get(detail_col, "") if detail_col else "",
+                        "오류 사유": error_reason
+                    })
+
+            prev_df = st.session_state.get("auto_prev_df")
+            if prev_df is not None and not prev_df.empty and biz_col_user and detail_col:
+                prev_biz_col = find_col(prev_df, ["사업자번호"], "사업자번호")
+                prev_detail_col = find_col(prev_df, ["활동상세", "활동내용"], "활동상세")
+
+                if prev_biz_col and prev_detail_col:
+                    prev_open_biz = prev_df[prev_df[prev_detail_col].astype(str).str.contains("개설", na=False)][prev_biz_col].unique()
+                    prev_link_biz = prev_df[prev_detail_col].astype(str).str.contains("연계", na=False)
+                    prev_link_biz = prev_df[prev_link_biz][prev_biz_col].unique()
+
+                    for idx, row in df_check_errors.iterrows():
+                        biz_num = str(row.get(biz_col_user, "")).strip()
+                        activity_detail = str(row.get(detail_col, ""))
+
+                        if not biz_num:
+                            continue
+
+                        if "개설" in activity_detail and biz_num in prev_open_biz:
+                            activity_date = row[date_col_user]
+                            if pd.notna(activity_date):
+                                other_errors.append({
+                                    "업체명": row.get(comp_col_user, "") if comp_col_user else "",
+                                    "사업자번호": biz_num,
+                                    "등록자": row.get(user_col, "") if user_col else "",
+                                    "활동일": activity_date.strftime("%Y-%m-%d"),
+                                    "활동상세": activity_detail,
+                                    "오류 사유": "전월에 이미 개설 기록 존재"
+                                })
+
+                        if "연계" in activity_detail and biz_num in prev_link_biz:
+                            activity_date = row[date_col_user]
+                            if pd.notna(activity_date):
+                                other_errors.append({
+                                    "업체명": row.get(comp_col_user, "") if comp_col_user else "",
+                                    "사업자번호": biz_num,
+                                    "등록자": row.get(user_col, "") if user_col else "",
+                                    "활동일": activity_date.strftime("%Y-%m-%d"),
+                                    "활동상세": activity_detail,
+                                    "오류 사유": "전월에 이미 연계 기록 존재"
+                                })
+
+    other_errors_df = pd.DataFrame(other_errors)
+
+    # 경고 메시지 표시
+    error_tabs = []
+    if not err_filtered.empty:
+        error_tabs.append("초과 방문")
+    if not other_errors_df.empty:
+        error_tabs.append("기타 오류")
+
+    if error_tabs:
+        error_list = ", ".join(error_tabs)
+        st.markdown(
+            f"<div style='margin-top:12px;margin-bottom:12px;padding:12px 16px;background:#FFF3CD;border-left:4px solid #FFC107;border-radius:4px;'>"
+            f"<div style='font-size:14px;color:#856404;'><b>⚠️ 다음 항목을 수정해주세요:</b> {error_list}</div>"
+            f"<div style='margin-top:4px;font-size:13px;color:#856404;'>위 탭에서 문제를 해결한 후 엑셀을 다시 업로드해주세요.</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
     t1, t2, t3, t4, t5 = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
 
     with t1:
@@ -908,32 +1019,8 @@ def show_user_history():
         style_report_logic(dup_my)
 
     with t2:
-        err_filtered = pd.DataFrame()
-        if err is not None and not err.empty:
-            # 본인 데이터만 필터링
-            if "담당자" in err.columns:
-                err_my = err[err["담당자"] == st.session_state.user_name].copy()
-            else:
-                err_my = err.copy()
-
-            err_filtered = err_my[err_my["일방문"] >= 5].copy()
-
+        if not err_filtered.empty:
             style_report_logic(err_filtered.drop(columns=["월총방문"], errors="ignore"))
-
-            # 최종 실적 표시
-            if not err_filtered.empty and not my_res.empty:
-                개설건수 = int(my_res.iloc[0].get("개설건수", 0))
-                연계건수 = int(my_res.iloc[0].get("연계건수", 0))
-                운영건수_실제 = int(my_res.iloc[0].get("운영건수 (실제 활동)", 0))
-                운영건수_추가 = int(my_res.iloc[0].get("운영건수 (추가 활동)", 0))
-                운영건수 = min(60, 운영건수_실제 + 운영건수_추가)
-                지급예상금액 = int(my_res.iloc[0].get("지급예상금액", 0))
-
-                st.markdown(
-                    f"<div style='margin-top:8px;padding:10px 16px;background:#EBF8FF;border-radius:8px;font-size:13px;color:#2B6CB0;'>"
-                    f"<b>{html.escape(st.session_state.user_name)}</b>님의 최종 실적은 개설 <b>{개설건수}</b>개, 연계 <b>{연계건수}</b>개, 운영 <b>{운영건수}</b>개 에 금액은 <b>{지급예상금액:,}</b>원 입니다.</div>",
-                    unsafe_allow_html=True,
-                )
         else:
             st.info("초과 방문 데이터가 없습니다.")
 
@@ -961,96 +1048,6 @@ def show_user_history():
             st.info("본사 구글시트에 ERP연계일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
 
     with t5:
-        # 기타 오류 체크
-        other_errors = []
-
-        if not df_user.empty:
-            date_col_user = find_col(df_user, ["활동일", "일자"], "활동일")
-            detail_col = find_col(df_user, ["활동상세", "활동내용"], "활동상세")
-            biz_col_user = find_col(df_user, ["사업자번호"], "사업자번호")
-            comp_col_user = find_col(df_user, ["업체명", "상호"], "업체명")
-            user_col = find_col(df_user, ["등록자", "담당자", "성명"], "등록자")
-
-            if date_col_user and date_col_user in df_user.columns:
-                df_check_errors = df_user.copy()
-                df_check_errors[date_col_user] = pd.to_datetime(df_check_errors[date_col_user], errors="coerce")
-
-                # 1. 주말/공휴일 체크
-                holidays = [
-                    "2026-01-01", "2026-03-01", "2026-05-05", "2026-06-06",
-                    "2026-08-15", "2026-10-03", "2026-10-09", "2026-12-25"
-                ]
-                holiday_dates = pd.to_datetime(holidays)
-
-                for idx, row in df_check_errors.iterrows():
-                    activity_date = row[date_col_user]
-                    if pd.isna(activity_date):
-                        continue
-
-                    error_reason = None
-
-                    # 주말 체크
-                    if activity_date.weekday() in [5, 6]:
-                        day_name = "토요일" if activity_date.weekday() == 5 else "일요일"
-                        error_reason = f"주말 활동 ({day_name})"
-
-                    # 공휴일 체크
-                    if activity_date.normalize() in holiday_dates:
-                        error_reason = "공휴일 활동"
-
-                    if error_reason:
-                        other_errors.append({
-                            "업체명": row.get(comp_col_user, "") if comp_col_user else "",
-                            "사업자번호": row.get(biz_col_user, "") if biz_col_user else "",
-                            "등록자": row.get(user_col, "") if user_col else "",
-                            "활동일": activity_date.strftime("%Y-%m-%d"),
-                            "활동상세": row.get(detail_col, "") if detail_col else "",
-                            "오류 사유": error_reason
-                        })
-
-                # 2. 전월 대비 중복 개설/연계 체크
-                prev_df = st.session_state.get("auto_prev_df")
-                if prev_df is not None and not prev_df.empty and biz_col_user and detail_col:
-                    prev_biz_col = find_col(prev_df, ["사업자번호"], "사업자번호")
-                    prev_detail_col = find_col(prev_df, ["활동상세", "활동내용"], "활동상세")
-
-                    if prev_biz_col and prev_detail_col:
-                        prev_open_biz = prev_df[prev_df[prev_detail_col].astype(str).str.contains("개설", na=False)][prev_biz_col].unique()
-                        prev_link_biz = prev_df[prev_detail_col].astype(str).str.contains("연계", na=False)
-                        prev_link_biz = prev_df[prev_link_biz][prev_biz_col].unique()
-
-                        for idx, row in df_check_errors.iterrows():
-                            biz_num = str(row.get(biz_col_user, "")).strip()
-                            activity_detail = str(row.get(detail_col, ""))
-
-                            if not biz_num:
-                                continue
-
-                            if "개설" in activity_detail and biz_num in prev_open_biz:
-                                activity_date = row[date_col_user]
-                                if pd.notna(activity_date):
-                                    other_errors.append({
-                                        "업체명": row.get(comp_col_user, "") if comp_col_user else "",
-                                        "사업자번호": biz_num,
-                                        "등록자": row.get(user_col, "") if user_col else "",
-                                        "활동일": activity_date.strftime("%Y-%m-%d"),
-                                        "활동상세": activity_detail,
-                                        "오류 사유": "전월에 이미 개설 기록 존재"
-                                    })
-
-                            if "연계" in activity_detail and biz_num in prev_link_biz:
-                                activity_date = row[date_col_user]
-                                if pd.notna(activity_date):
-                                    other_errors.append({
-                                        "업체명": row.get(comp_col_user, "") if comp_col_user else "",
-                                        "사업자번호": biz_num,
-                                        "등록자": row.get(user_col, "") if user_col else "",
-                                        "활동일": activity_date.strftime("%Y-%m-%d"),
-                                        "활동상세": activity_detail,
-                                        "오류 사유": "전월에 이미 연계 기록 존재"
-                                    })
-
-        other_errors_df = pd.DataFrame(other_errors)
         style_report_logic(other_errors_df)
 
     st.divider()
