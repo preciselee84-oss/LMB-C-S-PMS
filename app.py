@@ -538,6 +538,9 @@ def style_report_logic(df, compact=False):
 
     df = strip_activity_time_columns(df)
 
+    # 지사, 상품 컬럼 제거
+    df = df.drop(columns=["지사", "상품"], errors="ignore")
+
     diff_cols = [c for c in df.columns if "전월대비" in str(c) or "증감" in str(c) or "대비" in str(c)]
     exclude_from_num = ["담당자", "직급", "전송시각", "등록월", "항목", "일치여부"] + [c for c in df.columns if "사업자번호" in str(c)]
     num_cols = [c for c in df.columns if c not in exclude_from_num + diff_cols]
