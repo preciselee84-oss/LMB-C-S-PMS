@@ -935,7 +935,15 @@ def show_final_check():
         return
 
     original_df = st.session_state.user_excel_data
-    res, _, _ = process_performance_analysis(original_df, st.session_state.get("auto_prev_df"))
+
+    # Filter user data and attach cloud dates for tabs
+    df_for_tabs = original_df.copy()
+    u_col = find_col(df_for_tabs, ["등록자", "담당자", "성명"], "등록자")
+    d_col = find_col(df_for_tabs, ["활동상세", "활동내용"], "활동상세")
+    df_user = df_for_tabs[df_for_tabs[u_col] == st.session_state.user_name].copy() if u_col in df_for_tabs.columns else pd.DataFrame()
+    df_user = attach_cloud_dates(df_user)
+
+    res, err, dup = process_performance_analysis(original_df, st.session_state.get("auto_prev_df"))
 
     if not isinstance(res, pd.DataFrame) or res.empty:
         st.error(res if isinstance(res, str) else "실적을 계산할 수 없습니다.")
@@ -1046,6 +1054,51 @@ def show_final_check():
 
     cmp_df = pd.DataFrame(cmp_rows)
     style_report_logic(cmp_df)
+
+    # ── 중복방문/초과방문/누락 확인 탭 ──
+    t1, t2, t3, t4 = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락"])
+
+    with t1:
+        style_report_logic(dup)
+
+    with t2:
+        if err is not None and not err.empty:
+            err_filtered = err[(err["일방문"] >= 5) | (err["월총방문"] >= 60)].copy()
+            monthly_map = err_filtered.groupby("담당자")["월총방문"].first().to_dict() if "담당자" in err_filtered.columns else {}
+
+            style_report_logic(err_filtered.drop(columns=["월총방문"], errors="ignore"))
+
+            if monthly_map:
+                parts = "　｜　".join([f"<b>{name}</b>: {cnt:,}회" for name, cnt in monthly_map.items()])
+                st.markdown(
+                    f"<div style='margin-top:8px;padding:10px 16px;background:#EBF8FF;border-radius:8px;font-size:13px;color:#2B6CB0;'>월총방문　{parts}</div>",
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.info("초과 방문 데이터가 없습니다.")
+
+    with t3:
+        if "본사 개설완료일자" in df_user.columns:
+            missing_open = df_user[
+                pd.isna(df_user["본사 개설완료일자"]) | (df_user["본사 개설완료일자"].astype(str).str.strip() == "")
+            ]
+            style_report_logic(missing_open.drop(columns=["본사 ERP연계일자"], errors="ignore"))
+        else:
+            st.info("본사 구글시트에 개설완료일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
+
+    with t4:
+        if "본사 ERP연계일자" in df_user.columns:
+            if d_col and d_col in df_user.columns:
+                target = df_user[df_user[d_col].astype(str).str.contains("연계", na=False)]
+            else:
+                target = df_user
+
+            missing_erp = target[
+                pd.isna(target["본사 ERP연계일자"]) | (target["본사 ERP연계일자"].astype(str).str.strip() == "")
+            ]
+            style_report_logic(missing_erp.drop(columns=["본사 개설완료일자"], errors="ignore"))
+        else:
+            st.info("본사 구글시트에 ERP연계일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
 
     # ── 모든 항목 일치 여부 체크 ──
     all_match = uploaded_exists and all(r.get("일치여부") == "일치" for r in cmp_rows)
