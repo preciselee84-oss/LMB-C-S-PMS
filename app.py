@@ -658,9 +658,8 @@ def show_auth_page():
             background: linear-gradient(150deg, #EAE4FF 0%, #F0ECFF 40%, #F8F6FF 100%) !important;
         }
         .main .block-container {
-            max-width: 560px !important;
-            padding: 64px 24px 48px !important;
-            margin: 0 auto !important;
+            max-width: 100% !important;
+            padding: 64px 0 48px !important;
         }
         .auth-logo-card {
             background: #FFFFFF;
@@ -754,130 +753,133 @@ def show_auth_page():
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        """
-        <div class="auth-logo-card">
-            <div class="auth-logo-title">실적관리 시스템</div>
-            <div class="auth-logo-sub">Performance Management System</div>
-        </div>
-        <div class="auth-form-card">
-        """,
-        unsafe_allow_html=True,
-    )
+    _, center, _ = st.columns([1, 1.2, 1])
 
-    if st.session_state.auth_mode == "login":
-        sid = ""
-        if os.path.exists("saved_id.txt"):
-            try:
-                with open("saved_id.txt", "r", encoding="utf-8") as f:
-                    sid = f.read().strip()
-            except Exception:
-                pass
+    with center:
+        st.markdown(
+            """
+            <div class="auth-logo-card">
+                <div class="auth-logo-title">실적관리 시스템</div>
+                <div class="auth-logo-sub">Performance Management System</div>
+            </div>
+            <div class="auth-form-card">
+            """,
+            unsafe_allow_html=True,
+        )
 
-        u_id = st.text_input("아이디", value=sid, placeholder="아이디를 입력하세요", key="l_id")
-        u_pw = st.text_input("비밀번호", type="password", placeholder="비밀번호를 입력하세요", key="l_pw")
-        save_id_cb = st.checkbox("아이디 저장", value=bool(sid))
+        if st.session_state.auth_mode == "login":
+            sid = ""
+            if os.path.exists("saved_id.txt"):
+                try:
+                    with open("saved_id.txt", "r", encoding="utf-8") as f:
+                        sid = f.read().strip()
+                except Exception:
+                    pass
 
-        if st.button("로그인", use_container_width=True, type="primary"):
-            db = st.session_state.user_db
-            u_id_str = str(u_id).strip() if u_id else ""
-            u_pw_str = str(u_pw).strip() if u_pw else ""
+            u_id = st.text_input("아이디", value=sid, placeholder="아이디를 입력하세요", key="l_id")
+            u_pw = st.text_input("비밀번호", type="password", placeholder="비밀번호를 입력하세요", key="l_pw")
+            save_id_cb = st.checkbox("아이디 저장", value=bool(sid))
 
-            is_super = u_id_str == "1" and u_pw_str == "1"
-            is_user = (
-                u_id_str in db
-                and db[u_id_str].get("pw", "") == u_pw_str
-                and db[u_id_str].get("access") == "허용"
-            )
+            if st.button("로그인", use_container_width=True, type="primary"):
+                db = st.session_state.user_db
+                u_id_str = str(u_id).strip() if u_id else ""
+                u_pw_str = str(u_pw).strip() if u_pw else ""
 
-            if is_super or is_user:
-                if save_id_cb:
-                    try:
-                        with open("saved_id.txt", "w", encoding="utf-8") as f:
-                            f.write(u_id_str)
-                    except Exception:
-                        pass
-                elif os.path.exists("saved_id.txt"):
-                    try:
-                        os.remove("saved_id.txt")
-                    except Exception:
-                        pass
+                is_super = u_id_str == "1" and u_pw_str == "1"
+                is_user = (
+                    u_id_str in db
+                    and db[u_id_str].get("pw", "") == u_pw_str
+                    and db[u_id_str].get("access") == "허용"
+                )
 
-                user = db.get(u_id_str, {"role": "관리자", "name": "최고관리자"})
-                st.session_state.logged_in = True
-                st.session_state.user_role = user.get("role", "관리자")
-                st.session_state.user_name = user.get("name", "최고관리자")
-                st.session_state.login_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
+                if is_super or is_user:
+                    if save_id_cb:
+                        try:
+                            with open("saved_id.txt", "w", encoding="utf-8") as f:
+                                f.write(u_id_str)
+                        except Exception:
+                            pass
+                    elif os.path.exists("saved_id.txt"):
+                        try:
+                            os.remove("saved_id.txt")
+                        except Exception:
+                            pass
 
-                # 저장된 데이터 로드
-                saved_db = load_db(SAVED_STATE_FILE, {})
-                user_saved = saved_db.get(st.session_state.user_name)
-                if user_saved:
-                    if user_saved.get("user_excel_data"):
-                        st.session_state.user_excel_data = pd.DataFrame.from_dict(user_saved["user_excel_data"])
-                    if user_saved.get("final_reupload_df"):
-                        st.session_state.final_reupload_df = pd.DataFrame.from_dict(user_saved["final_reupload_df"])
-                    if user_saved.get("user_prev_month_sel"):
-                        st.session_state.user_prev_month_sel = user_saved["user_prev_month_sel"]
+                    user = db.get(u_id_str, {"role": "관리자", "name": "최고관리자"})
+                    st.session_state.logged_in = True
+                    st.session_state.user_role = user.get("role", "관리자")
+                    st.session_state.user_name = user.get("name", "최고관리자")
+                    st.session_state.login_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
 
-                st.session_state.current_menu = "실적 분석/계산" if st.session_state.user_role == "관리자" else "이력확인 및 작성"
+                    # 저장된 데이터 로드
+                    saved_db = load_db(SAVED_STATE_FILE, {})
+                    user_saved = saved_db.get(st.session_state.user_name)
+                    if user_saved:
+                        if user_saved.get("user_excel_data"):
+                            st.session_state.user_excel_data = pd.DataFrame.from_dict(user_saved["user_excel_data"])
+                        if user_saved.get("final_reupload_df"):
+                            st.session_state.final_reupload_df = pd.DataFrame.from_dict(user_saved["final_reupload_df"])
+                        if user_saved.get("user_prev_month_sel"):
+                            st.session_state.user_prev_month_sel = user_saved["user_prev_month_sel"]
+
+                    st.session_state.current_menu = "실적 분석/계산" if st.session_state.user_role == "관리자" else "이력확인 및 작성"
+                    st.rerun()
+                elif not u_id_str:
+                    st.error("아이디를 입력해주세요.")
+                elif not u_pw_str:
+                    st.error("비밀번호를 입력해주세요.")
+                else:
+                    st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
+
+            st.divider()
+            st.markdown("<div class='auth-small'>계정이 없으신가요?</div>", unsafe_allow_html=True)
+
+            if st.button("회원가입", use_container_width=True):
+                st.session_state.auth_mode = "signup"
                 st.rerun()
-            elif not u_id_str:
-                st.error("아이디를 입력해주세요.")
-            elif not u_pw_str:
-                st.error("비밀번호를 입력해주세요.")
-            else:
-                st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
 
-        st.divider()
-        st.markdown("<div class='auth-small'>계정이 없으신가요?</div>", unsafe_allow_html=True)
+        else:
+            r_id = st.text_input("아이디", key="r_id")
+            if r_id:
+                if r_id in st.session_state.user_db:
+                    st.error("이미 사용 중인 아이디입니다.")
+                else:
+                    st.success("사용 가능한 아이디입니다.")
 
-        if st.button("회원가입", use_container_width=True):
-            st.session_state.auth_mode = "signup"
-            st.rerun()
+            r_name = st.text_input("성명", key="r_name")
+            r_email = st.text_input("메일주소", key="r_email")
+            r_pw = st.text_input("비밀번호", type="password", key="r_pw")
+            r_pw2 = st.text_input("비밀번호 확인", type="password", key="r_pw2")
 
-    else:
-        r_id = st.text_input("아이디", key="r_id")
-        if r_id:
-            if r_id in st.session_state.user_db:
-                st.error("이미 사용 중인 아이디입니다.")
-            else:
-                st.success("사용 가능한 아이디입니다.")
+            if st.button("회원가입", use_container_width=True, type="primary"):
+                if not r_id or not r_name or not r_email or not r_pw or not r_pw2:
+                    st.error("모든 항목을 입력해주세요.")
+                elif r_pw != r_pw2:
+                    st.error("비밀번호가 일치하지 않습니다.")
+                elif r_id in st.session_state.user_db:
+                    st.error("이미 존재하는 아이디입니다.")
+                else:
+                    st.session_state.user_db[r_id] = {
+                        "pw": r_pw,
+                        "name": r_name,
+                        "email": r_email,
+                        "access": "불가",
+                        "role": "사용자",
+                        "staff_type": "정규직",
+                        "outsource": "아니오",
+                        "outsource_period": "해당없음",
+                    }
+                    save_db(DB_FILE, st.session_state.user_db)
+                    st.success("신청 완료. 관리자 승인 후 로그인 가능합니다.")
+                    time.sleep(1.5)
+                    st.session_state.auth_mode = "login"
+                    st.rerun()
 
-        r_name = st.text_input("성명", key="r_name")
-        r_email = st.text_input("메일주소", key="r_email")
-        r_pw = st.text_input("비밀번호", type="password", key="r_pw")
-        r_pw2 = st.text_input("비밀번호 확인", type="password", key="r_pw2")
-
-        if st.button("회원가입", use_container_width=True, type="primary"):
-            if not r_id or not r_name or not r_email or not r_pw or not r_pw2:
-                st.error("모든 항목을 입력해주세요.")
-            elif r_pw != r_pw2:
-                st.error("비밀번호가 일치하지 않습니다.")
-            elif r_id in st.session_state.user_db:
-                st.error("이미 존재하는 아이디입니다.")
-            else:
-                st.session_state.user_db[r_id] = {
-                    "pw": r_pw,
-                    "name": r_name,
-                    "email": r_email,
-                    "access": "불가",
-                    "role": "사용자",
-                    "staff_type": "정규직",
-                    "outsource": "아니오",
-                    "outsource_period": "해당없음",
-                }
-                save_db(DB_FILE, st.session_state.user_db)
-                st.success("신청 완료. 관리자 승인 후 로그인 가능합니다.")
-                time.sleep(1.5)
+            if st.button("로그인으로 돌아가기", use_container_width=True):
                 st.session_state.auth_mode = "login"
                 st.rerun()
 
-        if st.button("로그인으로 돌아가기", use_container_width=True):
-            st.session_state.auth_mode = "login"
-            st.rerun()
-
-    st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def show_sidebar():
