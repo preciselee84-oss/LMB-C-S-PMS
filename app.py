@@ -895,7 +895,7 @@ def show_user_history():
 
     with t2:
         if err is not None and not err.empty:
-            err_filtered = err[(err["일방문"] >= 5) | (err["월총방문"] >= 60)].copy()
+            err_filtered = err[err["일방문"] >= 5].copy()
             monthly_map = err_filtered.groupby("담당자")["월총방문"].first().to_dict() if "담당자" in err_filtered.columns else {}
 
             style_report_logic(err_filtered.drop(columns=["월총방문"], errors="ignore"))
@@ -1283,7 +1283,7 @@ def show_final_check():
             else:
                 err_my = err_check.copy()
 
-            err_filtered = err_my[(err_my["일방문"] >= 5) | (err_my["월총방문"] >= 60)].copy()
+            err_filtered = err_my[err_my["일방문"] >= 5].copy()
 
             style_report_logic(err_filtered.drop(columns=["월총방문"], errors="ignore"))
 
