@@ -2275,14 +2275,13 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
             pass
         return str(value)
 
-    def set_cell_text(cell, value, align=None):
+    def set_cell_text(cell, value, align=None, font_size=14):
         cell.text = fmt(value)
         for paragraph in cell.text_frame.paragraphs:
-            if align is not None:
-                paragraph.alignment = align
+            paragraph.alignment = align if align is not None else PP_ALIGN.CENTER
             for run in paragraph.runs:
                 run.font.name = "맑은 고딕"
-                run.font.size = Pt(14)
+                run.font.size = Pt(font_size)
 
     def slide_tables(slide):
         return [shape.table for shape in slide.shapes if getattr(shape, "has_table", False)]
@@ -2298,7 +2297,7 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
         ensure_rows(table, row_idx + 1)
         for col_idx, value in enumerate(values):
             if col_idx < len(table.columns):
-                set_cell_text(table.cell(row_idx, col_idx), value, PP_ALIGN.RIGHT if isinstance(value, (int, float, np.integer, np.floating)) else PP_ALIGN.CENTER)
+                set_cell_text(table.cell(row_idx, col_idx), value, PP_ALIGN.CENTER)
 
     def fill_stats_slide(slide, counts, cloud_counts):
         tables = slide_tables(slide)
@@ -2326,10 +2325,10 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
         ensure_rows(table, len(rows) + 1)
         for r in range(1, len(table.rows)):
             for c in range(len(table.columns)):
-                set_cell_text(table.cell(r, c), "")
+                set_cell_text(table.cell(r, c), "", font_size=10)
         for r_idx, row_values in enumerate(rows, start=1):
             for c_idx, value in enumerate(row_values[:len(table.columns)]):
-                set_cell_text(table.cell(r_idx, c_idx), value, PP_ALIGN.CENTER)
+                set_cell_text(table.cell(r_idx, c_idx), value, PP_ALIGN.CENTER, font_size=10)
 
     def delete_slide(index):
         slide_id_list = prs.slides._sldIdLst
