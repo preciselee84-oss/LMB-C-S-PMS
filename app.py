@@ -1114,21 +1114,19 @@ def show_user_history():
     saved = load_db(PERF_FILE, {}).get(st.session_state.user_name, {})
     base["입력(건)"] = base["구분"].map(saved).fillna(0).astype(int)
 
-    # 행 수에 맞는 높이 계산 (헤더 50px + 행당 45px)
-    table_height = 50 + len(base) * 45
-
-    # 디자인 개선 CSS
-    st.markdown(f"""
+    # 실적 예상치 검증 리포트와 동일한 디자인 적용
+    st.markdown("""
         <style>
-        /* 실적 예상치 검증 리포트 스타일 적용 */
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] {{
+        /* 전체 컨테이너 스타일 */
+        div[data-testid="stDataFrameResizable"] {
             border: 1px solid #E2E8F0 !important;
             border-radius: 10px !important;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
-        }}
+            margin-bottom: 1rem !important;
+        }
 
-        /* 헤더 스타일 */
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] thead th {{
+        /* 헤더 스타일 - 회색 배경, 굵은 글씨, 가운데 정렬 */
+        div[data-testid="stDataFrameResizable"] th {
             background: #EDF2F7 !important;
             color: #4A5568 !important;
             font-weight: 800 !important;
@@ -1136,51 +1134,48 @@ def show_user_history():
             padding: 9px 12px !important;
             text-align: center !important;
             border-bottom: 2px solid #E2E8F0 !important;
-        }}
+            white-space: nowrap !important;
+        }
 
-        /* 셀 기본 스타일 */
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td {{
+        /* 모든 셀 기본 스타일 */
+        div[data-testid="stDataFrameResizable"] td {
             padding: 8px 12px !important;
             border-bottom: 1px solid #EDF2F7 !important;
             font-size: 13px !important;
             color: #2D3748 !important;
-        }}
+            white-space: nowrap !important;
+        }
 
-        /* 문자 컬럼 가운데 정렬 (활동구분, 구분) */
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(1),
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(2) {{
+        /* 활동구분, 구분 컬럼 - 가운데 정렬 */
+        div[data-testid="stDataFrameResizable"] td:nth-child(1),
+        div[data-testid="stDataFrameResizable"] td:nth-child(2) {
             text-align: center !important;
-        }}
+        }
 
-        /* 입력 필드도 가운데 정렬 */
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(1) input,
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(2) input {{
+        /* 단위 점수, 월 최대점수 - 오른쪽 정렬 */
+        div[data-testid="stDataFrameResizable"] td:nth-child(3),
+        div[data-testid="stDataFrameResizable"] td:nth-child(4) {
+            text-align: right !important;
+        }
+
+        /* 입력(건) 컬럼 - 가운데 정렬 (편집 가능) */
+        div[data-testid="stDataFrameResizable"] td:nth-child(5) {
             text-align: center !important;
-        }}
+        }
 
-        /* 숫자 컬럼 오른쪽 정렬 (단위 점수, 월 최대점수, 입력(건), 계산점수) */
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(3),
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(4),
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(5),
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(6) {{
-            text-align: right !important;
-        }}
-
-        /* 숫자 입력 필드도 오른쪽 정렬 */
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(3) input,
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(4) input,
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(5) input,
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody td:nth-child(6) input {{
-            text-align: right !important;
-        }}
+        /* 입력 필드 스타일 */
+        div[data-testid="stDataFrameResizable"] input {
+            text-align: center !important;
+            font-size: 13px !important;
+        }
 
         /* 행 배경색 교차 */
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody tr:nth-child(even) {{
+        div[data-testid="stDataFrameResizable"] tbody tr:nth-child(even) {
             background: #F7FAFC !important;
-        }}
-        section[data-testid="stVerticalBlock"] div[data-testid="stDataFrameResizable"] tbody tr:nth-child(odd) {{
+        }
+        div[data-testid="stDataFrameResizable"] tbody tr:nth-child(odd) {
             background: #FFFFFF !important;
-        }}
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -1188,9 +1183,14 @@ def show_user_history():
         base,
         use_container_width=True,
         hide_index=True,
-        height=table_height,
         num_rows="fixed",
-        column_config={"입력(건)": st.column_config.NumberColumn("입력(건)", min_value=0, step=1, default=0)},
+        column_config={
+            "활동구분": st.column_config.TextColumn("활동구분", width="small"),
+            "구분": st.column_config.TextColumn("구분", width="medium"),
+            "단위 점수": st.column_config.NumberColumn("단위 점수", disabled=True),
+            "월 최대점수": st.column_config.TextColumn("월 최대점수", disabled=True),
+            "입력(건)": st.column_config.NumberColumn("입력(건)", min_value=0, step=1, default=0, width="small"),
+        },
         disabled=["활동구분", "구분", "단위 점수", "월 최대점수"],
     )
 
