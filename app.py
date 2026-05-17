@@ -920,7 +920,7 @@ def show_sidebar():
                 border: none !important;
                 box-shadow: none !important;
                 color: #FFFFFF !important;
-                font-size: 20px !important;
+                font-size: 15px !important;
                 font-weight: 800 !important;
                 text-align: left !important;
                 padding: 8px 12px !important;
@@ -932,7 +932,7 @@ def show_sidebar():
             }
             [data-testid="stSidebarContent"] [data-testid="stMarkdownContainer"] p {
                 color: #FFFFFF !important;
-                font-size: 20px !important;
+                font-size: 15px !important;
                 font-weight: 800 !important;
                 letter-spacing: 0.3px !important;
                 margin: 12px 0 4px 4px !important;
