@@ -125,7 +125,18 @@ def clean_header_logic(df):
 
         keep = ~pd.Series(df.columns).astype(str).str.contains("^Unnamed|^nan", case=False, na=False).values
         df = df.loc[:, keep]
-        df = df.dropna(how="all", axis=1).dropna(how="all", axis=0)
+
+        # 중요한 컬럼은 값이 비어있어도 유지
+        important_keywords = ["업무번호", "플로우", "식권", "비즈플레이"]
+        important_cols = [col for col in df.columns if any(keyword in str(col) for keyword in important_keywords)]
+
+        # 빈 컬럼 제거 (단, 중요 컬럼은 제외)
+        empty_cols = df.columns[df.isna().all()]
+        cols_to_drop = [col for col in empty_cols if col not in important_cols]
+        df = df.drop(columns=cols_to_drop, errors="ignore")
+
+        # 빈 행 제거
+        df = df.dropna(how="all", axis=0)
         return strip_activity_time_columns(df)
     except Exception:
         return df
