@@ -14,6 +14,7 @@ st.set_page_config(page_title="실적관리 시스템", layout="wide", initial_s
 DB_FILE = "users.json"
 PERF_FILE = "manual_perf.json"
 SENT_FILE = "sent_results.json"
+SENT_UPLOADS_FILE = "sent_uploads.json"
 
 DEFAULT_URL_ANALYSIS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9XPHqrqcaFf9bCOVya7yHORr-c1R4KCF0eEpdE3ESn8qJELP0BkqTOslur9bsGcVabRUIcyOa877R/pub?output=csv"
 DEFAULT_URL_SYNC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9F7R7oLA2B02H-I25kVv2JeYHFgWQq0CT7TeW61hrNpJLdHWJFhFR_iDQGCFAW044o8rRwBDeovKG/pub?gid=1533424484&single=true&output=csv"
@@ -32,6 +33,22 @@ def load_db(file_path, default_data):
 def save_db(file_path, data):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+
+
+def dataframe_to_upload_payload(df):
+    safe_df = strip_activity_time_columns(df).copy()
+    safe_df = safe_df.replace({np.nan: ""})
+    return {
+        "columns": [str(c) for c in safe_df.columns],
+        "rows": safe_df.astype(str).values.tolist(),
+        "saved_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+
+def upload_payload_to_dataframe(payload):
+    if not payload:
+        return pd.DataFrame()
+    return pd.DataFrame(payload.get("rows", []), columns=payload.get("columns", []))
 
 
 def init_state():
@@ -1839,6 +1856,7 @@ def show_final_check():
 
     if do_send:
         sent_db = load_db(SENT_FILE, {})
+        sent_uploads_db = load_db(SENT_UPLOADS_FILE, {})
         row_data = my_res.iloc[0].to_dict()
         row_data["전송시각"] = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -1852,7 +1870,9 @@ def show_final_check():
             row_data[f"전월대비({prev_m})"] = row_data.pop("전월대비")
 
         sent_db[st.session_state.user_name] = row_data
+        sent_uploads_db[st.session_state.user_name] = dataframe_to_upload_payload(uploaded_df)
         save_db(SENT_FILE, sent_db)
+        save_db(SENT_UPLOADS_FILE, sent_uploads_db)
 
         st.success("전송 완료")
         time.sleep(0.5)
@@ -1920,6 +1940,36 @@ def dataframe_to_excel_bytes(sheets):
             df.to_excel(writer, index=False, sheet_name=safe_name)
     output.seek(0)
     return output.getvalue()
+
+
+def sent_uploaded_files_excel_bytes():
+    sent_uploads_db = load_db(SENT_UPLOADS_FILE, {})
+    if not sent_uploads_db:
+        return dataframe_to_excel_bytes({
+            "안내": pd.DataFrame([{"내용": "아직 전송된 업로드 엑셀 파일이 없습니다. 직원이 실적 결과 전송을 다시 진행하면 이 파일에 포함됩니다."}])
+        })
+
+    sheets = {}
+    used_names = set()
+    for name, payload in sent_uploads_db.items():
+        df = upload_payload_to_dataframe(payload)
+        if df.empty:
+            continue
+
+        sheet_name = str(name)[:31] or "담당자"
+        base_name = sheet_name
+        suffix = 1
+        while sheet_name in used_names:
+            suffix_text = f"_{suffix}"
+            sheet_name = f"{base_name[:31 - len(suffix_text)]}{suffix_text}"
+            suffix += 1
+        used_names.add(sheet_name)
+        sheets[sheet_name] = df
+
+    if not sheets:
+        sheets["안내"] = pd.DataFrame([{"내용": "저장된 업로드 파일 데이터가 비어 있습니다."}])
+
+    return dataframe_to_excel_bytes(sheets)
 
 
 def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_label):
@@ -1998,15 +2048,12 @@ def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_m
         if st.button("실적파일 구글시트 전송", use_container_width=True):
             st.warning("구글시트 쓰기용 API/인증 설정이 없어 아직 전송할 수 없습니다. 서비스 계정 또는 Apps Script 전송 URL을 연결하면 이 버튼에 전송 기능을 붙일 수 있습니다.")
 
-    excel_bytes = dataframe_to_excel_bytes({
-        "실적보고서": report_df,
-        "비교리포트": compare_df,
-    })
+    excel_bytes = sent_uploaded_files_excel_bytes()
     with c2:
         st.download_button(
             "실적파일 엑셀 다운로드",
             data=excel_bytes,
-            file_name=f"performance_report_{curr_month_label}.xlsx",
+            file_name=f"sent_uploaded_files_{curr_month_label}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
@@ -2043,6 +2090,7 @@ def show_admin_analysis():
     with c1:
         if st.button("전송 내역 초기화"):
             save_db(SENT_FILE, {})
+            save_db(SENT_UPLOADS_FILE, {})
             st.success("초기화 완료")
             time.sleep(0.5)
             st.rerun()
