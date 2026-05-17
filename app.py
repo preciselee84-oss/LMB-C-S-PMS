@@ -2028,12 +2028,25 @@ def sent_uploaded_files_excel_bytes():
             "안내": pd.DataFrame([{"내용": "아직 전송된 업로드 엑셀 파일이 없습니다. 직원이 실적 결과 전송을 다시 진행하면 이 파일에 포함됩니다."}])
         })
 
-    # 모든 사용자의 데이터를 하나의 시트로 합치기
+    # 실적보고서(마감된 실적)에 있는 사람들의 이름 목록 가져오기
+    analysis_result = st.session_state.get("analysis_result")
+    if analysis_result is not None and not analysis_result.empty:
+        # 담당자 컬럼에서 이름 목록 추출
+        if "담당자" in analysis_result.columns:
+            report_names = set(analysis_result["담당자"].unique())
+        else:
+            report_names = set(sent_uploads_db.keys())
+    else:
+        # 마감되지 않았으면 모든 사람
+        report_names = set(sent_uploads_db.keys())
+
+    # 실적보고서 명단에 있는 사람들의 데이터만 합치기
     all_data = []
     for name, payload in sent_uploads_db.items():
-        df = upload_payload_to_dataframe(payload)
-        if not df.empty:
-            all_data.append(df)
+        if name in report_names:
+            df = upload_payload_to_dataframe(payload)
+            if not df.empty:
+                all_data.append(df)
 
     if all_data:
         combined_df = pd.concat(all_data, ignore_index=True)
