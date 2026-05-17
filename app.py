@@ -952,8 +952,58 @@ def show_final_check():
     my_res = res[res["담당자"] == st.session_state.user_name]
     uname = st.session_state.user_name
 
-    hidden_final_cols = ["운영건수 (추가 활동)", "운영포인트(추가 활동)"]
-    my_res_display = my_res.drop(columns=hidden_final_cols, errors="ignore")
+    # 업로드 전 예상치 계산 (추가 활동 제외)
+    if not my_res.empty:
+        before_res = my_res.copy()
+        o_p = int(float(before_res.iloc[0].get("개설포인트", 0)))
+        l_p = int(float(before_res.iloc[0].get("연계포인트", 0)))
+        v_p = int(float(before_res.iloc[0].get("운영포인트 (실제 활동)", 0)))
+
+        # 합계포인트: 개설 + 연계 + 운영(실제)만
+        before_total = min(2800, min(1000, o_p + l_p) + min(1800, v_p))
+        before_res.loc[before_res.index[0], "합계포인트"] = before_total
+
+        # 지급포인트
+        before_pay_point = max(0, before_total - 1000)
+        before_res.loc[before_res.index[0], "지급포인트"] = before_pay_point
+
+        # 지급예상금액
+        rank = before_res.iloc[0].get("직급", "")
+        name = before_res.iloc[0].get("담당자", "")
+        name_to_info = {
+            info.get("name"): {
+                "staff_type": info.get("staff_type", "정규직"),
+            }
+            for uid, info in st.session_state.user_db.items()
+            if uid != "1"
+        }
+        is_outsource = name_to_info.get(name, {}).get("staff_type", "정규직") == "외주"
+
+        if is_outsource:
+            before_pay = int(max(0, before_pay_point * 500))
+        else:
+            leader_bonus = 500 if rank == "팀장" else 0
+            before_pay = int(max(0, (before_pay_point + leader_bonus) * 500))
+
+        before_res.loc[before_res.index[0], "지급예상금액"] = before_pay
+
+        # 전월대비 재계산 (필요시)
+        if "전월대비" in before_res.columns:
+            prev_df = st.session_state.get("auto_prev_df")
+            if prev_df is not None:
+                try:
+                    prev_res, _, _ = process_performance_analysis(prev_df)
+                    if isinstance(prev_res, pd.DataFrame) and not prev_res.empty:
+                        p_map = prev_res.set_index("담당자")["지급예상금액"].to_dict()
+                        prev_pay = p_map.get(name, 0)
+                        before_res.loc[before_res.index[0], "전월대비"] = int(before_pay - prev_pay)
+                except Exception:
+                    pass
+
+        hidden_final_cols = ["운영건수 (추가 활동)", "운영포인트(추가 활동)"]
+        my_res_display = before_res.drop(columns=hidden_final_cols, errors="ignore")
+    else:
+        my_res_display = my_res
 
     st.markdown(
         f"<div style='padding:10px 16px;background:#EBF8FF;border-left:4px solid #4299E1;border-radius:6px;font-size:15px;font-weight:700;color:#2B6CB0;margin-bottom:12px;'>"
