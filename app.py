@@ -882,6 +882,12 @@ def show_sidebar():
             [data-testid="stSidebar"] {
                 background-color: #2D2D2D !important;
             }
+            [data-testid="stSidebar"] > div:first-child {
+                padding-top: 0 !important;
+            }
+            [data-testid="stSidebarContent"] {
+                padding-top: 0 !important;
+            }
             [data-testid="stSidebar"] * {
                 color: #E2E8F0 !important;
             }
@@ -890,8 +896,18 @@ def show_sidebar():
                 font-weight: 900;
                 color: #FFFFFF !important;
                 text-align: center;
-                padding: 4px 0 4px;
+                padding: 0 0 4px;
+                margin-top: 0;
                 letter-spacing: -0.5px;
+            }
+            [data-testid="stSidebar"] div.stButton {
+                margin-bottom: 0 !important;
+                padding-bottom: 0 !important;
+            }
+            [data-testid="stSidebar"] div.stButton > button {
+                margin-bottom: 0 !important;
+                padding-top: 4px !important;
+                padding-bottom: 4px !important;
             }
             [data-testid="stSidebar"] .sidebar-user {
                 text-align: center;
