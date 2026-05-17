@@ -662,12 +662,14 @@ def show_auth_page():
             padding: 64px 0 48px !important;
         }
         .auth-logo-card {
-            background: #FFFFFF;
-            border-radius: 16px;
-            box-shadow: 0 2px 16px rgba(100,80,200,0.10);
+            background: transparent;
             text-align: center;
             padding: 22px 32px 18px;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
+        }
+        [data-testid="stColumn"] {
+            background: transparent !important;
+            box-shadow: none !important;
         }
         .auth-logo-title {
             color: #1E1A3A;
