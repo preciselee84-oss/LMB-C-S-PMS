@@ -441,12 +441,25 @@ def style_report_logic(df, compact=False):
             return "<span style='color:#2F855A;font-weight:900;'>일치</span>"
         return html.escape(text)
 
+    # 전월대비 컬럼명 치환
+    user_sel = st.session_state.get("user_prev_month_sel") or st.session_state.get("adm_prev_month")
+    if user_sel and user_sel != "선택안함":
+        prev_m = str(int(user_sel.split("-")[1])) + "월"
+        비교월_label = f"{prev_m} 대비"
+    else:
+        비교월_label = "전월 대비"
+
+    def format_col_name(col):
+        if "전월대비" in str(col):
+            return str(col).replace("전월대비", 비교월_label)
+        return str(col)
+
     th_pad = "5px 6px" if compact else "9px 12px"
     th_font = "12px" if compact else "13px"
     td_pad = "5px 6px" if compact else "8px 12px"
     td_font = "12px" if compact else "13px"
     th = f"background:#EDF2F7;color:#4A5568;font-weight:800;font-size:{th_font};padding:{th_pad};text-align:center;border-bottom:2px solid #E2E8F0;" + ("white-space:normal;word-break:keep-all;" if compact else "white-space:nowrap;")
-    headers = "".join(f"<th style='{th}'>{html.escape(str(c))}</th>" for c in df.columns)
+    headers = "".join(f"<th style='{th}'>{html.escape(format_col_name(c))}</th>" for c in df.columns)
 
     body = ""
     for i, row in df.reset_index(drop=True).iterrows():
@@ -1606,10 +1619,19 @@ def show_final_check():
             전월대비_col = next((c for c in my_res.columns if "전월대비" in c), None)
             if 전월대비_col:
                 전월대비 = int(my_res.iloc[0].get(전월대비_col, 0))
+
+                # 비교 월 표시
+                user_sel = st.session_state.get("user_prev_month_sel", "선택안함")
+                if user_sel and user_sel != "선택안함":
+                    prev_m = str(int(user_sel.split("-")[1])) + "월"
+                    비교월_label = f"{prev_m} 대비"
+                else:
+                    비교월_label = "전월 대비"
+
                 if 전월대비 > 0:
-                    전월대비_text = f" 전월대비 <b>{전월대비:,}</b>원 증가하였습니다."
+                    전월대비_text = f" {비교월_label} <b>{전월대비:,}</b>원 증가하였습니다."
                 elif 전월대비 < 0:
-                    전월대비_text = f" 전월대비 <b>{abs(전월대비):,}</b>원 감소하였습니다."
+                    전월대비_text = f" {비교월_label} <b>{abs(전월대비):,}</b>원 감소하였습니다."
 
             st.markdown(
                 f"<div style='margin-top:8px;padding:10px 16px;background:#EBF8FF;border-radius:8px;font-size:13px;color:#2B6CB0;'>"
