@@ -997,7 +997,7 @@ def show_final_check():
         ("연계포인트", "연계포인트", "compare"),
         ("운영건수 (실제 활동)", "운영건수 (실제 활동)", "compare"),
         ("운영포인트 (실제 활동)", "운영포인트 (실제 활동)", "compare"),
-        ("추가 등록건수", "운영건수 (추가 활동)", "compare"),
+        ("추가 등록건수", "운영건수 (추가 활동)", "compare_upload_only"),
         ("최종 운영건수", None, "final_operation_count"),
         ("합계포인트", "합계포인트", "compare"),
         ("지급포인트", "지급포인트", "compare"),
@@ -1022,6 +1022,11 @@ def show_final_check():
                 uploaded_extra_count = int(float(uploaded_my_res.iloc[0].get("운영건수 (추가 활동)", 0)))
                 uploaded_value = uploaded_actual_count + uploaded_extra_count
                 match_value = "일치" if first_compare_value == uploaded_value else "불일치"
+        elif mode == "compare_upload_only":
+            first_value = ""
+
+            if uploaded_exists and source_col in uploaded_my_res.columns:
+                uploaded_value = int(float(uploaded_my_res.iloc[0].get(source_col, 0)))
         else:
             if source_col in my_res.columns:
                 first_value = int(float(my_res.iloc[0].get(source_col, 0)))
