@@ -254,10 +254,10 @@ def render_manual_perf_input_table(base):
         }
         .manual-perf-center { justify-content: center; text-align: center; }
         .manual-perf-right { justify-content: flex-end; text-align: right; }
-        .manual-perf-input div[data-testid="stNumberInput"] {
+        .manual-perf-input div[data-testid="stTextInput"] {
             margin: 0 !important;
         }
-        .manual-perf-input div[data-testid="stNumberInput"] label {
+        .manual-perf-input div[data-testid="stTextInput"] label {
             display: none !important;
         }
         .manual-perf-input input {
@@ -323,17 +323,22 @@ def render_manual_perf_input_table(base):
                 f"<div class='manual-perf-input' style='background:{bg};border-bottom:1px solid #EDF2F7;'>",
                 unsafe_allow_html=True,
             )
-            input_count = st.number_input(
+            input_raw = st.text_input(
                 f"입력(건) {row['구분']}",
-                min_value=0,
-                step=1,
+                value=str(int(st.session_state[input_key])),
                 key=input_key,
                 label_visibility="collapsed",
             )
             st.markdown("</div>", unsafe_allow_html=True)
 
+        try:
+            input_count = max(0, int(float(str(input_raw).replace(",", "").strip() or "0")))
+        except Exception:
+            input_count = 0
+        st.session_state[input_key] = input_count
+
         edited_row = row.to_dict()
-        edited_row["입력(건)"] = int(input_count)
+        edited_row["입력(건)"] = input_count
         edited_rows.append(edited_row)
 
     st.markdown("</div>", unsafe_allow_html=True)
@@ -613,7 +618,7 @@ def style_report_logic(df, compact=False):
     for i, row in df.reset_index(drop=True).iterrows():
         tds = ""
         for col in df.columns:
-            align = "right" if col in num_cols else "center"
+            align = "right" if col in num_cols or col in diff_cols else "center"
             bg = "#FFFFFF" if i % 2 == 0 else "#F7FAFC"
 
             if col == "일치여부":
