@@ -948,6 +948,14 @@ def show_sidebar():
                 padding: 8px 12px !important;
                 border-radius: 8px !important;
             }
+            [data-testid="stSidebar"] div.stButton > button p,
+            [data-testid="stSidebar"] div.stButton > button span,
+            [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] p,
+            [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span {
+                font-size: 15px !important;
+                font-weight: 800 !important;
+                color: #FFFFFF !important;
+            }
             [data-testid="stSidebar"] div.stButton > button:hover {
                 background: #3D3D3D !important;
                 color: #FFFFFF !important;
