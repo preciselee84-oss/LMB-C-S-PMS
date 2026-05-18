@@ -3131,6 +3131,30 @@ def show_dashboard():
     for g in guides:
         st.markdown(f"- {g}")
 
+    if ol_remain > 0:
+        st.markdown("")
+        st.markdown("**📋 개설·연계 포인트 확보가 어렵다면? — 추가 실적 입력 표 활용 가이드**")
+        st.markdown("""
+| 활동구분 | 활동 방법 | 단위 점수 | 월 최대 |
+|------|------|:---:|:---:|
+| 교차판매 | 타겟고객 선별 | 5pt | 100pt |
+| 교차판매 | 메일 발송 | 2pt | 100pt |
+| 교차판매 | 제안서 전달 | 5pt | 100pt |
+| 교차판매 | 방문설명회 & 견적 발송 | 30pt | 제한 없음 |
+| 교차판매 | 계약 진행 시 | 50pt | 제한 없음 |
+| 교차판매 | 유선 상담 (해피콜) | 5pt | 100pt |
+| 교차판매 | 활성화 (조회업무) | 10pt | 100pt |
+| 교차판매 | 이체·집금 활성화 | 30pt | 150pt |
+| 교차판매 | 계열사 추가 도입 | 30pt | 제한 없음 |
+| 교차판매 | 신규 연계 도입 | 60pt | 제한 없음 |
+| 추가활동 | 문서 작성 (본사) | 100pt | 100pt |
+| 추가활동 | 문서 작성 (가이드) | 50pt | 제한 없음 |
+| 추가활동 | 문서 작성 (기타) | 20pt | 제한 없음 |
+| 추가활동 | VOC (아이디어) | 10pt | 50pt |
+| 추가활동 | 운영활동 (원격) | 10pt | 200pt |
+        """)
+        st.info("💡 위 활동들은 **[이력확인 및 작성] 메뉴 → 추가 실적 입력** 표에서 건수를 직접 입력하여 포인트를 적립할 수 있습니다.")
+
 
 def show_google_sync():
     st.session_state.url_sync = st.text_input("본사 구글 시트 CSV URL", value=st.session_state.url_sync)
@@ -3199,8 +3223,11 @@ def inject_theme_toggle():
     .pms-sw-track button {
         position: relative; z-index: 1;
         background: none; border: none; cursor: pointer;
-        font-size: 15px; width: 34px; height: 30px;
+        font-size: 12px; font-weight: 600;
+        color: #ffffff; letter-spacing: 0.3px;
+        padding: 0 12px; height: 30px;
         border-radius: 26px; line-height: 1;
+        white-space: nowrap;
         transition: opacity 0.2s;
         opacity: 0.55;
     }
@@ -3272,9 +3299,9 @@ def inject_theme_toggle():
     <div class="pms-sw-outer">
         <div class="pms-sw-track" id="pmsThemeBar">
             <div class="pms-sw-thumb" id="pmsThumb"></div>
-            <button id="tbtn-light"  onclick="pmsSetTheme('light')"  title="밝게">☀️</button>
-            <button id="tbtn-dark"   onclick="pmsSetTheme('dark')"   title="다크">🌙</button>
-            <button id="tbtn-system" onclick="pmsSetTheme('system')" title="시스템">💻</button>
+            <button id="tbtn-light"  onclick="pmsSetTheme('light')"  title="밝게">밝게</button>
+            <button id="tbtn-dark"   onclick="pmsSetTheme('dark')"   title="다크">다크</button>
+            <button id="tbtn-system" onclick="pmsSetTheme('system')" title="시스템">시스템</button>
         </div>
     </div>
 
@@ -3283,9 +3310,16 @@ def inject_theme_toggle():
         var ORDER = ['light','dark','system'];
         function pmsApply(mode) {
             document.documentElement.setAttribute('data-pms-theme', mode);
-            var idx = ORDER.indexOf(mode);
             var thumb = document.getElementById('pmsThumb');
-            if (thumb) thumb.style.transform = 'translateX(' + (idx * 34) + 'px)';
+            var activeBtn = document.getElementById('tbtn-' + mode);
+            var track = document.getElementById('pmsThemeBar');
+            if (thumb && activeBtn && track) {
+                var trackRect = track.getBoundingClientRect();
+                var btnRect   = activeBtn.getBoundingClientRect();
+                thumb.style.width     = btnRect.width + 'px';
+                thumb.style.height    = btnRect.height + 'px';
+                thumb.style.transform = 'translateX(' + (btnRect.left - trackRect.left - 3) + 'px)';
+            }
             ORDER.forEach(function(m) {
                 var b = document.getElementById('tbtn-' + m);
                 if (b) b.classList.toggle('t-active', m === mode);
