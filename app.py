@@ -3203,7 +3203,7 @@ def show_dashboard():
         st.markdown("---")
         st.markdown(f"### {user_name}님 상세 현황")
 
-    curr = calc_points_hana(curr_ym)
+    curr = calc_points_hana(prev_ym)
     prev = calc_points_activity(prev_ym)
     py   = calc_points_activity(prev_year_ym)
 
@@ -3212,7 +3212,7 @@ def show_dashboard():
     max_add = max(0, 2800 - curr["합계포인트"])
 
     # ── 요약 카드 ──────────────────────────────────────
-    st.markdown(f"### {user_name}님의 {curr_ym} 실적 현황")
+    st.markdown(f"### {user_name}님의 {prev_ym} 실적 현황")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("이번달 추정 포인트", f"{curr['합계포인트']:,} pt")
     c2.metric("전월 대비", f"{prev['합계포인트']:,} pt", delta=f"{diff_prev:+,} pt")
