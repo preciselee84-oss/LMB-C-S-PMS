@@ -657,8 +657,16 @@ def show_auth_page():
             height: 0 !important;
             visibility: hidden !important;
         }
-        #MainMenu, [data-testid="stToolbar"], [data-testid="stStatusWidget"],
-        [data-testid="stDecoration"], footer {
+        #MainMenu, footer,
+        [data-testid="stToolbar"],
+        [data-testid="stStatusWidget"],
+        [data-testid="stDecoration"],
+        .stDeployButton,
+        ._profileContainer_gzau3_53,
+        ._profilePreview_gzau3_63,
+        [class*="viewerBadge"],
+        [class*="StatusWidget"],
+        [class*="toolbar"] {
             display: none !important;
             visibility: hidden !important;
         }
@@ -893,8 +901,19 @@ def show_sidebar():
         st.markdown(
             """
             <style>
-            #MainMenu, [data-testid="stToolbar"], [data-testid="stStatusWidget"],
-            [data-testid="stDecoration"], footer {
+            #MainMenu, footer,
+            [data-testid="stToolbar"],
+            [data-testid="stStatusWidget"],
+            [data-testid="stDecoration"],
+            [data-testid="stAppViewBlockContainer"] > div:last-child,
+            .stDeployButton,
+            ._profileContainer_gzau3_53,
+            ._profilePreview_gzau3_63,
+            .viewerBadge_container__r5tak,
+            .viewerBadge_link__qRIco,
+            [class*="viewerBadge"],
+            [class*="StatusWidget"],
+            [class*="toolbar"] {
                 display: none !important;
                 visibility: hidden !important;
             }
