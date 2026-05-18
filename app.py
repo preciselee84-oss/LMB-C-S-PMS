@@ -2803,23 +2803,15 @@ def show_staff_admin():
 def show_dashboard():
     import plotly.graph_objects as go
 
-    # ── 하나은행 데이터 로드 (당월) ────────────────────
-    if st.session_state.get("hana_sheet_df") is None:
-        try:
-            with st.spinner("하나은행 데이터 불러오는 중..."):
-                hana_raw = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
-                st.session_state.hana_sheet_df = hana_raw
-        except Exception:
-            pass
-
-    # ── 하나지사 활동이력 데이터 로드 (전월/전년동월) ──
-    if st.session_state.get("analysis_lookup_df") is None:
-        try:
-            with st.spinner("하나지사 활동이력 데이터 불러오는 중..."):
-                raw_act = pd.read_csv(st.session_state.get("url_analysis", DEFAULT_URL_ANALYSIS))
-                st.session_state.analysis_lookup_df = raw_act
-        except Exception as e:
-            st.warning(f"하나지사 활동이력 로드 실패: {e}")
+    # ── 대시보드 진입 시 두 데이터 항상 갱신 ─────────────
+    try:
+        with st.spinner("데이터 불러오는 중..."):
+            hana_raw = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+            st.session_state.hana_sheet_df = hana_raw
+            raw_act = pd.read_csv(st.session_state.get("url_analysis", DEFAULT_URL_ANALYSIS))
+            st.session_state.analysis_lookup_df = raw_act
+    except Exception as e:
+        st.warning(f"데이터 로드 실패: {e}")
 
     df_hana = st.session_state.get("hana_sheet_df")
     user_name = st.session_state.user_name
@@ -2908,15 +2900,6 @@ def show_dashboard():
     curr = calc_points_hana(curr_ym)       # 당월: 하나은행 시트
     prev = calc_points_activity(prev_ym)   # 전월: 하나지사 활동이력
     py   = calc_points_activity(prev_year_ym)  # 전년동월: 하나지사 활동이력
-
-    with st.expander("🔍 [디버그] 활동이력 데이터 상태 (문제 확인용)", expanded=False):
-        st.write(f"act_u_col={act_u_col}, act_date_col={act_date_col}, act_d_col={act_d_col}")
-        st.write(f"prev_ym={prev_ym}, prev_year_ym={prev_year_ym}")
-        st.write(f"df_user_act 건수: {len(df_user_act) if df_user_act is not None else 'None'}")
-        if df_user_act is not None and not df_user_act.empty:
-            st.write("월별 건수:", df_user_act[act_date_col].dt.strftime("%Y-%m").value_counts().sort_index().to_dict())
-            st.write(f"prev 결과: {prev}")
-            st.write(f"py 결과: {py}")
 
     diff_prev = curr["합계포인트"] - prev["합계포인트"]
     diff_year = curr["합계포인트"] - py["합계포인트"]
