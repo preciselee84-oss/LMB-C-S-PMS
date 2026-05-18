@@ -2161,7 +2161,7 @@ def show_final_check():
 
     st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
 
-    _, save_col, send_col = st.columns([0.56, 0.22, 0.22])
+    _, save_col, send_col = st.columns([0.8, 0.1, 0.1])
 
     with save_col:
         st.markdown('<div class="action-btn">', unsafe_allow_html=True)
@@ -2673,7 +2673,7 @@ def show_admin_analysis():
 
     style_report_logic(sent_df)
 
-    c1, c2, c3 = st.columns([0.56, 0.22, 0.22])
+    c1, c2, c3 = st.columns([0.8, 0.1, 0.1])
 
     with c1:
         if st.button("전송 내역 초기화"):
