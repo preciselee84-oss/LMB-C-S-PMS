@@ -1320,7 +1320,8 @@ def render_page_title(menu):
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown(f"## {menu}")
+    if menu != "대시보드":
+        st.markdown(f"## {menu}")
     settings_menus = ["직원 및 권한설정", "구글 스트레드시트 연동"]
     admin_menus = ["실적 분석/계산", "실적 보고서"]
     if menu in settings_menus:
