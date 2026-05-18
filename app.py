@@ -1,4 +1,4 @@
-# VERSION: 20260516_colab_full_send_button_under_report
+# VERSION: 20260518_cookie_save_id
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -9,6 +9,7 @@ import html
 import re
 from io import BytesIO
 from datetime import datetime, timedelta
+import extra_streamlit_components as stx
 
 st.set_page_config(page_title="실적관리 시스템", layout="wide", initial_sidebar_state="expanded")
 
@@ -782,13 +783,8 @@ def show_auth_page():
         )
 
         if st.session_state.auth_mode == "login":
-            sid = ""
-            if os.path.exists("saved_id.txt"):
-                try:
-                    with open("saved_id.txt", "r", encoding="utf-8") as f:
-                        sid = f.read().strip()
-                except Exception:
-                    pass
+            cookie_manager = stx.CookieManager(key="login_cookie_mgr")
+            sid = cookie_manager.get("saved_id") or ""
 
             u_id = st.text_input("아이디", value=sid, placeholder="아이디를 입력하세요", key="l_id")
             u_pw = st.text_input("비밀번호", type="password", placeholder="비밀번호를 입력하세요", key="l_pw")
@@ -808,16 +804,9 @@ def show_auth_page():
 
                 if is_super or is_user:
                     if save_id_cb:
-                        try:
-                            with open("saved_id.txt", "w", encoding="utf-8") as f:
-                                f.write(u_id_str)
-                        except Exception:
-                            pass
-                    elif os.path.exists("saved_id.txt"):
-                        try:
-                            os.remove("saved_id.txt")
-                        except Exception:
-                            pass
+                        cookie_manager.set("saved_id", u_id_str, expires_at=datetime(2099, 12, 31))
+                    else:
+                        cookie_manager.delete("saved_id")
 
                     user = db.get(u_id_str, {"role": "관리자", "name": "최고관리자"})
                     st.session_state.logged_in = True
