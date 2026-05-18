@@ -88,7 +88,7 @@ def init_state():
         "user_role": "사용자",
         "user_name": "",
         "auth_mode": "login",
-        "current_menu": "실적 분석/계산",
+        "current_menu": "대시보드",
         "url_analysis": DEFAULT_URL_ANALYSIS,
         "url_sync": DEFAULT_URL_SYNC,
         "url_hana": DEFAULT_URL_HANA,
@@ -836,7 +836,7 @@ def show_auth_page():
                         if user_saved.get("user_prev_month_sel"):
                             st.session_state.user_prev_month_sel = user_saved["user_prev_month_sel"]
 
-                    st.session_state.current_menu = "실적 분석/계산" if st.session_state.user_role == "관리자" else "이력확인 및 작성"
+                    st.session_state.current_menu = "대시보드"
                     st.rerun()
                 elif not u_id_str:
                     st.error("아이디를 입력해주세요.")
@@ -1005,6 +1005,12 @@ def show_sidebar():
         )
         st.divider()
 
+        if st.button("대시보드", use_container_width=True):
+            st.session_state.current_menu = "대시보드"
+            st.rerun()
+
+        st.markdown("<div style='margin-top:8px;'></div>", unsafe_allow_html=True)
+
         if st.session_state.user_role == "관리자":
             st.markdown("관리자 메뉴")
             for menu_name in ["실적 분석/계산", "실적 보고서", "직원 및 권한설정", "구글 스트레드시트 연동"]:
@@ -1046,6 +1052,12 @@ def apply_global_table_css():
 
 
 MENU_GUIDES = {
+    "대시보드": [
+        "📊 로그인한 본인의 이번달 실적 추정치를 한눈에 확인할 수 있습니다.",
+        "📅 전월 및 전년 동월과의 포인트 증감을 비교합니다.",
+        "💡 현재 부족한 실적을 채울 수 있는 활동 방안을 안내합니다.",
+        "🔄 데이터는 [구글 스트레드시트 연동] 메뉴에서 먼저 불러와야 합니다.",
+    ],
     "실적 분석/계산": [
         "📂 구글 스프레드시트에서 불러온 실적 데이터를 분석·계산합니다.",
         "📊 당월/전월 데이터를 비교하여 포인트 및 지급예상금액을 확인할 수 있습니다.",
@@ -2769,6 +2781,139 @@ def show_staff_admin():
         st.rerun()
 
 
+def show_dashboard():
+    import plotly.graph_objects as go
+
+    df_all = st.session_state.get("analysis_lookup_df")
+    user_name = st.session_state.user_name
+
+    if df_all is None or df_all.empty:
+        st.info("📂 데이터를 먼저 불러와주세요. [구글 스트레드시트 연동] 메뉴에서 '데이터 저장'을 눌러주세요.")
+        return
+
+    df_all = clean_header_logic(df_all.copy())
+    u_col = find_col(df_all, ["등록자", "담당자", "성명"], "등록자")
+    date_col = find_col(df_all, ["활동일", "일자"], "활동일")
+    d_col = find_col(df_all, ["활동상세", "활동내용"], "활동상세")
+
+    if not u_col or not date_col or not d_col:
+        st.error("데이터 컬럼을 찾을 수 없습니다.")
+        return
+
+    df_all[date_col] = pd.to_datetime(df_all[date_col], errors="coerce")
+    df_user = df_all[df_all[u_col].astype(str).str.strip() == user_name].dropna(subset=[date_col]).copy()
+
+    now = datetime.utcnow() + timedelta(hours=9)
+    curr_ym = now.strftime("%Y-%m")
+    prev_dt = (now.replace(day=1) - timedelta(days=1))
+    prev_ym = prev_dt.strftime("%Y-%m")
+    prev_year_ym = f"{now.year - 1}-{now.month:02d}"
+
+    def filter_month(df, ym):
+        return df[df[date_col].dt.strftime("%Y-%m") == ym].copy()
+
+    def calc_points(df_m):
+        if df_m.empty:
+            return {"개설건수": 0, "연계건수": 0, "운영건수": 0, "개설포인트": 0, "연계포인트": 0, "운영포인트": 0, "합계포인트": 0}
+        o = int(df_m[d_col].astype(str).str.contains("개설").sum())
+        l = int(df_m[d_col].astype(str).str.contains("연계").sum())
+        v = int(df_m[d_col].astype(str).str.contains("운영|방문|점검").sum())
+        o_p, l_p, v_p = o * 90, l * 120, v * 30
+        total = min(2800, min(1000, o_p + l_p) + min(1800, v_p))
+        return {"개설건수": o, "연계건수": l, "운영건수": v, "개설포인트": o_p, "연계포인트": l_p, "운영포인트": v_p, "합계포인트": total}
+
+    curr = calc_points(filter_month(df_user, curr_ym))
+    prev = calc_points(filter_month(df_user, prev_ym))
+    py = calc_points(filter_month(df_user, prev_year_ym))
+
+    diff_prev = curr["합계포인트"] - prev["합계포인트"]
+    diff_year = curr["합계포인트"] - py["합계포인트"]
+    max_add = max(0, 2800 - curr["합계포인트"])
+
+    # ── 요약 카드 ──────────────────────────────────────
+    st.markdown(f"### {user_name}님의 {curr_ym} 실적 현황")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("이번달 추정 포인트", f"{curr['합계포인트']:,} pt")
+    c2.metric("전월 대비", f"{prev['합계포인트']:,} pt", delta=f"{diff_prev:+,} pt")
+    c3.metric("전년 동월 대비", f"{py['합계포인트']:,} pt", delta=f"{diff_year:+,} pt")
+    c4.metric("최대 추가 가능", f"{max_add:,} pt")
+
+    st.markdown("---")
+
+    # ── 활동 유형별 포인트 차트 ────────────────────────
+    col_l, col_r = st.columns(2)
+
+    with col_l:
+        st.markdown("**활동 유형별 포인트 비교 (당월 / 전월 / 전년 동월)**")
+        categories = ["개설포인트", "연계포인트", "운영포인트"]
+        labels = ["개설", "연계", "운영"]
+        fig = go.Figure(data=[
+            go.Bar(name=f"당월 ({curr_ym})",   x=labels, y=[curr[c] for c in categories], marker_color="#4F46E5"),
+            go.Bar(name=f"전월 ({prev_ym})",   x=labels, y=[prev[c] for c in categories], marker_color="#A78BFA"),
+            go.Bar(name=f"전년 동월 ({prev_year_ym})", x=labels, y=[py[c]   for c in categories], marker_color="#D1D5DB"),
+        ])
+        fig.update_layout(barmode="group", height=300, margin=dict(t=20, b=20), legend=dict(orientation="h", y=-0.25))
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_r:
+        st.markdown("**이번달 포인트 구성**")
+        pie_labels = ["개설포인트", "연계포인트", "운영포인트"]
+        pie_values = [curr["개설포인트"], curr["연계포인트"], curr["운영포인트"]]
+        if sum(pie_values) > 0:
+            fig2 = go.Figure(go.Pie(
+                labels=["개설", "연계", "운영"],
+                values=pie_values,
+                hole=0.4,
+                marker_colors=["#4F46E5", "#7C3AED", "#A78BFA"],
+            ))
+            fig2.update_layout(height=300, margin=dict(t=20, b=20))
+            st.plotly_chart(fig2, use_container_width=True)
+        else:
+            st.info("이번달 집계된 활동이 없습니다.")
+
+    st.markdown("---")
+
+    # ── 일별 활동 추이 ─────────────────────────────────
+    curr_df = filter_month(df_user, curr_ym)
+    if not curr_df.empty:
+        st.markdown("**이번달 일별 활동 건수 추이**")
+        daily = curr_df.groupby(curr_df[date_col].dt.strftime("%Y-%m-%d")).size().reset_index()
+        daily.columns = ["날짜", "건수"]
+        fig3 = go.Figure(go.Scatter(x=daily["날짜"], y=daily["건수"], mode="lines+markers",
+                                    line=dict(color="#4F46E5", width=2), marker=dict(size=6)))
+        fig3.update_layout(height=220, margin=dict(t=10, b=20), xaxis_title="날짜", yaxis_title="건수")
+        st.plotly_chart(fig3, use_container_width=True)
+
+    st.markdown("---")
+
+    # ── 실적 보완 가이드 ───────────────────────────────
+    st.markdown("**💡 실적 보완 가이드**")
+    ol_used = min(1000, curr["개설포인트"] + curr["연계포인트"])
+    ol_remain = max(0, 1000 - (curr["개설포인트"] + curr["연계포인트"]))
+    v_remain = max(0, 1800 - curr["운영포인트"])
+
+    guides = []
+    if ol_remain > 0:
+        add_o = ol_remain // 90
+        add_l = ol_remain // 120
+        guides.append(f"📌 개설 추가 시 최대 **{add_o}건** ({ol_remain:,}pt 확보 가능, 건당 90pt)")
+        guides.append(f"📌 연계 추가 시 최대 **{add_l}건** ({ol_remain:,}pt 확보 가능, 건당 120pt)")
+    else:
+        guides.append("✅ 개설·연계 포인트 한도(1,000pt) 달성!")
+
+    if v_remain > 0:
+        add_v = v_remain // 30
+        guides.append(f"📌 운영·방문 추가 시 최대 **{add_v}건** ({v_remain:,}pt 확보 가능, 건당 30pt)")
+    else:
+        guides.append("✅ 운영 포인트 한도(1,800pt) 달성!")
+
+    if max_add == 0:
+        guides.append("🎉 최대 포인트(2,800pt) 달성! 수고하셨습니다.")
+
+    for g in guides:
+        st.markdown(f"- {g}")
+
+
 def show_google_sync():
     st.session_state.url_sync = st.text_input("본사 구글 시트 CSV URL", value=st.session_state.url_sync)
     st.session_state.url_analysis = st.text_input("하나지사 활동이력 구글 시트 CSV URL", value=st.session_state.url_analysis)
@@ -2816,7 +2961,9 @@ def show_main():
     menu = st.session_state.current_menu
     render_page_title(menu)
 
-    if menu == "이력확인 및 작성":
+    if menu == "대시보드":
+        show_dashboard()
+    elif menu == "이력확인 및 작성":
         show_user_history()
     elif menu == "최종 실적 확인":
         show_final_check()
