@@ -3171,8 +3171,128 @@ def show_google_sync():
         st.dataframe(strip_activity_time_columns(st.session_state.hana_sheet_df), use_container_width=True, hide_index=True)
 
 
+def inject_theme_toggle():
+    st.markdown("""
+    <style>
+    .theme-toggle-wrap {
+        position: fixed; top: 10px; right: 16px; z-index: 999999;
+        display: flex; gap: 4px; align-items: center;
+        background: rgba(255,255,255,0.92);
+        border-radius: 24px; padding: 4px 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+        backdrop-filter: blur(6px);
+    }
+    .theme-toggle-wrap button {
+        background: none; border: none; cursor: pointer;
+        font-size: 16px; padding: 3px 5px; border-radius: 50%;
+        line-height: 1; transition: background 0.2s;
+    }
+    .theme-toggle-wrap button:hover { background: rgba(0,0,0,0.08); }
+    .theme-toggle-wrap button.t-active {
+        background: rgba(79,70,229,0.18); outline: 2px solid #4F46E5;
+    }
+
+    /* ── 다크 모드 ─────────────────────────────────────── */
+    html[data-pms-theme="dark"] .stApp,
+    html[data-pms-theme="dark"] [data-testid="stAppViewContainer"],
+    html[data-pms-theme="dark"] [data-testid="stMain"],
+    html[data-pms-theme="dark"] section.main {
+        background-color: #1e1e2e !important; color: #cdd6f4 !important;
+    }
+    html[data-pms-theme="dark"] .main .block-container {
+        background-color: #1e1e2e !important;
+    }
+    html[data-pms-theme="dark"] [data-testid="stMarkdownContainer"],
+    html[data-pms-theme="dark"] [data-testid="stMarkdownContainer"] p,
+    html[data-pms-theme="dark"] label, html[data-pms-theme="dark"] span {
+        color: #cdd6f4 !important;
+    }
+    html[data-pms-theme="dark"] [data-testid="metric-container"] {
+        background: #2a2a3e !important; border-radius: 8px;
+    }
+    html[data-pms-theme="dark"] input,
+    html[data-pms-theme="dark"] textarea,
+    html[data-pms-theme="dark"] [data-testid="stTextInput"] input,
+    html[data-pms-theme="dark"] [data-baseweb="input"] {
+        background-color: #2a2a3e !important; color: #cdd6f4 !important;
+        border-color: #444466 !important;
+    }
+    html[data-pms-theme="dark"] [data-testid="stSelectbox"] div,
+    html[data-pms-theme="dark"] [data-baseweb="select"] div {
+        background-color: #2a2a3e !important; color: #cdd6f4 !important;
+    }
+    html[data-pms-theme="dark"] [data-testid="stDataFrame"],
+    html[data-pms-theme="dark"] [data-testid="stDataEditor"] {
+        background-color: #2a2a3e !important;
+    }
+    html[data-pms-theme="dark"] hr { border-color: #3a3a5e !important; }
+    html[data-pms-theme="dark"] .stButton > button {
+        background-color: #2a2a3e !important; color: #cdd6f4 !important;
+        border-color: #444466 !important;
+    }
+    html[data-pms-theme="dark"] .theme-toggle-wrap {
+        background: rgba(30,30,46,0.95) !important;
+    }
+
+    /* ── 시스템 모드 (media query) ──────────────────────── */
+    @media (prefers-color-scheme: dark) {
+        html[data-pms-theme="system"] .stApp,
+        html[data-pms-theme="system"] [data-testid="stAppViewContainer"],
+        html[data-pms-theme="system"] section.main {
+            background-color: #1e1e2e !important; color: #cdd6f4 !important;
+        }
+        html[data-pms-theme="system"] .main .block-container {
+            background-color: #1e1e2e !important;
+        }
+        html[data-pms-theme="system"] [data-testid="stMarkdownContainer"] p,
+        html[data-pms-theme="system"] label, html[data-pms-theme="system"] span {
+            color: #cdd6f4 !important;
+        }
+        html[data-pms-theme="system"] input,
+        html[data-pms-theme="system"] [data-testid="stTextInput"] input {
+            background-color: #2a2a3e !important; color: #cdd6f4 !important;
+        }
+        html[data-pms-theme="system"] .theme-toggle-wrap {
+            background: rgba(30,30,46,0.95) !important;
+        }
+    }
+    </style>
+
+    <div class="theme-toggle-wrap" id="pmsThemeBar">
+        <button id="tbtn-light"  onclick="pmsSetTheme('light')"  title="밝게">☀️</button>
+        <button id="tbtn-dark"   onclick="pmsSetTheme('dark')"   title="다크">🌙</button>
+        <button id="tbtn-system" onclick="pmsSetTheme('system')" title="시스템">💻</button>
+    </div>
+
+    <script>
+    (function() {
+        function pmsApply(mode) {
+            document.documentElement.setAttribute('data-pms-theme', mode);
+            ['light','dark','system'].forEach(function(m) {
+                var b = document.getElementById('tbtn-' + m);
+                if (b) b.classList.toggle('t-active', m === mode);
+            });
+        }
+        window.pmsSetTheme = function(mode) {
+            try { localStorage.setItem('pms_theme', mode); } catch(e) {}
+            pmsApply(mode);
+        };
+        var saved = 'light';
+        try { saved = localStorage.getItem('pms_theme') || 'light'; } catch(e) {}
+        pmsApply(saved);
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+            try {
+                if ((localStorage.getItem('pms_theme') || 'light') === 'system') pmsApply('system');
+            } catch(e) {}
+        });
+    })();
+    </script>
+    """, unsafe_allow_html=True)
+
+
 def show_main():
     apply_global_table_css()
+    inject_theme_toggle()
     show_sidebar()
 
     menu = st.session_state.current_menu
