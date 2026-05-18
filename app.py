@@ -2844,14 +2844,14 @@ def show_dashboard():
 
     # ── 하나지사 활동이력 전처리 (전월/전년동월용) ────
     df_user_act = None
+    df_act = None
+    act_u_col = None
     act_date_col = "활동일"
     act_d_col = "활동상세"
     df_activity = st.session_state.get("analysis_lookup_df")
     if df_activity is not None and not df_activity.empty:
         df_act = df_activity.copy()
-        # 컬럼명 공백 제거
         df_act.columns = [str(c).strip() for c in df_act.columns]
-        # 실제 존재하는 컬럼 탐색
         act_u_col = next((c for c in df_act.columns if c.strip() in ["등록자", "담당자", "성명"]), None)
         act_date_col = next((c for c in df_act.columns if "활동일" in c.replace(" ", "") or "일자" in c.replace(" ", "")), None)
         act_d_col = next((c for c in df_act.columns if c.strip() in ["활동상세", "활동내용"]), None)
@@ -2865,6 +2865,36 @@ def show_dashboard():
     prev_ym = prev_dt.strftime("%Y-%m")
     prev_year_ym = f"{now.year - 1}-{now.month:02d}"
 
+    # ── 공통 계산 헬퍼 (유저 이름 인자) ──────────────────
+    def calc_hana_for(uname, ym):
+        df_u = df_hana[df_hana[u_col].astype(str).str.strip() == uname]
+        gdf  = df_u[df_u[gaeseol_date_col].dt.strftime("%Y-%m") == ym]
+        o = int((gdf[gubun_col].astype(str).str.strip() == "신규").sum()) if gubun_col in gdf.columns else len(gdf)
+        ldf = df_u[df_u[yeonge_date_col].dt.strftime("%Y-%m") == ym] if yeonge_date_col in df_u.columns else df_u.iloc[0:0]
+        l   = len(ldf)
+        v = int((gdf[gubun_col].astype(str).str.strip() == "이행").sum()) if gubun_col in gdf.columns else 0
+        o_p, l_p, v_p = o * 90, l * 120, v * 30
+        total = min(2800, min(1000, o_p + l_p) + min(1800, v_p))
+        return {"개설건수": o, "연계건수": l, "운영건수": v, "합계포인트": total}
+
+    def calc_act_for(uname, ym):
+        empty = {"개설건수": 0, "연계건수": 0, "운영건수": 0, "합계포인트": 0}
+        try:
+            if df_activity is None or act_date_col is None or act_d_col is None or act_u_col is None:
+                return empty
+            df_u = df_act[df_act[act_u_col].astype(str).str.strip() == uname]
+            df_m = df_u[df_u[act_date_col].dt.strftime("%Y-%m") == ym]
+            if df_m.empty:
+                return empty
+            o = int(df_m[act_d_col].astype(str).str.contains("개설", na=False).sum())
+            l = int(df_m[act_d_col].astype(str).str.contains("연계", na=False).sum())
+            v = int(df_m[act_d_col].astype(str).str.contains("운영|방문|점검", na=False).sum())
+            o_p, l_p, v_p = o * 90, l * 120, v * 30
+            total = min(2800, min(1000, o_p + l_p) + min(1800, v_p))
+            return {"개설건수": o, "연계건수": l, "운영건수": v, "합계포인트": total}
+        except Exception:
+            return empty
+
     def filter_month_gaeseol(df, ym):
         return df[df[gaeseol_date_col].dt.strftime("%Y-%m") == ym].copy()
 
@@ -2874,13 +2904,7 @@ def show_dashboard():
         return df[df[yeonge_date_col].dt.strftime("%Y-%m") == ym].copy()
 
     def calc_points_hana(ym):
-        gdf = filter_month_gaeseol(df_user_hana, ym)
-        o = int((gdf[gubun_col].astype(str).str.strip() == "신규").sum()) if gubun_col in gdf.columns else len(gdf)
-        l = len(filter_month_yeonge(df_user_hana, ym))
-        v = int((gdf[gubun_col].astype(str).str.strip() == "이행").sum()) if gubun_col in gdf.columns else 0
-        o_p, l_p, v_p = o * 90, l * 120, v * 30
-        total = min(2800, min(1000, o_p + l_p) + min(1800, v_p))
-        return {"개설건수": o, "연계건수": l, "운영건수": v, "개설포인트": o_p, "연계포인트": l_p, "운영포인트": v_p, "합계포인트": total}
+        return calc_hana_for(user_name, ym)
 
     def calc_points_activity(ym):
         empty = {"개설건수": 0, "연계건수": 0, "운영건수": 0, "개설포인트": 0, "연계포인트": 0, "운영포인트": 0, "합계포인트": 0}
@@ -2899,9 +2923,50 @@ def show_dashboard():
         except Exception:
             return empty
 
-    curr = calc_points_hana(curr_ym)       # 당월: 하나은행 시트
-    prev = calc_points_activity(prev_ym)   # 전월: 하나지사 활동이력
-    py   = calc_points_activity(prev_year_ym)  # 전년동월: 하나지사 활동이력
+    # ── 관리자: 전체 직원 현황 2열 그리드 ────────────────
+    if st.session_state.user_role == "관리자":
+        st.markdown(f"### 전체 직원 {curr_ym} 실적 현황")
+        all_names = [
+            info.get("name", "")
+            for uid, info in st.session_state.user_db.items()
+            if uid != "1" and info.get("name") and info.get("access") == "허용"
+        ]
+        cards = []
+        for uname in all_names:
+            c = calc_hana_for(uname, curr_ym)
+            p = calc_act_for(uname, prev_ym)
+            delta = c["합계포인트"] - p["합계포인트"]
+            cards.append((uname, c, p, delta))
+
+        for i in range(0, len(cards), 2):
+            cols = st.columns(2)
+            for j, col in enumerate(cols):
+                if i + j >= len(cards):
+                    break
+                uname, c, p, delta = cards[i + j]
+                with col:
+                    st.markdown(f"""
+                    <div style="border:1px solid #e2e8f0; border-radius:10px; padding:14px 18px; margin-bottom:10px; background:#f8fafc;">
+                        <div style="font-size:16px; font-weight:700; margin-bottom:8px;">👤 {uname}</div>
+                        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                            <span style="font-size:13px;">개설 <b>{c['개설건수']}건</b></span>
+                            <span style="font-size:13px;">연계 <b>{c['연계건수']}건</b></span>
+                            <span style="font-size:13px;">이행 <b>{c['운영건수']}건</b></span>
+                        </div>
+                        <div style="margin-top:6px; font-size:15px; font-weight:600; color:#4F46E5;">
+                            {c['합계포인트']:,} pt
+                            <span style="font-size:12px; color:{'#16a34a' if delta >= 0 else '#dc2626'}; margin-left:8px;">
+                                {'▲' if delta >= 0 else '▼'} {abs(delta):,}pt (전월비)
+                            </span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        st.markdown("---")
+        st.markdown(f"### {user_name}님 상세 현황")
+
+    curr = calc_points_hana(curr_ym)
+    prev = calc_points_activity(prev_ym)
+    py   = calc_points_activity(prev_year_ym)
 
     diff_prev = curr["합계포인트"] - prev["합계포인트"]
     diff_year = curr["합계포인트"] - py["합계포인트"]
