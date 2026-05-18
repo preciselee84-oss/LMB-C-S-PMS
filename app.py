@@ -1599,7 +1599,7 @@ def show_user_history():
 
     st.metric("추가 실적 합산 점수", f"{total:,} PT")
 
-    _, save_col = st.columns([0.78, 0.22])
+    _, save_col = st.columns([0.85, 0.15])
     with save_col:
         save_and_check = st.button("저장 후 최종 실적 확인", use_container_width=True, type="primary", disabled=has_validation_issues)
 
