@@ -1102,14 +1102,44 @@ def render_page_title(menu):
             bar.progress(pct)
         bar.empty()
 
+    if menu != "대시보드":
+        st.markdown(
+            """
+            <style>
+            .home-btn > div.stButton > button {
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                font-size: 22px !important;
+                padding: 0 4px !important;
+                height: auto !important;
+                line-height: 1 !important;
+                color: #718096 !important;
+                width: auto !important;
+            }
+            .home-btn > div.stButton > button:hover {
+                color: #4F46E5 !important;
+                background: transparent !important;
+            }
+            </style>
+            <div class="home-btn">
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button("🏠", key=f"home_btn_{menu}", help="대시보드로 이동"):
+            st.session_state.current_menu = "대시보드"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
     st.markdown(f"## {menu}")
     admin_menus = ["실적 분석/계산", "실적 보고서", "직원 및 권한설정", "구글 스트레드시트 연동"]
     parent_nav = "관리자 메뉴" if menu in admin_menus else "사용자 메뉴"
 
-    st.markdown(
-        f"<div style='color:#718096;font-size:14px;font-weight:600;margin-top:-8px;margin-bottom:12px;'>{parent_nav} &gt; {html.escape(menu)}</div>",
-        unsafe_allow_html=True,
-    )
+    if menu != "대시보드":
+        st.markdown(
+            f"<div style='color:#718096;font-size:14px;font-weight:600;margin-top:-8px;margin-bottom:12px;'>{parent_nav} &gt; {html.escape(menu)}</div>",
+            unsafe_allow_html=True,
+        )
 
     if menu in MENU_GUIDES:
         with st.expander("📌 메뉴 이용 안내", expanded=False):
