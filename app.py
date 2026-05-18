@@ -400,6 +400,21 @@ def apply_rank_from_user_db(df):
     return df
 
 
+_RANK_ORDER = {"팀장": 1, "과장": 2, "대리": 3, "주임": 4, "직원": 5}
+
+
+def sort_by_rank_name(df):
+    if df.empty:
+        return df
+    name_col = next((c for c in ["담당자", "성명"] if c in df.columns), None)
+    if "직급" not in df.columns or name_col is None:
+        return df
+    df = df.copy()
+    df["_rank_order"] = df["직급"].map(_RANK_ORDER).fillna(9)
+    df = df.sort_values(["_rank_order", name_col]).drop(columns=["_rank_order"]).reset_index(drop=True)
+    return df
+
+
 def process_performance_analysis(curr_df_raw, prev_df_raw=None):
     try:
         df = clean_header_logic(curr_df_raw)
@@ -414,7 +429,6 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         if missing:
             return f"필수 컬럼이 없습니다: {', '.join(missing)}", None, None
 
-        rank_order = {"팀장": 1, "과장": 2, "대리": 3, "주임": 4, "직원": 5}
         _udb = st.session_state.get("user_db", {})
         member_db = {
             info.get("name", ""): info.get("rank", "직원")
@@ -543,8 +557,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
 
         res_df = pd.DataFrame(rows)
         res_df = apply_rank_from_user_db(res_df)
-        res_df["_rank"] = res_df["직급"].map(rank_order).fillna(5)
-        res_df = res_df.sort_values("_rank").drop(columns=["_rank"])
+        res_df = sort_by_rank_name(res_df)
 
         if prev_df_raw is not None:
             try:
@@ -2239,7 +2252,7 @@ def sent_results_df():
         idx = sent_df.columns.tolist().index(next((c for c in sent_df.columns if "전월대비" in c), sent_df.columns[-1]))
         sent_df.insert(idx, "등록월", sent_df["전송시각"].astype(str).str[:7])
 
-    return apply_rank_from_user_db(sent_df)
+    return sort_by_rank_name(apply_rank_from_user_db(sent_df))
 
 
 def apply_admin_prev_diff(sent_df):
