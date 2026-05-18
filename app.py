@@ -3164,7 +3164,7 @@ def show_dashboard():
 
     # ── 관리자: 전체 직원 현황 2열 그리드 ────────────────
     if st.session_state.user_role == "관리자":
-        st.markdown(f"### 전체 직원 {curr_ym} 실적 현황")
+        st.markdown(f"### 전체 직원 {prev_ym} 실적 현황")
         all_names = [
             info.get("name", "")
             for uid, info in st.session_state.user_db.items()
@@ -3172,7 +3172,7 @@ def show_dashboard():
         ]
         cards = []
         for uname in all_names:
-            c = calc_hana_for(uname, curr_ym)
+            c = calc_hana_for(uname, prev_ym)
             p = calc_act_for(uname, prev_ym)
             delta = c["합계포인트"] - p["합계포인트"]
             cards.append((uname, c, p, delta))
