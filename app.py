@@ -657,6 +657,11 @@ def show_auth_page():
             height: 0 !important;
             visibility: hidden !important;
         }
+        #MainMenu, [data-testid="stToolbar"], [data-testid="stStatusWidget"],
+        [data-testid="stDecoration"], footer {
+            display: none !important;
+            visibility: hidden !important;
+        }
         [data-testid="stSidebar"] { display: none !important; }
         .stApp, [data-testid="stAppViewContainer"], .main {
             background: #FFFFFF !important;
@@ -888,6 +893,11 @@ def show_sidebar():
         st.markdown(
             """
             <style>
+            #MainMenu, [data-testid="stToolbar"], [data-testid="stStatusWidget"],
+            [data-testid="stDecoration"], footer {
+                display: none !important;
+                visibility: hidden !important;
+            }
             [data-testid="stSidebar"] {
                 background-color: #2D2D2D !important;
             }
