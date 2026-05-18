@@ -1329,7 +1329,7 @@ def render_page_title(menu):
             unsafe_allow_html=True,
         )
 
-    if menu in MENU_GUIDES:
+    if menu in MENU_GUIDES and menu != "대시보드":
         with st.expander("📌 메뉴 이용 안내", expanded=False):
             for line in MENU_GUIDES[menu]:
                 st.markdown(f"- {line}")
