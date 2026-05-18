@@ -1093,6 +1093,13 @@ def apply_global_table_css():
             white-space: nowrap !important;
             word-break: keep-all !important;
         }
+        div[data-testid="stDataFrame"] [role="columnheader"],
+        div[data-testid="stDataEditor"] [role="columnheader"] {
+            height: 20px !important;
+            min-height: 20px !important;
+            max-height: 20px !important;
+            line-height: 20px !important;
+        }
         .action-btn button p, .action-btn button span {
             font-size: 10px !important;
         }
