@@ -2803,12 +2803,12 @@ def show_staff_admin():
         use_container_width=True,
         hide_index=True,
         column_config={
-            "직급": st.column_config.SelectboxColumn("직급", options=["팀장", "과장", "대리", "주임", "직원"]),
-            "직원구분": st.column_config.SelectboxColumn("직원구분", options=["정규직", "계약직", "파견직", "외주"]),
-            "외주여부": st.column_config.SelectboxColumn("외주여부", options=["예", "아니오"]),
-            "외주 근무기간": st.column_config.SelectboxColumn("외주 근무기간", options=["해당없음", "1년 미만", "1년 이상", "2년 이상"]),
-            "로그인 허용 여부": st.column_config.SelectboxColumn("로그인 허용 여부", options=["허용", "불가"]),
-            "메뉴 접근 권한": st.column_config.SelectboxColumn("메뉴 접근 권한", options=["사용자 메뉴", "관리자 메뉴"]),
+            "직급": st.column_config.SelectboxColumn("직급", options=["팀장", "과장", "대리", "주임", "직원"], required=True),
+            "직원구분": st.column_config.SelectboxColumn("직원구분", options=["정규직", "계약직", "파견직", "외주"], required=True),
+            "외주여부": st.column_config.SelectboxColumn("외주여부", options=["예", "아니오"], required=True),
+            "외주 근무기간": st.column_config.SelectboxColumn("외주 근무기간", options=["해당없음", "1년 미만", "1년 이상", "2년 이상"], required=True),
+            "로그인 허용 여부": st.column_config.SelectboxColumn("로그인 허용 여부", options=["허용", "불가"], required=True),
+            "메뉴 접근 권한": st.column_config.SelectboxColumn("메뉴 접근 권한", options=["사용자 메뉴", "관리자 메뉴"], required=True),
             "삭제": st.column_config.CheckboxColumn("삭제"),
         },
     )
