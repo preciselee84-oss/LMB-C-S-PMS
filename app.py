@@ -2816,9 +2816,10 @@ def show_dashboard():
     if st.session_state.get("analysis_lookup_df") is None:
         try:
             with st.spinner("하나지사 활동이력 데이터 불러오는 중..."):
-                load_csv_to_state("url_analysis", "analysis_lookup_df")
-        except Exception:
-            pass
+                raw_act = pd.read_csv(st.session_state.get("url_analysis", DEFAULT_URL_ANALYSIS))
+                st.session_state.analysis_lookup_df = raw_act
+        except Exception as e:
+            st.warning(f"하나지사 활동이력 로드 실패: {e}")
 
     df_hana = st.session_state.get("hana_sheet_df")
     user_name = st.session_state.user_name
@@ -2849,14 +2850,17 @@ def show_dashboard():
 
     # ── 하나지사 활동이력 전처리 (전월/전년동월용) ────
     df_user_act = None
-    act_date_col = None
-    act_d_col = None
+    act_date_col = "활동일"
+    act_d_col = "활동상세"
     df_activity = st.session_state.get("analysis_lookup_df")
     if df_activity is not None and not df_activity.empty:
-        df_act = clean_header_logic(df_activity.copy())
-        act_u_col = find_col(df_act, ["등록자", "담당자", "성명"], "등록자")
-        act_date_col = find_col(df_act, ["활동일", "일자"], "활동일")
-        act_d_col = find_col(df_act, ["활동상세", "활동내용"], "활동상세")
+        df_act = df_activity.copy()
+        # 컬럼명 공백 제거
+        df_act.columns = [str(c).strip() for c in df_act.columns]
+        # 실제 존재하는 컬럼 탐색
+        act_u_col = next((c for c in df_act.columns if c.strip() in ["등록자", "담당자", "성명"]), None)
+        act_date_col = next((c for c in df_act.columns if "활동일" in c.replace(" ", "") or "일자" in c.replace(" ", "")), None)
+        act_d_col = next((c for c in df_act.columns if c.strip() in ["활동상세", "활동내용"]), None)
         if act_u_col and act_date_col and act_d_col:
             df_act[act_date_col] = pd.to_datetime(df_act[act_date_col], errors="coerce")
             df_user_act = df_act[df_act[act_u_col].astype(str).str.strip() == user_name].dropna(subset=[act_date_col]).copy()
@@ -2886,17 +2890,20 @@ def show_dashboard():
 
     def calc_points_activity(ym):
         empty = {"개설건수": 0, "연계건수": 0, "운영건수": 0, "개설포인트": 0, "연계포인트": 0, "운영포인트": 0, "합계포인트": 0}
-        if df_user_act is None or act_date_col is None or act_d_col is None:
+        try:
+            if df_user_act is None or df_user_act.empty or act_date_col is None or act_d_col is None:
+                return empty
+            df_m = df_user_act[df_user_act[act_date_col].dt.strftime("%Y-%m") == ym].copy()
+            if df_m.empty:
+                return empty
+            o = int(df_m[act_d_col].astype(str).str.contains("개설", na=False).sum())
+            l = int(df_m[act_d_col].astype(str).str.contains("연계", na=False).sum())
+            v = int(df_m[act_d_col].astype(str).str.contains("운영|방문|점검", na=False).sum())
+            o_p, l_p, v_p = o * 90, l * 120, v * 30
+            total = min(2800, min(1000, o_p + l_p) + min(1800, v_p))
+            return {"개설건수": o, "연계건수": l, "운영건수": v, "개설포인트": o_p, "연계포인트": l_p, "운영포인트": v_p, "합계포인트": total}
+        except Exception:
             return empty
-        df_m = df_user_act[df_user_act[act_date_col].dt.strftime("%Y-%m") == ym].copy()
-        if df_m.empty:
-            return empty
-        o = int(df_m[act_d_col].astype(str).str.contains("개설").sum())
-        l = int(df_m[act_d_col].astype(str).str.contains("연계").sum())
-        v = int(df_m[act_d_col].astype(str).str.contains("운영|방문|점검").sum())
-        o_p, l_p, v_p = o * 90, l * 120, v * 30
-        total = min(2800, min(1000, o_p + l_p) + min(1800, v_p))
-        return {"개설건수": o, "연계건수": l, "운영건수": v, "개설포인트": o_p, "연계포인트": l_p, "운영포인트": v_p, "합계포인트": total}
 
     curr = calc_points_hana(curr_ym)       # 당월: 하나은행 시트
     prev = calc_points_activity(prev_ym)   # 전월: 하나지사 활동이력
