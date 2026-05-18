@@ -1093,6 +1093,9 @@ def apply_global_table_css():
             white-space: nowrap !important;
             word-break: keep-all !important;
         }
+        .action-btn button p, .action-btn button span {
+            font-size: 20px !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -2157,8 +2160,6 @@ def show_final_check():
         )
 
     st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
-
-    st.markdown('<style>.action-btn button p, .action-btn button span { font-size: 30px !important; }</style>', unsafe_allow_html=True)
 
     _, save_col, send_col = st.columns([0.56, 0.22, 0.22])
 
