@@ -2875,7 +2875,7 @@ def show_dashboard():
         v = int((gdf[gubun_col].astype(str).str.strip() == "이행").sum()) if gubun_col in gdf.columns else 0
         o_p, l_p, v_p = o * 90, l * 120, v * 30
         total = min(2800, min(1000, o_p + l_p) + min(1800, v_p))
-        return {"개설건수": o, "연계건수": l, "운영건수": v, "합계포인트": total}
+        return {"개설건수": o, "연계건수": l, "운영건수": v, "개설포인트": o_p, "연계포인트": l_p, "운영포인트": v_p, "합계포인트": total}
 
     def calc_act_for(uname, ym):
         empty = {"개설건수": 0, "연계건수": 0, "운영건수": 0, "합계포인트": 0}
