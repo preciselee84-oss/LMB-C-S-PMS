@@ -2803,11 +2803,18 @@ def show_staff_admin():
 def show_dashboard():
     import plotly.graph_objects as go
 
+    if st.session_state.get("analysis_lookup_df") is None:
+        try:
+            with st.spinner("하나지사 활동이력 데이터 불러오는 중..."):
+                load_csv_to_state("url_analysis", "analysis_lookup_df")
+        except Exception:
+            pass
+
     df_all = st.session_state.get("analysis_lookup_df")
     user_name = st.session_state.user_name
 
     if df_all is None or df_all.empty:
-        st.info("📂 데이터를 먼저 불러와주세요. [구글 스트레드시트 연동] 메뉴에서 '데이터 저장'을 눌러주세요.")
+        st.info("📂 데이터를 불러올 수 없습니다. [구글 스트레드시트 연동] 메뉴에서 URL을 확인해주세요.")
         return
 
     df_all = clean_header_logic(df_all.copy())
