@@ -992,6 +992,7 @@ def show_sidebar():
                     st.session_state.current_menu = menu_name
                     st.rerun()
 
+        st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
         st.markdown("사용자 메뉴")
         for menu_name in ["이력확인 및 작성", "최종 실적 확인"]:
             if st.button(menu_name, use_container_width=True):
