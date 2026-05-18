@@ -726,17 +726,34 @@ def show_auth_page():
             border-radius: 12px !important;
             font-size: 15px !important;
             font-weight: 700 !important;
+            width: 100% !important;
+            transition: all 0.18s !important;
+        }
+        [data-testid="stBaseButton-primary"] {
             background: #FFFFFF !important;
             color: #3D3580 !important;
             border: 1.5px solid #D8D3F5 !important;
             box-shadow: 0 2px 10px rgba(104,91,190,0.09) !important;
-            width: 100% !important;
-            transition: all 0.18s !important;
         }
-        div.stButton > button:hover {
+        [data-testid="stBaseButton-primary"]:hover {
             background: #F3F0FF !important;
             border-color: #7B6FD4 !important;
             color: #493E9A !important;
+        }
+        [data-testid="stBaseButton-secondary"] {
+            background: #009A5A !important;
+            color: #FFFFFF !important;
+            border: 1.5px solid #009A5A !important;
+            box-shadow: none !important;
+        }
+        [data-testid="stBaseButton-secondary"]:hover {
+            background: #007A47 !important;
+            border-color: #007A47 !important;
+            color: #FFFFFF !important;
+        }
+        [data-testid="stBaseButton-secondary"] p,
+        [data-testid="stBaseButton-secondary"] span {
+            color: #FFFFFF !important;
         }
         hr {
             border: 0 !important;
@@ -828,23 +845,6 @@ def show_auth_page():
             st.divider()
             st.markdown("<div class='auth-small'>계정이 없으신가요?</div>", unsafe_allow_html=True)
 
-            st.markdown("""
-                <style>
-                [data-testid="stMarkdownContainer"]:has(.signup-marker) + div button,
-                [data-testid="stMarkdownContainer"]:has(.signup-marker) ~ div button {
-                    background: #009A5A !important;
-                    color: #FFFFFF !important;
-                    border-color: #009A5A !important;
-                }
-                [data-testid="stMarkdownContainer"]:has(.signup-marker) + div button p,
-                [data-testid="stMarkdownContainer"]:has(.signup-marker) + div button span,
-                [data-testid="stMarkdownContainer"]:has(.signup-marker) ~ div button p,
-                [data-testid="stMarkdownContainer"]:has(.signup-marker) ~ div button span {
-                    color: #FFFFFF !important;
-                }
-                </style>
-                <span class="signup-marker"></span>
-            """, unsafe_allow_html=True)
             if st.button("회원가입", use_container_width=True):
                 st.session_state.auth_mode = "signup"
                 st.rerun()
