@@ -1094,7 +1094,7 @@ def apply_global_table_css():
             word-break: keep-all !important;
         }
         .action-btn button p, .action-btn button span {
-            font-size: 20px !important;
+            font-size: 10px !important;
         }
         </style>
         """,
