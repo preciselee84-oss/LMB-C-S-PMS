@@ -1,2 +1,8 @@
 # Claude Code settings
 .claude/
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# Local JSON data files
+*.json

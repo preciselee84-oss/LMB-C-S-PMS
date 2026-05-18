@@ -1,4 +1,4 @@
-# VERSION: 20260518_cookie_save_id
+# VERSION: 20260518_staff_filter_deadline
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -7,6 +7,8 @@ import json
 import os
 import html
 import re
+import base64
+import requests as _requests
 from io import BytesIO
 from datetime import datetime, timedelta
 from streamlit_cookies_controller import CookieController
@@ -26,6 +28,55 @@ DEFAULT_URL_HANA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgRHnTZD4eD
 DEFAULT_URL_HANA_BILLING = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgRHnTZD4eDW2UeODQuGxmxFrflKpbQda3sBsVjj1s3qAFWMKcpke2U58UuT6VEDlkbXveZlaroTCr/pub?gid=1172734914&single=true&output=csv"
 
 
+GITHUB_REPO = "preciselee84-oss/LMB-C-S-PMS"
+GITHUB_BRANCH = "main"
+GITHUB_DATA_DIR = "data"
+
+
+def _get_github_token():
+    try:
+        return st.secrets.get("GITHUB_TOKEN", "")
+    except Exception:
+        return os.environ.get("GITHUB_TOKEN", "")
+
+
+def _github_save(file_path, data):
+    token = _get_github_token()
+    if not token:
+        return False
+    try:
+        headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+        gh_path = f"{GITHUB_DATA_DIR}/{file_path}"
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{gh_path}"
+        resp = _requests.get(url, headers=headers, params={"ref": GITHUB_BRANCH}, timeout=10)
+        sha = resp.json().get("sha") if resp.status_code == 200 else None
+        content = base64.b64encode(json.dumps(data, ensure_ascii=False, indent=4).encode()).decode()
+        payload = {"message": f"auto-save {file_path}", "content": content, "branch": GITHUB_BRANCH}
+        if sha:
+            payload["sha"] = sha
+        resp = _requests.put(url, json=payload, headers=headers, timeout=15)
+        return resp.status_code in (200, 201)
+    except Exception:
+        return False
+
+
+def _github_load(file_path, default_data):
+    token = _get_github_token()
+    if not token:
+        return default_data
+    try:
+        headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+        gh_path = f"{GITHUB_DATA_DIR}/{file_path}"
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{gh_path}"
+        resp = _requests.get(url, headers=headers, params={"ref": GITHUB_BRANCH}, timeout=10)
+        if resp.status_code == 200:
+            content = base64.b64decode(resp.json()["content"]).decode()
+            return json.loads(content)
+    except Exception:
+        pass
+    return default_data
+
+
 def load_db(file_path, default_data):
     if os.path.exists(file_path):
         try:
@@ -33,12 +84,58 @@ def load_db(file_path, default_data):
                 return json.load(f)
         except Exception:
             pass
-    return default_data
+    data = _github_load(file_path, default_data)
+    if data != default_data:
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+        except Exception:
+            pass
+    return data
 
 
 def save_db(file_path, data):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+    _github_save(file_path, data)
+
+
+def send_kakao_notify(message):
+    try:
+        token = ""
+        try:
+            token = st.secrets.get("KAKAO_TOKEN", "")
+        except Exception:
+            token = os.environ.get("KAKAO_TOKEN", "")
+        if not token:
+            return False
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/x-www-form-urlencoded"}
+        data = {"template_object": json.dumps({"object_type": "text", "text": message, "link": {"web_url": "", "mobile_web_url": ""}, "button_title": "확인"})}
+        resp = _requests.post("https://kapi.kakao.com/v2/api/talk/memo/default/send", headers=headers, data=data, timeout=10)
+        return resp.status_code == 200
+    except Exception:
+        return False
+
+
+def get_staff_names():
+    return {info.get("name") for uid, info in st.session_state.get("user_db", {}).items() if uid != "1" and info.get("name")}
+
+
+def get_current_user_rank():
+    name = st.session_state.get("user_name", "")
+    for uid, info in st.session_state.get("user_db", {}).items():
+        if info.get("name") == name:
+            return info.get("rank", "직원")
+    return "직원"
+
+
+def filter_by_staff(df, name_col="담당자"):
+    if df.empty or name_col not in df.columns:
+        return df
+    staff_names = get_staff_names()
+    if not staff_names:
+        return df
+    return df[df[name_col].isin(staff_names)].reset_index(drop=True)
 
 
 def dataframe_to_upload_payload(df):
@@ -106,6 +203,7 @@ def init_state():
         "temp_cloud_df": None,
         "auto_prev_df": None,
         "deadline_time": "",
+        "report_closed": "",
         "login_time": "",
         "_prev_menu": None,
     }
@@ -407,7 +505,7 @@ def apply_rank_from_user_db(df):
     return df
 
 
-_RANK_ORDER = {"팀장": 1, "과장": 2, "대리": 3, "주임": 4, "직원": 5}
+_RANK_ORDER = {"부서장": 0, "팀장": 1, "과장": 2, "대리": 3, "주임": 4, "직원": 5}
 
 
 def sort_by_rank_name(df):
@@ -444,6 +542,9 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         }
 
         df_clean = df.dropna(subset=[u_col, date_col]).copy()
+        _staff = get_staff_names()
+        if _staff and u_col in df_clean.columns:
+            df_clean = df_clean[df_clean[u_col].isin(_staff)]
         df_clean[date_col] = pd.to_datetime(df_clean[date_col], errors="coerce")
         df_clean = df_clean.dropna(subset=[date_col])
         df_clean[date_col] = df_clean[date_col].dt.strftime("%Y-%m-%d")
@@ -874,6 +975,16 @@ def show_auth_page():
                             st.session_state.final_reupload_df = pd.DataFrame.from_dict(user_saved["final_reupload_df"])
                         if user_saved.get("user_prev_month_sel"):
                             st.session_state.user_prev_month_sel = user_saved["user_prev_month_sel"]
+
+                    admin_analysis = saved_db.get("admin_analysis")
+                    if admin_analysis and admin_analysis.get("sent_df"):
+                        st.session_state.analysis_result = pd.DataFrame.from_dict(admin_analysis["sent_df"])
+                    deadline_info = saved_db.get("deadline")
+                    if deadline_info:
+                        st.session_state.deadline_time = deadline_info.get("time", "")
+                    report_closed_info = saved_db.get("report_closed")
+                    if report_closed_info:
+                        st.session_state.report_closed = report_closed_info.get("time", "")
 
                     st.session_state.current_menu = "대시보드"
                     st.rerun()
@@ -2256,6 +2367,12 @@ def sent_results_df():
     if not sent_db:
         return pd.DataFrame()
 
+    staff_names = get_staff_names()
+    if staff_names:
+        sent_db = {k: v for k, v in sent_db.items() if k in staff_names}
+    if not sent_db:
+        return pd.DataFrame()
+
     sent_df = pd.DataFrame(list(sent_db.values()))
     sent_df = sent_df.drop(columns=[c for c in sent_df.columns if "관리자전월대비" in c], errors="ignore")
 
@@ -2322,7 +2439,14 @@ def sent_uploaded_files_excel_bytes():
             "안내": pd.DataFrame([{"내용": "아직 전송된 업로드 엑셀 파일이 없습니다. 직원이 실적 결과 전송을 다시 진행하면 이 파일에 포함됩니다."}])
         })
 
-    # 실적보고서(마감된 실적)에 있는 사람들의 이름 목록 가져오기
+    staff_names = get_staff_names()
+    if staff_names:
+        sent_uploads_db = {k: v for k, v in sent_uploads_db.items() if k in staff_names}
+    if not sent_uploads_db:
+        return dataframe_to_excel_bytes({
+            "안내": pd.DataFrame([{"내용": "직원 목록에 해당하는 전송 데이터가 없습니다."}])
+        })
+
     analysis_result = st.session_state.get("analysis_result")
     if analysis_result is not None and not analysis_result.empty:
         if "담당자" in analysis_result.columns:
@@ -2332,7 +2456,6 @@ def sent_uploaded_files_excel_bytes():
     else:
         report_names = set(sent_uploads_db.keys())
 
-    # 실적보고서 명단에 있는 사람들의 데이터만 합치기
     all_data = []
     for name, payload in sent_uploads_db.items():
         if name in report_names:
@@ -2633,18 +2756,39 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
 
 def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_month_label):
     st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
+
+    is_dept_head = get_current_user_rank() == "부서장"
+    is_closed = bool(st.session_state.get("report_closed"))
+
+    dc1, dc2 = st.columns([0.85, 0.15])
+    with dc2:
+        if is_dept_head:
+            if not is_closed:
+                if st.button("마감", use_container_width=True, type="primary"):
+                    close_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
+                    st.session_state.report_closed = close_time
+                    saved_db = load_db(SAVED_STATE_FILE, {})
+                    saved_db["report_closed"] = {"time": close_time, "by": st.session_state.get("user_name", "")}
+                    save_db(SAVED_STATE_FILE, saved_db)
+                    st.success("실적 보고서 마감 완료")
+                    time.sleep(0.5)
+                    st.rerun()
+            else:
+                st.info(f"마감 완료: {st.session_state.report_closed}")
+        else:
+            if is_closed:
+                st.info(f"마감 완료: {st.session_state.report_closed}")
+            else:
+                st.caption("부서장만 마감할 수 있습니다.")
+
     c1, c2, c3 = st.columns(3)
 
     with c1:
-        if st.button("실적파일 구글시트 전송", use_container_width=True):
-            st.warning("구글시트 쓰기용 API/인증 설정이 없어 아직 전송할 수 없습니다. 서비스 계정 또는 Apps Script 전송 URL을 연결하면 이 버튼에 전송 기능을 붙일 수 있습니다.")
+        st.button("실적파일 구글시트 전송", use_container_width=True, disabled=not is_closed)
 
-    excel_bytes = sent_uploaded_files_excel_bytes()
-
-    # 파일명 생성
     ym = get_uploaded_month(st.session_state.user_excel_data) if st.session_state.user_excel_data is not None else ""
     if ym:
-        year_month = ym.replace("-", "")  # YYYY-MM -> YYYYMM
+        year_month = ym.replace("-", "")
     else:
         year_month = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
 
@@ -2652,34 +2796,41 @@ def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_m
     file_name = f"LMB월간 활동실적__{year_month}_{download_time}.xlsx"
 
     with c2:
-        st.download_button(
-            "실적파일 엑셀 다운로드",
-            data=excel_bytes,
-            file_name=file_name,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
-
-    with c3:
-        try:
-            ppt_bytes = build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_label)
+        if is_closed:
+            excel_bytes = sent_uploaded_files_excel_bytes()
             st.download_button(
-                "실적보고서 PPT 다운로드",
-                data=ppt_bytes,
-                file_name=f"performance_report_{curr_month_label}.pptx",
-                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                "실적파일 엑셀 다운로드",
+                data=excel_bytes,
+                file_name=file_name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
             )
-        except Exception as e:
+        else:
+            st.button("실적파일 엑셀 다운로드", use_container_width=True, disabled=True)
+
+    with c3:
+        if is_closed:
+            try:
+                ppt_bytes = build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_label)
+                st.download_button(
+                    "실적보고서 PPT 다운로드",
+                    data=ppt_bytes,
+                    file_name=f"performance_report_{curr_month_label}.pptx",
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.button("실적보고서 PPT 다운로드", use_container_width=True, disabled=True)
+                st.caption(f"PPT 생성 준비 중 오류: {e}")
+        else:
             st.button("실적보고서 PPT 다운로드", use_container_width=True, disabled=True)
-            st.caption(f"PPT 생성 준비 중 오류: {e}")
 
 
 def show_admin_analysis():
     select_prev_month("auto_prev_df", "adm_prev_month")
 
     st.markdown("### 직원 전송 실적 내역")
-    sent_df = apply_admin_prev_diff(sent_results_df())
+    sent_df = filter_by_staff(apply_admin_prev_diff(sent_results_df()))
 
     if sent_df.empty:
         st.info("아직 전송된 실적이 없습니다.")
@@ -2700,7 +2851,6 @@ def show_admin_analysis():
     with c2:
         st.markdown('<div class="action-btn">', unsafe_allow_html=True)
         if st.button("저장", use_container_width=True, type="secondary"):
-            # 현재 전송된 실적 데이터를 임시 저장
             admin_saved = {
                 "sent_df": sent_df.to_dict(),
                 "sent_uploads_db": load_db(SENT_UPLOADS_FILE, {}),
@@ -2717,8 +2867,13 @@ def show_admin_analysis():
     with c3:
         st.markdown('<div class="action-btn">', unsafe_allow_html=True)
         if st.button("마감", use_container_width=True, type="primary"):
-            st.session_state.deadline_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
+            deadline_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
+            st.session_state.deadline_time = deadline_time
             st.session_state.analysis_result = sent_df.copy()
+            saved_db = load_db(SAVED_STATE_FILE, {})
+            saved_db["deadline"] = {"time": deadline_time, "by": st.session_state.get("user_name", "")}
+            save_db(SAVED_STATE_FILE, saved_db)
+            send_kakao_notify(f"[LMB 실적관리] 실적 분석/계산 마감 완료\n마감시각: {deadline_time}\n마감자: {st.session_state.get('user_name', '')}")
             st.success("마감 처리 완료")
             time.sleep(0.5)
             st.rerun()
@@ -2734,7 +2889,7 @@ def show_report():
         return
 
     drop_cols = ["전송시각"] + [c for c in st.session_state.analysis_result.columns if "관리자전월대비" in c]
-    report_df = st.session_state.analysis_result.drop(columns=drop_cols, errors="ignore")
+    report_df = filter_by_staff(st.session_state.analysis_result.drop(columns=drop_cols, errors="ignore"))
 
     curr_month_label = "당월"
     prev_month_label = "전월"
@@ -2761,6 +2916,8 @@ def show_report():
     if not isinstance(prev_res, pd.DataFrame) or prev_res.empty:
         st.info("전월 데이터를 분석할 수 없습니다.")
         return
+
+    prev_res = filter_by_staff(prev_res)
 
     st.markdown("### 비교 리포트")
 
@@ -2847,7 +3004,7 @@ def show_staff_admin():
         use_container_width=True,
         hide_index=True,
         column_config={
-            "직급": st.column_config.SelectboxColumn("직급", options=["팀장", "과장", "대리", "주임", "직원"], required=True),
+            "직급": st.column_config.SelectboxColumn("직급", options=["부서장", "팀장", "과장", "대리", "주임", "직원"], required=True),
             "직원구분": st.column_config.SelectboxColumn("직원구분", options=["정규직", "계약직", "파견직", "외주"], required=True),
             "외주여부": st.column_config.SelectboxColumn("외주여부", options=["예", "아니오"], required=True),
             "외주 근무기간": st.column_config.SelectboxColumn("외주 근무기간", options=["해당없음", "1년 미만", "1년 이상", "2년 이상"], required=True),
