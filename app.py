@@ -1278,14 +1278,6 @@ def render_page_title(menu):
     if menu == "대시보드":
         return
 
-    if st.session_state.get("_prev_menu") != menu:
-        st.session_state._prev_menu = menu
-        bar = st.progress(0)
-        for pct in [25, 55, 85, 100]:
-            time.sleep(0.03)
-            bar.progress(pct)
-        bar.empty()
-
     if menu != "대시보드":
         st.markdown(
             """
