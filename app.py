@@ -979,6 +979,8 @@ def show_auth_page():
                     admin_analysis = saved_db.get("admin_analysis")
                     if admin_analysis and admin_analysis.get("sent_df"):
                         st.session_state.analysis_result = pd.DataFrame.from_dict(admin_analysis["sent_df"])
+                    if admin_analysis and admin_analysis.get("adm_prev_month"):
+                        st.session_state.adm_prev_month = admin_analysis["adm_prev_month"]
                     deadline_info = saved_db.get("deadline")
                     if deadline_info:
                         st.session_state.deadline_time = deadline_info.get("time", "")
@@ -2854,6 +2856,7 @@ def show_admin_analysis():
             admin_saved = {
                 "sent_df": sent_df.to_dict(),
                 "sent_uploads_db": load_db(SENT_UPLOADS_FILE, {}),
+                "adm_prev_month": st.session_state.get("adm_prev_month", "선택안함"),
                 "saved_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
             }
             saved_db = load_db(SAVED_STATE_FILE, {})
