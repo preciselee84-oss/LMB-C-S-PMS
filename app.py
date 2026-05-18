@@ -1074,7 +1074,8 @@ MENU_GUIDES = {
         "📊 로그인한 본인의 이번달 실적 추정치를 한눈에 확인할 수 있습니다.",
         "📅 전월 및 전년 동월과의 포인트 증감을 비교합니다.",
         "💡 현재 부족한 실적을 채울 수 있는 활동 방안을 안내합니다.",
-        "🔄 데이터는 [구글 스트레드시트 연동] 메뉴에서 먼저 불러와야 합니다.",
+        "🏦 이번달 추정 포인트는 하나은행 구글 시트에 입력된 수치를 기준으로 표시됩니다.",
+        "📋 전월 대비 · 전년 동월 대비는 본사에 최종 제출하는 활동이력 데이터를 참조하여 표시됩니다.",
     ],
     "실적 분석/계산": [
         "📂 구글 스프레드시트에서 불러온 실적 데이터를 분석·계산합니다.",
@@ -3177,9 +3178,9 @@ def inject_theme_toggle():
     .theme-toggle-wrap {
         position: fixed; top: 10px; right: 16px; z-index: 999999;
         display: flex; gap: 4px; align-items: center;
-        background: rgba(255,255,255,0.92);
+        background: #3a3a3a;
         border-radius: 24px; padding: 4px 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.35);
         backdrop-filter: blur(6px);
     }
     .theme-toggle-wrap button {
@@ -3231,7 +3232,7 @@ def inject_theme_toggle():
         border-color: #444466 !important;
     }
     html[data-pms-theme="dark"] .theme-toggle-wrap {
-        background: rgba(30,30,46,0.95) !important;
+        background: #2a2a2a !important;
     }
 
     /* ── 시스템 모드 (media query) ──────────────────────── */
@@ -3253,7 +3254,7 @@ def inject_theme_toggle():
             background-color: #2a2a3e !important; color: #cdd6f4 !important;
         }
         html[data-pms-theme="system"] .theme-toggle-wrap {
-            background: rgba(30,30,46,0.95) !important;
+            background: #2a2a2a !important;
         }
     }
     </style>
