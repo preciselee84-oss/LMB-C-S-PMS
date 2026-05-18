@@ -830,25 +830,24 @@ def show_auth_page():
 
             st.markdown("""
                 <style>
-                .signup-btn button {
+                [data-testid="stMarkdownContainer"]:has(.signup-marker) + div button,
+                [data-testid="stMarkdownContainer"]:has(.signup-marker) ~ div button {
                     background: #009A5A !important;
                     color: #FFFFFF !important;
                     border-color: #009A5A !important;
                 }
-                .signup-btn button:hover {
-                    background: #007A47 !important;
-                    border-color: #007A47 !important;
-                }
-                .signup-btn button p, .signup-btn button span {
+                [data-testid="stMarkdownContainer"]:has(.signup-marker) + div button p,
+                [data-testid="stMarkdownContainer"]:has(.signup-marker) + div button span,
+                [data-testid="stMarkdownContainer"]:has(.signup-marker) ~ div button p,
+                [data-testid="stMarkdownContainer"]:has(.signup-marker) ~ div button span {
                     color: #FFFFFF !important;
                 }
                 </style>
-                <div class="signup-btn">
+                <span class="signup-marker"></span>
             """, unsafe_allow_html=True)
             if st.button("회원가입", use_container_width=True):
                 st.session_state.auth_mode = "signup"
                 st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
 
         else:
             r_id = st.text_input("아이디", key="r_id")
