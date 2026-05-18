@@ -304,14 +304,21 @@ def render_manual_perf_input_table(base):
             white-space: nowrap !important;
         }
         div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="1"],
-        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="2"] {
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="2"],
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="1"] > *,
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="2"] > * {
             text-align: center !important;
+            justify-content: center !important;
         }
         div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="3"],
         div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="4"],
         div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="5"],
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="3"] > *,
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="4"] > *,
+        div[data-testid="stDataEditor"] [role="gridcell"][aria-colindex="5"] > *,
         div[data-testid="stDataEditor"] input {
             text-align: right !important;
+            justify-content: flex-end !important;
         }
         </style>
         """,
