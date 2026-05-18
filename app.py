@@ -2775,22 +2775,34 @@ def show_google_sync():
     st.session_state.url_hana = st.text_input("하나은행 구글 시트 CSV URL", value=st.session_state.url_hana)
 
     if st.button("데이터 저장", type="primary"):
+        errors = []
         try:
             load_csv_to_state("url_sync", "temp_cloud_df")
             st.session_state.cloud_sheet_df = st.session_state.temp_cloud_df
-            try:
-                hana_raw = pd.read_csv(st.session_state.url_hana, header=2)
-                hana_raw = hana_raw.dropna(how="all").reset_index(drop=True)
-                st.session_state.hana_sheet_df = hana_raw
-            except Exception:
-                st.warning("하나은행 구글 시트 불러오기 실패. URL을 확인해주세요.")
-            st.success("불러오기 및 저장 완료")
         except Exception:
-            st.error("불러오기 실패. URL을 확인해주세요.")
+            errors.append("본사 구글 시트")
+        try:
+            load_csv_to_state("url_analysis", "analysis_lookup_df")
+        except Exception:
+            errors.append("하나지사 활동이력 구글 시트")
+        try:
+            hana_raw = pd.read_csv(st.session_state.url_hana, header=2)
+            hana_raw = hana_raw.dropna(how="all").reset_index(drop=True)
+            st.session_state.hana_sheet_df = hana_raw
+        except Exception:
+            errors.append("하나은행 구글 시트")
+        if errors:
+            st.error(f"불러오기 실패: {', '.join(errors)} — URL을 확인해주세요.")
+        else:
+            st.success("불러오기 및 저장 완료")
 
     if st.session_state.temp_cloud_df is not None:
         st.markdown("**본사 구글 시트 데이터**")
         st.dataframe(strip_activity_time_columns(st.session_state.temp_cloud_df), use_container_width=True, hide_index=True)
+
+    if st.session_state.analysis_lookup_df is not None:
+        st.markdown("**하나지사 활동이력 구글 시트 데이터**")
+        st.dataframe(strip_activity_time_columns(st.session_state.analysis_lookup_df), use_container_width=True, hide_index=True)
 
     if st.session_state.hana_sheet_df is not None:
         st.markdown("**하나은행 구글 시트 데이터**")
