@@ -1282,6 +1282,7 @@ def render_page_title(menu):
         st.markdown(
             """
             <style>
+            .block-container { padding-top: 1rem !important; }
             .home-btn > div.stButton > button {
                 background: transparent !important;
                 border: none !important;
