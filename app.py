@@ -1276,7 +1276,6 @@ MENU_GUIDES = {
 
 def render_page_title(menu):
     if menu == "대시보드":
-        st.markdown("<style>.block-container{padding-top:1rem!important;}</style>", unsafe_allow_html=True)
         return
 
     if st.session_state.get("_prev_menu") != menu:
