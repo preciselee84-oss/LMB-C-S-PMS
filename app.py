@@ -2838,13 +2838,16 @@ def show_staff_admin():
 def show_dashboard():
     import plotly.graph_objects as go
 
-    # ── 대시보드 진입 시 두 데이터 항상 갱신 ─────────────
+    # ── 대시보드 진입 시 세 데이터 항상 갱신 ─────────────
     try:
         with st.spinner("데이터 불러오는 중..."):
             hana_raw = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
             st.session_state.hana_sheet_df = hana_raw
             raw_act = pd.read_csv(st.session_state.get("url_analysis", DEFAULT_URL_ANALYSIS))
             st.session_state.analysis_lookup_df = raw_act
+            billing_raw = pd.read_csv(st.session_state.get("url_hana_billing", DEFAULT_URL_HANA_BILLING))
+            billing_raw = billing_raw.dropna(how="all").reset_index(drop=True)
+            st.session_state.hana_billing_df = billing_raw
     except Exception as e:
         st.warning(f"데이터 로드 실패: {e}")
 
@@ -3136,6 +3139,13 @@ def show_dashboard():
 
     if ol_remain > 0:
         st.markdown("")
+        st.info(
+            "💡 개설·연계 포인트 확보가 어렵다면 **교차판매·활성화·VOC 활동**을 통해 부족한 포인트를 채울 수 있습니다.\n\n"
+            "- **교차판매**: 타겟고객 선별·메일발송·방문설명회 등 영업활동 — 건당 2\~60pt, 월 최대 100\~제한없음\n"
+            "- **활성화**: 이체·집금 활성화, 조회업무 활성화 — 건당 10\~30pt, 월 최대 100\~150pt\n"
+            "- **VOC**: 고객 개선 아이디어 제출 — 건당 10pt, 월 최대 50pt\n\n"
+            "위 활동들은 개설·연계 실적 없이도 단독으로 포인트를 적립할 수 있는 가장 현실적인 방법입니다."
+        )
         st.markdown("**📋 개설·연계 포인트 확보가 어렵다면? — 추가 실적 입력 표 활용 가이드**")
         st.markdown("""
 | 활동구분 | 활동 방법 | 단위 점수 | 월 최대 |
@@ -3157,6 +3167,98 @@ def show_dashboard():
 | 추가활동 | 운영활동 (원격) | 10pt | 200pt |
         """)
         st.info("💡 위 활동들은 **[이력확인 및 작성] 메뉴 → 추가 실적 입력** 표에서 건수를 직접 입력하여 포인트를 적립할 수 있습니다.")
+
+    # ── 청구 시트 기반 관심 고객 분석 ────────────────────
+    st.markdown("---")
+    st.markdown("### 🔍 관심 고객 현황 (하나은행 청구 시트 기준)")
+    df_billing = st.session_state.get("hana_billing_df")
+    if df_billing is None or df_billing.empty:
+        st.info("청구 시트 데이터가 없습니다. [구글 스트레드시트 연동] 메뉴에서 URL을 확인해주세요.")
+    else:
+        billing = df_billing.copy()
+        billing.columns = [str(c).strip() for c in billing.columns]
+
+        # ── 컬럼 자동 감지 ────────────────────────────────
+        b_gubun_col   = next((c for c in billing.columns if "청구구분" in c), None)
+        b_login_date  = next((c for c in billing.columns if "최종로그인" in c or "로그인일자" in c.replace(" ", "")), None)
+        b_transfer    = next((c for c in billing.columns if "이체일자" in c or "최종이체" in c), None)
+        b_login_cnt   = next((c for c in billing.columns if "로그인건수" in c.replace(" ", "")), None)
+        b_name_col    = next((c for c in billing.columns if c in ["고객명", "업체명", "회사명", "거래처명"]), None)
+        b_user_col    = next((c for c in billing.columns if c in ["담당자", "영업담당", "담당영업"]), None)
+        b_onset_col   = next((c for c in billing.columns if any(k in c for k in ["개통일", "구축일", "연계일", "도입일", "계약일"])), None)
+
+        # 날짜 파싱
+        if b_login_date:
+            billing[b_login_date] = pd.to_datetime(billing[b_login_date], errors="coerce")
+        if b_transfer:
+            billing[b_transfer]   = pd.to_datetime(billing[b_transfer], errors="coerce")
+        if b_onset_col:
+            billing[b_onset_col]  = pd.to_datetime(billing[b_onset_col], errors="coerce")
+
+        one_month_ago = now - timedelta(days=30)
+        curr_year     = now.year
+
+        # 관리자가 아닌 경우 본인 담당 고객만
+        if b_user_col and st.session_state.user_role != "관리자":
+            billing = billing[billing[b_user_col].astype(str).str.strip() == user_name].copy()
+
+        display_cols = [c for c in [b_name_col, b_user_col, b_gubun_col, b_onset_col,
+                                     b_login_date, b_login_cnt, b_transfer] if c]
+
+        # ── 분석 1: 신규구축·ERP연계 중 미활성 고객 ──────
+        if b_gubun_col:
+            is_new = billing[b_gubun_col].astype(str).str.contains("신규|ERP|구축", na=False, case=False)
+            new_cust = billing[is_new].copy()
+            if b_onset_col and not new_cust.empty:
+                new_cust = new_cust[new_cust[b_onset_col].dt.year == curr_year]
+
+            if not new_cust.empty:
+                masks = []
+                if b_login_date:
+                    no_login  = new_cust[b_login_date].isna()
+                    old_login = new_cust[b_login_date] < one_month_ago
+                    masks.append(no_login | old_login)
+                if b_login_cnt and b_transfer:
+                    new_cust[b_login_cnt] = pd.to_numeric(new_cust[b_login_cnt], errors="coerce").fillna(0)
+                    has_login   = new_cust[b_login_cnt] > 0
+                    no_transfer = new_cust[b_transfer].isna()
+                    masks.append(has_login & no_transfer)
+
+                if masks:
+                    import functools as _ft
+                    combined = _ft.reduce(lambda a, b: a | b, masks)
+                    alert1 = new_cust[combined]
+                else:
+                    alert1 = new_cust
+
+                if not alert1.empty:
+                    st.markdown("#### ⚠️ 신규구축·ERP연계 고객 중 미활성 고객")
+                    st.caption("올해 신규구축 또는 ERP연계를 진행하였으나 최종 로그인이 1개월 이상 없거나, 로그인 기록만 있고 이체 이력이 없는 고객입니다.")
+                    show_cols = [c for c in display_cols if c in alert1.columns]
+                    st.dataframe(alert1[show_cols].reset_index(drop=True), use_container_width=True, hide_index=True)
+                else:
+                    st.success("✅ 신규구축·ERP연계 고객 중 미활성 고객이 없습니다.")
+            else:
+                st.info("올해 신규구축·ERP연계 고객 데이터가 없습니다.")
+        else:
+            st.warning("청구구분 컬럼을 찾을 수 없습니다.")
+
+        # ── 분석 2: SM 고객 중 로그인 건수 多 ───────────
+        if b_gubun_col and b_login_cnt:
+            sm_mask = billing[b_gubun_col].astype(str).str.strip().str.upper() == "SM"
+            sm_cust = billing[sm_mask].copy()
+            if not sm_cust.empty:
+                sm_cust[b_login_cnt] = pd.to_numeric(sm_cust[b_login_cnt], errors="coerce").fillna(0)
+                avg_login = sm_cust[b_login_cnt].mean()
+                high_login_sm = sm_cust[sm_cust[b_login_cnt] > avg_login]
+                if not high_login_sm.empty:
+                    st.markdown("#### ⚠️ SM 고객 중 로그인 건수 多 (교차판매 기회)")
+                    st.caption(f"청구구분이 SM이지만 로그인 건수가 평균({avg_login:.1f}건)보다 많은 고객으로, 추가 서비스 제안 또는 업그레이드 대화를 시작할 수 있습니다.")
+                    show_cols = [c for c in [b_name_col, b_user_col, b_gubun_col, b_login_cnt, b_login_date] if c and c in high_login_sm.columns]
+                    st.dataframe(high_login_sm[show_cols].sort_values(b_login_cnt, ascending=False).reset_index(drop=True),
+                                 use_container_width=True, hide_index=True)
+                else:
+                    st.success("✅ SM 고객 중 평균 이상 로그인 건수를 가진 고객이 없습니다.")
 
 
 def show_google_sync():
