@@ -1042,6 +1042,42 @@ def apply_global_table_css():
     )
 
 
+MENU_GUIDES = {
+    "실적 분석/계산": [
+        "📂 구글 스프레드시트에서 불러온 실적 데이터를 분석·계산합니다.",
+        "📊 당월/전월 데이터를 비교하여 포인트 및 지급예상금액을 확인할 수 있습니다.",
+        "✅ 검증 탭에서 중복/초과 방문, 누락 데이터 등 오류 여부를 확인하세요.",
+        "🔒 검토 완료 후 [마감] 버튼을 눌러 실적을 확정합니다.",
+    ],
+    "실적 보고서": [
+        "📋 마감된 실적 데이터를 기반으로 보고서를 조회합니다.",
+        "📥 Excel 또는 PPT 형식으로 보고서를 다운로드할 수 있습니다.",
+        "📅 당월·전월 비교 데이터가 함께 표시됩니다.",
+    ],
+    "직원 및 권한설정": [
+        "👤 직원 계정의 접근 권한을 허용/불가로 설정합니다.",
+        "🔑 비밀번호 초기화 및 역할(관리자/사용자) 변경이 가능합니다.",
+        "➕ 신규 직원 계정을 직접 등록할 수 있습니다.",
+    ],
+    "구글 스트레드시트 연동": [
+        "🔗 분석용·동기화용 구글 스프레드시트 URL을 설정합니다.",
+        "🔄 [데이터 새로고침] 버튼으로 최신 데이터를 불러옵니다.",
+        "⚠️ URL이 잘못된 경우 데이터를 불러오지 못할 수 있습니다.",
+    ],
+    "이력확인 및 작성": [
+        "📝 본인의 활동 이력을 엑셀 파일로 업로드합니다.",
+        "🔍 업로드 후 중복·초과 방문, 오류 데이터를 탭에서 확인하세요.",
+        "💾 [저장] 버튼으로 임시 저장 후 [실적 결과 전송]으로 제출합니다.",
+        "⚠️ 전송 전 검증 오류 항목을 반드시 확인하세요.",
+    ],
+    "최종 실적 확인": [
+        "📊 전송된 실적 데이터를 최종 확인합니다.",
+        "🔁 수정이 필요한 경우 [이력확인 및 작성] 메뉴로 돌아가 재전송하세요.",
+        "✅ 내용 확인 후 관리자에게 마감을 요청하세요.",
+    ],
+}
+
+
 def render_page_title(menu):
     if st.session_state.get("_prev_menu") != menu:
         st.session_state._prev_menu = menu
@@ -1056,9 +1092,15 @@ def render_page_title(menu):
     parent_nav = "관리자 메뉴" if menu in admin_menus else "사용자 메뉴"
 
     st.markdown(
-        f"<div style='color:#718096;font-size:14px;font-weight:600;margin-top:-8px;margin-bottom:26px;'>{parent_nav} &gt; {html.escape(menu)}</div>",
+        f"<div style='color:#718096;font-size:14px;font-weight:600;margin-top:-8px;margin-bottom:12px;'>{parent_nav} &gt; {html.escape(menu)}</div>",
         unsafe_allow_html=True,
     )
+
+    if menu in MENU_GUIDES:
+        with st.expander("📌 메뉴 이용 안내", expanded=False):
+            for line in MENU_GUIDES[menu]:
+                st.markdown(f"- {line}")
+        st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
 
 def load_csv_to_state(url_key, state_key):
