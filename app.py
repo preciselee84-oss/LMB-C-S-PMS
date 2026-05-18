@@ -2740,6 +2740,8 @@ def show_report():
 def show_staff_admin():
     st.markdown("### 직원 목록")
 
+    st.session_state.user_db = load_db(DB_FILE, {"1": {"pw": "1", "role": "관리자", "name": "최고관리자", "access": "허용"}})
+
     staff_rows = []
     for uid, info in st.session_state.user_db.items():
         if uid == "1":
