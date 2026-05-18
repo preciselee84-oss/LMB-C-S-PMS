@@ -2005,13 +2005,19 @@ def show_final_check():
 
     st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
 
+    st.markdown('<style>.action-btn button p, .action-btn button span { font-size: 30px !important; }</style>', unsafe_allow_html=True)
+
     _, save_col, send_col = st.columns([0.56, 0.22, 0.22])
 
     with save_col:
+        st.markdown('<div class="action-btn">', unsafe_allow_html=True)
         do_save = st.button("저장", use_container_width=True, type="secondary")
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with send_col:
+        st.markdown('<div class="action-btn">', unsafe_allow_html=True)
         do_send = st.button("실적 결과 전송", use_container_width=True, type="primary", disabled=not can_send)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     if do_save:
         saved_db = load_db(SAVED_STATE_FILE, {})
@@ -2523,6 +2529,7 @@ def show_admin_analysis():
             st.rerun()
 
     with c2:
+        st.markdown('<div class="action-btn">', unsafe_allow_html=True)
         if st.button("저장", use_container_width=True, type="secondary"):
             # 현재 전송된 실적 데이터를 임시 저장
             admin_saved = {
@@ -2536,14 +2543,17 @@ def show_admin_analysis():
             st.success("저장 완료")
             time.sleep(0.5)
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with c3:
+        st.markdown('<div class="action-btn">', unsafe_allow_html=True)
         if st.button("마감", use_container_width=True, type="primary"):
             st.session_state.deadline_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
             st.session_state.analysis_result = sent_df.copy()
             st.success("마감 처리 완료")
             time.sleep(0.5)
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     if st.session_state.deadline_time:
         st.info(f"마감 완료: {st.session_state.deadline_time}")
