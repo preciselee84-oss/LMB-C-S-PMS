@@ -1181,7 +1181,7 @@ def show_sidebar():
 
         if st.session_state.user_role == "관리자":
             st.markdown("관리자 메뉴")
-            for menu_name in ["실적 분석/계산", "실적 보고서", "직원 및 권한설정", "구글 스트레드시트 연동"]:
+            for menu_name in ["실적 분석/계산", "실적 보고서"]:
                 if st.button(menu_name, use_container_width=True):
                     st.session_state.current_menu = menu_name
                     st.rerun()
@@ -1192,6 +1192,14 @@ def show_sidebar():
             if st.button(menu_name, use_container_width=True):
                 st.session_state.current_menu = menu_name
                 st.rerun()
+
+        if st.session_state.user_role == "관리자":
+            st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
+            st.markdown("설정")
+            for menu_name in ["직원 및 권한설정", "구글 스트레드시트 연동"]:
+                if st.button(menu_name, use_container_width=True):
+                    st.session_state.current_menu = menu_name
+                    st.rerun()
 
         st.divider()
         if st.button("로그아웃", use_container_width=True):
@@ -1311,8 +1319,14 @@ def render_page_title(menu):
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown(f"## {menu}")
-    admin_menus = ["실적 분석/계산", "실적 보고서", "직원 및 권한설정", "구글 스트레드시트 연동"]
-    parent_nav = "관리자 메뉴" if menu in admin_menus else "사용자 메뉴"
+    settings_menus = ["직원 및 권한설정", "구글 스트레드시트 연동"]
+    admin_menus = ["실적 분석/계산", "실적 보고서"]
+    if menu in settings_menus:
+        parent_nav = "설정"
+    elif menu in admin_menus:
+        parent_nav = "관리자 메뉴"
+    else:
+        parent_nav = "사용자 메뉴"
 
     if menu != "대시보드":
         st.markdown(
