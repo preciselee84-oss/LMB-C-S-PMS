@@ -9,7 +9,7 @@ import html
 import re
 from io import BytesIO
 from datetime import datetime, timedelta
-import extra_streamlit_components as stx
+from streamlit_cookies_controller import CookieController
 
 st.set_page_config(page_title="실적관리 시스템", layout="wide", initial_sidebar_state="expanded")
 
@@ -783,7 +783,7 @@ def show_auth_page():
         )
 
         if st.session_state.auth_mode == "login":
-            cookie_manager = stx.CookieManager(key="login_cookie_mgr")
+            cookie_manager = CookieController()
             sid = cookie_manager.get("saved_id") or ""
 
             u_id = st.text_input("아이디", value=sid, placeholder="아이디를 입력하세요", key="l_id")
@@ -804,9 +804,9 @@ def show_auth_page():
 
                 if is_super or is_user:
                     if save_id_cb:
-                        cookie_manager.set("saved_id", u_id_str, expires_at=datetime(2099, 12, 31))
+                        cookie_manager.set("saved_id", u_id_str)
                     else:
-                        cookie_manager.delete("saved_id")
+                        cookie_manager.remove("saved_id")
 
                     user = db.get(u_id_str, {"role": "관리자", "name": "최고관리자"})
                     st.session_state.logged_in = True

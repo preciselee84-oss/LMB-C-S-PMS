@@ -4,4 +4,4 @@ pandas
 numpy
 python-pptx
 plotly
-extra-streamlit-components
+streamlit-cookies-controller
