@@ -2957,7 +2957,7 @@ def show_dashboard():
     st.markdown("---")
 
     # ── 일별 개설 추이 ─────────────────────────────────
-    curr_df = filter_month_gaeseol(df_user, curr_ym)
+    curr_df = filter_month_gaeseol(df_user_hana, curr_ym)
     if not curr_df.empty:
         st.markdown("**이번달 일별 개설 건수 추이**")
         daily = curr_df.groupby(curr_df[gaeseol_date_col].dt.strftime("%Y-%m-%d")).size().reset_index()
