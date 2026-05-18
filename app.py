@@ -2779,7 +2779,7 @@ def show_google_sync():
             load_csv_to_state("url_sync", "temp_cloud_df")
             st.session_state.cloud_sheet_df = st.session_state.temp_cloud_df
             try:
-                hana_raw = pd.read_csv(st.session_state.url_hana, header=1)
+                hana_raw = pd.read_csv(st.session_state.url_hana, header=2)
                 hana_raw = hana_raw.dropna(how="all").reset_index(drop=True)
                 st.session_state.hana_sheet_df = hana_raw
             except Exception:
