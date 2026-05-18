@@ -2803,14 +2803,15 @@ def show_staff_admin():
 def show_dashboard():
     import plotly.graph_objects as go
 
-    if st.session_state.get("analysis_lookup_df") is None:
+    if st.session_state.get("hana_sheet_df") is None:
         try:
-            with st.spinner("하나지사 활동이력 데이터 불러오는 중..."):
-                load_csv_to_state("url_analysis", "analysis_lookup_df")
+            with st.spinner("하나은행 데이터 불러오는 중..."):
+                hana_raw = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+                st.session_state.hana_sheet_df = hana_raw
         except Exception:
             pass
 
-    df_all = st.session_state.get("analysis_lookup_df")
+    df_all = st.session_state.get("hana_sheet_df")
     user_name = st.session_state.user_name
 
     if df_all is None or df_all.empty:
