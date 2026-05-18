@@ -2248,15 +2248,16 @@ def apply_admin_prev_diff(sent_df):
     prev_pay_map = prev_res.set_index("담당자")["지급예상금액"].to_dict()
 
     if "담당자" in result_df.columns and "지급예상금액" in result_df.columns:
-        result_df["전월대비"] = result_df.apply(
+        diff_col = str(int(selected_month.split("-")[1])) + "월 대비"
+        result_df[diff_col] = result_df.apply(
             lambda r: int(float(r.get("지급예상금액", 0))) - int(float(prev_pay_map.get(r.get("담당자"), 0))),
             axis=1,
         )
 
         cols = result_df.columns.tolist()
-        cols.remove("전월대비")
+        cols.remove(diff_col)
         insert_at = cols.index("전송시각") if "전송시각" in cols else len(cols)
-        cols.insert(insert_at, "전월대비")
+        cols.insert(insert_at, diff_col)
         result_df = result_df[cols]
 
     return result_df
