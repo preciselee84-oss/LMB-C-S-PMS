@@ -2818,17 +2818,26 @@ def show_dashboard():
         st.info("📂 데이터를 불러올 수 없습니다. [구글 스트레드시트 연동] 메뉴에서 URL을 확인해주세요.")
         return
 
-    df_all = clean_header_logic(df_all.copy())
-    u_col = find_col(df_all, ["등록자", "담당자", "성명"], "등록자")
-    date_col = find_col(df_all, ["활동일", "일자"], "활동일")
-    d_col = find_col(df_all, ["활동상세", "활동내용"], "활동상세")
+    df_all = df_all.copy()
 
-    if not u_col or not date_col or not d_col:
-        st.error("데이터 컬럼을 찾을 수 없습니다.")
+    u_col = "담당자"
+    gaeseol_date_col = "개설/이행일"
+    yeonge_date_col = "연계일자"
+    gubun_col = "구축구분"
+
+    if u_col not in df_all.columns or gaeseol_date_col not in df_all.columns:
+        st.error("데이터 컬럼을 찾을 수 없습니다. (담당자, 개설/이행일 필요)")
         return
 
-    df_all[date_col] = pd.to_datetime(df_all[date_col], errors="coerce")
-    df_user = df_all[df_all[u_col].astype(str).str.strip() == user_name].dropna(subset=[date_col]).copy()
+    df_all[gaeseol_date_col] = pd.to_datetime(
+        df_all[gaeseol_date_col].astype(str).str.strip().str[:8], format="%Y%m%d", errors="coerce"
+    )
+    if yeonge_date_col in df_all.columns:
+        df_all[yeonge_date_col] = pd.to_datetime(
+            df_all[yeonge_date_col].astype(str).str.strip().str[:8], format="%Y%m%d", errors="coerce"
+        )
+
+    df_user = df_all[df_all[u_col].astype(str).str.strip() == user_name].copy()
 
     now = datetime.utcnow() + timedelta(hours=9)
     curr_ym = now.strftime("%Y-%m")
@@ -2836,22 +2845,29 @@ def show_dashboard():
     prev_ym = prev_dt.strftime("%Y-%m")
     prev_year_ym = f"{now.year - 1}-{now.month:02d}"
 
-    def filter_month(df, ym):
-        return df[df[date_col].dt.strftime("%Y-%m") == ym].copy()
+    def filter_month_gaeseol(df, ym):
+        return df[df[gaeseol_date_col].dt.strftime("%Y-%m") == ym].copy()
 
-    def calc_points(df_m):
-        if df_m.empty:
-            return {"개설건수": 0, "연계건수": 0, "운영건수": 0, "개설포인트": 0, "연계포인트": 0, "운영포인트": 0, "합계포인트": 0}
-        o = int(df_m[d_col].astype(str).str.contains("개설").sum())
-        l = int(df_m[d_col].astype(str).str.contains("연계").sum())
-        v = int(df_m[d_col].astype(str).str.contains("운영|방문|점검").sum())
+    def filter_month_yeonge(df, ym):
+        if yeonge_date_col not in df.columns:
+            return df.iloc[0:0]
+        return df[df[yeonge_date_col].dt.strftime("%Y-%m") == ym].copy()
+
+    def calc_points(ym):
+        gdf = filter_month_gaeseol(df_user, ym)
+        # 개설: 구축구분 == 신규
+        o = int((gdf[gubun_col].astype(str).str.strip() == "신규").sum()) if gubun_col in gdf.columns else len(gdf)
+        # 연계: 연계일자가 해당 월
+        l = len(filter_month_yeonge(df_user, ym))
+        # 운영: 구축구분 == 이행
+        v = int((gdf[gubun_col].astype(str).str.strip() == "이행").sum()) if gubun_col in gdf.columns else 0
         o_p, l_p, v_p = o * 90, l * 120, v * 30
         total = min(2800, min(1000, o_p + l_p) + min(1800, v_p))
         return {"개설건수": o, "연계건수": l, "운영건수": v, "개설포인트": o_p, "연계포인트": l_p, "운영포인트": v_p, "합계포인트": total}
 
-    curr = calc_points(filter_month(df_user, curr_ym))
-    prev = calc_points(filter_month(df_user, prev_ym))
-    py = calc_points(filter_month(df_user, prev_year_ym))
+    curr = calc_points(curr_ym)
+    prev = calc_points(prev_ym)
+    py   = calc_points(prev_year_ym)
 
     diff_prev = curr["합계포인트"] - prev["합계포인트"]
     diff_year = curr["합계포인트"] - py["합계포인트"]
@@ -2900,11 +2916,11 @@ def show_dashboard():
 
     st.markdown("---")
 
-    # ── 일별 활동 추이 ─────────────────────────────────
-    curr_df = filter_month(df_user, curr_ym)
+    # ── 일별 개설 추이 ─────────────────────────────────
+    curr_df = filter_month_gaeseol(df_user, curr_ym)
     if not curr_df.empty:
-        st.markdown("**이번달 일별 활동 건수 추이**")
-        daily = curr_df.groupby(curr_df[date_col].dt.strftime("%Y-%m-%d")).size().reset_index()
+        st.markdown("**이번달 일별 개설 건수 추이**")
+        daily = curr_df.groupby(curr_df[gaeseol_date_col].dt.strftime("%Y-%m-%d")).size().reset_index()
         daily.columns = ["날짜", "건수"]
         fig3 = go.Figure(go.Scatter(x=daily["날짜"], y=daily["건수"], mode="lines+markers",
                                     line=dict(color="#4F46E5", width=2), marker=dict(size=6)))
