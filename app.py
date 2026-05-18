@@ -400,13 +400,11 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
             return f"필수 컬럼이 없습니다: {', '.join(missing)}", None, None
 
         rank_order = {"팀장": 1, "과장": 2, "대리": 3, "주임": 4, "직원": 5}
+        _udb = st.session_state.get("user_db", {})
         member_db = {
-            "이성환": "팀장",
-            "임인지": "과장",
-            "전준수": "대리",
-            "이수현": "대리",
-            "하성춘": "대리",
-            "길민종": "주임",
+            info.get("name", ""): info.get("rank", "직원")
+            for uid, info in _udb.items()
+            if uid != "1" and info.get("name")
         }
 
         df_clean = df.dropna(subset=[u_col, date_col]).copy()
@@ -2785,6 +2783,7 @@ def show_staff_admin():
             {
                 "ID": uid,
                 "성명": info.get("name", ""),
+                "직급": info.get("rank", "직원"),
                 "메일주소": info.get("email", ""),
                 "직원구분": info.get("staff_type", "정규직"),
                 "외주여부": info.get("outsource", "아니오"),
@@ -2804,6 +2803,7 @@ def show_staff_admin():
         use_container_width=True,
         hide_index=True,
         column_config={
+            "직급": st.column_config.SelectboxColumn("직급", options=["팀장", "과장", "대리", "주임", "직원"]),
             "직원구분": st.column_config.SelectboxColumn("직원구분", options=["정규직", "계약직", "파견직", "외주"]),
             "외주여부": st.column_config.SelectboxColumn("외주여부", options=["예", "아니오"]),
             "외주 근무기간": st.column_config.SelectboxColumn("외주 근무기간", options=["해당없음", "1년 미만", "1년 이상", "2년 이상"]),
@@ -2823,6 +2823,7 @@ def show_staff_admin():
             if row.get("삭제", False):
                 del st.session_state.user_db[uid]
             else:
+                st.session_state.user_db[uid]["rank"] = row.get("직급", "직원")
                 st.session_state.user_db[uid]["email"] = row.get("메일주소", "")
                 st.session_state.user_db[uid]["staff_type"] = row.get("직원구분", "정규직")
                 st.session_state.user_db[uid]["outsource"] = row.get("외주여부", "아니오")
