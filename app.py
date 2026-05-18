@@ -3175,8 +3175,11 @@ def show_google_sync():
 def inject_theme_toggle():
     st.markdown("""
     <style>
-    .pms-sw-track {
+    .pms-sw-outer {
         position: fixed; top: 12px; right: 16px; z-index: 999999;
+    }
+    .pms-sw-track {
+        position: relative;
         display: flex; align-items: center;
         background: #3a3a3a;
         border-radius: 30px; padding: 3px;
@@ -3185,6 +3188,7 @@ def inject_theme_toggle():
     }
     .pms-sw-thumb {
         position: absolute;
+        top: 3px; left: 3px;
         width: 34px; height: 30px;
         background: #6366f1;
         border-radius: 26px;
@@ -3241,9 +3245,7 @@ def inject_theme_toggle():
         background-color: #2a2a3e !important; color: #cdd6f4 !important;
         border-color: #444466 !important;
     }
-    html[data-pms-theme="dark"] .pms-sw-track {
-        background: #2a2a2a !important;
-    }
+    html[data-pms-theme="dark"] .pms-sw-track { background: #2a2a2a !important; }
 
     /* ── 시스템 모드 (media query) ──────────────────────── */
     @media (prefers-color-scheme: dark) {
@@ -3263,17 +3265,17 @@ def inject_theme_toggle():
         html[data-pms-theme="system"] [data-testid="stTextInput"] input {
             background-color: #2a2a3e !important; color: #cdd6f4 !important;
         }
-        html[data-pms-theme="system"] .pms-sw-track {
-            background: #2a2a2a !important;
-        }
+        html[data-pms-theme="system"] .pms-sw-track { background: #2a2a2a !important; }
     }
     </style>
 
-    <div class="pms-sw-track" id="pmsThemeBar" style="position:fixed;">
-        <div class="pms-sw-thumb" id="pmsThumb"></div>
-        <button id="tbtn-light"  onclick="pmsSetTheme('light')"  title="밝게">☀️</button>
-        <button id="tbtn-dark"   onclick="pmsSetTheme('dark')"   title="다크">🌙</button>
-        <button id="tbtn-system" onclick="pmsSetTheme('system')" title="시스템">💻</button>
+    <div class="pms-sw-outer">
+        <div class="pms-sw-track" id="pmsThemeBar">
+            <div class="pms-sw-thumb" id="pmsThumb"></div>
+            <button id="tbtn-light"  onclick="pmsSetTheme('light')"  title="밝게">☀️</button>
+            <button id="tbtn-dark"   onclick="pmsSetTheme('dark')"   title="다크">🌙</button>
+            <button id="tbtn-system" onclick="pmsSetTheme('system')" title="시스템">💻</button>
+        </div>
     </div>
 
     <script>
