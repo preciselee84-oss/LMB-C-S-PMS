@@ -1173,13 +1173,13 @@ def show_sidebar():
         )
         st.divider()
 
+        st.markdown("대시보드")
         if st.button("대시보드", use_container_width=True):
             st.session_state.current_menu = "대시보드"
             st.rerun()
 
-        st.markdown("<div style='margin-top:8px;'></div>", unsafe_allow_html=True)
-
         if st.session_state.user_role == "관리자":
+            st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
             st.markdown("관리자 메뉴")
             for menu_name in ["실적 분석/계산", "실적 보고서"]:
                 if st.button(menu_name, use_container_width=True):
