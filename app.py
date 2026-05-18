@@ -3175,23 +3175,33 @@ def show_google_sync():
 def inject_theme_toggle():
     st.markdown("""
     <style>
-    .theme-toggle-wrap {
-        position: fixed; top: 10px; right: 16px; z-index: 999999;
-        display: flex; gap: 4px; align-items: center;
+    .pms-sw-track {
+        position: fixed; top: 12px; right: 16px; z-index: 999999;
+        display: flex; align-items: center;
         background: #3a3a3a;
-        border-radius: 24px; padding: 4px 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.35);
-        backdrop-filter: blur(6px);
+        border-radius: 30px; padding: 3px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+        gap: 0;
     }
-    .theme-toggle-wrap button {
+    .pms-sw-thumb {
+        position: absolute;
+        width: 34px; height: 30px;
+        background: #6366f1;
+        border-radius: 26px;
+        transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+        pointer-events: none;
+        z-index: 0;
+    }
+    .pms-sw-track button {
+        position: relative; z-index: 1;
         background: none; border: none; cursor: pointer;
-        font-size: 16px; padding: 3px 5px; border-radius: 50%;
-        line-height: 1; transition: background 0.2s;
+        font-size: 15px; width: 34px; height: 30px;
+        border-radius: 26px; line-height: 1;
+        transition: opacity 0.2s;
+        opacity: 0.55;
     }
-    .theme-toggle-wrap button:hover { background: rgba(0,0,0,0.08); }
-    .theme-toggle-wrap button.t-active {
-        background: rgba(79,70,229,0.18); outline: 2px solid #4F46E5;
-    }
+    .pms-sw-track button.t-active { opacity: 1; }
+    .pms-sw-track button:hover { opacity: 0.85; }
 
     /* ── 다크 모드 ─────────────────────────────────────── */
     html[data-pms-theme="dark"] .stApp,
@@ -3231,7 +3241,7 @@ def inject_theme_toggle():
         background-color: #2a2a3e !important; color: #cdd6f4 !important;
         border-color: #444466 !important;
     }
-    html[data-pms-theme="dark"] .theme-toggle-wrap {
+    html[data-pms-theme="dark"] .pms-sw-track {
         background: #2a2a2a !important;
     }
 
@@ -3253,13 +3263,14 @@ def inject_theme_toggle():
         html[data-pms-theme="system"] [data-testid="stTextInput"] input {
             background-color: #2a2a3e !important; color: #cdd6f4 !important;
         }
-        html[data-pms-theme="system"] .theme-toggle-wrap {
+        html[data-pms-theme="system"] .pms-sw-track {
             background: #2a2a2a !important;
         }
     }
     </style>
 
-    <div class="theme-toggle-wrap" id="pmsThemeBar">
+    <div class="pms-sw-track" id="pmsThemeBar" style="position:fixed;">
+        <div class="pms-sw-thumb" id="pmsThumb"></div>
         <button id="tbtn-light"  onclick="pmsSetTheme('light')"  title="밝게">☀️</button>
         <button id="tbtn-dark"   onclick="pmsSetTheme('dark')"   title="다크">🌙</button>
         <button id="tbtn-system" onclick="pmsSetTheme('system')" title="시스템">💻</button>
@@ -3267,9 +3278,13 @@ def inject_theme_toggle():
 
     <script>
     (function() {
+        var ORDER = ['light','dark','system'];
         function pmsApply(mode) {
             document.documentElement.setAttribute('data-pms-theme', mode);
-            ['light','dark','system'].forEach(function(m) {
+            var idx = ORDER.indexOf(mode);
+            var thumb = document.getElementById('pmsThumb');
+            if (thumb) thumb.style.transform = 'translateX(' + (idx * 34) + 'px)';
+            ORDER.forEach(function(m) {
                 var b = document.getElementById('tbtn-' + m);
                 if (b) b.classList.toggle('t-active', m === mode);
             });
