@@ -2963,6 +2963,52 @@ def show_dashboard():
 
     st.markdown("---")
 
+    # ── 전년도 / 올해 업무별 월평균 ──────────────────────
+    if df_user_act is not None and not df_user_act.empty:
+        st.markdown("**📊 업무별 월평균 비교**")
+
+        this_year  = str(now.year)
+        last_year  = str(now.year - 1)
+
+        def monthly_avg(year_str):
+            df_y = df_user_act[df_user_act[act_date_col].dt.strftime("%Y") == year_str].copy()
+            if df_y.empty:
+                return {"개설": 0.0, "연계": 0.0, "운영": 0.0}
+            months = df_y[act_date_col].dt.strftime("%Y-%m").unique()
+            totals = {"개설": 0, "연계": 0, "운영": 0}
+            for ym in months:
+                dm = df_y[df_y[act_date_col].dt.strftime("%Y-%m") == ym]
+                totals["개설"] += int(dm[act_d_col].astype(str).str.contains("개설", na=False).sum())
+                totals["연계"] += int(dm[act_d_col].astype(str).str.contains("연계", na=False).sum())
+                totals["운영"] += int(dm[act_d_col].astype(str).str.contains("운영|방문|점검", na=False).sum())
+            n = len(months)
+            return {k: round(v / n, 1) for k, v in totals.items()}
+
+        avg_last = monthly_avg(last_year)
+        avg_this = monthly_avg(this_year)
+
+        avg_labels = ["개설", "연계", "운영"]
+        fig_avg = go.Figure(data=[
+            go.Bar(name=f"{last_year}년 월평균", x=avg_labels,
+                   y=[avg_last[k] for k in avg_labels], marker_color="#A78BFA"),
+            go.Bar(name=f"{this_year}년 월평균", x=avg_labels,
+                   y=[avg_this[k] for k in avg_labels], marker_color="#4F46E5"),
+        ])
+        fig_avg.update_layout(barmode="group", height=260,
+                              margin=dict(t=10, b=20),
+                              legend=dict(orientation="h", y=-0.3))
+        st.plotly_chart(fig_avg, use_container_width=True)
+
+        ca, cb, cc = st.columns(3)
+        for col_ui, key in zip([ca, cb, cc], avg_labels):
+            col_ui.metric(
+                f"{key} 월평균",
+                f"{avg_this[key]}건 (올해)",
+                delta=f"{avg_this[key] - avg_last[key]:+.1f}건 vs {last_year}년",
+            )
+
+    st.markdown("---")
+
     # ── 실적 보완 가이드 ───────────────────────────────
     st.markdown("**💡 실적 보완 가이드**")
     ol_used = min(1000, curr["개설포인트"] + curr["연계포인트"])
