@@ -1250,7 +1250,7 @@ def show_user_history():
             err_my = err[err["담당자"] == st.session_state.user_name].copy()
         else:
             err_my = err.copy()
-        err_filtered = err_my[err_my["일방문"] >= 5].copy()
+        err_filtered = err_my[err_my["일방문"] >= 6].copy()
 
     # 기타 오류 데이터 계산
     other_errors = []
@@ -1784,7 +1784,7 @@ def show_final_check():
             err_my_final = err_check[err_check["담당자"] == st.session_state.user_name].copy()
         else:
             err_my_final = err_check.copy()
-        err_filtered_final = err_my_final[err_my_final["일방문"] >= 5].copy()
+        err_filtered_final = err_my_final[err_my_final["일방문"] >= 6].copy()
 
     # 개설완료일자 누락
     missing_open_final = pd.DataFrame()
