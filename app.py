@@ -3865,6 +3865,36 @@ def inject_theme_toggle():
         background-color: #6366f1 !important;
     }
 
+    /* 홈 버튼 — 아이콘 전용: 배경·테두리 없음 */
+    button.pms-home-btn,
+    button.pms-home-btn:hover {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: #718096 !important;
+    }
+    body:has(#pms-d:checked) button.pms-home-btn {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: #a0aec0 !important;
+    }
+    body:has(#pms-d:checked) button.pms-home-btn:hover {
+        color: #818cf8 !important;
+        background: transparent !important;
+    }
+
+    /* 새로고침 버튼 다크모드 */
+    body:has(#pms-d:checked) button.pms-refresh-btn {
+        background: #1e1e30 !important;
+        color: #cdd6f4 !important;
+        border-color: #45475a !important;
+    }
+    body:has(#pms-d:checked) button.pms-refresh-btn:hover {
+        background: #313244 !important;
+        color: #ffffff !important;
+    }
+
     /* 탭 */
     body:has(#pms-d:checked) [data-baseweb="tab-list"] {
         background-color: #1e1e2e !important; border-bottom: 2px solid #45475a !important;
@@ -4184,11 +4214,19 @@ def inject_theme_toggle():
                  var r = document.getElementById('pms-' + t);
                  if(r && !r.checked){ r.checked = true; }
              }
+             function tagSpecialBtns(){
+                 document.querySelectorAll('button').forEach(function(btn){
+                     var t = btn.textContent.trim();
+                     if(t === '🏠') btn.classList.add('pms-home-btn');
+                     if(t === '↻') btn.classList.add('pms-refresh-btn');
+                 });
+             }
              applyTheme();
+             tagSpecialBtns();
              var debounce;
              window._pmsThemeObs = new MutationObserver(function(){
                  clearTimeout(debounce);
-                 debounce = setTimeout(applyTheme, 80);
+                 debounce = setTimeout(function(){ applyTheme(); tagSpecialBtns(); }, 80);
              });
              window._pmsThemeObs.observe(document.body, {childList:true, subtree:true});
              document.addEventListener('change', function(e){
