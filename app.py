@@ -401,6 +401,14 @@ def render_manual_perf_input_table(base):
             background:#0f0f1f !important;
             color:#ffffff !important;
         }
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] canvas {
+            filter: invert(1) hue-rotate(180deg) brightness(0.88) contrast(1.08);
+        }
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] input {
+            background:#252535 !important;
+            color:#ffffff !important;
+            border-color:#45475a !important;
+        }
         </style>""",
         unsafe_allow_html=True,
     )
