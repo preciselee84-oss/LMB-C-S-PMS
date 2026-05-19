@@ -374,13 +374,14 @@ def criteria_df():
 
 
 def render_manual_perf_input_table(base):
-    """표는 보고서 표와 동일하게 렌더링하고, 입력 위젯은 표 밖에서 처리한다."""
+    """표는 보고서 표와 동일하게 렌더링하고, 실적 입력은 표 아래에서 처리한다."""
     result_df = base.copy()
     result_df["입력(건)"] = pd.to_numeric(result_df["입력(건)"], errors="coerce").fillna(0).astype(int)
 
-    style_report_logic(result_df)
+    style_report_logic(result_df.drop(columns=["입력(건)"], errors="ignore"))
 
-    st.markdown("#### 입력값 수정")
+    st.markdown("#### 실적 입력")
+    st.info("월 최대점수가 있는 항목은 `월 최대점수 ÷ 단위 점수`까지만 입력할 수 있습니다. 예: 타겟고객선별은 100 ÷ 5 = 최대 20건입니다.")
     st.markdown(
         """<style>
         .manual-input-row {
@@ -390,7 +391,14 @@ def render_manual_perf_input_table(base):
             padding-top:9px;
             white-space:nowrap;
         }
-        body:has(#pms-d:checked) .manual-input-row {
+        .manual-input-help {
+            color:#718096;
+            font-size:12px;
+            margin-top:-4px;
+            margin-bottom:4px;
+        }
+        body:has(#pms-d:checked) .manual-input-row,
+        body:has(#pms-d:checked) .manual-input-help {
             color:#ffffff !important;
         }
         </style>""",
@@ -402,16 +410,36 @@ def render_manual_perf_input_table(base):
         cols = st.columns(3)
         for col, (_, row) in zip(cols, result_df.iloc[i:i + 3].iterrows()):
             item = str(row["구분"])
+            unit_score = int(row["단위 점수"])
+            monthly_limit = row["월 최대점수"]
+            max_count = None
+            if str(monthly_limit).strip() != "-":
+                try:
+                    max_count = int(float(monthly_limit) // unit_score)
+                except Exception:
+                    max_count = None
+
+            value = int(row["입력(건)"])
+            if max_count is not None:
+                value = min(value, max_count)
+
             with col:
                 st.markdown(f"<div class='manual-input-row'>{html.escape(item)}</div>", unsafe_allow_html=True)
-                results[item] = st.number_input(
-                    "입력(건)",
-                    min_value=0,
-                    value=int(row["입력(건)"]),
-                    key=f"perf_{item}",
-                    label_visibility="collapsed",
-                    step=1,
-                )
+                if max_count is not None:
+                    st.markdown(f"<div class='manual-input-help'>최대 {max_count}건 입력 가능</div>", unsafe_allow_html=True)
+                else:
+                    st.markdown("<div class='manual-input-help'>월 최대점수 제한 없음</div>", unsafe_allow_html=True)
+                kwargs = {
+                    "label": "입력(건)",
+                    "min_value": 0,
+                    "value": value,
+                    "key": f"perf_{item}",
+                    "label_visibility": "collapsed",
+                    "step": 1,
+                }
+                if max_count is not None:
+                    kwargs["max_value"] = max_count
+                results[item] = st.number_input(**kwargs)
 
     result_df["입력(건)"] = result_df["구분"].map(results).fillna(0).astype(int)
     return result_df
