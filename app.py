@@ -3882,22 +3882,54 @@ def inject_theme_toggle():
     body:has(#pms-d:checked) [class*="ag-theme"] .ag-center-cols-container {
         background-color: #252535 !important;
     }
-    /* stDataEditor 전역 다크모드 (직원 목록 등 모든 data_editor 포함) */
-    body:has(#pms-d:checked) [data-testid="stDataEditor"] {
+    /* stDataEditor / stDataFrame 전역 다크모드 */
+    body:has(#pms-d:checked) [data-testid="stDataEditor"],
+    body:has(#pms-d:checked) [data-testid="stDataFrame"] {
         border-color: #45475a !important; box-shadow: none !important;
     }
-    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"] {
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"],
+    body:has(#pms-d:checked) [data-testid="stDataFrame"]  [role="columnheader"] {
         background-color: #0f0f1f !important; color: #ffffff !important;
         border-bottom-color: #45475a !important; border-right-color: #45475a !important;
     }
-    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"] * {
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"] *,
+    body:has(#pms-d:checked) [data-testid="stDataFrame"]  [role="columnheader"] * {
         color: #ffffff !important;
     }
-    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"] {
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"],
+    body:has(#pms-d:checked) [data-testid="stDataFrame"]  [role="gridcell"] {
         border-right-color: #313244 !important;
     }
     body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"]:not([style*="color"]),
-    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"]:not([style*="color"]) * {
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"]:not([style*="color"]) *,
+    body:has(#pms-d:checked) [data-testid="stDataFrame"]  [role="gridcell"]:not([style*="color"]),
+    body:has(#pms-d:checked) [data-testid="stDataFrame"]  [role="gridcell"]:not([style*="color"]) * {
+        color: #ffffff !important;
+    }
+    /* AG Grid 셀 편집 팝업 (SelectboxColumn 드롭다운 등) */
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-popup,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-popup-editor,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-popup-child {
+        background-color: #252535 !important; border-color: #45475a !important;
+    }
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-rich-select,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-rich-select-list {
+        background-color: #252535 !important; border-color: #45475a !important;
+    }
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-rich-select-row,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-virtual-list-item {
+        background-color: #252535 !important; color: #ffffff !important;
+    }
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-rich-select-row:hover,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-rich-select-row-selected {
+        background-color: #3a3a5e !important;
+    }
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-text-field-input {
+        background-color: #252535 !important; color: #ffffff !important;
+        border-color: #45475a !important;
+    }
+    /* 체크박스 컬럼 아이콘 */
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-checkbox-input-wrapper::after {
         color: #ffffff !important;
     }
 
