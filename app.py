@@ -2044,10 +2044,12 @@ def convert_bank_excel_to_activity(bank_df):
 
 
 def show_user_history():
+    converted_preview_df = None
     col1, col_convert, col_upload, col_sample, _ = st.columns([1, 1, 1, 1, 2])
     with col1:
         st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>은행 이력 업로드</div>", unsafe_allow_html=True)
         history_file = st.file_uploader("은행 이력 업로드", type=["xls", "xlsx"], key="history_convert_upload", label_visibility="collapsed")
+        st.caption("은행에서 반출해준 이력파일 그대로 업로드 해주세요.")
     with col_convert:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
         if history_file is not None:
@@ -2059,6 +2061,7 @@ def show_user_history():
                     st.button("변환파일 다운로드", use_container_width=True, disabled=True)
                     st.warning(convert_info.get("error", "변환할 데이터가 없습니다."))
                 else:
+                    converted_preview_df = converted_df
                     converted_bytes = sample_format_excel_bytes(converted_df)
                     converted_ym = get_uploaded_month(converted_df).replace("-", "") or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
                     st.download_button(
@@ -2095,6 +2098,11 @@ def show_user_history():
                 )
         else:
             st.button("샘플파일 다운로드", use_container_width=True, disabled=True)
+
+    if converted_preview_df is not None and not converted_preview_df.empty:
+        st.markdown("#### 변환파일 미리보기")
+        render_plain_html_table(converted_preview_df)
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
     # 파일이 제거되면 데이터 초기화
     if u_file is None:
