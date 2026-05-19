@@ -374,138 +374,53 @@ def criteria_df():
 
 
 def render_manual_perf_input_table(base):
-    """st.data_editor(AG Grid) 완전 제거 → columns + number_input 혼합 (다크모드 완전 호환)."""
+    """추가 실적 입력표를 하나의 편집 가능한 그리드로 렌더링한다."""
     st.markdown(
         """<style>
-        div[data-testid="stElementToolbar"] { display: none !important; }
-
-        /* ── 헤더 셀 ── */
-        .pif-hdr {
-            background:#EDF2F7; color:#4A5568; font-weight:800; font-size:12px;
-            height:30px; padding:0 8px; text-align:center; border-bottom:2px solid #CBD5E0;
-            display:flex; align-items:center; justify-content:center; box-sizing:border-box;
-            white-space:nowrap;
+        [data-testid="stDataEditor"] {
+            border:1px solid #E2E8F0 !important;
+            border-radius:10px !important;
+            overflow:hidden !important;
+            margin-bottom:1rem !important;
         }
-        body:has(#pms-d:checked) .pif-hdr {
-            background:#0f0f1f !important; color:#ffffff !important;
-            border-bottom-color:#45475a !important;
+        [data-testid="stDataEditor"] [role="columnheader"] {
+            background:#EDF2F7 !important;
+            color:#4A5568 !important;
+            font-weight:800 !important;
+            justify-content:center !important;
+            text-align:center !important;
         }
-
-        /* ── 데이터 셀 ── */
-        .pif-cell {
-            background:transparent !important; font-size:12px; color:#2D3748;
-            height:36px; padding:0 10px; border-bottom:0; white-space:nowrap;
-            display:flex; align-items:center; justify-content:center;
-            text-align:center; line-height:1.2; box-sizing:border-box;
+        [data-testid="stDataEditor"] [role="gridcell"] {
+            justify-content:center !important;
+            text-align:center !important;
         }
-        .pif-e { background:#FFFFFF; }
-        .pif-o { background:#F7FAFC; }
-        body:has(#pms-d:checked) .pif-cell {
-            color:#ffffff !important; border-bottom-color:transparent !important;
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] {
+            border-color:#45475a !important;
         }
-        body:has(#pms-d:checked) .pif-e,
-        body:has(#pms-d:checked) .pif-o { background:transparent !important; }
-
-        /* ── 행 전체를 하나의 표 줄처럼 고정 ── */
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) {
-            gap:0 !important;
-            min-height:36px !important; height:36px !important; max-height:36px !important;
-            overflow:hidden !important; align-items:stretch !important;
-            border-bottom:1px solid #EDF2F7 !important;
-            background:#FFFFFF !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-o) {
-            background:#F7FAFC !important;
-        }
-        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-cell) {
-            border-bottom-color:#313244 !important;
-            background:#252535 !important;
-        }
-        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-o) {
-            background:#1e1e30 !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-hdr) { gap:0 !important; }
-
-        /* 행 목록 직접 부모 stVerticalBlock gap 제거 */
-        [data-testid="stVerticalBlock"]:has(> [data-testid="stHorizontalBlock"]:has(.pif-cell)) {
-            gap:0 !important;
-        }
-
-        /* 내부 모든 래퍼 여백 제거 */
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stVerticalBlock"],
-        [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stVerticalBlock"] {
-            gap:0 !important; padding:0 !important; margin:0 !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stElementContainer"],
-        [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stElementContainer"] {
-            margin:0 !important; padding:0 !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) > div[data-testid="stColumn"],
-        [data-testid="stHorizontalBlock"]:has(.pif-hdr) > div[data-testid="stColumn"] {
-            padding:0 !important;
-        }
-
-        /* ── number input: 라벨·버튼 제거, 래퍼 투명화 ── */
-        div[data-testid="stNumberInput"] button { display:none !important; }
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] label {
-            display:none !important; height:0 !important; margin:0 !important; overflow:hidden !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"],
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] > div,
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] > div > div,
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] [data-baseweb="input"] {
-            background:transparent !important; border:none !important;
-            box-shadow:none !important; margin:0 !important; padding:0 !important;
-            width:100% !important;
-            height:36px !important; min-height:36px !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] input {
-            font-size:12px !important; text-align:center !important;
-            width:100% !important; height:36px !important; min-height:36px !important;
-            padding:0 6px !important; background:transparent !important;
-            border:none !important; box-shadow:none !important;
-        }
-        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] input {
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"] {
+            background:#0f0f1f !important;
             color:#ffffff !important;
         }
         </style>""",
         unsafe_allow_html=True,
     )
 
-    COLS = [18, 40, 11, 12, 19]
-
-    # 헤더 행 (가운데 정렬)
-    hc = st.columns(COLS)
-    hc[0].markdown("<div class='pif-hdr'>활동구분</div>", unsafe_allow_html=True)
-    hc[1].markdown("<div class='pif-hdr'>구분</div>", unsafe_allow_html=True)
-    hc[2].markdown("<div class='pif-hdr'>단위 점수</div>", unsafe_allow_html=True)
-    hc[3].markdown("<div class='pif-hdr'>월 최대점수</div>", unsafe_allow_html=True)
-    hc[4].markdown("<div class='pif-hdr'>입력(건)</div>", unsafe_allow_html=True)
-
-    # 데이터 행 (모두 가운데 정렬)
-    results = {}
-    rows_list = list(base.iterrows())
-    for i, (_, row) in enumerate(rows_list):
-        ec = "pif-e" if i % 2 == 0 else "pif-o"
-        rc = st.columns(COLS)
-        with rc[0]:
-            st.markdown(f"<div class='pif-cell {ec}'>{html.escape(str(row['활동구분']))}</div>", unsafe_allow_html=True)
-        with rc[1]:
-            st.markdown(f"<div class='pif-cell {ec}'>{html.escape(str(row['구분']))}</div>", unsafe_allow_html=True)
-        with rc[2]:
-            st.markdown(f"<div class='pif-cell {ec}'>{row['단위 점수']}</div>", unsafe_allow_html=True)
-        with rc[3]:
-            st.markdown(f"<div class='pif-cell {ec}'>{row['월 최대점수']}</div>", unsafe_allow_html=True)
-        with rc[4]:
-            val = st.number_input(
-                "입력(건)", min_value=0, value=int(row["입력(건)"]),
-                key=f"perf_{row['구분']}", label_visibility="collapsed", step=1,
-            )
-        results[row["구분"]] = val
-
-    result_df = base.copy()
-    result_df["입력(건)"] = result_df["구분"].map(results).fillna(0).astype(int)
-    return result_df
+    editor_df = base.copy()
+    editor_df["입력(건)"] = pd.to_numeric(editor_df["입력(건)"], errors="coerce").fillna(0).astype(int)
+    return st.data_editor(
+        editor_df,
+        hide_index=True,
+        use_container_width=True,
+        disabled=["활동구분", "구분", "단위 점수", "월 최대점수"],
+        key="manual_perf_input_editor",
+        column_config={
+            "활동구분": st.column_config.TextColumn("활동구분", width="medium"),
+            "구분": st.column_config.TextColumn("구분", width="large"),
+            "단위 점수": st.column_config.NumberColumn("단위 점수", width="small", format="%d"),
+            "월 최대점수": st.column_config.TextColumn("월 최대점수", width="small"),
+            "입력(건)": st.column_config.NumberColumn("입력(건)", width="small", min_value=0, step=1, format="%d"),
+        },
+    )
 
 
 def manual_points_for_user(name):
