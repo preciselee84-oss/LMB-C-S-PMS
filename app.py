@@ -3201,6 +3201,8 @@ def show_staff_admin():
     st.markdown("### 직원 목록")
 
     st.session_state.user_db = load_db(DB_FILE, {"1": {"pw": "1", "role": "관리자", "name": "최고관리자", "access": "허용"}})
+    if st.session_state.pop("reset_staff_edit_sel", False):
+        st.session_state.staff_edit_sel = "선택안함"
 
     staff_rows = []
     for uid, info in st.session_state.user_db.items():
@@ -3274,7 +3276,7 @@ def show_staff_admin():
             st.session_state.user_db[sel_uid]["access"] = new_access
             st.session_state.user_db[sel_uid]["role"] = "관리자" if new_role == "관리자 메뉴" else "사용자"
             save_db(DB_FILE, st.session_state.user_db)
-            st.session_state.staff_edit_sel = "선택안함"
+            st.session_state.reset_staff_edit_sel = True
             st.success("저장 완료")
             time.sleep(0.5)
             st.rerun()
@@ -3282,7 +3284,7 @@ def show_staff_admin():
         if st.button("삭제", type="secondary", use_container_width=True):
             del st.session_state.user_db[sel_uid]
             save_db(DB_FILE, st.session_state.user_db)
-            st.session_state.staff_edit_sel = "선택안함"
+            st.session_state.reset_staff_edit_sel = True
             st.success(f"{sel} 삭제 완료")
             time.sleep(0.5)
             st.rerun()
