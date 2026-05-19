@@ -374,72 +374,161 @@ def criteria_df():
 
 
 def render_manual_perf_input_table(base):
-    """추가 실적 입력표를 하나의 편집 가능한 그리드로 렌더링한다."""
+    """추가 실적 입력표를 다른 보고서 표와 같은 색상 체계로 렌더링한다."""
     st.markdown(
         """<style>
-        [data-testid="stDataEditor"] {
-            border:1px solid #E2E8F0 !important;
+        .pif-hdr {
+            background:#EDF2F7;
+            color:#4A5568;
+            font-weight:800;
+            font-size:13px;
+            min-height:38px;
+            padding:0 12px;
+            border-bottom:2px solid #E2E8F0;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            box-sizing:border-box;
+            white-space:nowrap;
+        }
+        .pif-cell {
+            color:#2D3748;
+            font-size:13px;
+            min-height:38px;
+            padding:0 12px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            box-sizing:border-box;
+            white-space:nowrap;
+        }
+        .pif-e { background:#FFFFFF; }
+        .pif-o { background:#F7FAFC; }
+
+        [data-testid="stHorizontalBlock"]:has(.pif-hdr),
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) {
+            gap:0 !important;
+            align-items:stretch !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) {
+            border-bottom:1px solid #EDF2F7 !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stColumn"],
+        [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stColumn"] {
+            padding:0 !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-e) [data-testid="stColumn"]:last-child {
+            background:#FFFFFF !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-o) [data-testid="stColumn"]:last-child {
+            background:#F7FAFC !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stElementContainer"],
+        [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stElementContainer"] {
+            margin:0 !important;
+            padding:0 !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stNumberInput"] {
+            margin:0 !important;
+            padding:0 !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stNumberInput"] label {
+            display:none !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stNumberInput"] button {
+            display:none !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stNumberInput"] > div,
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stNumberInput"] [data-baseweb="input"] {
+            width:100% !important;
+            min-height:38px !important;
+            height:38px !important;
+            margin:0 !important;
+            padding:0 !important;
+            background:transparent !important;
+            border:none !important;
+            box-shadow:none !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stNumberInput"] input {
+            min-height:38px !important;
+            height:38px !important;
+            padding:0 12px !important;
+            text-align:center !important;
+            font-size:13px !important;
+            background:transparent !important;
+            border:none !important;
+            box-shadow:none !important;
+        }
+
+        .pif-table-frame {
+            border:1px solid #E2E8F0;
             border-radius:10px !important;
-            overflow:hidden !important;
-            margin-bottom:1rem !important;
+            overflow:hidden;
+            margin-bottom:1rem;
         }
-        [data-testid="stDataEditor"] [role="columnheader"] {
-            background:#EDF2F7 !important;
-            color:#4A5568 !important;
-            font-weight:800 !important;
-            justify-content:center !important;
-            text-align:center !important;
-        }
-        [data-testid="stDataEditor"] [role="gridcell"] {
-            justify-content:center !important;
-            text-align:center !important;
-        }
-        body:has(#pms-d:checked) [data-testid="stDataEditor"],
-        body:has(#pms-d:checked) [data-testid="stDataFrame"] {
+        body:has(#pms-d:checked) .pif-table-frame {
             background:#252535 !important;
             border-color:#45475a !important;
         }
-        body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"],
-        body:has(#pms-d:checked) [data-testid="stDataFrame"] [role="columnheader"] {
+        body:has(#pms-d:checked) .pif-hdr {
             background:#0f0f1f !important;
             color:#ffffff !important;
+            border-bottom-color:#45475a !important;
         }
-        body:has(#pms-d:checked) [data-testid="stDataEditor"] canvas,
-        body:has(#pms-d:checked) [data-testid="stDataFrame"] canvas {
-            filter: invert(1) hue-rotate(180deg) brightness(0.88) contrast(1.08);
-        }
-        body:has(#pms-d:checked) [data-testid="stDataEditor"] [class*="dvn"],
-        body:has(#pms-d:checked) [data-testid="stDataFrame"] [class*="dvn"],
-        body:has(#pms-d:checked) [data-testid="stDataEditor"] [class*="glide"],
-        body:has(#pms-d:checked) [data-testid="stDataFrame"] [class*="glide"] {
-            background:#252535 !important;
-        }
-        body:has(#pms-d:checked) [data-testid="stDataEditor"] input,
-        body:has(#pms-d:checked) [data-testid="stDataFrame"] input {
-            background:#252535 !important;
+        body:has(#pms-d:checked) .pif-cell {
             color:#ffffff !important;
-            border-color:#45475a !important;
+        }
+        body:has(#pms-d:checked) .pif-e {
+            background:#252535 !important;
+        }
+        body:has(#pms-d:checked) .pif-o {
+            background:#1e1e30 !important;
+        }
+        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-e) [data-testid="stColumn"]:last-child {
+            background:#252535 !important;
+        }
+        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-o) [data-testid="stColumn"]:last-child {
+            background:#1e1e30 !important;
+        }
+        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-cell) {
+            border-bottom-color:#313244 !important;
+        }
+        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stNumberInput"] input {
+            color:#ffffff !important;
         }
         </style>""",
         unsafe_allow_html=True,
     )
 
-    editor_df = base.copy()
-    editor_df["입력(건)"] = pd.to_numeric(editor_df["입력(건)"], errors="coerce").fillna(0).astype(int)
-    return st.data_editor(
-        editor_df,
-        hide_index=True,
-        use_container_width=True,
-        disabled=["활동구분", "구분", "단위 점수", "월 최대점수"],
-        key="manual_perf_input_editor",
-        column_config={
-            "활동구분": st.column_config.TextColumn("활동구분", width="medium"),
-            "구분": st.column_config.TextColumn("구분", width="large"),
-            "단위 점수": st.column_config.NumberColumn("단위 점수", width="small", format="%d"),
-            "월 최대점수": st.column_config.TextColumn("월 최대점수", width="small"),
-            "입력(건)": st.column_config.NumberColumn("입력(건)", width="small", min_value=0, step=1, format="%d"),
-        },
-    )
+    cols = [18, 36, 14, 14, 18]
+    results = {}
+
+    st.markdown("<div class='pif-table-frame'>", unsafe_allow_html=True)
+    hc = st.columns(cols)
+    for col, title in zip(hc, ["활동구분", "구분", "단위 점수", "월 최대점수", "입력(건)"]):
+        col.markdown(f"<div class='pif-hdr'>{title}</div>", unsafe_allow_html=True)
+
+    for i, (_, row) in enumerate(base.iterrows()):
+        bg = "pif-e" if i % 2 == 0 else "pif-o"
+        rc = st.columns(cols)
+        rc[0].markdown(f"<div class='pif-cell {bg}'>{html.escape(str(row['활동구분']))}</div>", unsafe_allow_html=True)
+        rc[1].markdown(f"<div class='pif-cell {bg}'>{html.escape(str(row['구분']))}</div>", unsafe_allow_html=True)
+        rc[2].markdown(f"<div class='pif-cell {bg}'>{html.escape(str(row['단위 점수']))}</div>", unsafe_allow_html=True)
+        rc[3].markdown(f"<div class='pif-cell {bg}'>{html.escape(str(row['월 최대점수']))}</div>", unsafe_allow_html=True)
+        with rc[4]:
+            results[row["구분"]] = st.number_input(
+                "입력(건)",
+                min_value=0,
+                value=int(row["입력(건)"]),
+                key=f"perf_{row['구분']}",
+                label_visibility="collapsed",
+                step=1,
+            )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    result_df = base.copy()
+    result_df["입력(건)"] = result_df["구분"].map(results).fillna(0).astype(int)
+    return result_df
 
 
 def manual_points_for_user(name):
