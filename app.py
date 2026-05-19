@@ -1390,13 +1390,13 @@ def show_sidebar():
 
 
 def _chart_layout(height=300, **overrides):
-    """Plotly 차트 라이트 테마 레이아웃 기본값 반환."""
-    bg = "#ffffff"
-    plot = "#f8fafc"
+    """Plotly 차트 기본 레이아웃. 배경은 앱 테마가 보이도록 투명 처리."""
+    bg = "rgba(0,0,0,0)"
+    plot = "rgba(0,0,0,0)"
     txt = "#1e293b"
     grid = "#e2e8f0"
     axis = "#cbd5e1"
-    legend_bg = "rgba(255,255,255,0.85)"
+    legend_bg = "rgba(255,255,255,0)"
     layout = dict(
         paper_bgcolor=bg, plot_bgcolor=plot, height=height,
         font=dict(color=txt, size=12),
@@ -3960,10 +3960,10 @@ def inject_theme_toggle():
     body:has(#pms-d:checked) .js-plotly-plot .svg-container {
         background: transparent !important;
     }
-    body:has(#pms-d:checked) .js-plotly-plot .main-svg {
-        background: #1e1e2e !important;
+    body:has(#pms-d:checked) .js-plotly-plot .bglayer rect.bg {
+        fill: transparent !important;
+        stroke: transparent !important;
     }
-    body:has(#pms-d:checked) .js-plotly-plot .bg,
     body:has(#pms-d:checked) .js-plotly-plot .legend rect.bg {
         fill: #252535 !important;
         stroke: #45475a !important;
@@ -4245,10 +4245,10 @@ def inject_theme_toggle():
         body:has(#pms-s:checked) .js-plotly-plot .svg-container {
             background: transparent !important;
         }
-        body:has(#pms-s:checked) .js-plotly-plot .main-svg {
-            background: #1e1e2e !important;
+        body:has(#pms-s:checked) .js-plotly-plot .bglayer rect.bg {
+            fill: transparent !important;
+            stroke: transparent !important;
         }
-        body:has(#pms-s:checked) .js-plotly-plot .bg,
         body:has(#pms-s:checked) .js-plotly-plot .legend rect.bg {
             fill: #252535 !important;
             stroke: #45475a !important;
