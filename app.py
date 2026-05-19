@@ -2118,7 +2118,7 @@ def show_user_history():
         # 파일이 변경되었을 때만 처리
         if st.session_state.get("user_excel_file_key") != file_key:
             st.session_state.user_excel_file_key = file_key
-            with st.spinner("본사이력 파일을 변환 중입니다..."):
+            with st.spinner("본사이력 파일을 불러오는 중입니다..."):
                 # cloud_sheet_df가 없을 때만 로드 시도
                 if st.session_state.get("cloud_sheet_df") is None:
                     try:
@@ -2126,20 +2126,16 @@ def show_user_history():
                     except Exception as e:
                         st.warning(f"⚠️ 본사 구글시트를 불러오는데 실패했습니다: {str(e)}")
 
-                # 은행 엑셀 읽기
-                bank_excel_df = clean_header_logic(pd.read_excel(u_file, sheet_name=0))
+                uploaded_df = clean_header_logic(pd.read_excel(u_file, sheet_name=0))
 
-                # 활동실적 양식으로 변환
-                converted_df = convert_bank_excel_to_activity(bank_excel_df)
-
-                if not converted_df.empty:
-                    st.session_state.user_excel_data = converted_df
+                if not uploaded_df.empty:
+                    st.session_state.user_excel_data = uploaded_df
                     st.session_state.final_reupload_df = None
                     st.session_state.final_reupload_key = ""
-                    st.toast("변환 완료. 분석이 자동으로 시작됩니다.")
+                    st.toast("업로드 완료. 분석이 자동으로 시작됩니다.")
                     st.rerun()
                 else:
-                    st.error("변환된 데이터가 없습니다. 파일을 확인해주세요.")
+                    st.error("업로드된 데이터가 없습니다. 파일을 확인해주세요.")
                     st.session_state.user_excel_data = None
 
     if st.session_state.user_excel_data is None:
