@@ -423,6 +423,14 @@ def render_manual_perf_input_table(base):
         body:has(#pms-d:checked) div[data-testid="stDataEditor"] {
             border-color: #45475a !important;
             box-shadow: none !important;
+            --ag-background-color: #252535;
+            --ag-odd-row-background-color: #1e1e30;
+            --ag-header-background-color: #0f0f1f;
+            --ag-foreground-color: #ffffff;
+            --ag-header-foreground-color: #ffffff;
+            --ag-row-hover-color: #313244;
+            --ag-border-color: #45475a;
+            --ag-cell-horizontal-border: solid #313244;
         }
         body:has(#pms-d:checked) div[data-testid="stDataEditor"] [role="columnheader"] {
             background: #0f0f1f !important;
@@ -430,8 +438,26 @@ def render_manual_perf_input_table(base):
             border-bottom-color: #45475a !important;
         }
         body:has(#pms-d:checked) div[data-testid="stDataEditor"] [role="gridcell"] {
+            background-color: #252535 !important;
             color: #ffffff !important;
             border-bottom-color: #313244 !important;
+        }
+        body:has(#pms-d:checked) div[data-testid="stDataEditor"] [role="row"]:nth-child(odd) [role="gridcell"] {
+            background-color: #1e1e30 !important;
+        }
+        body:has(#pms-d:checked) div[data-testid="stDataEditor"] .ag-row {
+            background-color: #252535 !important;
+        }
+        body:has(#pms-d:checked) div[data-testid="stDataEditor"] .ag-row-odd {
+            background-color: #1e1e30 !important;
+        }
+        body:has(#pms-d:checked) div[data-testid="stDataEditor"] .ag-cell {
+            background-color: inherit !important;
+            color: #ffffff !important;
+        }
+        body:has(#pms-d:checked) div[data-testid="stDataEditor"] > div,
+        body:has(#pms-d:checked) div[data-testid="stDataEditor"] > div > div {
+            background-color: #252535 !important;
         }
         body:has(#pms-d:checked) div[data-testid="stDataEditor"] input {
             color: #ffffff !important;
@@ -704,12 +730,13 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         return f"ERR: {str(e)}", None, None
 
 
-def render_plain_html_table(df, max_rows=500):
+def render_plain_html_table(df, max_rows=500, center_align=False):
     """AG Grid 없이 순수 HTML 테이블로 렌더링 — 다크모드 완전 호환."""
     if df is None or df.empty:
         st.info("표시할 데이터가 없습니다.")
         return
     df = df.head(max_rows).reset_index(drop=True)
+    td_align = "text-align:center;" if center_align else ""
     th = "background:#EDF2F7;color:#4A5568;font-weight:700;font-size:12px;padding:6px 10px;white-space:nowrap;border-bottom:2px solid #E2E8F0;text-align:center;"
     headers = "".join(f"<th style='{th}'>{html.escape(str(c))}</th>" for c in df.columns)
     body = ""
@@ -718,7 +745,7 @@ def render_plain_html_table(df, max_rows=500):
         tds = ""
         for col in df.columns:
             val = "" if pd.isna(row[col]) else html.escape(str(row[col]))
-            tds += f"<td style='background:{bg};padding:5px 10px;border-bottom:1px solid #EDF2F7;font-size:12px;color:#2D3748;white-space:nowrap;'>{val}</td>"
+            tds += f"<td style='background:{bg};padding:5px 10px;border-bottom:1px solid #EDF2F7;font-size:12px;color:#2D3748;white-space:nowrap;{td_align}'>{val}</td>"
         body += f"<tr>{tds}</tr>"
     st.markdown(
         f"""<div class="pms-report-table" style="overflow-x:auto;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.05);margin-bottom:1rem;">
@@ -3178,8 +3205,8 @@ def show_staff_admin():
         st.info("등록된 직원이 없습니다.")
         return
 
-    # ── 직원 목록 HTML 테이블 표시 (다크모드 호환) ──
-    render_plain_html_table(pd.DataFrame(staff_rows))
+    # ── 직원 목록 HTML 테이블 표시 (다크모드 호환, 가운데 정렬) ──
+    render_plain_html_table(pd.DataFrame(staff_rows), center_align=True)
 
     st.markdown("---")
     st.markdown("#### 직원 정보 수정")
@@ -3193,12 +3220,13 @@ def show_staff_admin():
     sel_uid = sel.split(" — ")[0].strip()
     info = st.session_state.user_db.get(sel_uid, {})
 
+    st.markdown(f"**메일주소:** {info.get('email', '—')}")
+
     c1, c2, c3 = st.columns(3)
     with c1:
         new_rank = st.selectbox("직급", ["부서장", "팀장", "과장", "대리", "주임", "직원"],
                                 index=["부서장", "팀장", "과장", "대리", "주임", "직원"].index(info.get("rank", "직원")),
                                 key="edit_rank")
-        new_email = st.text_input("메일주소", value=info.get("email", ""), key="edit_email")
     with c2:
         new_staff_type = st.selectbox("직원구분", ["정규직", "계약직", "파견직", "외주"],
                                       index=["정규직", "계약직", "파견직", "외주"].index(info.get("staff_type", "정규직")),
@@ -3223,7 +3251,6 @@ def show_staff_admin():
     with bc1:
         if st.button("저장", type="primary", use_container_width=True):
             st.session_state.user_db[sel_uid]["rank"] = new_rank
-            st.session_state.user_db[sel_uid]["email"] = new_email
             st.session_state.user_db[sel_uid]["staff_type"] = new_staff_type
             st.session_state.user_db[sel_uid]["outsource"] = new_outsource
             st.session_state.user_db[sel_uid]["outsource_period"] = new_period
@@ -3729,11 +3756,11 @@ def inject_theme_toggle():
         color: #ffffff !important;
     }
     body:has(#pms-d:checked) [data-testid="stSidebar"] .stButton > button {
-        background-color: #252535 !important; color: #ffffff !important;
-        border-color: #45475a !important;
+        background-color: transparent !important; color: #ffffff !important;
+        border-color: transparent !important; box-shadow: none !important;
     }
     body:has(#pms-d:checked) [data-testid="stSidebar"] .stButton > button:hover {
-        background-color: #313244 !important;
+        background-color: rgba(255,255,255,0.08) !important;
     }
 
     /* 입력 컨트롤 */
