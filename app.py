@@ -378,7 +378,8 @@ def render_manual_perf_input_table(base):
     st.markdown(
         """<style>
         div[data-testid="stElementToolbar"] { display: none !important; }
-        /* 헤더 셀 */
+
+        /* ── 헤더 셀 ── */
         .pif-hdr {
             background:#EDF2F7; color:#4A5568; font-weight:800; font-size:12px;
             padding:8px 6px; text-align:center; border-bottom:2px solid #CBD5E0;
@@ -388,11 +389,12 @@ def render_manual_perf_input_table(base):
             background:#0f0f1f !important; color:#ffffff !important;
             border-bottom-color:#45475a !important;
         }
-        /* 데이터 셀 */
+
+        /* ── 데이터 셀 ── */
         .pif-cell {
             font-size:12px; color:#2D3748; padding:6px 8px;
             border-bottom:1px solid #EDF2F7; white-space:nowrap;
-            min-height:34px; line-height:22px;
+            height:36px; line-height:24px;
         }
         .pif-e { background:#FFFFFF; }
         .pif-o { background:#F7FAFC; }
@@ -401,21 +403,61 @@ def render_manual_perf_input_table(base):
         }
         body:has(#pms-d:checked) .pif-e { background:#252535 !important; }
         body:has(#pms-d:checked) .pif-o { background:#1e1e30 !important; }
-        /* number input 스텝 버튼 제거 + 외곽선 최소화 */
+
+        /* ── 행 간격 제거: pif 행의 Streamlit 여백 전부 0 ── */
+        [data-testid="stHorizontalBlock"]:has(.pif-cell),
+        [data-testid="stHorizontalBlock"]:has(.pif-hdr) {
+            gap: 0 !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stVerticalBlock"],
+        [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stVerticalBlock"] {
+            gap: 0 !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stElementContainer"],
+        [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stElementContainer"] {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        /* 부모 stVerticalBlock 행 간격 제거 */
+        [data-testid="stVerticalBlock"]:has(.pif-cell) {
+            gap: 0 !important;
+        }
+
+        /* ── number input: 라벨 공간 제거 ── */
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] label {
+            display: none !important;
+            height: 0 !important;
+            margin: 0 !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        /* ── number input: 라이트모드 외관 ── */
         div[data-testid="stNumberInput"] button { display:none !important; }
-        div[data-testid="stNumberInput"] > div {
-            border:1px solid #E2E8F0 !important; box-shadow:none !important;
-            min-height:34px !important; border-radius:4px !important;
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] > div,
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] [data-baseweb="input"] {
+            border: 1px solid #CBD5E0 !important; box-shadow: none !important;
+            height: 36px !important; border-radius: 4px !important;
+            background: #F8FAFC !important;
         }
-        div[data-testid="stNumberInput"] input {
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] input {
             font-size:12px !important; text-align:right !important;
-            padding:0 6px !important;
+            padding:0 6px !important; background: transparent !important;
         }
-        body:has(#pms-d:checked) div[data-testid="stNumberInput"] > div {
-            border-color:#45475a !important; background:#252535 !important;
+
+        /* ── number input: 다크모드 — 짝수행(pif-e), 홀수행(pif-o) 배경 일치 ── */
+        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-e) div[data-testid="stNumberInput"] > div,
+        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-e) div[data-testid="stNumberInput"] [data-baseweb="input"] {
+            background: #252535 !important; border-color: #45475a !important;
         }
-        body:has(#pms-d:checked) div[data-testid="stNumberInput"] input {
-            color:#ffffff !important; background:transparent !important;
+        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-o) div[data-testid="stNumberInput"] > div,
+        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-o) div[data-testid="stNumberInput"] [data-baseweb="input"] {
+            background: #1e1e30 !important; border-color: #45475a !important;
+        }
+        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] input {
+            color: #ffffff !important; background: transparent !important;
         }
         </style>""",
         unsafe_allow_html=True,
