@@ -413,8 +413,6 @@ def render_manual_perf_input_table(base):
         [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stElementContainer"] {
             margin: 0 !important; padding: 0 !important;
         }
-        [data-testid="stVerticalBlock"]:has(.pif-cell) { gap: 0 !important; }
-
         /* ── 입력(건) 열: stColumn 자체에 행 배경색 적용 (흰색 노출 원천 차단) ── */
         [data-testid="stHorizontalBlock"]:has(.pif-e) [data-testid="stColumn"]:last-child { background:#FFFFFF; }
         [data-testid="stHorizontalBlock"]:has(.pif-o) [data-testid="stColumn"]:last-child { background:#F7FAFC; }
