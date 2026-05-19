@@ -423,22 +423,29 @@ def render_manual_perf_input_table(base):
             background:#1e1e30 !important;
         }
 
-        /* ── number input: 라벨·버튼 제거, 래퍼 투명화 ── */
+        /* ── number input: 라벨·버튼 제거, 래퍼 투명화·높이 고정 ── */
         div[data-testid="stNumberInput"] button { display:none !important; }
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] label {
-            display:none !important; height:0 !important; margin:0 !important;
+            display:none !important; height:0 !important; margin:0 !important; overflow:hidden !important;
         }
+        /* 모든 래퍼 계층: 투명·높이 28px 고정 */
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"],
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] > div,
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] > div > div,
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] [data-baseweb="input"] {
             background: transparent !important; border: none !important;
             box-shadow: none !important; margin:0 !important; padding:0 !important;
+            height:28px !important; min-height:unset !important; overflow:hidden !important;
         }
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] input {
             font-size:12px !important; text-align:center !important;
             padding:5px 6px !important; background:transparent !important;
             border:none !important; box-shadow:none !important;
+            height:28px !important; min-height:unset !important;
+        }
+        /* stColumn 자체 패딩 제거 */
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) > div[data-testid="stColumn"] {
+            padding:0 !important;
         }
         body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] input {
             color:#ffffff !important;
