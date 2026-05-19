@@ -1509,29 +1509,51 @@ def render_page_title(menu):
                 background-color: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
-                font-size: 22px !important;
-                padding: 0 4px !important;
-                height: auto !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                font-size: 0 !important;
+                padding: 0 !important;
+                height: 40px !important;
                 line-height: 1 !important;
-                color: #718096 !important;
-                width: auto !important;
+                color: transparent !important;
+                width: 48px !important;
+            }
+            [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button * {
+                color: transparent !important;
+                font-size: 0 !important;
+            }
+            [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button::before {
+                content: "";
+                width: 25px;
+                height: 25px;
+                display: block;
+                background-color: #111827;
+                -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.2 11 12 3l8.8 8a1.55 1.55 0 0 1-1.05 2.7H18v5.8a1.7 1.7 0 0 1-1.7 1.7h-3.1v-5.5h-2.4v5.5H7.7A1.7 1.7 0 0 1 6 19.5v-5.8H4.25A1.55 1.55 0 0 1 3.2 11Z'/%3E%3C/svg%3E") center / contain no-repeat;
+                mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.2 11 12 3l8.8 8a1.55 1.55 0 0 1-1.05 2.7H18v5.8a1.7 1.7 0 0 1-1.7 1.7h-3.1v-5.5h-2.4v5.5H7.7A1.7 1.7 0 0 1 6 19.5v-5.8H4.25A1.55 1.55 0 0 1 3.2 11Z'/%3E%3C/svg%3E") center / contain no-repeat;
             }
             [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover {
-                color: #4F46E5 !important;
                 background: transparent !important;
                 background-color: transparent !important;
             }
+            [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover::before {
+                background-color: #4F46E5;
+            }
             body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button {
-                color: #a0aec0 !important;
                 background: #1e1e30 !important;
                 background-color: #1e1e30 !important;
                 border: 1px solid #45475a !important;
             }
+            body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button::before {
+                background-color: #cdd6f4;
+            }
             body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover {
-                color: #818cf8 !important;
                 background: #313244 !important;
                 background-color: #313244 !important;
                 border-color: #6366f1 !important;
+            }
+            body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover::before {
+                background-color: #818cf8;
             }
             </style>
             <div class="home-btn">
@@ -3882,23 +3904,51 @@ def inject_theme_toggle():
     /* 홈 버튼 — 아이콘 전용: 배경·테두리 없음 */
     button.pms-home-btn,
     button.pms-home-btn:hover {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 48px !important;
+        height: 40px !important;
+        padding: 0 !important;
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
-        color: #718096 !important;
+        color: transparent !important;
+        font-size: 0 !important;
+    }
+    button.pms-home-btn *,
+    button.pms-home-btn:hover * {
+        color: transparent !important;
+        font-size: 0 !important;
+    }
+    button.pms-home-btn::before {
+        content: "";
+        width: 25px;
+        height: 25px;
+        display: block;
+        background-color: #111827;
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.2 11 12 3l8.8 8a1.55 1.55 0 0 1-1.05 2.7H18v5.8a1.7 1.7 0 0 1-1.7 1.7h-3.1v-5.5h-2.4v5.5H7.7A1.7 1.7 0 0 1 6 19.5v-5.8H4.25A1.55 1.55 0 0 1 3.2 11Z'/%3E%3C/svg%3E") center / contain no-repeat;
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.2 11 12 3l8.8 8a1.55 1.55 0 0 1-1.05 2.7H18v5.8a1.7 1.7 0 0 1-1.7 1.7h-3.1v-5.5h-2.4v5.5H7.7A1.7 1.7 0 0 1 6 19.5v-5.8H4.25A1.55 1.55 0 0 1 3.2 11Z'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+    button.pms-home-btn:hover::before {
+        background-color: #4F46E5;
     }
     body:has(#pms-d:checked) button.pms-home-btn {
         background: #1e1e30 !important;
         background-color: #1e1e30 !important;
         border: 1px solid #45475a !important;
         box-shadow: none !important;
-        color: #a0aec0 !important;
+    }
+    body:has(#pms-d:checked) button.pms-home-btn::before {
+        background-color: #cdd6f4;
     }
     body:has(#pms-d:checked) button.pms-home-btn:hover {
-        color: #818cf8 !important;
         background: #313244 !important;
         background-color: #313244 !important;
         border-color: #6366f1 !important;
+    }
+    body:has(#pms-d:checked) button.pms-home-btn:hover::before {
+        background-color: #818cf8;
     }
 
     /* 새로고침 버튼 다크모드 */
@@ -4220,13 +4270,17 @@ def inject_theme_toggle():
             background-color: #1e1e30 !important;
             border: 1px solid #45475a !important;
             box-shadow: none !important;
-            color: #a0aec0 !important;
+        }
+        body:has(#pms-s:checked) button.pms-home-btn::before {
+            background-color: #cdd6f4;
         }
         body:has(#pms-s:checked) button.pms-home-btn:hover {
             background: #313244 !important;
             background-color: #313244 !important;
             border-color: #6366f1 !important;
-            color: #818cf8 !important;
+        }
+        body:has(#pms-s:checked) button.pms-home-btn:hover::before {
+            background-color: #818cf8;
         }
         body:has(#pms-s:checked) [data-baseweb="tab"][aria-selected="true"] { color: #ffffff !important; }
         body:has(#pms-s:checked) .pms-sw-track { background: #313244; }
