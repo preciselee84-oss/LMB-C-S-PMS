@@ -2044,11 +2044,11 @@ def convert_bank_excel_to_activity(bank_df):
 
 
 def show_user_history():
-    col1, col_sample, col2 = st.columns([1, 1, 4])
+    col1, col_convert, col_upload, col_sample, _ = st.columns([1, 1, 1, 1, 2])
     with col1:
         st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>은행 이력 업로드</div>", unsafe_allow_html=True)
         history_file = st.file_uploader("은행 이력 업로드", type=["xls", "xlsx"], key="history_convert_upload", label_visibility="collapsed")
-    with col_sample:
+    with col_convert:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
         if history_file is not None:
             try:
@@ -2079,13 +2079,10 @@ def show_user_history():
                 st.error(f"은행 이력 업로드 실패: {e}")
         else:
             st.button("변환파일 다운로드", use_container_width=True, disabled=True)
-    with col2:
+    with col_upload:
         st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>본사이력 업로드</div>", unsafe_allow_html=True)
         u_file = st.file_uploader("본사이력 업로드", type=["xlsx"], label_visibility="collapsed")
-
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-    _, sample_col, _ = st.columns([1, 1, 4])
-    with sample_col:
+    with col_sample:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
         if os.path.exists(EXCEL_SAMPLE_FILE):
             with open(EXCEL_SAMPLE_FILE, "rb") as sample_file:
