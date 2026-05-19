@@ -3624,53 +3624,96 @@ def inject_theme_toggle():
         background-color: #313244 !important;
     }
 
-    /* 데이터프레임 / 데이터에디터 (AG Grid) */
+    /* ─── AG Grid: CSS 변수 설정 (Streamlit 모든 표에 적용) ─── */
+    body:has(#pms-d:checked) [class*="ag-theme"] {
+        --ag-background-color: #252535;
+        --ag-foreground-color: #e2e8f0;
+        --ag-secondary-foreground-color: #a6adc8;
+        --ag-border-color: #45475a;
+        --ag-secondary-border-color: #313244;
+        --ag-row-border-color: #313244;
+        --ag-header-background-color: #0f0f1f;
+        --ag-header-foreground-color: #93c5fd;
+        --ag-header-column-separator-color: #45475a;
+        --ag-odd-row-background-color: #1e1e30;
+        --ag-row-hover-color: #2d2d45;
+        --ag-selected-row-background-color: #3a3a5e;
+        --ag-range-selection-background-color: rgba(137,180,250,0.15);
+        --ag-range-selection-border-color: #89b4fa;
+        --ag-input-focus-border-color: #89b4fa;
+        --ag-cell-horizontal-border: solid #313244;
+        --ag-font-size: 13px;
+        --ag-alpine-active-color: #89b4fa;
+        --ag-selected-tab-underline-color: #89b4fa;
+    }
+    /* 래퍼·루트 */
     body:has(#pms-d:checked) [data-testid="stDataFrame"],
-    body:has(#pms-d:checked) [data-testid="stDataEditor"] {
+    body:has(#pms-d:checked) [data-testid="stDataEditor"],
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-root-wrapper,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-root {
+        background-color: #252535 !important; border-color: #45475a !important; color: #e2e8f0 !important;
+    }
+    /* 헤더 — 어두운 배경 + 파란 굵은 글씨 */
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-row,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-viewport {
+        background-color: #0f0f1f !important; border-bottom: 2px solid #45475a !important;
+    }
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-cell,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-cell-comp-wrapper {
+        background-color: #0f0f1f !important; color: #93c5fd !important;
+        border-right: 1px solid #45475a !important;
+    }
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-cell-text {
+        color: #93c5fd !important; font-weight: 700 !important;
+    }
+    /* 행 — 짝수/홀수 교차 + 호버 */
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row {
+        border-bottom-color: #313244 !important;
+    }
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row-even {
         background-color: #252535 !important;
     }
-    /* AG Grid 루트 */
-    body:has(#pms-d:checked) .ag-root-wrapper,
-    body:has(#pms-d:checked) .ag-root { background-color: #252535 !important; border-color: #45475a !important; }
-    /* 헤더 행 — 진한 배경 + 밝은 글씨 */
-    body:has(#pms-d:checked) .ag-header,
-    body:has(#pms-d:checked) .ag-header-row {
-        background-color: #16162a !important; border-bottom: 2px solid #45475a !important;
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row-odd {
+        background-color: #1e1e30 !important;
     }
-    body:has(#pms-d:checked) .ag-header-cell {
-        background-color: #16162a !important; color: #89b4fa !important;
-        font-weight: 700; border-right: 1px solid #45475a !important;
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row:hover,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row-hover {
+        background-color: #2d2d45 !important;
     }
-    body:has(#pms-d:checked) .ag-header-cell-text { color: #89b4fa !important; }
-    /* 데이터 행 — 짝수/홀수 구분 */
-    body:has(#pms-d:checked) .ag-row-even {
-        background-color: #252535 !important;
-    }
-    body:has(#pms-d:checked) .ag-row-odd {
-        background-color: #2a2a3e !important;
-    }
-    body:has(#pms-d:checked) .ag-row:hover,
-    body:has(#pms-d:checked) .ag-row-hover {
-        background-color: #313244 !important;
-    }
-    body:has(#pms-d:checked) .ag-row-selected {
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row-selected {
         background-color: #3a3a5e !important;
     }
     /* 셀 텍스트 */
-    body:has(#pms-d:checked) .ag-cell,
-    body:has(#pms-d:checked) .ag-cell-value,
-    body:has(#pms-d:checked) [role="gridcell"] {
-        color: #cdd6f4 !important; border-right: 1px solid #313244 !important;
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-cell,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-cell-value,
+    body:has(#pms-d:checked) [class*="ag-theme"] span.ag-cell-value,
+    body:has(#pms-d:checked) [class*="ag-theme"] [role="gridcell"] {
+        color: #e2e8f0 !important; border-right-color: #313244 !important;
     }
-    /* 핀된 컬럼 */
-    body:has(#pms-d:checked) .ag-pinned-left-cols-container,
-    body:has(#pms-d:checked) .ag-pinned-right-cols-container {
+    /* 핀 컬럼 배경 */
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-pinned-left-cols-container,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-pinned-right-cols-container {
         background-color: #252535 !important;
     }
-    /* 숫자 셀 강조 */
-    body:has(#pms-d:checked) [role="gridcell"][aria-colindex] { color: #cdd6f4 !important; }
-    /* 합계/포인트 행 (일반 텍스트) */
-    body:has(#pms-d:checked) .ag-row:last-child .ag-cell { font-weight: 600; color: #b4befe !important; }
+    /* 수평 스크롤 영역 */
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-body-viewport,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-center-cols-viewport,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-center-cols-container {
+        background-color: #252535 !important;
+    }
+    /* HTML 테이블 (st.table 등) */
+    body:has(#pms-d:checked) table { background-color: #252535 !important; border-color: #45475a !important; }
+    body:has(#pms-d:checked) th {
+        background-color: #0f0f1f !important; color: #93c5fd !important;
+        border-color: #45475a !important; font-weight: 700 !important;
+    }
+    body:has(#pms-d:checked) td {
+        background-color: #252535 !important; color: #e2e8f0 !important;
+        border-color: #313244 !important;
+    }
+    body:has(#pms-d:checked) tr:nth-child(odd) td { background-color: #1e1e30 !important; }
+    body:has(#pms-d:checked) tr:hover td { background-color: #2d2d45 !important; }
 
     /* 체크박스 / 라디오 (Streamlit 위젯) */
     body:has(#pms-d:checked) [data-baseweb="checkbox"] div,
@@ -3703,11 +3746,19 @@ def inject_theme_toggle():
         body:has(#pms-s:checked) input, body:has(#pms-s:checked) [data-baseweb="input"] input {
             background-color: #252535 !important; color: #cdd6f4 !important; border-color: #45475a !important;
         }
-        body:has(#pms-s:checked) .ag-header, body:has(#pms-s:checked) .ag-header-row { background-color: #16162a !important; }
-        body:has(#pms-s:checked) .ag-header-cell-text { color: #89b4fa !important; }
-        body:has(#pms-s:checked) .ag-row-even { background-color: #252535 !important; }
-        body:has(#pms-s:checked) .ag-row-odd  { background-color: #2a2a3e !important; }
-        body:has(#pms-s:checked) .ag-cell, body:has(#pms-s:checked) .ag-cell-value { color: #cdd6f4 !important; }
+        body:has(#pms-s:checked) [class*="ag-theme"] {
+            --ag-background-color: #252535; --ag-foreground-color: #e2e8f0;
+            --ag-header-background-color: #0f0f1f; --ag-header-foreground-color: #93c5fd;
+            --ag-border-color: #45475a; --ag-row-border-color: #313244;
+            --ag-odd-row-background-color: #1e1e30; --ag-row-hover-color: #2d2d45;
+        }
+        body:has(#pms-s:checked) [class*="ag-theme"] .ag-header,
+        body:has(#pms-s:checked) [class*="ag-theme"] .ag-header-row { background-color: #0f0f1f !important; }
+        body:has(#pms-s:checked) [class*="ag-theme"] .ag-header-cell-text { color: #93c5fd !important; font-weight: 700 !important; }
+        body:has(#pms-s:checked) [class*="ag-theme"] .ag-row-even { background-color: #252535 !important; }
+        body:has(#pms-s:checked) [class*="ag-theme"] .ag-row-odd  { background-color: #1e1e30 !important; }
+        body:has(#pms-s:checked) [class*="ag-theme"] .ag-cell,
+        body:has(#pms-s:checked) [class*="ag-theme"] .ag-cell-value { color: #e2e8f0 !important; }
         body:has(#pms-s:checked) [data-testid="stSidebar"] { background-color: #16162a !important; }
         body:has(#pms-s:checked) .stButton > button { background-color: #2a2a3e !important; color: #cdd6f4 !important; border-color: #45475a !important; }
         body:has(#pms-s:checked) [data-baseweb="tab"][aria-selected="true"] { color: #89b4fa !important; }
