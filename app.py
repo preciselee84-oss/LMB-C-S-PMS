@@ -3454,50 +3454,241 @@ def inject_theme_toggle():
         opacity: 1; background: #4F46E5; color: white;
     }
 
-    /* 다크 모드 */
+    /* ══ 다크 모드 컬러 팔레트 ══
+       배경:    #1e1e2e  표면:   #252535  카드:    #2a2a3e
+       테두리:  #45475a  텍스트: #cdd6f4  보조:    #a6adc8
+       강조:    #89b4fa  성공:   #a6e3a1  경고:    #f9e2af
+       오류:    #f38ba8  정보:   #89dceb  사이드:  #16162a  */
+
+    /* 기본 배경·텍스트 */
     body:has(#pms-d:checked) .stApp,
     body:has(#pms-d:checked) [data-testid="stAppViewContainer"],
     body:has(#pms-d:checked) [data-testid="stMain"],
     body:has(#pms-d:checked) section.main {
         background-color: #1e1e2e !important; color: #cdd6f4 !important;
     }
-    body:has(#pms-d:checked) .main .block-container {
-        background-color: #1e1e2e !important;
+    body:has(#pms-d:checked) .main .block-container { background-color: #1e1e2e !important; }
+
+    /* 텍스트 계층 */
+    body:has(#pms-d:checked) h1, body:has(#pms-d:checked) h2, body:has(#pms-d:checked) h3 {
+        color: #89b4fa !important;
     }
+    body:has(#pms-d:checked) h4, body:has(#pms-d:checked) h5, body:has(#pms-d:checked) h6 {
+        color: #b4befe !important;
+    }
+    body:has(#pms-d:checked) p, body:has(#pms-d:checked) li,
     body:has(#pms-d:checked) [data-testid="stMarkdownContainer"],
-    body:has(#pms-d:checked) [data-testid="stMarkdownContainer"] p,
-    body:has(#pms-d:checked) label, body:has(#pms-d:checked) span {
+    body:has(#pms-d:checked) [data-testid="stMarkdownContainer"] p {
         color: #cdd6f4 !important;
     }
-    body:has(#pms-d:checked) [data-testid="metric-container"] {
-        background: #2a2a3e !important; border-radius: 8px;
+    body:has(#pms-d:checked) label { color: #a6adc8 !important; }
+    body:has(#pms-d:checked) span  { color: #cdd6f4 !important; }
+    body:has(#pms-d:checked) small, body:has(#pms-d:checked) [data-testid="stCaptionContainer"] {
+        color: #7f849c !important;
     }
-    body:has(#pms-d:checked) input,
-    body:has(#pms-d:checked) textarea,
-    body:has(#pms-d:checked) [data-testid="stTextInput"] input,
-    body:has(#pms-d:checked) [data-baseweb="input"] {
-        background-color: #2a2a3e !important; color: #cdd6f4 !important;
-        border-color: #444466 !important;
-    }
-    body:has(#pms-d:checked) [data-testid="stSelectbox"] div,
-    body:has(#pms-d:checked) [data-baseweb="select"] div {
-        background-color: #2a2a3e !important; color: #cdd6f4 !important;
-    }
-    body:has(#pms-d:checked) [data-testid="stDataFrame"],
-    body:has(#pms-d:checked) [data-testid="stDataEditor"] {
-        background-color: #2a2a3e !important;
-    }
-    body:has(#pms-d:checked) hr { border-color: #3a3a5e !important; }
-    body:has(#pms-d:checked) .stButton > button {
-        background-color: #2a2a3e !important; color: #cdd6f4 !important;
-        border-color: #444466 !important;
-    }
+    body:has(#pms-d:checked) hr { border-color: #45475a !important; }
+
+    /* 사이드바 */
     body:has(#pms-d:checked) [data-testid="stSidebar"],
     body:has(#pms-d:checked) [data-testid="stSidebarContent"] {
         background-color: #16162a !important;
     }
-    body:has(#pms-d:checked) .pms-sw-track { background: #374151; }
-    body:has(#pms-d:checked) .pms-btn { color: #cdd6f4; }
+    body:has(#pms-d:checked) [data-testid="stSidebar"] p,
+    body:has(#pms-d:checked) [data-testid="stSidebar"] span,
+    body:has(#pms-d:checked) [data-testid="stSidebar"] label {
+        color: #a6adc8 !important;
+    }
+    body:has(#pms-d:checked) [data-testid="stSidebar"] .stButton > button {
+        background-color: #252535 !important; color: #cdd6f4 !important;
+        border-color: #45475a !important;
+    }
+    body:has(#pms-d:checked) [data-testid="stSidebar"] .stButton > button:hover {
+        background-color: #313244 !important;
+    }
+    body:has(#pms-d:checked) [data-testid="stSidebar"] [data-testid="stRadio"] > label > div > p {
+        color: #89b4fa !important; font-weight: 600;
+    }
+
+    /* 입력 컨트롤 */
+    body:has(#pms-d:checked) input,
+    body:has(#pms-d:checked) textarea,
+    body:has(#pms-d:checked) [data-baseweb="input"] input,
+    body:has(#pms-d:checked) [data-baseweb="textarea"] textarea {
+        background-color: #252535 !important; color: #cdd6f4 !important;
+        border-color: #45475a !important;
+    }
+    body:has(#pms-d:checked) [data-baseweb="input"],
+    body:has(#pms-d:checked) [data-baseweb="textarea"] {
+        background-color: #252535 !important; border-color: #45475a !important;
+    }
+    body:has(#pms-d:checked) [data-baseweb="select"] > div,
+    body:has(#pms-d:checked) [data-baseweb="select"] div[role="combobox"] {
+        background-color: #252535 !important; border-color: #45475a !important; color: #cdd6f4 !important;
+    }
+    body:has(#pms-d:checked) [data-baseweb="menu"],
+    body:has(#pms-d:checked) [data-baseweb="popover"] {
+        background-color: #2a2a3e !important; border-color: #45475a !important;
+    }
+    body:has(#pms-d:checked) [data-baseweb="menu"] li,
+    body:has(#pms-d:checked) [data-baseweb="menu"] [role="option"] {
+        background-color: #2a2a3e !important; color: #cdd6f4 !important;
+    }
+    body:has(#pms-d:checked) [data-baseweb="menu"] li:hover,
+    body:has(#pms-d:checked) [data-baseweb="menu"] [aria-selected="true"] {
+        background-color: #313244 !important;
+    }
+    body:has(#pms-d:checked) [data-testid="stNumberInput"] button {
+        background-color: #313244 !important; color: #cdd6f4 !important;
+        border-color: #45475a !important;
+    }
+
+    /* 버튼 */
+    body:has(#pms-d:checked) .stButton > button {
+        background-color: #2a2a3e !important; color: #cdd6f4 !important;
+        border-color: #45475a !important;
+    }
+    body:has(#pms-d:checked) .stButton > button:hover {
+        background-color: #313244 !important; border-color: #89b4fa !important;
+        color: #89b4fa !important;
+    }
+    body:has(#pms-d:checked) .stButton > button[kind="primary"],
+    body:has(#pms-d:checked) .stButton > button[data-testid="baseButton-primary"] {
+        background-color: #4F46E5 !important; color: #ffffff !important;
+        border-color: #6366f1 !important;
+    }
+    body:has(#pms-d:checked) .stButton > button[kind="primary"]:hover {
+        background-color: #6366f1 !important;
+    }
+
+    /* 탭 */
+    body:has(#pms-d:checked) [data-baseweb="tab-list"] {
+        background-color: #1e1e2e !important; border-bottom: 2px solid #45475a !important;
+    }
+    body:has(#pms-d:checked) [data-baseweb="tab"] {
+        background-color: transparent !important; color: #a6adc8 !important;
+    }
+    body:has(#pms-d:checked) [data-baseweb="tab"][aria-selected="true"] {
+        color: #89b4fa !important; font-weight: 700;
+    }
+    body:has(#pms-d:checked) [data-baseweb="tab-highlight"] {
+        background-color: #89b4fa !important;
+    }
+    body:has(#pms-d:checked) [data-baseweb="tab-border"] {
+        background-color: #45475a !important;
+    }
+
+    /* 메트릭 카드 */
+    body:has(#pms-d:checked) [data-testid="metric-container"] {
+        background: #252535 !important; border: 1px solid #45475a !important; border-radius: 8px;
+    }
+    body:has(#pms-d:checked) [data-testid="stMetricValue"] {
+        color: #89b4fa !important; font-weight: 700;
+    }
+    body:has(#pms-d:checked) [data-testid="stMetricLabel"] { color: #a6adc8 !important; }
+    body:has(#pms-d:checked) [data-testid="stMetricDelta"] svg { }
+    body:has(#pms-d:checked) [data-testid="stMetricDeltaIcon-Up"]   { color: #a6e3a1 !important; }
+    body:has(#pms-d:checked) [data-testid="stMetricDeltaIcon-Down"] { color: #f38ba8 !important; }
+
+    /* 알림 박스 (info / success / warning / error) */
+    body:has(#pms-d:checked) [data-testid="stNotification"],
+    body:has(#pms-d:checked) .stAlert {
+        border-radius: 6px !important;
+    }
+    body:has(#pms-d:checked) [data-testid="stNotification"][kind="info"],
+    body:has(#pms-d:checked) .stAlert.stInfo {
+        background-color: #1a2a3a !important; border-left: 4px solid #89dceb !important; color: #89dceb !important;
+    }
+    body:has(#pms-d:checked) [data-testid="stNotification"][kind="success"],
+    body:has(#pms-d:checked) .stAlert.stSuccess {
+        background-color: #1a2e1a !important; border-left: 4px solid #a6e3a1 !important; color: #a6e3a1 !important;
+    }
+    body:has(#pms-d:checked) [data-testid="stNotification"][kind="warning"],
+    body:has(#pms-d:checked) .stAlert.stWarning {
+        background-color: #2e2a1a !important; border-left: 4px solid #f9e2af !important; color: #f9e2af !important;
+    }
+    body:has(#pms-d:checked) [data-testid="stNotification"][kind="error"],
+    body:has(#pms-d:checked) .stAlert.stError {
+        background-color: #2e1a1a !important; border-left: 4px solid #f38ba8 !important; color: #f38ba8 !important;
+    }
+    body:has(#pms-d:checked) [data-testid="stNotification"] p,
+    body:has(#pms-d:checked) .stAlert p { color: inherit !important; }
+
+    /* 익스팬더 */
+    body:has(#pms-d:checked) [data-testid="stExpander"] {
+        background-color: #252535 !important; border: 1px solid #45475a !important; border-radius: 6px;
+    }
+    body:has(#pms-d:checked) [data-testid="stExpander"] summary {
+        background-color: #252535 !important; color: #89b4fa !important;
+    }
+    body:has(#pms-d:checked) [data-testid="stExpander"] summary:hover {
+        background-color: #313244 !important;
+    }
+
+    /* 데이터프레임 / 데이터에디터 (AG Grid) */
+    body:has(#pms-d:checked) [data-testid="stDataFrame"],
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] {
+        background-color: #252535 !important;
+    }
+    /* AG Grid 루트 */
+    body:has(#pms-d:checked) .ag-root-wrapper,
+    body:has(#pms-d:checked) .ag-root { background-color: #252535 !important; border-color: #45475a !important; }
+    /* 헤더 행 — 진한 배경 + 밝은 글씨 */
+    body:has(#pms-d:checked) .ag-header,
+    body:has(#pms-d:checked) .ag-header-row {
+        background-color: #16162a !important; border-bottom: 2px solid #45475a !important;
+    }
+    body:has(#pms-d:checked) .ag-header-cell {
+        background-color: #16162a !important; color: #89b4fa !important;
+        font-weight: 700; border-right: 1px solid #45475a !important;
+    }
+    body:has(#pms-d:checked) .ag-header-cell-text { color: #89b4fa !important; }
+    /* 데이터 행 — 짝수/홀수 구분 */
+    body:has(#pms-d:checked) .ag-row-even {
+        background-color: #252535 !important;
+    }
+    body:has(#pms-d:checked) .ag-row-odd {
+        background-color: #2a2a3e !important;
+    }
+    body:has(#pms-d:checked) .ag-row:hover,
+    body:has(#pms-d:checked) .ag-row-hover {
+        background-color: #313244 !important;
+    }
+    body:has(#pms-d:checked) .ag-row-selected {
+        background-color: #3a3a5e !important;
+    }
+    /* 셀 텍스트 */
+    body:has(#pms-d:checked) .ag-cell,
+    body:has(#pms-d:checked) .ag-cell-value,
+    body:has(#pms-d:checked) [role="gridcell"] {
+        color: #cdd6f4 !important; border-right: 1px solid #313244 !important;
+    }
+    /* 핀된 컬럼 */
+    body:has(#pms-d:checked) .ag-pinned-left-cols-container,
+    body:has(#pms-d:checked) .ag-pinned-right-cols-container {
+        background-color: #252535 !important;
+    }
+    /* 숫자 셀 강조 */
+    body:has(#pms-d:checked) [role="gridcell"][aria-colindex] { color: #cdd6f4 !important; }
+    /* 합계/포인트 행 (일반 텍스트) */
+    body:has(#pms-d:checked) .ag-row:last-child .ag-cell { font-weight: 600; color: #b4befe !important; }
+
+    /* 체크박스 / 라디오 (Streamlit 위젯) */
+    body:has(#pms-d:checked) [data-baseweb="checkbox"] div,
+    body:has(#pms-d:checked) [data-baseweb="radio"] div { border-color: #89b4fa !important; }
+    body:has(#pms-d:checked) [data-baseweb="checkbox"] [aria-checked="true"] div,
+    body:has(#pms-d:checked) [data-baseweb="radio"] [aria-checked="true"] div {
+        background-color: #89b4fa !important;
+    }
+
+    /* 스크롤바 */
+    body:has(#pms-d:checked) ::-webkit-scrollbar { width: 6px; height: 6px; }
+    body:has(#pms-d:checked) ::-webkit-scrollbar-track { background: #252535; }
+    body:has(#pms-d:checked) ::-webkit-scrollbar-thumb { background: #45475a; border-radius: 3px; }
+    body:has(#pms-d:checked) ::-webkit-scrollbar-thumb:hover { background: #585b70; }
+
+    /* 테마 토글 바 */
+    body:has(#pms-d:checked) .pms-sw-track { background: #313244; }
+    body:has(#pms-d:checked) .pms-btn { color: #a6adc8; }
 
     @media (prefers-color-scheme: dark) {
         body:has(#pms-s:checked) .stApp,
@@ -3505,18 +3696,22 @@ def inject_theme_toggle():
         body:has(#pms-s:checked) section.main {
             background-color: #1e1e2e !important; color: #cdd6f4 !important;
         }
-        body:has(#pms-s:checked) .main .block-container {
-            background-color: #1e1e2e !important;
+        body:has(#pms-s:checked) .main .block-container { background-color: #1e1e2e !important; }
+        body:has(#pms-s:checked) h1, body:has(#pms-s:checked) h2, body:has(#pms-s:checked) h3 { color: #89b4fa !important; }
+        body:has(#pms-s:checked) p, body:has(#pms-s:checked) [data-testid="stMarkdownContainer"] p { color: #cdd6f4 !important; }
+        body:has(#pms-s:checked) label { color: #a6adc8 !important; }
+        body:has(#pms-s:checked) input, body:has(#pms-s:checked) [data-baseweb="input"] input {
+            background-color: #252535 !important; color: #cdd6f4 !important; border-color: #45475a !important;
         }
-        body:has(#pms-s:checked) [data-testid="stMarkdownContainer"] p,
-        body:has(#pms-s:checked) label, body:has(#pms-s:checked) span {
-            color: #cdd6f4 !important;
-        }
-        body:has(#pms-s:checked) input,
-        body:has(#pms-s:checked) [data-testid="stTextInput"] input {
-            background-color: #2a2a3e !important; color: #cdd6f4 !important;
-        }
-        body:has(#pms-s:checked) .pms-sw-track { background: #374151; }
+        body:has(#pms-s:checked) .ag-header, body:has(#pms-s:checked) .ag-header-row { background-color: #16162a !important; }
+        body:has(#pms-s:checked) .ag-header-cell-text { color: #89b4fa !important; }
+        body:has(#pms-s:checked) .ag-row-even { background-color: #252535 !important; }
+        body:has(#pms-s:checked) .ag-row-odd  { background-color: #2a2a3e !important; }
+        body:has(#pms-s:checked) .ag-cell, body:has(#pms-s:checked) .ag-cell-value { color: #cdd6f4 !important; }
+        body:has(#pms-s:checked) [data-testid="stSidebar"] { background-color: #16162a !important; }
+        body:has(#pms-s:checked) .stButton > button { background-color: #2a2a3e !important; color: #cdd6f4 !important; border-color: #45475a !important; }
+        body:has(#pms-s:checked) [data-baseweb="tab"][aria-selected="true"] { color: #89b4fa !important; }
+        body:has(#pms-s:checked) .pms-sw-track { background: #313244; }
     }
     </style>
 
