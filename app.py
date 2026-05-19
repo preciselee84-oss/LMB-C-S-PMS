@@ -1900,11 +1900,151 @@ def select_prev_month(state_key, widget_key):
             st.session_state[state_key] = c_df[c_df[d_col].dt.strftime("%Y-%m") == sel] if sel != "선택안함" else None
 
 
+def convert_bank_excel_to_activity(bank_df):
+    """
+    은행 엑셀 파일을 활동실적 양식으로 변환
+
+    Args:
+        bank_df: 은행 엑셀 DataFrame (접수일자, CMS구분, 고객번호, 업체명, 접수유형, 업무유형, 접수자, 담당자, 진행상태, 요청사항, 처리내용)
+
+    Returns:
+        변환된 DataFrame (등록자, 활동일, 활동상세, 업체명, 사업자번호)
+    """
+    try:
+        # 1. 필요한 컬럼 찾기
+        receipt_type_col = find_col(bank_df, ["접수유형"], "접수유형")
+        receipt_date_col = find_col(bank_df, ["접수일자"], "접수일자")
+        customer_no_col = find_col(bank_df, ["고객번호"], "고객번호")
+        company_col = find_col(bank_df, ["업체명"], "업체명")
+        manager_col = find_col(bank_df, ["담당자"], "담당자")
+        request_col = find_col(bank_df, ["요청사항"], "요청사항")
+
+        # 2. 접수유형이 "방문"인 것만 필터링
+        if receipt_type_col not in bank_df.columns:
+            st.error("접수유형 컬럼을 찾을 수 없습니다.")
+            return pd.DataFrame()
+
+        filtered_df = bank_df[bank_df[receipt_type_col].astype(str).str.contains("방문", na=False)].copy()
+
+        if filtered_df.empty:
+            st.warning("접수유형이 '방문'인 데이터가 없습니다.")
+            return pd.DataFrame()
+
+        # 3. 하나은행 시트 로드 (고객번호 → 사업자번호 매칭)
+        try:
+            load_csv_to_state("url_analysis", "analysis_lookup_df")
+            hana_df = st.session_state.analysis_lookup_df.copy()
+        except Exception as e:
+            st.error(f"하나은행 시트를 불러올 수 없습니다: {str(e)}")
+            return pd.DataFrame()
+
+        # 하나은행 시트에서 고객번호와 사업자번호 컬럼 찾기
+        hana_customer_col = find_col(hana_df, ["고객번호"], "고객번호")
+        hana_biz_col = find_col(hana_df, ["사업자번호"], "사업자번호")
+
+        if hana_customer_col not in hana_df.columns or hana_biz_col not in hana_df.columns:
+            st.error("하나은행 시트에서 고객번호 또는 사업자번호 컬럼을 찾을 수 없습니다.")
+            return pd.DataFrame()
+
+        # 고객번호로 사업자번호 매칭
+        hana_lookup = hana_df[[hana_customer_col, hana_biz_col]].drop_duplicates(subset=[hana_customer_col])
+        hana_lookup.columns = ["고객번호_매칭", "사업자번호"]
+
+        # 4. 본사 시트 로드 (사업자번호 → 개설완료일자, ERP연계일자 확인)
+        try:
+            load_csv_to_state("url_sync", "cloud_sheet_df")
+            sync_df = st.session_state.cloud_sheet_df.copy()
+        except Exception as e:
+            st.error(f"본사 시트를 불러올 수 없습니다: {str(e)}")
+            return pd.DataFrame()
+
+        # 본사 시트에서 필요한 컬럼 찾기
+        sync_biz_col = find_col(sync_df, ["사업자번호"], "사업자번호")
+        sync_open_col = find_col(sync_df, ["개설완료일자"], "개설완료일자")
+        sync_erp_col = find_col(sync_df, ["ERP연계일자"], "ERP연계일자")
+
+        if sync_biz_col not in sync_df.columns:
+            st.error("본사 시트에서 사업자번호 컬럼을 찾을 수 없습니다.")
+            return pd.DataFrame()
+
+        # 사업자번호 정규화
+        sync_df[sync_biz_col] = normalize_biz(sync_df[sync_biz_col])
+        sync_lookup = sync_df[[sync_biz_col, sync_open_col, sync_erp_col]].drop_duplicates(subset=[sync_biz_col]) if sync_open_col and sync_erp_col else sync_df[[sync_biz_col]].drop_duplicates(subset=[sync_biz_col])
+        sync_lookup.columns = ["사업자번호_매칭", "개설완료일자", "ERP연계일자"] if sync_open_col and sync_erp_col else ["사업자번호_매칭"]
+
+        # 5. 변환 로직 적용
+        result_rows = []
+
+        for idx, row in filtered_df.iterrows():
+            customer_no = str(row.get(customer_no_col, "")).strip()
+            receipt_date = row.get(receipt_date_col, "")
+            company = row.get(company_col, "")
+            manager = row.get(manager_col, "")
+            request = str(row.get(request_col, "")).strip()
+
+            # 고객번호로 사업자번호 찾기
+            biz_no = ""
+            matched_hana = hana_lookup[hana_lookup["고객번호_매칭"].astype(str).str.strip() == customer_no]
+            if not matched_hana.empty:
+                biz_no = str(matched_hana.iloc[0]["사업자번호"]).strip()
+
+            # 사업자번호 정규화
+            biz_no_normalized = normalize_biz(pd.Series([biz_no])).iloc[0]
+
+            # 본사 시트에서 개설완료일자, ERP연계일자 확인
+            open_date = ""
+            erp_date = ""
+
+            if biz_no_normalized and sync_open_col and sync_erp_col:
+                matched_sync = sync_lookup[sync_lookup["사업자번호_매칭"] == biz_no_normalized]
+                if not matched_sync.empty:
+                    open_date = str(matched_sync.iloc[0].get("개설완료일자", "")).strip()
+                    erp_date = str(matched_sync.iloc[0].get("ERP연계일자", "")).strip()
+
+            # 활동상세 결정
+            activity_detail = "운영"  # 기본값
+
+            # 개설 조건: 요청사항에 "개설" or "구축" or "신규" 포함 AND 개설완료일자 공백
+            if any(keyword in request for keyword in ["개설", "구축", "신규"]):
+                if not open_date or open_date in ["", "nan", "None", "NaT"]:
+                    activity_detail = "개설"
+
+            # 연계 조건: 요청사항에 "연계" or "ERP" 포함 AND ERP연계일자 공백
+            if any(keyword in request for keyword in ["연계", "ERP"]):
+                if not erp_date or erp_date in ["", "nan", "None", "NaT"]:
+                    activity_detail = "연계"
+
+            # 활동일 포맷팅
+            try:
+                if isinstance(receipt_date, pd.Timestamp):
+                    activity_date = receipt_date.strftime("%Y-%m-%d")
+                else:
+                    activity_date = pd.to_datetime(receipt_date).strftime("%Y-%m-%d")
+            except:
+                activity_date = str(receipt_date)
+
+            result_rows.append({
+                "등록자": manager,
+                "활동일": activity_date,
+                "활동상세": activity_detail,
+                "업체명": company,
+                "사업자번호": biz_no
+            })
+
+        result_df = pd.DataFrame(result_rows)
+
+        return result_df
+
+    except Exception as e:
+        st.error(f"변환 중 오류가 발생했습니다: {str(e)}")
+        return pd.DataFrame()
+
+
 def show_user_history():
     col1, col_sample, col2 = st.columns([1, 1, 4])
     with col1:
-        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>활동실적 엑셀 업로드</div>", unsafe_allow_html=True)
-        u_file = st.file_uploader("활동실적 엑셀 업로드", type=["xlsx"], label_visibility="collapsed")
+        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>은행 엑셀파일 업로드</div>", unsafe_allow_html=True)
+        u_file = st.file_uploader("은행 엑셀파일 업로드", type=["xlsx"], label_visibility="collapsed")
     with col_sample:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
         if os.path.exists(EXCEL_SAMPLE_FILE):
@@ -1970,18 +2110,29 @@ def show_user_history():
         # 파일이 변경되었을 때만 처리
         if st.session_state.get("user_excel_file_key") != file_key:
             st.session_state.user_excel_file_key = file_key
-            with st.spinner("분석 중입니다."):
+            with st.spinner("은행 엑셀 파일을 변환 중입니다..."):
                 # cloud_sheet_df가 없을 때만 로드 시도
                 if st.session_state.get("cloud_sheet_df") is None:
                     try:
                         load_csv_to_state("url_sync", "cloud_sheet_df")
                     except Exception as e:
                         st.warning(f"⚠️ 본사 구글시트를 불러오는데 실패했습니다: {str(e)}")
-                st.session_state.user_excel_data = clean_header_logic(pd.read_excel(u_file, sheet_name=0))
-                st.session_state.final_reupload_df = None
-                st.session_state.final_reupload_key = ""
-                st.toast("업로드 완료. 분석이 자동으로 시작됩니다.")
-                st.rerun()
+
+                # 은행 엑셀 읽기
+                bank_excel_df = clean_header_logic(pd.read_excel(u_file, sheet_name=0))
+
+                # 활동실적 양식으로 변환
+                converted_df = convert_bank_excel_to_activity(bank_excel_df)
+
+                if not converted_df.empty:
+                    st.session_state.user_excel_data = converted_df
+                    st.session_state.final_reupload_df = None
+                    st.session_state.final_reupload_key = ""
+                    st.toast("변환 완료. 분석이 자동으로 시작됩니다.")
+                    st.rerun()
+                else:
+                    st.error("변환된 데이터가 없습니다. 파일을 확인해주세요.")
+                    st.session_state.user_excel_data = None
 
     if st.session_state.user_excel_data is None:
         return
