@@ -204,6 +204,7 @@ def init_state():
         "auto_prev_df": None,
         "deadline_time": "",
         "report_closed": "",
+        "dark_mode": True,
         "login_time": "",
         "_prev_menu": None,
     }
@@ -1219,6 +1220,32 @@ def show_sidebar():
             st.session_state.logged_in = False
             st.session_state.auth_mode = "login"
             st.rerun()
+
+
+def _chart_layout(height=300, **overrides):
+    """다크 테마 Plotly 레이아웃 기본값 반환."""
+    dark = st.session_state.get("dark_mode", True)
+    bg     = "#252535" if dark else "#ffffff"
+    plot   = "#1e1e30" if dark else "#f8fafc"
+    txt    = "#ffffff" if dark else "#1e293b"
+    grid   = "#313244" if dark else "#e2e8f0"
+    axis   = "#45475a" if dark else "#cbd5e1"
+    legend_bg = "rgba(37,37,53,0.85)" if dark else "rgba(255,255,255,0.85)"
+    layout = dict(
+        paper_bgcolor=bg, plot_bgcolor=plot, height=height,
+        font=dict(color=txt, size=12),
+        xaxis=dict(gridcolor=grid, linecolor=axis,
+                   tickfont=dict(color=txt), title_font=dict(color=txt),
+                   showgrid=True, zeroline=False),
+        yaxis=dict(gridcolor=grid, linecolor=axis,
+                   tickfont=dict(color=txt), title_font=dict(color=txt),
+                   showgrid=True, zeroline=False),
+        legend=dict(font=dict(color=txt), bgcolor=legend_bg,
+                    bordercolor=axis, borderwidth=1),
+        margin=dict(t=20, b=20, l=10, r=10),
+    )
+    layout.update(overrides)
+    return layout
 
 
 def apply_global_table_css():
@@ -3283,26 +3310,32 @@ def show_dashboard():
         categories = ["개설포인트", "연계포인트", "운영포인트"]
         labels = ["개설", "연계", "운영"]
         fig = go.Figure(data=[
-            go.Bar(name=f"당월 ({curr_ym})",   x=labels, y=[curr[c] for c in categories], marker_color="#4F46E5"),
-            go.Bar(name=f"전월 ({prev_ym})",   x=labels, y=[prev[c] for c in categories], marker_color="#A78BFA"),
-            go.Bar(name=f"전년 동월 ({prev_year_ym})", x=labels, y=[py[c]   for c in categories], marker_color="#D1D5DB"),
+            go.Bar(name=f"당월 ({curr_ym})",   x=labels, y=[curr[c] for c in categories], marker_color="#6366f1"),
+            go.Bar(name=f"전월 ({prev_ym})",   x=labels, y=[prev[c] for c in categories], marker_color="#a78bfa"),
+            go.Bar(name=f"전년 동월 ({prev_year_ym})", x=labels, y=[py[c]   for c in categories], marker_color="#94a3b8"),
         ])
-        fig.update_layout(barmode="group", height=300, margin=dict(t=20, b=20), legend=dict(orientation="h", y=-0.25))
-        st.plotly_chart(fig, use_container_width=True)
+        _txt0 = "#ffffff" if st.session_state.get("dark_mode", True) else "#1e293b"
+        fig.update_layout(**_chart_layout(height=300, barmode="group",
+                          legend=dict(orientation="h", y=-0.3, font=dict(color=_txt0))))
+        st.plotly_chart(fig, use_container_width=True, theme=None)
 
     with col_r:
         st.markdown("**이번달 포인트 구성**")
         pie_labels = ["개설포인트", "연계포인트", "운영포인트"]
         pie_values = [curr["개설포인트"], curr["연계포인트"], curr["운영포인트"]]
         if sum(pie_values) > 0:
+            _dark = st.session_state.get("dark_mode", True)
+            _txt  = "#ffffff" if _dark else "#1e293b"
             fig2 = go.Figure(go.Pie(
                 labels=["개설", "연계", "운영"],
                 values=pie_values,
                 hole=0.4,
-                marker_colors=["#4F46E5", "#7C3AED", "#A78BFA"],
+                marker_colors=["#6366f1", "#7C3AED", "#a78bfa"],
+                textfont=dict(color=_txt),
             ))
-            fig2.update_layout(height=300, margin=dict(t=20, b=20))
-            st.plotly_chart(fig2, use_container_width=True)
+            fig2.update_layout(**_chart_layout(height=300,
+                legend=dict(font=dict(color=_txt))))
+            st.plotly_chart(fig2, use_container_width=True, theme=None)
         else:
             st.info("이번달 집계된 활동이 없습니다.")
 
@@ -3315,9 +3348,9 @@ def show_dashboard():
         daily = curr_df.groupby(curr_df[gaeseol_date_col].dt.strftime("%Y-%m-%d")).size().reset_index()
         daily.columns = ["날짜", "건수"]
         fig3 = go.Figure(go.Scatter(x=daily["날짜"], y=daily["건수"], mode="lines+markers",
-                                    line=dict(color="#4F46E5", width=2), marker=dict(size=6)))
-        fig3.update_layout(height=220, margin=dict(t=10, b=20), xaxis_title="날짜", yaxis_title="건수")
-        st.plotly_chart(fig3, use_container_width=True)
+                                    line=dict(color="#6366f1", width=2), marker=dict(size=7, color="#a78bfa")))
+        fig3.update_layout(**_chart_layout(height=220, xaxis_title="날짜", yaxis_title="건수"))
+        st.plotly_chart(fig3, use_container_width=True, theme=None)
 
     st.markdown("---")
 
@@ -3346,16 +3379,17 @@ def show_dashboard():
         avg_this = monthly_avg(this_year)
 
         avg_labels = ["개설", "연계", "운영"]
+        _dark2 = st.session_state.get("dark_mode", True)
+        _txt2  = "#ffffff" if _dark2 else "#1e293b"
         fig_avg = go.Figure(data=[
             go.Bar(name=f"{last_year}년 월평균", x=avg_labels,
-                   y=[avg_last[k] for k in avg_labels], marker_color="#A78BFA"),
+                   y=[avg_last[k] for k in avg_labels], marker_color="#a78bfa"),
             go.Bar(name=f"{this_year}년 월평균", x=avg_labels,
-                   y=[avg_this[k] for k in avg_labels], marker_color="#4F46E5"),
+                   y=[avg_this[k] for k in avg_labels], marker_color="#6366f1"),
         ])
-        fig_avg.update_layout(barmode="group", height=260,
-                              margin=dict(t=10, b=20),
-                              legend=dict(orientation="h", y=-0.3))
-        st.plotly_chart(fig_avg, use_container_width=True)
+        fig_avg.update_layout(**_chart_layout(height=260, barmode="group",
+                              legend=dict(orientation="h", y=-0.3, font=dict(color=_txt2))))
+        st.plotly_chart(fig_avg, use_container_width=True, theme=None)
 
         ca, cb, cc = st.columns(3)
         for col_ui, key in zip([ca, cb, cc], avg_labels):
