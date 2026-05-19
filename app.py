@@ -1286,14 +1286,13 @@ def show_sidebar():
 
 
 def _chart_layout(height=300, **overrides):
-    """다크 테마 Plotly 레이아웃 기본값 반환."""
-    dark = st.session_state.get("dark_mode", False)
-    bg     = "#252535" if dark else "#ffffff"
-    plot   = "#1e1e30" if dark else "#f8fafc"
-    txt    = "#ffffff" if dark else "#1e293b"
-    grid   = "#313244" if dark else "#e2e8f0"
-    axis   = "#45475a" if dark else "#cbd5e1"
-    legend_bg = "rgba(37,37,53,0.85)" if dark else "rgba(255,255,255,0.85)"
+    """Plotly 차트 라이트 테마 레이아웃 기본값 반환."""
+    bg = "#ffffff"
+    plot = "#f8fafc"
+    txt = "#1e293b"
+    grid = "#e2e8f0"
+    axis = "#cbd5e1"
+    legend_bg = "rgba(255,255,255,0.85)"
     layout = dict(
         paper_bgcolor=bg, plot_bgcolor=plot, height=height,
         font=dict(color=txt, size=12),
@@ -3502,7 +3501,7 @@ def show_dashboard():
             go.Bar(name=f"전월 ({prev_ym})",   x=labels, y=[prev[c] for c in categories], marker_color="#a78bfa"),
             go.Bar(name=f"전년 동월 ({prev_year_ym})", x=labels, y=[py[c]   for c in categories], marker_color="#94a3b8"),
         ])
-        _txt0 = "#ffffff" if st.session_state.get("dark_mode", False) else "#1e293b"
+        _txt0 = "#1e293b"
         fig.update_layout(**_chart_layout(height=300, barmode="group",
                           legend=dict(orientation="h", y=-0.3, font=dict(color=_txt0))))
         st.plotly_chart(fig, use_container_width=True, theme=None)
@@ -3512,8 +3511,7 @@ def show_dashboard():
         pie_labels = ["개설포인트", "연계포인트", "운영포인트"]
         pie_values = [curr["개설포인트"], curr["연계포인트"], curr["운영포인트"]]
         if sum(pie_values) > 0:
-            _dark = st.session_state.get("dark_mode", False)
-            _txt  = "#ffffff" if _dark else "#1e293b"
+            _txt  = "#1e293b"
             fig2 = go.Figure(go.Pie(
                 labels=["개설", "연계", "운영"],
                 values=pie_values,
@@ -3567,8 +3565,7 @@ def show_dashboard():
         avg_this = monthly_avg(this_year)
 
         avg_labels = ["개설", "연계", "운영"]
-        _dark2 = st.session_state.get("dark_mode", False)
-        _txt2  = "#ffffff" if _dark2 else "#1e293b"
+        _txt2  = "#1e293b"
         fig_avg = go.Figure(data=[
             go.Bar(name=f"{last_year}년 월평균", x=avg_labels,
                    y=[avg_last[k] for k in avg_labels], marker_color="#a78bfa"),
