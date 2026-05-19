@@ -3885,6 +3885,31 @@ def inject_theme_toggle():
             </label>
         </div>
     </div>
+
+    <!-- localStorage 테마 영속성: onload 인라인 핸들러로 실행 (script 태그는 React innerHTML에서 미실행) -->
+    <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+         onload="(function(){
+             if(window._pmsThemeReady) return;
+             window._pmsThemeReady = true;
+             function applyTheme(){
+                 var t = localStorage.getItem('pms-theme') || 'l';
+                 var r = document.getElementById('pms-' + t);
+                 if(r && !r.checked){ r.checked = true; }
+             }
+             applyTheme();
+             var debounce;
+             window._pmsThemeObs = new MutationObserver(function(){
+                 clearTimeout(debounce);
+                 debounce = setTimeout(applyTheme, 80);
+             });
+             window._pmsThemeObs.observe(document.body, {childList:true, subtree:true});
+             document.addEventListener('change', function(e){
+                 if(e.target && e.target.name === 'pms-theme'){
+                     localStorage.setItem('pms-theme', e.target.id.replace('pms-',''));
+                 }
+             });
+         })()"
+         style="display:none" alt="">
     """, unsafe_allow_html=True)
 
 
