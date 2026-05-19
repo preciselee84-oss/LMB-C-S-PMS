@@ -2046,32 +2046,13 @@ def convert_bank_excel_to_activity(bank_df):
 def show_user_history():
     col1, col_sample, col2 = st.columns([1, 1, 4])
     with col1:
-        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>은행 엑셀파일 업로드</div>", unsafe_allow_html=True)
-        u_file = st.file_uploader("은행 엑셀파일 업로드", type=["xlsx"], label_visibility="collapsed")
+        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>은행 이력 업로드</div>", unsafe_allow_html=True)
+        history_file = st.file_uploader("은행 이력 업로드", type=["xls", "xlsx"], key="history_convert_upload", label_visibility="collapsed")
     with col_sample:
-        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-        if os.path.exists(EXCEL_SAMPLE_FILE):
-            with open(EXCEL_SAMPLE_FILE, "rb") as sample_file:
-                st.download_button(
-                    "샘플파일 다운로드",
-                    data=sample_file.read(),
-                    file_name="LMB월간 활동실적_000000(샘플).xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,
-                )
-        else:
-            st.button("샘플파일 다운로드", use_container_width=True, disabled=True)
-
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-    conv_col1, conv_col2, conv_col3 = st.columns([1, 1, 4])
-    with conv_col1:
-        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>기존 이력 파일 변환</div>", unsafe_allow_html=True)
-        history_file = st.file_uploader("기존 이력 파일 변환", type=["xls", "xlsx"], key="history_convert_upload", label_visibility="collapsed")
-    with conv_col2:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
         if history_file is not None:
             try:
-                with st.spinner("기존 이력을 샘플 양식으로 변환 중입니다."):
+                with st.spinner("은행 이력을 샘플 양식으로 변환 중입니다."):
                     history_df = read_excel_history_file(history_file)
                     converted_df, convert_info = convert_history_to_sample_df(history_df, st.session_state.user_name)
                 if converted_df.empty:
@@ -2095,9 +2076,28 @@ def show_user_history():
                 st.error("xls 파일 변환을 위해 xlrd 패키지가 필요합니다. 배포 후 requirements.txt 반영을 확인해주세요.")
             except Exception as e:
                 st.button("변환파일 다운로드", use_container_width=True, disabled=True)
-                st.error(f"이력 파일 변환 실패: {e}")
+                st.error(f"은행 이력 업로드 실패: {e}")
         else:
             st.button("변환파일 다운로드", use_container_width=True, disabled=True)
+
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    conv_col1, conv_col2, conv_col3 = st.columns([1, 1, 4])
+    with conv_col1:
+        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>은행 엑셀파일 업로드</div>", unsafe_allow_html=True)
+        u_file = st.file_uploader("은행 엑셀파일 업로드", type=["xlsx"], label_visibility="collapsed")
+    with conv_col2:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        if os.path.exists(EXCEL_SAMPLE_FILE):
+            with open(EXCEL_SAMPLE_FILE, "rb") as sample_file:
+                st.download_button(
+                    "샘플파일 다운로드",
+                    data=sample_file.read(),
+                    file_name="LMB월간 활동실적_000000(샘플).xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+        else:
+            st.button("샘플파일 다운로드", use_container_width=True, disabled=True)
 
     # 파일이 제거되면 데이터 초기화
     if u_file is None:
