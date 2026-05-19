@@ -382,7 +382,8 @@ def render_manual_perf_input_table(base):
         /* ── 헤더 셀 ── */
         .pif-hdr {
             background:#EDF2F7; color:#4A5568; font-weight:800; font-size:12px;
-            padding:6px 8px; text-align:center; border-bottom:2px solid #CBD5E0;
+            height:30px; padding:0 8px; text-align:center; border-bottom:2px solid #CBD5E0;
+            display:flex; align-items:center; justify-content:center; box-sizing:border-box;
             white-space:nowrap;
         }
         body:has(#pms-d:checked) .pif-hdr {
@@ -392,23 +393,36 @@ def render_manual_perf_input_table(base):
 
         /* ── 데이터 셀 ── */
         .pif-cell {
-            font-size:12px; color:#2D3748; padding:5px 10px;
-            border-bottom:1px solid #EDF2F7; white-space:nowrap;
-            text-align:center; line-height:18px; box-sizing:border-box;
+            background:transparent !important; font-size:12px; color:#2D3748;
+            height:36px; padding:0 10px; border-bottom:0; white-space:nowrap;
+            display:flex; align-items:center; justify-content:center;
+            text-align:center; line-height:1.2; box-sizing:border-box;
         }
         .pif-e { background:#FFFFFF; }
         .pif-o { background:#F7FAFC; }
         body:has(#pms-d:checked) .pif-cell {
-            color:#ffffff !important; border-bottom-color:#313244 !important;
+            color:#ffffff !important; border-bottom-color:transparent !important;
         }
-        body:has(#pms-d:checked) .pif-e { background:#252535 !important; }
-        body:has(#pms-d:checked) .pif-o { background:#1e1e30 !important; }
+        body:has(#pms-d:checked) .pif-e,
+        body:has(#pms-d:checked) .pif-o { background:transparent !important; }
 
-        /* ── 핵심: 행 컨테이너를 29px로 고정·클리핑 (내부 컴포넌트 높이 무관) ── */
+        /* ── 행 전체를 하나의 표 줄처럼 고정 ── */
         [data-testid="stHorizontalBlock"]:has(.pif-cell) {
             gap:0 !important;
-            height:29px !important; max-height:29px !important;
+            min-height:36px !important; height:36px !important; max-height:36px !important;
             overflow:hidden !important; align-items:stretch !important;
+            border-bottom:1px solid #EDF2F7 !important;
+            background:#FFFFFF !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-o) {
+            background:#F7FAFC !important;
+        }
+        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-cell) {
+            border-bottom-color:#313244 !important;
+            background:#252535 !important;
+        }
+        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-o) {
+            background:#1e1e30 !important;
         }
         [data-testid="stHorizontalBlock"]:has(.pif-hdr) { gap:0 !important; }
 
@@ -431,16 +445,6 @@ def render_manual_perf_input_table(base):
             padding:0 !important;
         }
 
-        /* ── 입력(건) 열 배경 ── */
-        [data-testid="stHorizontalBlock"]:has(.pif-e) [data-testid="stColumn"]:last-child { background:#FFFFFF; }
-        [data-testid="stHorizontalBlock"]:has(.pif-o) [data-testid="stColumn"]:last-child { background:#F7FAFC; }
-        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-e) [data-testid="stColumn"]:last-child {
-            background:#252535 !important;
-        }
-        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-o) [data-testid="stColumn"]:last-child {
-            background:#1e1e30 !important;
-        }
-
         /* ── number input: 라벨·버튼 제거, 래퍼 투명화 ── */
         div[data-testid="stNumberInput"] button { display:none !important; }
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] label {
@@ -452,10 +456,13 @@ def render_manual_perf_input_table(base):
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] [data-baseweb="input"] {
             background:transparent !important; border:none !important;
             box-shadow:none !important; margin:0 !important; padding:0 !important;
+            width:100% !important;
+            height:36px !important; min-height:36px !important;
         }
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] input {
             font-size:12px !important; text-align:center !important;
-            padding:5px 6px !important; background:transparent !important;
+            width:100% !important; height:36px !important; min-height:36px !important;
+            padding:0 6px !important; background:transparent !important;
             border:none !important; box-shadow:none !important;
         }
         body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] input {
