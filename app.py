@@ -2840,15 +2840,18 @@ def summarize_activity_note(value, max_lines=2, max_chars_per_line=34):
         return ""
 
     parts = [
-        re.sub(r"\s+", " ", part).strip(" -ㆍ*•")
+        re.sub(r"\s+", " ", part).strip(" -ㆍ*•●○◦·.,;:/\\|")
         for part in re.split(r"(?:\n+|[.;。]|[.!?]\s+)", text)
-        if part.strip(" -ㆍ*•")
+        if part.strip(" -ㆍ*•●○◦·.,;:/\\|")
     ]
     if not parts:
-        parts = [text]
+        parts = [re.sub(r"^[^\w가-힣]+", "", text)]
 
     lines = []
     for part in parts:
+        part = re.sub(r"^[^\w가-힣]+", "", part).strip()
+        if not part:
+            continue
         while len(part) > max_chars_per_line and len(lines) < max_lines:
             cut_at = part.rfind(" ", 0, max_chars_per_line + 1)
             if cut_at < max_chars_per_line // 2:
@@ -2860,7 +2863,18 @@ def summarize_activity_note(value, max_lines=2, max_chars_per_line=34):
         if len(lines) >= max_lines:
             break
 
+    if not lines:
+        return ""
+    lines[0] = f"● {lines[0]}"
     return "\n".join(lines[:max_lines])
+
+
+def is_major_note_col(table, col_idx):
+    try:
+        header = table.cell(0, col_idx).text.replace(" ", "")
+        return "비고" in header
+    except Exception:
+        return False
 
 
 def uploaded_major_rows(name, keyword, row_type):
@@ -2978,7 +2992,8 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
                 set_cell_text(table.cell(r, c), "", font_size=10)
         for r_idx, row_values in enumerate(rows, start=1):
             for c_idx, value in enumerate(row_values[:len(table.columns)]):
-                set_cell_text(table.cell(r_idx, c_idx), value, PP_ALIGN.CENTER, font_size=10)
+                align = PP_ALIGN.LEFT if is_major_note_col(table, c_idx) else PP_ALIGN.CENTER
+                set_cell_text(table.cell(r_idx, c_idx), value, align, font_size=10)
 
     def delete_slide(index):
         slide_id_list = prs.slides._sldIdLst
