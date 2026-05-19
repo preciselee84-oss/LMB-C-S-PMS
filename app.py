@@ -419,63 +419,13 @@ def render_manual_perf_input_table(base):
             text-align: right !important;
             justify-content: flex-end !important;
         }
-        /* 추가 실적 입력표 다크모드 — 헤더/테두리만 CSS, 셀 배경은 JS로 처리 */
+        /* 다크모드: AG Grid inline style 우회 — CSS filter compositing 활용 */
         body:has(#pms-d:checked) div[data-testid="stDataEditor"] {
+            filter: invert(1) hue-rotate(180deg) !important;
             border-color: #45475a !important;
             box-shadow: none !important;
         }
-        body:has(#pms-d:checked) div[data-testid="stDataEditor"] [role="columnheader"] {
-            background: #0f0f1f !important;
-            color: #ffffff !important;
-            border-bottom-color: #45475a !important;
-        }
-        body:has(#pms-d:checked) div[data-testid="stDataEditor"] [role="gridcell"] {
-            color: #ffffff !important;
-            border-bottom-color: #313244 !important;
-        }
-        body:has(#pms-d:checked) div[data-testid="stDataEditor"] input {
-            color: #ffffff !important;
-            background-color: transparent !important;
-        }
         </style>
-        <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-             onload="(function(){
-                 function applyEditorDark(){
-                     var isDark = document.querySelector('#pms-d') && document.querySelector('#pms-d').checked;
-                     var editors = document.querySelectorAll('[data-testid=stDataEditor]');
-                     editors.forEach(function(editor){
-                         if(isDark){
-                             editor.querySelectorAll('[role=columnheader]').forEach(function(h){
-                                 h.style.setProperty('background-color','#0f0f1f','important');
-                                 h.style.setProperty('color','#ffffff','important');
-                             });
-                             editor.querySelectorAll('[role=row]').forEach(function(row,i){
-                                 var idx = parseInt(row.getAttribute('row-index')||i);
-                                 var bg = idx%2===0 ? '#252535' : '#1e1e30';
-                                 row.style.setProperty('background-color',bg,'important');
-                                 row.querySelectorAll('[role=gridcell]').forEach(function(cell){
-                                     cell.style.setProperty('background-color',bg,'important');
-                                     cell.style.setProperty('color','#ffffff','important');
-                                 });
-                             });
-                         } else {
-                             editor.querySelectorAll('[role=columnheader],[role=row],[role=gridcell]').forEach(function(el){
-                                 el.style.removeProperty('background-color');
-                             });
-                         }
-                     });
-                 }
-                 applyEditorDark();
-                 var deb;
-                 new MutationObserver(function(){
-                     clearTimeout(deb);
-                     deb = setTimeout(applyEditorDark, 80);
-                 }).observe(document.body, {childList:true, subtree:true});
-                 document.addEventListener('change', function(e){
-                     if(e.target && e.target.name==='pms-theme') setTimeout(applyEditorDark, 80);
-                 });
-             })()"
-             style="display:none" alt="">
         """,
         unsafe_allow_html=True,
     )
