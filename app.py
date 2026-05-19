@@ -419,6 +419,24 @@ def render_manual_perf_input_table(base):
             text-align: right !important;
             justify-content: flex-end !important;
         }
+        /* 추가 실적 입력표 다크모드 */
+        body:has(#pms-d:checked) div[data-testid="stDataEditor"] {
+            border-color: #45475a !important;
+            box-shadow: none !important;
+        }
+        body:has(#pms-d:checked) div[data-testid="stDataEditor"] [role="columnheader"] {
+            background: #0f0f1f !important;
+            color: #ffffff !important;
+            border-bottom-color: #45475a !important;
+        }
+        body:has(#pms-d:checked) div[data-testid="stDataEditor"] [role="gridcell"] {
+            color: #ffffff !important;
+            border-bottom-color: #313244 !important;
+        }
+        body:has(#pms-d:checked) div[data-testid="stDataEditor"] input {
+            color: #ffffff !important;
+            background-color: transparent !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -776,7 +794,7 @@ def style_report_logic(df, compact=False):
     _tbl_style = "width:100%;border-collapse:collapse;table-layout:fixed;" if compact else "width:100%;border-collapse:collapse;"
     st.markdown(
         f"""
-        <div style="overflow-x:{_ov};border:1px solid #E2E8F0;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:1rem;">
+        <div class="pms-report-table" style="overflow-x:{_ov};border:1px solid #E2E8F0;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:1rem;">
             <table style="{_tbl_style}">
                 <thead><tr>{headers}</tr></thead>
                 <tbody>{body}</tbody>
@@ -1321,6 +1339,48 @@ def apply_global_table_css():
         }
         body:has(#pms-d:checked) [style*="color:#2B6CB0"] { color: #89dceb !important; }
         body:has(#pms-d:checked) [style*="color: #2B6CB0"] { color: #89dceb !important; }
+
+        /* 실적 보고 테이블 (style_report_logic 래퍼) 다크모드 */
+        body:has(#pms-d:checked) .pms-report-table {
+            border-color: #45475a !important;
+            box-shadow: none !important;
+            background: #252535 !important;
+        }
+        body:has(#pms-d:checked) .pms-report-table th {
+            background: #0f0f1f !important;
+            color: #ffffff !important;
+            border-color: #45475a !important;
+        }
+        body:has(#pms-d:checked) .pms-report-table td {
+            background: #252535 !important;
+            color: #ffffff !important;
+            border-color: #313244 !important;
+        }
+        body:has(#pms-d:checked) .pms-report-table tr:nth-child(odd) td {
+            background: #1e1e30 !important;
+        }
+        body:has(#pms-d:checked) .pms-report-table tr:hover td {
+            background: #2d2d45 !important;
+        }
+
+        /* 다운로드 버튼 다크모드 */
+        body:has(#pms-d:checked) [data-testid="stDownloadButton"] button,
+        body:has(#pms-d:checked) [data-testid="stDownloadButton"] a {
+            background-color: #2a2a3e !important;
+            color: #ffffff !important;
+            border-color: #45475a !important;
+        }
+        body:has(#pms-d:checked) [data-testid="stDownloadButton"] button:hover,
+        body:has(#pms-d:checked) [data-testid="stDownloadButton"] a:hover {
+            background-color: #313244 !important;
+            border-color: #ffffff !important;
+        }
+        body:has(#pms-d:checked) [data-testid="stDownloadButton"] button p,
+        body:has(#pms-d:checked) [data-testid="stDownloadButton"] button span,
+        body:has(#pms-d:checked) [data-testid="stDownloadButton"] a p,
+        body:has(#pms-d:checked) [data-testid="stDownloadButton"] a span {
+            color: #ffffff !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
