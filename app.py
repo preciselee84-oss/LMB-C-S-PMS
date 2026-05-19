@@ -21,6 +21,7 @@ SENT_FILE = "sent_results.json"
 SENT_UPLOADS_FILE = "sent_uploads.json"
 SAVED_STATE_FILE = "saved_state.json"
 PPT_TEMPLATE_FILE = os.path.join(os.path.dirname(__file__), "templates", "LMB활동실적보고서_202605_하나지사.pptx")
+EXCEL_SAMPLE_FILE = os.path.join(os.path.dirname(__file__), "templates", "LMB월간 활동실적_000000(샘플).xlsx")
 
 DEFAULT_URL_ANALYSIS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9XPHqrqcaFf9bCOVya7yHORr-c1R4KCF0eEpdE3ESn8qJELP0BkqTOslur9bsGcVabRUIcyOa877R/pub?output=csv"
 DEFAULT_URL_SYNC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9F7R7oLA2B02H-I25kVv2JeYHFgWQq0CT7TeW61hrNpJLdHWJFhFR_iDQGCFAW044o8rRwBDeovKG/pub?gid=1533424484&single=true&output=csv"
@@ -1747,9 +1748,23 @@ def select_prev_month(state_key, widget_key):
 
 
 def show_user_history():
-    col1, col2 = st.columns([1, 5])
+    col1, col_sample, col2 = st.columns([1, 1, 4])
     with col1:
-        u_file = st.file_uploader("활동실적 엑셀 업로드", type=["xlsx"])
+        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>활동실적 엑셀 업로드</div>", unsafe_allow_html=True)
+        u_file = st.file_uploader("활동실적 엑셀 업로드", type=["xlsx"], label_visibility="collapsed")
+    with col_sample:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        if os.path.exists(EXCEL_SAMPLE_FILE):
+            with open(EXCEL_SAMPLE_FILE, "rb") as sample_file:
+                st.download_button(
+                    "샘플파일 다운로드",
+                    data=sample_file.read(),
+                    file_name="LMB월간 활동실적_000000(샘플).xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+        else:
+            st.button("샘플파일 다운로드", use_container_width=True, disabled=True)
 
     # 파일이 제거되면 데이터 초기화
     if u_file is None:
@@ -2108,7 +2123,8 @@ def show_final_check():
 
     col1_reupload, col2_reupload = st.columns([1, 5])
     with col1_reupload:
-        new_file = st.file_uploader("엑셀 재업로드", type=["xlsx"], key="final_reupload")
+        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>활동실적 엑셀 재업로드</div>", unsafe_allow_html=True)
+        new_file = st.file_uploader("활동실적 엑셀 재업로드", type=["xlsx"], key="final_reupload", label_visibility="collapsed")
 
     if new_file is not None:
         file_key = f"{new_file.name}_{new_file.size}"
@@ -3037,7 +3053,7 @@ def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_m
                 st.download_button(
                     "실적보고서 PPT 다운로드",
                     data=ppt_bytes,
-                    file_name=f"performance_report_{curr_month_label}.pptx",
+                    file_name=f"LMB활동실적보고서_{year_month}_하나지사.pptx",
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     use_container_width=True,
                 )
