@@ -3418,7 +3418,10 @@ def show_dashboard():
         all_names = [
             info.get("name", "")
             for uid, info in st.session_state.user_db.items()
-            if uid != "1" and info.get("name") and info.get("access") == "허용"
+            if uid != "1"
+            and info.get("name")
+            and info.get("access") == "허용"
+            and info.get("rank") != "부서장"
         ]
         cards = []
         for uname in all_names:
