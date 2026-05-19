@@ -3432,154 +3432,121 @@ def show_google_sync():
 
 
 def inject_theme_toggle():
-    # CSS는 부모 페이지에 직접 주입 (st.html은 iframe이라 CSS가 부모에 미적용)
+    # JavaScript는 st.markdown innerHTML으로 실행 불가 → CSS :has() + radio 버튼 방식 사용
     st.markdown("""
     <style>
+    .pms-wrapper { position: relative; }
+    .pms-theme-radio {
+        position: absolute; opacity: 0; width: 0; height: 0;
+        pointer-events: none;
+    }
     .pms-sw-outer {
         position: fixed; top: 14px; right: 18px; z-index: 999999;
-        pointer-events: none;
     }
     .pms-sw-track {
-        position: relative;
         display: inline-flex; align-items: center;
-        background: #e5e7eb;
-        border-radius: 22px; padding: 3px;
-        box-shadow: 0 1px 6px rgba(0,0,0,0.12);
-        gap: 2px;
-        pointer-events: all;
+        background: #e5e7eb; border-radius: 22px; padding: 3px;
+        box-shadow: 0 1px 6px rgba(0,0,0,0.12); gap: 2px;
     }
-    .pms-sw-thumb {
-        position: absolute;
-        top: 3px; left: 3px;
-        width: 32px; height: 28px;
-        background: #4F46E5;
-        border-radius: 18px;
-        transition: transform 0.25s cubic-bezier(.4,0,.2,1), width 0.25s;
-        pointer-events: none;
-        z-index: 0;
-    }
-    .pms-sw-track button {
-        position: relative; z-index: 1;
-        background: none; border: none; cursor: pointer;
-        font-size: 15px;
-        padding: 0 10px; height: 28px;
-        border-radius: 18px; line-height: 28px;
-        white-space: nowrap;
-        transition: opacity 0.2s;
-        opacity: 0.4;
+    .pms-sw-track label {
+        cursor: pointer; font-size: 15px;
+        padding: 0 10px; height: 28px; border-radius: 18px;
+        line-height: 28px; opacity: 0.45; color: #374151;
         display: flex; align-items: center; justify-content: center;
+        transition: opacity 0.2s, background 0.15s, color 0.15s;
+        user-select: none;
     }
-    .pms-sw-track button.t-active { opacity: 1; }
-    .pms-sw-track button:hover { opacity: 0.8; }
+    .pms-sw-track label:hover { opacity: 0.75; }
+    .pms-wrapper:has(#pms-l:checked) label[for="pms-l"],
+    .pms-wrapper:has(#pms-d:checked) label[for="pms-d"],
+    .pms-wrapper:has(#pms-s:checked) label[for="pms-s"] {
+        opacity: 1; background: #4F46E5; color: white;
+    }
 
-    html[data-pms-theme="dark"] .pms-sw-track { background: #374151; }
-    html[data-pms-theme="dark"] .pms-sw-thumb { background: #6366f1; }
-
-    html[data-pms-theme="dark"] .stApp,
-    html[data-pms-theme="dark"] [data-testid="stAppViewContainer"],
-    html[data-pms-theme="dark"] [data-testid="stMain"],
-    html[data-pms-theme="dark"] section.main {
+    /* 다크 모드 */
+    body:has(#pms-d:checked) .stApp,
+    body:has(#pms-d:checked) [data-testid="stAppViewContainer"],
+    body:has(#pms-d:checked) [data-testid="stMain"],
+    body:has(#pms-d:checked) section.main {
         background-color: #1e1e2e !important; color: #cdd6f4 !important;
     }
-    html[data-pms-theme="dark"] .main .block-container {
+    body:has(#pms-d:checked) .main .block-container {
         background-color: #1e1e2e !important;
     }
-    html[data-pms-theme="dark"] [data-testid="stMarkdownContainer"],
-    html[data-pms-theme="dark"] [data-testid="stMarkdownContainer"] p,
-    html[data-pms-theme="dark"] label, html[data-pms-theme="dark"] span {
+    body:has(#pms-d:checked) [data-testid="stMarkdownContainer"],
+    body:has(#pms-d:checked) [data-testid="stMarkdownContainer"] p,
+    body:has(#pms-d:checked) label, body:has(#pms-d:checked) span {
         color: #cdd6f4 !important;
     }
-    html[data-pms-theme="dark"] [data-testid="metric-container"] {
+    body:has(#pms-d:checked) [data-testid="metric-container"] {
         background: #2a2a3e !important; border-radius: 8px;
     }
-    html[data-pms-theme="dark"] input,
-    html[data-pms-theme="dark"] textarea,
-    html[data-pms-theme="dark"] [data-testid="stTextInput"] input,
-    html[data-pms-theme="dark"] [data-baseweb="input"] {
+    body:has(#pms-d:checked) input,
+    body:has(#pms-d:checked) textarea,
+    body:has(#pms-d:checked) [data-testid="stTextInput"] input,
+    body:has(#pms-d:checked) [data-baseweb="input"] {
         background-color: #2a2a3e !important; color: #cdd6f4 !important;
         border-color: #444466 !important;
     }
-    html[data-pms-theme="dark"] [data-testid="stSelectbox"] div,
-    html[data-pms-theme="dark"] [data-baseweb="select"] div {
+    body:has(#pms-d:checked) [data-testid="stSelectbox"] div,
+    body:has(#pms-d:checked) [data-baseweb="select"] div {
         background-color: #2a2a3e !important; color: #cdd6f4 !important;
     }
-    html[data-pms-theme="dark"] [data-testid="stDataFrame"],
-    html[data-pms-theme="dark"] [data-testid="stDataEditor"] {
+    body:has(#pms-d:checked) [data-testid="stDataFrame"],
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] {
         background-color: #2a2a3e !important;
     }
-    html[data-pms-theme="dark"] hr { border-color: #3a3a5e !important; }
-    html[data-pms-theme="dark"] .stButton > button {
+    body:has(#pms-d:checked) hr { border-color: #3a3a5e !important; }
+    body:has(#pms-d:checked) .stButton > button {
         background-color: #2a2a3e !important; color: #cdd6f4 !important;
         border-color: #444466 !important;
     }
+    body:has(#pms-d:checked) [data-testid="stSidebar"],
+    body:has(#pms-d:checked) [data-testid="stSidebarContent"] {
+        background-color: #16162a !important;
+    }
+    body:has(#pms-d:checked) .pms-sw-track { background: #374151; }
+    body:has(#pms-d:checked) .pms-sw-track label { color: #cdd6f4; }
+
     @media (prefers-color-scheme: dark) {
-        html[data-pms-theme="system"] .stApp,
-        html[data-pms-theme="system"] [data-testid="stAppViewContainer"],
-        html[data-pms-theme="system"] section.main {
+        body:has(#pms-s:checked) .stApp,
+        body:has(#pms-s:checked) [data-testid="stAppViewContainer"],
+        body:has(#pms-s:checked) section.main {
             background-color: #1e1e2e !important; color: #cdd6f4 !important;
         }
-        html[data-pms-theme="system"] .main .block-container {
+        body:has(#pms-s:checked) .main .block-container {
             background-color: #1e1e2e !important;
         }
-        html[data-pms-theme="system"] [data-testid="stMarkdownContainer"] p,
-        html[data-pms-theme="system"] label, html[data-pms-theme="system"] span {
+        body:has(#pms-s:checked) [data-testid="stMarkdownContainer"] p,
+        body:has(#pms-s:checked) label, body:has(#pms-s:checked) span {
             color: #cdd6f4 !important;
         }
-        html[data-pms-theme="system"] input,
-        html[data-pms-theme="system"] [data-testid="stTextInput"] input {
+        body:has(#pms-s:checked) input,
+        body:has(#pms-s:checked) [data-testid="stTextInput"] input {
             background-color: #2a2a3e !important; color: #cdd6f4 !important;
         }
-        html[data-pms-theme="system"] .pms-sw-track { background: #374151; }
+        body:has(#pms-s:checked) .pms-sw-track { background: #374151; }
     }
     </style>
 
-    <div class="pms-sw-outer">
-        <div class="pms-sw-track" id="pmsThemeBar">
-            <div class="pms-sw-thumb" id="pmsThumb"></div>
-            <button id="tbtn-light" title="라이트" onclick="pmsSetTheme('light')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-            </button>
-            <button id="tbtn-dark" title="다크" onclick="pmsSetTheme('dark')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-            </button>
-            <button id="tbtn-system" title="시스템" onclick="pmsSetTheme('system')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-            </button>
+    <div class="pms-wrapper">
+        <input type="radio" class="pms-theme-radio" name="pms-theme" id="pms-l" checked>
+        <input type="radio" class="pms-theme-radio" name="pms-theme" id="pms-d">
+        <input type="radio" class="pms-theme-radio" name="pms-theme" id="pms-s">
+        <div class="pms-sw-outer">
+            <div class="pms-sw-track">
+                <label for="pms-l" title="라이트">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                </label>
+                <label for="pms-d" title="다크">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                </label>
+                <label for="pms-s" title="시스템">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </label>
+            </div>
         </div>
     </div>
-
-    <script>
-    (function(){
-        var ORDER = ['light','dark','system'];
-        function pmsApply(mode) {
-            document.documentElement.setAttribute('data-pms-theme', mode);
-            var thumb = document.getElementById('pmsThumb');
-            var btn   = document.getElementById('tbtn-' + mode);
-            var track = document.getElementById('pmsThemeBar');
-            if (thumb && btn && track) {
-                var tR = track.getBoundingClientRect();
-                var bR = btn.getBoundingClientRect();
-                thumb.style.width     = bR.width  + 'px';
-                thumb.style.height    = bR.height + 'px';
-                thumb.style.transform = 'translateX(' + (bR.left - tR.left - 3) + 'px)';
-            }
-            ORDER.forEach(function(m) {
-                var b = document.getElementById('tbtn-' + m);
-                if (b) b.classList.toggle('t-active', m === mode);
-            });
-        }
-        window.pmsSetTheme = function(mode) {
-            try { localStorage.setItem('pms_theme', mode); } catch(e) {}
-            pmsApply(mode);
-        };
-        var saved = 'light';
-        try { saved = localStorage.getItem('pms_theme') || 'light'; } catch(e) {}
-        pmsApply(saved);
-        window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change', function() {
-            try { if ((localStorage.getItem('pms_theme') || 'light') === 'system') pmsApply('system'); } catch(e) {}
-        });
-    })();
-    </script>
     """, unsafe_allow_html=True)
 
 
