@@ -1070,6 +1070,12 @@ def show_sidebar():
                 display: none !important;
                 visibility: hidden !important;
             }
+            [data-testid="stSidebarCollapseButton"],
+            [data-testid="collapsedControl"],
+            [data-testid="stSidebarCollapsedControl"] {
+                display: flex !important;
+                visibility: visible !important;
+            }
             [data-testid="stSidebar"] {
                 background-color: #2D2D2D !important;
             }
