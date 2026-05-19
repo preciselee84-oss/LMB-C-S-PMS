@@ -1521,11 +1521,13 @@ def render_page_title(menu):
             }
             body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] > button {
                 color: #a0aec0 !important;
-                background: transparent !important;
+                background: #1e1e30 !important;
+                border: 1px solid #45475a !important;
             }
             body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] > button:hover {
                 color: #818cf8 !important;
-                background: transparent !important;
+                background: #313244 !important;
+                border-color: #6366f1 !important;
             }
             </style>
             <div class="home-btn">
@@ -1588,7 +1590,7 @@ def validation_tabs_with_refresh(key):
             font-weight: 900 !important;
         }
         body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.refresh-tab-button) + [data-testid="stElementContainer"] [data-testid="stButton"] > button {
-            background: #1e1e30 !important;
+            background: #2a2a3e !important;
             color: #cdd6f4 !important;
             border-color: #45475a !important;
         }
@@ -3874,19 +3876,20 @@ def inject_theme_toggle():
         color: #718096 !important;
     }
     body:has(#pms-d:checked) button.pms-home-btn {
-        background: transparent !important;
-        border: none !important;
+        background: #1e1e30 !important;
+        border: 1px solid #45475a !important;
         box-shadow: none !important;
         color: #a0aec0 !important;
     }
     body:has(#pms-d:checked) button.pms-home-btn:hover {
         color: #818cf8 !important;
-        background: transparent !important;
+        background: #313244 !important;
+        border-color: #6366f1 !important;
     }
 
     /* 새로고침 버튼 다크모드 */
     body:has(#pms-d:checked) button.pms-refresh-btn {
-        background: #1e1e30 !important;
+        background: #2a2a3e !important;
         color: #cdd6f4 !important;
         border-color: #45475a !important;
     }
