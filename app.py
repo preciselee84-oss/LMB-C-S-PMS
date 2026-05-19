@@ -821,7 +821,7 @@ def render_plain_html_table(df, max_rows=500, center_align=False):
     )
 
 
-def style_report_logic(df, compact=False):
+def style_report_logic(df, compact=False, align_overrides=None, default_align=None):
     if df is None or df.empty:
         st.info("표시할 데이터가 없습니다.")
         return
@@ -887,12 +887,14 @@ def style_report_logic(df, compact=False):
     td_font = "12px" if compact else "13px"
     th = f"background:#EDF2F7;color:#4A5568;font-weight:800;font-size:{th_font};padding:{th_pad};text-align:center;border-bottom:2px solid #E2E8F0;white-space:nowrap;"
     headers = "".join(f"<th style='{th}'>{html.escape(format_col_name(c))}</th>" for c in df.columns)
+    align_overrides = align_overrides or {}
 
     body = ""
     for i, row in df.reset_index(drop=True).iterrows():
         tds = ""
         for col in df.columns:
-            align = "right" if col in num_cols or col in diff_cols else "center"
+            align = default_align or ("right" if col in num_cols or col in diff_cols else "center")
+            align = align_overrides.get(col, align)
             bg = "#FFFFFF" if i % 2 == 0 else "#F7FAFC"
 
             if col == "일치여부":
@@ -1953,7 +1955,7 @@ def show_user_history():
             st.info("본사 구글시트에 ERP연계일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
 
     with t5:
-        style_report_logic(other_errors_df)
+        style_report_logic(other_errors_df, align_overrides={"오류 사유": "left"}, default_align="center")
 
     st.divider()
     st.markdown("### 추가 실적 표")
@@ -2396,7 +2398,7 @@ def show_final_check():
             st.info("본사 구글시트에 ERP연계일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
 
     with t5:
-        style_report_logic(other_errors_df_final)
+        style_report_logic(other_errors_df_final, align_overrides={"오류 사유": "left"}, default_align="center")
 
     # ── 모든 항목 일치 여부 체크 ──
     # 일치여부가 빈 항목은 체크에서 제외 (compare_no_match 모드)
