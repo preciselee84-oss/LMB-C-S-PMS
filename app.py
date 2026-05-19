@@ -3435,11 +3435,6 @@ def inject_theme_toggle():
     # JavaScript는 st.markdown innerHTML으로 실행 불가 → CSS :has() + radio 버튼 방식 사용
     st.markdown("""
     <style>
-    .pms-wrapper { position: relative; }
-    .pms-theme-radio {
-        position: absolute; opacity: 0; width: 0; height: 0;
-        pointer-events: none;
-    }
     .pms-sw-outer {
         position: fixed; top: 14px; right: 18px; z-index: 999999;
     }
@@ -3448,18 +3443,21 @@ def inject_theme_toggle():
         background: #e5e7eb; border-radius: 22px; padding: 3px;
         box-shadow: 0 1px 6px rgba(0,0,0,0.12); gap: 2px;
     }
-    .pms-sw-track label {
-        cursor: pointer; font-size: 15px;
+    .pms-btn {
+        position: relative; cursor: pointer;
         padding: 0 10px; height: 28px; border-radius: 18px;
         line-height: 28px; opacity: 0.45; color: #374151;
         display: flex; align-items: center; justify-content: center;
         transition: opacity 0.2s, background 0.15s, color 0.15s;
         user-select: none;
     }
-    .pms-sw-track label:hover { opacity: 0.75; }
-    .pms-wrapper:has(#pms-l:checked) label[for="pms-l"],
-    .pms-wrapper:has(#pms-d:checked) label[for="pms-d"],
-    .pms-wrapper:has(#pms-s:checked) label[for="pms-s"] {
+    .pms-btn:hover { opacity: 0.75; }
+    /* radio를 label 전체에 투명하게 덮어서 한 번 클릭에 즉시 체크 */
+    .pms-theme-radio {
+        position: absolute; inset: 0;
+        opacity: 0; cursor: pointer; margin: 0;
+    }
+    .pms-btn:has(input:checked) {
         opacity: 1; background: #4F46E5; color: white;
     }
 
@@ -3506,7 +3504,7 @@ def inject_theme_toggle():
         background-color: #16162a !important;
     }
     body:has(#pms-d:checked) .pms-sw-track { background: #374151; }
-    body:has(#pms-d:checked) .pms-sw-track label { color: #cdd6f4; }
+    body:has(#pms-d:checked) .pms-btn { color: #cdd6f4; }
 
     @media (prefers-color-scheme: dark) {
         body:has(#pms-s:checked) .stApp,
@@ -3529,22 +3527,20 @@ def inject_theme_toggle():
     }
     </style>
 
-    <div class="pms-wrapper">
-        <input type="radio" class="pms-theme-radio" name="pms-theme" id="pms-l" checked>
-        <input type="radio" class="pms-theme-radio" name="pms-theme" id="pms-d">
-        <input type="radio" class="pms-theme-radio" name="pms-theme" id="pms-s">
-        <div class="pms-sw-outer">
-            <div class="pms-sw-track">
-                <label for="pms-l" title="라이트">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                </label>
-                <label for="pms-d" title="다크">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                </label>
-                <label for="pms-s" title="시스템">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                </label>
-            </div>
+    <div class="pms-sw-outer">
+        <div class="pms-sw-track">
+            <label class="pms-btn" title="라이트">
+                <input type="radio" class="pms-theme-radio" name="pms-theme" id="pms-l" checked>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            </label>
+            <label class="pms-btn" title="다크">
+                <input type="radio" class="pms-theme-radio" name="pms-theme" id="pms-d">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </label>
+            <label class="pms-btn" title="시스템">
+                <input type="radio" class="pms-theme-radio" name="pms-theme" id="pms-s">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </label>
         </div>
     </div>
     """, unsafe_allow_html=True)
