@@ -1503,7 +1503,8 @@ def render_page_title(menu):
             """
             <style>
             .block-container { padding-top: 1rem !important; }
-            .home-btn > div.stButton > button {
+            /* .home-btn div와 button은 DOM에서 형제(sibling) — :has()+인접형제로 타겟팅 */
+            [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] > button {
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
@@ -1514,15 +1515,15 @@ def render_page_title(menu):
                 color: #718096 !important;
                 width: auto !important;
             }
-            .home-btn > div.stButton > button:hover {
+            [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] > button:hover {
                 color: #4F46E5 !important;
                 background: transparent !important;
             }
-            body:has(#pms-d:checked) .home-btn > div.stButton > button {
+            body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] > button {
                 color: #a0aec0 !important;
                 background: transparent !important;
             }
-            body:has(#pms-d:checked) .home-btn > div.stButton > button:hover {
+            body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] > button:hover {
                 color: #818cf8 !important;
                 background: transparent !important;
             }
@@ -1576,7 +1577,8 @@ def validation_tabs_with_refresh(key):
     st.markdown(
         """
         <style>
-        .refresh-tab-button div.stButton > button {
+        /* .refresh-tab-button div과 button도 형제 — :has()+인접형제로 타겟팅 */
+        [data-testid="stElementContainer"]:has(.refresh-tab-button) + [data-testid="stElementContainer"] [data-testid="stButton"] > button {
             min-width: 42px !important;
             height: 38px !important;
             padding: 0 !important;
@@ -1585,12 +1587,12 @@ def validation_tabs_with_refresh(key):
             font-size: 18px !important;
             font-weight: 900 !important;
         }
-        body:has(#pms-d:checked) .refresh-tab-button div.stButton > button {
+        body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.refresh-tab-button) + [data-testid="stElementContainer"] [data-testid="stButton"] > button {
             background: #1e1e30 !important;
             color: #cdd6f4 !important;
             border-color: #45475a !important;
         }
-        body:has(#pms-d:checked) .refresh-tab-button div.stButton > button:hover {
+        body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.refresh-tab-button) + [data-testid="stElementContainer"] [data-testid="stButton"] > button:hover {
             background: #313244 !important;
             color: #ffffff !important;
         }
