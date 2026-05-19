@@ -1244,6 +1244,40 @@ def apply_global_table_css():
         .action-btn button p, .action-btn button span {
             font-size: 10px !important;
         }
+        /* 직원 현황 카드 (라이트 모드) */
+        .pms-staff-card {
+            border: 1px solid #e2e8f0; border-radius: 10px;
+            padding: 14px 18px; margin-bottom: 10px; background: #f8fafc;
+        }
+        .pms-card-name { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: #1e293b; }
+        .pms-card-stats { display: flex; gap: 12px; flex-wrap: wrap; }
+        .pms-card-stats span { font-size: 13px; color: #475569; }
+        .pms-card-points { margin-top: 6px; font-size: 15px; font-weight: 600; color: #4F46E5; }
+        .pms-delta { font-size: 12px; margin-left: 8px; }
+        .pms-delta-up   { color: #16a34a; }
+        .pms-delta-down { color: #dc2626; }
+        /* 직원 현황 카드 (다크 모드) */
+        body:has(#pms-d:checked) .pms-staff-card {
+            background: #252535 !important; border-color: #45475a !important;
+        }
+        body:has(#pms-d:checked) .pms-card-name  { color: #e2e8f0 !important; }
+        body:has(#pms-d:checked) .pms-card-stats span { color: #a6adc8 !important; }
+        body:has(#pms-d:checked) .pms-card-points { color: #89b4fa !important; }
+        body:has(#pms-d:checked) .pms-delta-up   { color: #a6e3a1 !important; }
+        body:has(#pms-d:checked) .pms-delta-down { color: #f38ba8 !important; }
+        /* 기타 인라인 배경 패턴 (흰/연회색 배경 다크 처리) */
+        body:has(#pms-d:checked) [style*="background:#f8fafc"],
+        body:has(#pms-d:checked) [style*="background: #f8fafc"],
+        body:has(#pms-d:checked) [style*="background:#EBF8FF"],
+        body:has(#pms-d:checked) [style*="background: #EBF8FF"],
+        body:has(#pms-d:checked) [style*="background:#fff"],
+        body:has(#pms-d:checked) [style*="background: #fff"],
+        body:has(#pms-d:checked) [style*="background:white"],
+        body:has(#pms-d:checked) [style*="background: white"] {
+            background: #252535 !important;
+        }
+        body:has(#pms-d:checked) [style*="color:#2B6CB0"] { color: #89dceb !important; }
+        body:has(#pms-d:checked) [style*="color: #2B6CB0"] { color: #89dceb !important; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -3204,19 +3238,19 @@ def show_dashboard():
                     break
                 uname, c, p, delta = cards[i + j]
                 with col:
+                    delta_cls = "pms-delta-up" if delta >= 0 else "pms-delta-down"
+                    delta_sym = "▲" if delta >= 0 else "▼"
                     st.markdown(f"""
-                    <div style="border:1px solid #e2e8f0; border-radius:10px; padding:14px 18px; margin-bottom:10px; background:#f8fafc;">
-                        <div style="font-size:16px; font-weight:700; margin-bottom:8px;">👤 {uname}</div>
-                        <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                            <span style="font-size:13px;">개설 <b>{c['개설건수']}건</b></span>
-                            <span style="font-size:13px;">연계 <b>{c['연계건수']}건</b></span>
-                            <span style="font-size:13px;">이행 <b>{c['운영건수']}건</b></span>
+                    <div class="pms-staff-card">
+                        <div class="pms-card-name">👤 {uname}</div>
+                        <div class="pms-card-stats">
+                            <span>개설 <b>{c['개설건수']}건</b></span>
+                            <span>연계 <b>{c['연계건수']}건</b></span>
+                            <span>이행 <b>{c['운영건수']}건</b></span>
                         </div>
-                        <div style="margin-top:6px; font-size:15px; font-weight:600; color:#4F46E5;">
+                        <div class="pms-card-points">
                             {c['합계포인트']:,} pt
-                            <span style="font-size:12px; color:{'#16a34a' if delta >= 0 else '#dc2626'}; margin-left:8px;">
-                                {'▲' if delta >= 0 else '▼'} {abs(delta):,}pt (전월비)
-                            </span>
+                            <span class="pms-delta {delta_cls}">{delta_sym} {abs(delta):,}pt (전월비)</span>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
