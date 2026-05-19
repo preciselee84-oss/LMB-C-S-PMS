@@ -3432,10 +3432,12 @@ def show_google_sync():
 
 
 def inject_theme_toggle():
-    st.html("""
+    # CSS는 부모 페이지에 직접 주입 (st.html은 iframe이라 CSS가 부모에 미적용)
+    st.markdown("""
     <style>
     .pms-sw-outer {
         position: fixed; top: 14px; right: 18px; z-index: 999999;
+        pointer-events: none;
     }
     .pms-sw-track {
         position: relative;
@@ -3444,6 +3446,7 @@ def inject_theme_toggle():
         border-radius: 22px; padding: 3px;
         box-shadow: 0 1px 6px rgba(0,0,0,0.12);
         gap: 2px;
+        pointer-events: all;
     }
     .pms-sw-thumb {
         position: absolute;
@@ -3509,7 +3512,6 @@ def inject_theme_toggle():
         background-color: #2a2a3e !important; color: #cdd6f4 !important;
         border-color: #444466 !important;
     }
-
     @media (prefers-color-scheme: dark) {
         html[data-pms-theme="system"] .stApp,
         html[data-pms-theme="system"] [data-testid="stAppViewContainer"],
@@ -3534,13 +3536,13 @@ def inject_theme_toggle():
     <div class="pms-sw-outer">
         <div class="pms-sw-track" id="pmsThemeBar">
             <div class="pms-sw-thumb" id="pmsThumb"></div>
-            <button id="tbtn-light" title="라이트">
+            <button id="tbtn-light" title="라이트" onclick="pmsSetTheme('light')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
             </button>
-            <button id="tbtn-dark" title="다크">
+            <button id="tbtn-dark" title="다크" onclick="pmsSetTheme('dark')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             </button>
-            <button id="tbtn-system" title="시스템">
+            <button id="tbtn-system" title="시스템" onclick="pmsSetTheme('system')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             </button>
         </div>
@@ -3548,39 +3550,37 @@ def inject_theme_toggle():
 
     <script>
     (function(){
-        var ORDER=['light','dark','system'];
-        function apply(mode){
-            document.documentElement.setAttribute('data-pms-theme',mode);
-            var thumb=document.getElementById('pmsThumb');
-            var btn=document.getElementById('tbtn-'+mode);
-            var track=document.getElementById('pmsThemeBar');
-            if(thumb&&btn&&track){
-                var tR=track.getBoundingClientRect();
-                var bR=btn.getBoundingClientRect();
-                thumb.style.width=bR.width+'px';
-                thumb.style.height=bR.height+'px';
-                thumb.style.transform='translateX('+(bR.left-tR.left-3)+'px)';
+        var ORDER = ['light','dark','system'];
+        function pmsApply(mode) {
+            document.documentElement.setAttribute('data-pms-theme', mode);
+            var thumb = document.getElementById('pmsThumb');
+            var btn   = document.getElementById('tbtn-' + mode);
+            var track = document.getElementById('pmsThemeBar');
+            if (thumb && btn && track) {
+                var tR = track.getBoundingClientRect();
+                var bR = btn.getBoundingClientRect();
+                thumb.style.width     = bR.width  + 'px';
+                thumb.style.height    = bR.height + 'px';
+                thumb.style.transform = 'translateX(' + (bR.left - tR.left - 3) + 'px)';
             }
-            ORDER.forEach(function(m){
-                var b=document.getElementById('tbtn-'+m);
-                if(b) b.classList.toggle('t-active',m===mode);
+            ORDER.forEach(function(m) {
+                var b = document.getElementById('tbtn-' + m);
+                if (b) b.classList.toggle('t-active', m === mode);
             });
         }
-        ORDER.forEach(function(m){
-            document.getElementById('tbtn-'+m).addEventListener('click',function(){
-                try{localStorage.setItem('pms_theme',m);}catch(e){}
-                apply(m);
-            });
-        });
-        var saved='light';
-        try{saved=localStorage.getItem('pms_theme')||'light';}catch(e){}
-        apply(saved);
-        window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change',function(){
-            try{if((localStorage.getItem('pms_theme')||'light')==='system') apply('system');}catch(e){}
+        window.pmsSetTheme = function(mode) {
+            try { localStorage.setItem('pms_theme', mode); } catch(e) {}
+            pmsApply(mode);
+        };
+        var saved = 'light';
+        try { saved = localStorage.getItem('pms_theme') || 'light'; } catch(e) {}
+        pmsApply(saved);
+        window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change', function() {
+            try { if ((localStorage.getItem('pms_theme') || 'light') === 'system') pmsApply('system'); } catch(e) {}
         });
     })();
     </script>
-    """)
+    """, unsafe_allow_html=True)
 
 
 def show_main():
