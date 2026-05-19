@@ -704,6 +704,32 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         return f"ERR: {str(e)}", None, None
 
 
+def render_plain_html_table(df, max_rows=500):
+    """AG Grid 없이 순수 HTML 테이블로 렌더링 — 다크모드 완전 호환."""
+    if df is None or df.empty:
+        st.info("표시할 데이터가 없습니다.")
+        return
+    df = df.head(max_rows).reset_index(drop=True)
+    th = "background:#EDF2F7;color:#4A5568;font-weight:700;font-size:12px;padding:6px 10px;white-space:nowrap;border-bottom:2px solid #E2E8F0;text-align:center;"
+    headers = "".join(f"<th style='{th}'>{html.escape(str(c))}</th>" for c in df.columns)
+    body = ""
+    for i, row in df.iterrows():
+        bg = "#FFFFFF" if i % 2 == 0 else "#F7FAFC"
+        tds = ""
+        for col in df.columns:
+            val = "" if pd.isna(row[col]) else html.escape(str(row[col]))
+            tds += f"<td style='background:{bg};padding:5px 10px;border-bottom:1px solid #EDF2F7;font-size:12px;color:#2D3748;white-space:nowrap;'>{val}</td>"
+        body += f"<tr>{tds}</tr>"
+    st.markdown(
+        f"""<div class="pms-report-table" style="overflow-x:auto;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.05);margin-bottom:1rem;">
+        <table style="width:100%;border-collapse:collapse;">
+            <thead><tr>{headers}</tr></thead>
+            <tbody>{body}</tbody>
+        </table></div>""",
+        unsafe_allow_html=True,
+    )
+
+
 def style_report_logic(df, compact=False):
     if df is None or df.empty:
         st.info("표시할 데이터가 없습니다.")
@@ -3136,63 +3162,84 @@ def show_staff_admin():
     for uid, info in st.session_state.user_db.items():
         if uid == "1":
             continue
-
-        staff_rows.append(
-            {
-                "ID": uid,
-                "성명": info.get("name", ""),
-                "직급": info.get("rank", "직원"),
-                "메일주소": info.get("email", ""),
-                "직원구분": info.get("staff_type", "정규직"),
-                "외주여부": info.get("outsource", "아니오"),
-                "외주 근무기간": info.get("outsource_period", "해당없음"),
-                "로그인 허용 여부": info.get("access", "불가"),
-                "메뉴 접근 권한": "관리자 메뉴" if info.get("role") == "관리자" else "사용자 메뉴",
-                "삭제": False,
-            }
-        )
+        staff_rows.append({
+            "ID": uid,
+            "성명": info.get("name", ""),
+            "직급": info.get("rank", "직원"),
+            "메일주소": info.get("email", ""),
+            "직원구분": info.get("staff_type", "정규직"),
+            "외주여부": info.get("outsource", "아니오"),
+            "외주 근무기간": info.get("outsource_period", "해당없음"),
+            "로그인 허용 여부": info.get("access", "불가"),
+            "메뉴 접근 권한": "관리자 메뉴" if info.get("role") == "관리자" else "사용자 메뉴",
+        })
 
     if not staff_rows:
         st.info("등록된 직원이 없습니다.")
         return
 
-    edited = st.data_editor(
-        pd.DataFrame(staff_rows),
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "직급": st.column_config.SelectboxColumn("직급", options=["부서장", "팀장", "과장", "대리", "주임", "직원"], required=True),
-            "직원구분": st.column_config.SelectboxColumn("직원구분", options=["정규직", "계약직", "파견직", "외주"], required=True),
-            "외주여부": st.column_config.SelectboxColumn("외주여부", options=["예", "아니오"], required=True),
-            "외주 근무기간": st.column_config.SelectboxColumn("외주 근무기간", options=["해당없음", "1년 미만", "1년 이상", "2년 이상"], required=True),
-            "로그인 허용 여부": st.column_config.SelectboxColumn("로그인 허용 여부", options=["허용", "불가"], required=True),
-            "메뉴 접근 권한": st.column_config.SelectboxColumn("메뉴 접근 권한", options=["사용자 메뉴", "관리자 메뉴"], required=True),
-            "삭제": st.column_config.CheckboxColumn("삭제"),
-        },
-    )
+    # ── 직원 목록 HTML 테이블 표시 (다크모드 호환) ──
+    render_plain_html_table(pd.DataFrame(staff_rows))
 
-    if st.button("저장", type="primary"):
-        for _, row in edited.iterrows():
-            uid = row["ID"]
+    st.markdown("---")
+    st.markdown("#### 직원 정보 수정")
 
-            if uid not in st.session_state.user_db:
-                continue
+    uid_options = [f"{r['ID']} — {r['성명']}" for r in staff_rows]
+    sel = st.selectbox("수정할 직원 선택", ["선택안함"] + uid_options, key="staff_edit_sel")
 
-            if row.get("삭제", False):
-                del st.session_state.user_db[uid]
-            else:
-                st.session_state.user_db[uid]["rank"] = row.get("직급", "직원")
-                st.session_state.user_db[uid]["email"] = row.get("메일주소", "")
-                st.session_state.user_db[uid]["staff_type"] = row.get("직원구분", "정규직")
-                st.session_state.user_db[uid]["outsource"] = row.get("외주여부", "아니오")
-                st.session_state.user_db[uid]["outsource_period"] = row.get("외주 근무기간", "해당없음")
-                st.session_state.user_db[uid]["access"] = row.get("로그인 허용 여부", "불가")
-                st.session_state.user_db[uid]["role"] = "관리자" if row.get("메뉴 접근 권한") == "관리자 메뉴" else "사용자"
+    if sel == "선택안함":
+        return
 
-        save_db(DB_FILE, st.session_state.user_db)
-        st.success("저장 완료")
-        time.sleep(0.5)
-        st.rerun()
+    sel_uid = sel.split(" — ")[0].strip()
+    info = st.session_state.user_db.get(sel_uid, {})
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        new_rank = st.selectbox("직급", ["부서장", "팀장", "과장", "대리", "주임", "직원"],
+                                index=["부서장", "팀장", "과장", "대리", "주임", "직원"].index(info.get("rank", "직원")),
+                                key="edit_rank")
+        new_email = st.text_input("메일주소", value=info.get("email", ""), key="edit_email")
+    with c2:
+        new_staff_type = st.selectbox("직원구분", ["정규직", "계약직", "파견직", "외주"],
+                                      index=["정규직", "계약직", "파견직", "외주"].index(info.get("staff_type", "정규직")),
+                                      key="edit_staff_type")
+        new_outsource = st.selectbox("외주여부", ["아니오", "예"],
+                                     index=["아니오", "예"].index(info.get("outsource", "아니오")),
+                                     key="edit_outsource")
+    with c3:
+        period_opts = ["해당없음", "1년 미만", "1년 이상", "2년 이상"]
+        new_period = st.selectbox("외주 근무기간", period_opts,
+                                  index=period_opts.index(info.get("outsource_period", "해당없음")),
+                                  key="edit_period")
+        new_access = st.selectbox("로그인 허용 여부", ["허용", "불가"],
+                                  index=["허용", "불가"].index(info.get("access", "불가")),
+                                  key="edit_access")
+
+    new_role = st.selectbox("메뉴 접근 권한", ["사용자 메뉴", "관리자 메뉴"],
+                            index=0 if info.get("role") != "관리자" else 1,
+                            key="edit_role")
+
+    bc1, bc2, _ = st.columns([0.15, 0.15, 0.7])
+    with bc1:
+        if st.button("저장", type="primary", use_container_width=True):
+            st.session_state.user_db[sel_uid]["rank"] = new_rank
+            st.session_state.user_db[sel_uid]["email"] = new_email
+            st.session_state.user_db[sel_uid]["staff_type"] = new_staff_type
+            st.session_state.user_db[sel_uid]["outsource"] = new_outsource
+            st.session_state.user_db[sel_uid]["outsource_period"] = new_period
+            st.session_state.user_db[sel_uid]["access"] = new_access
+            st.session_state.user_db[sel_uid]["role"] = "관리자" if new_role == "관리자 메뉴" else "사용자"
+            save_db(DB_FILE, st.session_state.user_db)
+            st.success("저장 완료")
+            time.sleep(0.5)
+            st.rerun()
+    with bc2:
+        if st.button("삭제", type="secondary", use_container_width=True):
+            del st.session_state.user_db[sel_uid]
+            save_db(DB_FILE, st.session_state.user_db)
+            st.success(f"{sel} 삭제 완료")
+            time.sleep(0.5)
+            st.rerun()
 
 
 def show_dashboard():
@@ -3553,19 +3600,19 @@ def show_google_sync():
 
     if st.session_state.temp_cloud_df is not None:
         st.markdown("**본사 구글 시트 데이터**")
-        st.dataframe(strip_activity_time_columns(st.session_state.temp_cloud_df), use_container_width=True, hide_index=True)
+        render_plain_html_table(strip_activity_time_columns(st.session_state.temp_cloud_df))
 
     if st.session_state.analysis_lookup_df is not None:
         st.markdown("**하나지사 활동이력 구글 시트 데이터**")
-        st.dataframe(strip_activity_time_columns(st.session_state.analysis_lookup_df), use_container_width=True, hide_index=True)
+        render_plain_html_table(strip_activity_time_columns(st.session_state.analysis_lookup_df))
 
     if st.session_state.hana_sheet_df is not None:
         st.markdown("**하나은행 구글 시트 데이터**")
-        st.dataframe(strip_activity_time_columns(st.session_state.hana_sheet_df), use_container_width=True, hide_index=True)
+        render_plain_html_table(strip_activity_time_columns(st.session_state.hana_sheet_df))
 
     if st.session_state.hana_billing_df is not None:
         st.markdown("**하나은행 청구 시트 데이터**")
-        st.dataframe(strip_activity_time_columns(st.session_state.hana_billing_df), use_container_width=True, hide_index=True)
+        render_plain_html_table(strip_activity_time_columns(st.session_state.hana_billing_df))
 
 
 def inject_theme_toggle():
