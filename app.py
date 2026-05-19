@@ -1518,6 +1518,14 @@ def render_page_title(menu):
                 color: #4F46E5 !important;
                 background: transparent !important;
             }
+            body:has(#pms-d:checked) .home-btn > div.stButton > button {
+                color: #a0aec0 !important;
+                background: transparent !important;
+            }
+            body:has(#pms-d:checked) .home-btn > div.stButton > button:hover {
+                color: #818cf8 !important;
+                background: transparent !important;
+            }
             </style>
             <div class="home-btn">
             """,
@@ -1576,6 +1584,15 @@ def validation_tabs_with_refresh(key):
             border-radius: 8px !important;
             font-size: 18px !important;
             font-weight: 900 !important;
+        }
+        body:has(#pms-d:checked) .refresh-tab-button div.stButton > button {
+            background: #1e1e30 !important;
+            color: #cdd6f4 !important;
+            border-color: #45475a !important;
+        }
+        body:has(#pms-d:checked) .refresh-tab-button div.stButton > button:hover {
+            background: #313244 !important;
+            color: #ffffff !important;
         }
         </style>
         """,
