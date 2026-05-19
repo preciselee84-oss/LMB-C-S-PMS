@@ -390,13 +390,11 @@ def render_manual_perf_input_table(base):
             border-bottom-color:#45475a !important;
         }
 
-        /* ── 데이터 셀: pms-report-table td와 동일한 높이·정렬 ── */
+        /* ── 데이터 셀 ── */
         .pif-cell {
             font-size:12px; color:#2D3748; padding:5px 10px;
             border-bottom:1px solid #EDF2F7; white-space:nowrap;
-            text-align:center;
-            height:28px !important; line-height:18px !important;
-            box-sizing:border-box !important;
+            text-align:center; line-height:18px; box-sizing:border-box;
         }
         .pif-e { background:#FFFFFF; }
         .pif-o { background:#F7FAFC; }
@@ -406,22 +404,34 @@ def render_manual_perf_input_table(base):
         body:has(#pms-d:checked) .pif-e { background:#252535 !important; }
         body:has(#pms-d:checked) .pif-o { background:#1e1e30 !important; }
 
-        /* ── 행 간격 제거 ── */
-        [data-testid="stHorizontalBlock"]:has(.pif-cell),
-        [data-testid="stHorizontalBlock"]:has(.pif-hdr) { gap: 0 !important; }
+        /* ── 핵심: 행 컨테이너를 29px로 고정·클리핑 (내부 컴포넌트 높이 무관) ── */
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) {
+            gap:0 !important;
+            height:29px !important; max-height:29px !important;
+            overflow:hidden !important; align-items:stretch !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-hdr) { gap:0 !important; }
+
+        /* 행 목록 직접 부모 stVerticalBlock gap 제거 */
+        [data-testid="stVerticalBlock"]:has(> [data-testid="stHorizontalBlock"]:has(.pif-cell)) {
+            gap:0 !important;
+        }
+
+        /* 내부 모든 래퍼 여백 제거 */
         [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stVerticalBlock"],
         [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stVerticalBlock"] {
-            gap: 0 !important; padding: 0 !important; margin: 0 !important;
+            gap:0 !important; padding:0 !important; margin:0 !important;
         }
         [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stElementContainer"],
         [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stElementContainer"] {
-            margin: 0 !important; padding: 0 !important;
+            margin:0 !important; padding:0 !important;
         }
-        /* 행 목록을 직접 감싸는 stVerticalBlock만 gap 제거 (> 직접자식 선택자로 최상위 오염 방지) */
-        [data-testid="stVerticalBlock"]:has(> [data-testid="stHorizontalBlock"]:has(.pif-cell)) {
-            gap: 0 !important;
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) > div[data-testid="stColumn"],
+        [data-testid="stHorizontalBlock"]:has(.pif-hdr) > div[data-testid="stColumn"] {
+            padding:0 !important;
         }
-        /* ── 입력(건) 열: stColumn 자체에 행 배경색 적용 (흰색 노출 원천 차단) ── */
+
+        /* ── 입력(건) 열 배경 ── */
         [data-testid="stHorizontalBlock"]:has(.pif-e) [data-testid="stColumn"]:last-child { background:#FFFFFF; }
         [data-testid="stHorizontalBlock"]:has(.pif-o) [data-testid="stColumn"]:last-child { background:#F7FAFC; }
         body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-e) [data-testid="stColumn"]:last-child {
@@ -431,29 +441,22 @@ def render_manual_perf_input_table(base):
             background:#1e1e30 !important;
         }
 
-        /* ── number input: 라벨·버튼 제거, 래퍼 투명화·높이 고정 ── */
+        /* ── number input: 라벨·버튼 제거, 래퍼 투명화 ── */
         div[data-testid="stNumberInput"] button { display:none !important; }
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] label {
             display:none !important; height:0 !important; margin:0 !important; overflow:hidden !important;
         }
-        /* 모든 래퍼 계층: 투명·높이 28px 고정 */
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"],
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] > div,
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] > div > div,
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] [data-baseweb="input"] {
-            background: transparent !important; border: none !important;
-            box-shadow: none !important; margin:0 !important; padding:0 !important;
-            height:28px !important; min-height:unset !important; overflow:hidden !important;
+            background:transparent !important; border:none !important;
+            box-shadow:none !important; margin:0 !important; padding:0 !important;
         }
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] input {
             font-size:12px !important; text-align:center !important;
             padding:5px 6px !important; background:transparent !important;
             border:none !important; box-shadow:none !important;
-            height:28px !important; min-height:unset !important;
-        }
-        /* stColumn 자체 패딩 제거 */
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) > div[data-testid="stColumn"] {
-            padding:0 !important;
         }
         body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] input {
             color:#ffffff !important;
