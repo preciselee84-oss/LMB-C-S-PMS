@@ -2783,29 +2783,22 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
 def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_month_label):
     st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
 
-    is_dept_head = get_current_user_rank() == "부서장"
     is_closed = bool(st.session_state.get("report_closed"))
 
     dc1, dc2 = st.columns([0.85, 0.15])
     with dc2:
-        if is_dept_head:
-            if not is_closed:
-                if st.button("마감", use_container_width=True, type="primary"):
-                    close_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
-                    st.session_state.report_closed = close_time
-                    saved_db = load_db(SAVED_STATE_FILE, {})
-                    saved_db["report_closed"] = {"time": close_time, "by": st.session_state.get("user_name", "")}
-                    save_db(SAVED_STATE_FILE, saved_db)
-                    st.success("실적 보고서 마감 완료")
-                    time.sleep(0.5)
-                    st.rerun()
-            else:
-                st.info(f"마감 완료: {st.session_state.report_closed}")
+        if not is_closed:
+            if st.button("마감", use_container_width=True, type="primary"):
+                close_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
+                st.session_state.report_closed = close_time
+                saved_db = load_db(SAVED_STATE_FILE, {})
+                saved_db["report_closed"] = {"time": close_time, "by": st.session_state.get("user_name", "")}
+                save_db(SAVED_STATE_FILE, saved_db)
+                st.success("실적 보고서 마감 완료")
+                time.sleep(0.5)
+                st.rerun()
         else:
-            if is_closed:
-                st.info(f"마감 완료: {st.session_state.report_closed}")
-            else:
-                st.caption("부서장만 마감할 수 있습니다.")
+            st.info(f"마감 완료: {st.session_state.report_closed}")
 
     c1, c2, c3 = st.columns(3)
 
