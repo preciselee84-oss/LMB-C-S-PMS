@@ -419,18 +419,10 @@ def render_manual_perf_input_table(base):
             text-align: right !important;
             justify-content: flex-end !important;
         }
-        /* 추가 실적 입력표 다크모드 */
+        /* 추가 실적 입력표 다크모드 — 헤더/테두리만 CSS, 셀 배경은 JS로 처리 */
         body:has(#pms-d:checked) div[data-testid="stDataEditor"] {
             border-color: #45475a !important;
             box-shadow: none !important;
-            --ag-background-color: #252535;
-            --ag-odd-row-background-color: #1e1e30;
-            --ag-header-background-color: #0f0f1f;
-            --ag-foreground-color: #ffffff;
-            --ag-header-foreground-color: #ffffff;
-            --ag-row-hover-color: #313244;
-            --ag-border-color: #45475a;
-            --ag-cell-horizontal-border: solid #313244;
         }
         body:has(#pms-d:checked) div[data-testid="stDataEditor"] [role="columnheader"] {
             background: #0f0f1f !important;
@@ -438,32 +430,52 @@ def render_manual_perf_input_table(base):
             border-bottom-color: #45475a !important;
         }
         body:has(#pms-d:checked) div[data-testid="stDataEditor"] [role="gridcell"] {
-            background-color: #252535 !important;
             color: #ffffff !important;
             border-bottom-color: #313244 !important;
-        }
-        body:has(#pms-d:checked) div[data-testid="stDataEditor"] [role="row"]:nth-child(odd) [role="gridcell"] {
-            background-color: #1e1e30 !important;
-        }
-        body:has(#pms-d:checked) div[data-testid="stDataEditor"] .ag-row {
-            background-color: #252535 !important;
-        }
-        body:has(#pms-d:checked) div[data-testid="stDataEditor"] .ag-row-odd {
-            background-color: #1e1e30 !important;
-        }
-        body:has(#pms-d:checked) div[data-testid="stDataEditor"] .ag-cell {
-            background-color: inherit !important;
-            color: #ffffff !important;
-        }
-        body:has(#pms-d:checked) div[data-testid="stDataEditor"] > div,
-        body:has(#pms-d:checked) div[data-testid="stDataEditor"] > div > div {
-            background-color: #252535 !important;
         }
         body:has(#pms-d:checked) div[data-testid="stDataEditor"] input {
             color: #ffffff !important;
             background-color: transparent !important;
         }
         </style>
+        <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+             onload="(function(){
+                 function applyEditorDark(){
+                     var isDark = document.querySelector('#pms-d') && document.querySelector('#pms-d').checked;
+                     var editors = document.querySelectorAll('[data-testid=stDataEditor]');
+                     editors.forEach(function(editor){
+                         if(isDark){
+                             editor.querySelectorAll('[role=columnheader]').forEach(function(h){
+                                 h.style.setProperty('background-color','#0f0f1f','important');
+                                 h.style.setProperty('color','#ffffff','important');
+                             });
+                             editor.querySelectorAll('[role=row]').forEach(function(row,i){
+                                 var idx = parseInt(row.getAttribute('row-index')||i);
+                                 var bg = idx%2===0 ? '#252535' : '#1e1e30';
+                                 row.style.setProperty('background-color',bg,'important');
+                                 row.querySelectorAll('[role=gridcell]').forEach(function(cell){
+                                     cell.style.setProperty('background-color',bg,'important');
+                                     cell.style.setProperty('color','#ffffff','important');
+                                 });
+                             });
+                         } else {
+                             editor.querySelectorAll('[role=columnheader],[role=row],[role=gridcell]').forEach(function(el){
+                                 el.style.removeProperty('background-color');
+                             });
+                         }
+                     });
+                 }
+                 applyEditorDark();
+                 var deb;
+                 new MutationObserver(function(){
+                     clearTimeout(deb);
+                     deb = setTimeout(applyEditorDark, 80);
+                 }).observe(document.body, {childList:true, subtree:true});
+                 document.addEventListener('change', function(e){
+                     if(e.target && e.target.name==='pms-theme') setTimeout(applyEditorDark, 80);
+                 });
+             })()"
+             style="display:none" alt="">
         """,
         unsafe_allow_html=True,
     )
@@ -3257,6 +3269,7 @@ def show_staff_admin():
             st.session_state.user_db[sel_uid]["access"] = new_access
             st.session_state.user_db[sel_uid]["role"] = "관리자" if new_role == "관리자 메뉴" else "사용자"
             save_db(DB_FILE, st.session_state.user_db)
+            st.session_state.staff_edit_sel = "선택안함"
             st.success("저장 완료")
             time.sleep(0.5)
             st.rerun()
@@ -3264,6 +3277,7 @@ def show_staff_admin():
         if st.button("삭제", type="secondary", use_container_width=True):
             del st.session_state.user_db[sel_uid]
             save_db(DB_FILE, st.session_state.user_db)
+            st.session_state.staff_edit_sel = "선택안함"
             st.success(f"{sel} 삭제 완료")
             time.sleep(0.5)
             st.rerun()
