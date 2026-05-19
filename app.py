@@ -3820,7 +3820,9 @@ def inject_theme_toggle():
         background-color: #313244 !important;
     }
 
-    /* ─── AG Grid: CSS 변수 설정 ─── */
+    /* ─── AG Grid 완전 다크모드 ─── */
+
+    /* 1. CSS 변수 (AG Grid가 읽는 경우 적용) */
     body:has(#pms-d:checked) [class*="ag-theme"] {
         --ag-background-color: #252535;
         --ag-foreground-color: #ffffff;
@@ -3838,75 +3840,121 @@ def inject_theme_toggle():
         --ag-input-focus-border-color: #ffffff;
         --ag-cell-horizontal-border: solid #313244;
         --ag-font-size: 13px;
+        --ag-data-color: #ffffff;
+        --ag-alpine-active-color: #4F46E5;
     }
-    /* 래퍼·루트 */
+
+    /* 2. 최외곽 래퍼 + 내부 모든 div 배경 강제 */
     body:has(#pms-d:checked) [data-testid="stDataFrame"],
     body:has(#pms-d:checked) [data-testid="stDataEditor"],
+    body:has(#pms-d:checked) [data-testid="stDataFrame"] > div,
+    body:has(#pms-d:checked) [data-testid="stDataFrame"] > div > div,
+    body:has(#pms-d:checked) [data-testid="stDataFrame"] > div > div > div,
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] > div,
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] > div > div {
+        background-color: #252535 !important;
+        border-color: #45475a !important;
+        color: #ffffff !important;
+    }
+
+    /* 3. ag-theme 컨테이너 전체 */
+    body:has(#pms-d:checked) [class*="ag-theme"],
     body:has(#pms-d:checked) [class*="ag-theme"] .ag-root-wrapper,
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-root {
-        background-color: #252535 !important; border-color: #45475a !important; color: #ffffff !important;
-    }
-    /* 헤더 */
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header,
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-row,
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-viewport {
-        background-color: #0f0f1f !important; border-bottom: 2px solid #45475a !important;
-    }
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-cell,
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-cell-comp-wrapper {
-        background-color: #0f0f1f !important; color: #ffffff !important;
-        border-right: 1px solid #45475a !important;
-    }
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-cell-text {
-        color: #ffffff !important; font-weight: 700 !important;
-    }
-    /* 행 */
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row { border-bottom-color: #313244 !important; }
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row-even { background-color: #252535 !important; }
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row-odd  { background-color: #1e1e30 !important; }
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row:hover,
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row-hover { background-color: #2d2d45 !important; }
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row-selected { background-color: #3a3a5e !important; }
-    /* 셀 텍스트 — 인라인 color(대비/증감 색상) 없는 셀만 흰색 적용 */
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-cell:not([style*="color"]),
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-cell-value:not([style*="color"]),
-    body:has(#pms-d:checked) [class*="ag-theme"] [role="gridcell"]:not([style*="color"]) {
-        color: #ffffff !important; border-right-color: #313244 !important;
-    }
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-cell { border-right-color: #313244 !important; }
-    /* 핀 컬럼 / 스크롤 영역 */
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-root-wrapper-body,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-root,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-body,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-body-viewport,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-body-horizontal-scroll,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-body-horizontal-scroll-viewport,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-center-cols-clipper,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-center-cols-viewport,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-center-cols-container,
     body:has(#pms-d:checked) [class*="ag-theme"] .ag-pinned-left-cols-container,
     body:has(#pms-d:checked) [class*="ag-theme"] .ag-pinned-right-cols-container,
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-body-viewport,
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-center-cols-viewport,
-    body:has(#pms-d:checked) [class*="ag-theme"] .ag-center-cols-container {
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-full-width-container,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-floating-top,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-floating-bottom,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-overlay {
         background-color: #252535 !important;
+        border-color: #45475a !important;
     }
-    /* stDataEditor / stDataFrame 전역 다크모드 */
-    body:has(#pms-d:checked) [data-testid="stDataEditor"],
-    body:has(#pms-d:checked) [data-testid="stDataFrame"] {
-        border-color: #45475a !important; box-shadow: none !important;
+
+    /* 4. 헤더 */
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-row,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-viewport,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-container,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-pinned-left-header,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-pinned-right-header {
+        background-color: #0f0f1f !important;
+        border-bottom: 2px solid #45475a !important;
     }
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-cell,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-cell-comp-wrapper,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-group-cell {
+        background-color: #0f0f1f !important;
+        color: #ffffff !important;
+        border-right: 1px solid #45475a !important;
+    }
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-cell-text,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-cell-label {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-sort-indicator-icon,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-header-icon {
+        color: #ffffff !important;
+    }
+
+    /* 5. 행 — .ag-row 자체에 배경 지정 (ag-row-even 없을 때 대비) */
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row {
+        background-color: #252535 !important;
+        border-bottom-color: #313244 !important;
+        color: #ffffff !important;
+    }
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row-odd {
+        background-color: #1e1e30 !important;
+    }
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row:hover,
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row-hover {
+        background-color: #2d2d45 !important;
+    }
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-row-selected {
+        background-color: #3a3a5e !important;
+    }
+
+    /* 6. 셀 */
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-cell {
+        border-right-color: #313244 !important;
+    }
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-cell:not([style*="color"]),
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-cell-value:not([style*="color"]) {
+        color: #ffffff !important;
+    }
+    body:has(#pms-d:checked) [class*="ag-theme"] .ag-cell span:not([style*="color"]) {
+        color: #ffffff !important;
+    }
+
+    /* 7. role 속성 기반 (columnheader / gridcell) */
     body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"],
     body:has(#pms-d:checked) [data-testid="stDataFrame"]  [role="columnheader"] {
-        background-color: #0f0f1f !important; color: #ffffff !important;
-        border-bottom-color: #45475a !important; border-right-color: #45475a !important;
+        background-color: #0f0f1f !important;
+        color: #ffffff !important;
+        border-bottom-color: #45475a !important;
+        border-right-color: #45475a !important;
     }
     body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"] *,
     body:has(#pms-d:checked) [data-testid="stDataFrame"]  [role="columnheader"] * {
         color: #ffffff !important;
     }
-    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"],
-    body:has(#pms-d:checked) [data-testid="stDataFrame"]  [role="gridcell"] {
-        border-right-color: #313244 !important;
-    }
     body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"]:not([style*="color"]),
-    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"]:not([style*="color"]) *,
     body:has(#pms-d:checked) [data-testid="stDataFrame"]  [role="gridcell"]:not([style*="color"]),
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"]:not([style*="color"]) *,
     body:has(#pms-d:checked) [data-testid="stDataFrame"]  [role="gridcell"]:not([style*="color"]) * {
         color: #ffffff !important;
     }
-    /* AG Grid 셀 편집 팝업 (SelectboxColumn 드롭다운 등) */
+
+    /* 8. 셀 편집 팝업 (SelectboxColumn 등) */
     body:has(#pms-d:checked) [class*="ag-theme"] .ag-popup,
     body:has(#pms-d:checked) [class*="ag-theme"] .ag-popup-editor,
     body:has(#pms-d:checked) [class*="ag-theme"] .ag-popup-child {
@@ -3928,7 +3976,6 @@ def inject_theme_toggle():
         background-color: #252535 !important; color: #ffffff !important;
         border-color: #45475a !important;
     }
-    /* 체크박스 컬럼 아이콘 */
     body:has(#pms-d:checked) [class*="ag-theme"] .ag-checkbox-input-wrapper::after {
         color: #ffffff !important;
     }
