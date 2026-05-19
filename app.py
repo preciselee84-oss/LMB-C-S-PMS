@@ -901,8 +901,13 @@ def show_auth_page():
         }
         div[data-testid="stTextInput"] input {
             color: #1E1A3A !important;
+            caret-color: #1E1A3A !important;
             font-size: 15px !important;
             background: #F2F2F5 !important;
+        }
+        div[data-testid="stTextInput"] > div[data-baseweb="input"]:focus-within {
+            border: 1.5px solid #7B6FD4 !important;
+            box-shadow: 0 0 0 2px rgba(123,111,212,0.18) !important;
         }
         div[data-testid="stTextInput"] input::placeholder {
             color: #AEACC8 !important;
@@ -965,6 +970,11 @@ def show_auth_page():
         }
         body:has(#pms-d:checked) div[data-testid="stTextInput"] input {
             background: #252535 !important; color: #ffffff !important;
+            caret-color: #ffffff !important;
+        }
+        body:has(#pms-d:checked) div[data-testid="stTextInput"] > div[data-baseweb="input"]:focus-within {
+            border-color: #818cf8 !important;
+            box-shadow: 0 0 0 2px rgba(129,140,248,0.22) !important;
         }
         body:has(#pms-d:checked) div[data-testid="stCheckbox"] label { color: #cdd6f4 !important; }
         body:has(#pms-d:checked) hr { border-top-color: #45475a !important; }
