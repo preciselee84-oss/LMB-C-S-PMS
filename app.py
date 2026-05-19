@@ -957,7 +957,10 @@ def show_auth_page():
                     if save_id_cb:
                         cookie_manager.set("saved_id", u_id_str)
                     else:
-                        cookie_manager.remove("saved_id")
+                        try:
+                            cookie_manager.remove("saved_id")
+                        except Exception:
+                            pass
 
                     user = db.get(u_id_str, {"role": "관리자", "name": "최고관리자"})
                     st.session_state.logged_in = True
