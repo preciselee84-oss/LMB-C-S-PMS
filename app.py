@@ -1054,7 +1054,6 @@ def show_sidebar():
             """
             <style>
             #MainMenu, footer,
-            [data-testid="stToolbar"],
             [data-testid="stStatusWidget"],
             [data-testid="stDecoration"],
             [data-testid="stAppViewBlockContainer"] > div:last-child,
@@ -1064,9 +1063,24 @@ def show_sidebar():
             .viewerBadge_container__r5tak,
             .viewerBadge_link__qRIco,
             [class*="viewerBadge"],
-            [class*="StatusWidget"] {
+            [class*="StatusWidget"],
+            [data-testid="stToolbar"] > * {
                 display: none !important;
                 visibility: hidden !important;
+            }
+            header[data-testid="stHeader"] {
+                background: transparent !important;
+                height: 40px !important;
+                min-height: 40px !important;
+            }
+            [data-testid="stSidebarCollapseButton"],
+            [data-testid="collapsedControl"],
+            [data-testid="stSidebarCollapsedControl"],
+            header[data-testid="stHeader"] button {
+                display: flex !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                z-index: 999999 !important;
             }
             [data-testid="stSidebar"] {
                 background-color: #2D2D2D !important;
