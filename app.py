@@ -2833,6 +2833,36 @@ def uploaded_activity_customer_count(name=None):
     return len(biz_keys)
 
 
+def summarize_activity_note(value, max_lines=2, max_chars_per_line=34):
+    text = "" if value is None else str(value)
+    text = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not text or text.lower() == "nan":
+        return ""
+
+    parts = [
+        re.sub(r"\s+", " ", part).strip(" -ㆍ*•")
+        for part in re.split(r"(?:\n+|[.;。]|[.!?]\s+)", text)
+        if part.strip(" -ㆍ*•")
+    ]
+    if not parts:
+        parts = [text]
+
+    lines = []
+    for part in parts:
+        while len(part) > max_chars_per_line and len(lines) < max_lines:
+            cut_at = part.rfind(" ", 0, max_chars_per_line + 1)
+            if cut_at < max_chars_per_line // 2:
+                cut_at = max_chars_per_line
+            lines.append(part[:cut_at].strip())
+            part = part[cut_at:].strip()
+        if part and len(lines) < max_lines:
+            lines.append(part[:max_chars_per_line].strip())
+        if len(lines) >= max_lines:
+            break
+
+    return "\n".join(lines[:max_lines])
+
+
 def uploaded_major_rows(name, keyword, row_type):
     payload = load_db(SENT_UPLOADS_FILE, {}).get(name)
     df = upload_payload_to_dataframe(payload)
@@ -2840,12 +2870,12 @@ def uploaded_major_rows(name, keyword, row_type):
         return []
 
     u_col = find_col(df, ["등록자", "담당자", "성명"])
-    d_col = find_col(df, ["활동상세", "활동내용"])
+    d_col = find_col(df, ["활동상세"]) or find_col(df, ["활동내용"])
     comp_col = find_col(df, ["업체명", "상호", "고객명"])
     product_col = find_col(df, ["상품"])
     system_col = find_col(df, ["내부시스템", "ERP", "시스템"])
     report_col = find_col(df, ["구축보고서"])
-    note_col = find_col(df, ["활동내용", "비고", "제목", "활동상세"])
+    note_col = find_col(df, ["활동내용"]) or find_col(df, ["비고", "제목"])
 
     if u_col and u_col in df.columns:
         df = df[df[u_col].astype(str).str.strip() == str(name).strip()]
@@ -2860,7 +2890,7 @@ def uploaded_major_rows(name, keyword, row_type):
             row.get(product_col, "통합CMS") if product_col else "통합CMS",
             row.get(system_col, "") if system_col else "",
             row.get(report_col, "X") if report_col else "X",
-            row.get(note_col, "") if note_col else "",
+            summarize_activity_note(row.get(note_col, "")) if note_col else "",
         ])
     return rows
 
