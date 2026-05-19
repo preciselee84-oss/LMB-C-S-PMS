@@ -374,159 +374,45 @@ def criteria_df():
 
 
 def render_manual_perf_input_table(base):
-    """추가 실적 입력표를 다른 보고서 표와 같은 색상 체계로 렌더링한다."""
+    """표는 보고서 표와 동일하게 렌더링하고, 입력 위젯은 표 밖에서 처리한다."""
+    result_df = base.copy()
+    result_df["입력(건)"] = pd.to_numeric(result_df["입력(건)"], errors="coerce").fillna(0).astype(int)
+
+    style_report_logic(result_df)
+
+    st.markdown("#### 입력값 수정")
     st.markdown(
         """<style>
-        .pif-hdr {
-            background:#EDF2F7;
+        .manual-input-row {
             color:#4A5568;
-            font-weight:800;
             font-size:13px;
-            min-height:38px;
-            padding:0 12px;
-            border-bottom:2px solid #E2E8F0;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            box-sizing:border-box;
+            font-weight:700;
+            padding-top:9px;
             white-space:nowrap;
         }
-        .pif-cell {
-            color:#2D3748;
-            font-size:13px;
-            min-height:38px;
-            padding:0 12px;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            box-sizing:border-box;
-            white-space:nowrap;
-        }
-        .pif-e { background:#FFFFFF; }
-        .pif-o { background:#F7FAFC; }
-
-        [data-testid="stHorizontalBlock"]:has(.pif-hdr),
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) {
-            gap:0 !important;
-            align-items:stretch !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) {
-            border-bottom:1px solid #EDF2F7 !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stColumn"],
-        [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stColumn"] {
-            padding:0 !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-e) [data-testid="stColumn"]:last-child {
-            background:#FFFFFF !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-o) [data-testid="stColumn"]:last-child {
-            background:#F7FAFC !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stElementContainer"],
-        [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stElementContainer"] {
-            margin:0 !important;
-            padding:0 !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stNumberInput"] {
-            margin:0 !important;
-            padding:0 !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stNumberInput"] label {
-            display:none !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stNumberInput"] button {
-            display:none !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stNumberInput"] > div,
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stNumberInput"] [data-baseweb="input"] {
-            width:100% !important;
-            min-height:38px !important;
-            height:38px !important;
-            margin:0 !important;
-            padding:0 !important;
-            background:transparent !important;
-            border:none !important;
-            box-shadow:none !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stNumberInput"] input {
-            min-height:38px !important;
-            height:38px !important;
-            padding:0 12px !important;
-            text-align:center !important;
-            font-size:13px !important;
-            background:transparent !important;
-            border:none !important;
-            box-shadow:none !important;
-        }
-
-        .pif-table-frame {
-            border:1px solid #E2E8F0;
-            border-radius:10px !important;
-            overflow:hidden;
-            margin-bottom:1rem;
-        }
-        body:has(#pms-d:checked) .pif-table-frame {
-            background:#252535 !important;
-            border-color:#45475a !important;
-        }
-        body:has(#pms-d:checked) .pif-hdr {
-            background:#0f0f1f !important;
-            color:#ffffff !important;
-            border-bottom-color:#45475a !important;
-        }
-        body:has(#pms-d:checked) .pif-cell {
-            color:#ffffff !important;
-        }
-        body:has(#pms-d:checked) .pif-e {
-            background:#252535 !important;
-        }
-        body:has(#pms-d:checked) .pif-o {
-            background:#1e1e30 !important;
-        }
-        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-e) [data-testid="stColumn"]:last-child {
-            background:#252535 !important;
-        }
-        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-o) [data-testid="stColumn"]:last-child {
-            background:#1e1e30 !important;
-        }
-        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-cell) {
-            border-bottom-color:#313244 !important;
-        }
-        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stNumberInput"] input {
+        body:has(#pms-d:checked) .manual-input-row {
             color:#ffffff !important;
         }
         </style>""",
         unsafe_allow_html=True,
     )
 
-    cols = [18, 36, 14, 14, 18]
     results = {}
+    for i in range(0, len(result_df), 3):
+        cols = st.columns(3)
+        for col, (_, row) in zip(cols, result_df.iloc[i:i + 3].iterrows()):
+            item = str(row["구분"])
+            with col:
+                st.markdown(f"<div class='manual-input-row'>{html.escape(item)}</div>", unsafe_allow_html=True)
+                results[item] = st.number_input(
+                    "입력(건)",
+                    min_value=0,
+                    value=int(row["입력(건)"]),
+                    key=f"perf_{item}",
+                    label_visibility="collapsed",
+                    step=1,
+                )
 
-    st.markdown("<div class='pif-table-frame'>", unsafe_allow_html=True)
-    hc = st.columns(cols)
-    for col, title in zip(hc, ["활동구분", "구분", "단위 점수", "월 최대점수", "입력(건)"]):
-        col.markdown(f"<div class='pif-hdr'>{title}</div>", unsafe_allow_html=True)
-
-    for i, (_, row) in enumerate(base.iterrows()):
-        bg = "pif-e" if i % 2 == 0 else "pif-o"
-        rc = st.columns(cols)
-        rc[0].markdown(f"<div class='pif-cell {bg}'>{html.escape(str(row['활동구분']))}</div>", unsafe_allow_html=True)
-        rc[1].markdown(f"<div class='pif-cell {bg}'>{html.escape(str(row['구분']))}</div>", unsafe_allow_html=True)
-        rc[2].markdown(f"<div class='pif-cell {bg}'>{html.escape(str(row['단위 점수']))}</div>", unsafe_allow_html=True)
-        rc[3].markdown(f"<div class='pif-cell {bg}'>{html.escape(str(row['월 최대점수']))}</div>", unsafe_allow_html=True)
-        with rc[4]:
-            results[row["구분"]] = st.number_input(
-                "입력(건)",
-                min_value=0,
-                value=int(row["입력(건)"]),
-                key=f"perf_{row['구분']}",
-                label_visibility="collapsed",
-                step=1,
-            )
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    result_df = base.copy()
     result_df["입력(건)"] = result_df["구분"].map(results).fillna(0).astype(int)
     return result_df
 
