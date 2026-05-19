@@ -1504,8 +1504,9 @@ def render_page_title(menu):
             <style>
             .block-container { padding-top: 1rem !important; }
             /* .home-btn div와 button은 DOM에서 형제(sibling) — :has()+인접형제로 타겟팅 */
-            [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] > button {
+            [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button {
                 background: transparent !important;
+                background-color: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
                 font-size: 22px !important;
@@ -1515,18 +1516,21 @@ def render_page_title(menu):
                 color: #718096 !important;
                 width: auto !important;
             }
-            [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] > button:hover {
+            [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover {
                 color: #4F46E5 !important;
                 background: transparent !important;
+                background-color: transparent !important;
             }
-            body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] > button {
+            body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button {
                 color: #a0aec0 !important;
                 background: #1e1e30 !important;
+                background-color: #1e1e30 !important;
                 border: 1px solid #45475a !important;
             }
-            body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] > button:hover {
+            body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover {
                 color: #818cf8 !important;
                 background: #313244 !important;
+                background-color: #313244 !important;
                 border-color: #6366f1 !important;
             }
             </style>
@@ -1580,7 +1584,7 @@ def validation_tabs_with_refresh(key):
         """
         <style>
         /* .refresh-tab-button div과 button도 형제 — :has()+인접형제로 타겟팅 */
-        [data-testid="stElementContainer"]:has(.refresh-tab-button) + [data-testid="stElementContainer"] [data-testid="stButton"] > button {
+        [data-testid="stElementContainer"]:has(.refresh-tab-button) + [data-testid="stElementContainer"] [data-testid="stButton"] button {
             min-width: 42px !important;
             height: 38px !important;
             padding: 0 !important;
@@ -1589,13 +1593,15 @@ def validation_tabs_with_refresh(key):
             font-size: 18px !important;
             font-weight: 900 !important;
         }
-        body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.refresh-tab-button) + [data-testid="stElementContainer"] [data-testid="stButton"] > button {
+        body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.refresh-tab-button) + [data-testid="stElementContainer"] [data-testid="stButton"] button {
             background: #2a2a3e !important;
+            background-color: #2a2a3e !important;
             color: #cdd6f4 !important;
             border-color: #45475a !important;
         }
-        body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.refresh-tab-button) + [data-testid="stElementContainer"] [data-testid="stButton"] > button:hover {
+        body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.refresh-tab-button) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover {
             background: #313244 !important;
+            background-color: #313244 !important;
             color: #ffffff !important;
         }
         </style>
@@ -3851,11 +3857,17 @@ def inject_theme_toggle():
     }
 
     /* 버튼 */
-    body:has(#pms-d:checked) .stButton > button {
+    body:has(#pms-d:checked) .stButton > button,
+    body:has(#pms-d:checked) [data-testid="stButton"] button,
+    body:has(#pms-d:checked) button[data-testid^="baseButton"] {
+        background: #2a2a3e !important;
         background-color: #2a2a3e !important; color: #ffffff !important;
         border-color: #45475a !important;
     }
-    body:has(#pms-d:checked) .stButton > button:hover {
+    body:has(#pms-d:checked) .stButton > button:hover,
+    body:has(#pms-d:checked) [data-testid="stButton"] button:hover,
+    body:has(#pms-d:checked) button[data-testid^="baseButton"]:hover {
+        background: #313244 !important;
         background-color: #313244 !important; border-color: #ffffff !important;
     }
     body:has(#pms-d:checked) .stButton > button[kind="primary"],
@@ -3877,6 +3889,7 @@ def inject_theme_toggle():
     }
     body:has(#pms-d:checked) button.pms-home-btn {
         background: #1e1e30 !important;
+        background-color: #1e1e30 !important;
         border: 1px solid #45475a !important;
         box-shadow: none !important;
         color: #a0aec0 !important;
@@ -3884,17 +3897,20 @@ def inject_theme_toggle():
     body:has(#pms-d:checked) button.pms-home-btn:hover {
         color: #818cf8 !important;
         background: #313244 !important;
+        background-color: #313244 !important;
         border-color: #6366f1 !important;
     }
 
     /* 새로고침 버튼 다크모드 */
     body:has(#pms-d:checked) button.pms-refresh-btn {
         background: #2a2a3e !important;
+        background-color: #2a2a3e !important;
         color: #cdd6f4 !important;
         border-color: #45475a !important;
     }
     body:has(#pms-d:checked) button.pms-refresh-btn:hover {
         background: #313244 !important;
+        background-color: #313244 !important;
         color: #ffffff !important;
     }
 
@@ -4184,7 +4200,34 @@ def inject_theme_toggle():
         body:has(#pms-s:checked) [class*="ag-theme"] .ag-cell,
         body:has(#pms-s:checked) [class*="ag-theme"] .ag-cell-value { color: #ffffff !important; }
         body:has(#pms-s:checked) [data-testid="stSidebar"] { background-color: #16162a !important; }
-        body:has(#pms-s:checked) .stButton > button { background-color: #2a2a3e !important; color: #ffffff !important; border-color: #45475a !important; }
+        body:has(#pms-s:checked) .stButton > button,
+        body:has(#pms-s:checked) [data-testid="stButton"] button,
+        body:has(#pms-s:checked) button[data-testid^="baseButton"] {
+            background: #2a2a3e !important;
+            background-color: #2a2a3e !important;
+            color: #ffffff !important;
+            border-color: #45475a !important;
+        }
+        body:has(#pms-s:checked) .stButton > button:hover,
+        body:has(#pms-s:checked) [data-testid="stButton"] button:hover,
+        body:has(#pms-s:checked) button[data-testid^="baseButton"]:hover {
+            background: #313244 !important;
+            background-color: #313244 !important;
+            border-color: #ffffff !important;
+        }
+        body:has(#pms-s:checked) button.pms-home-btn {
+            background: #1e1e30 !important;
+            background-color: #1e1e30 !important;
+            border: 1px solid #45475a !important;
+            box-shadow: none !important;
+            color: #a0aec0 !important;
+        }
+        body:has(#pms-s:checked) button.pms-home-btn:hover {
+            background: #313244 !important;
+            background-color: #313244 !important;
+            border-color: #6366f1 !important;
+            color: #818cf8 !important;
+        }
         body:has(#pms-s:checked) [data-baseweb="tab"][aria-selected="true"] { color: #ffffff !important; }
         body:has(#pms-s:checked) .pms-sw-track { background: #313244; }
     }
