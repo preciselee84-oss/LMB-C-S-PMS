@@ -4315,20 +4315,29 @@ def inject_theme_toggle():
                 <input type="radio" class="pms-theme-radio" name="pms-theme" id="pms-d">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             </label>
-            <label class="pms-btn" title="시스템">
-                <input type="radio" class="pms-theme-radio" name="pms-theme" id="pms-s">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-            </label>
         </div>
     </div>
 
     <!-- localStorage 테마 영속성: onload 인라인 핸들러로 실행 (script 태그는 React innerHTML에서 미실행) -->
     <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
          onload="(function(){
-             if(window._pmsThemeReady) return;
-             window._pmsThemeReady = true;
+             function readCookie(name){
+                 var found = document.cookie.split('; ').find(function(row){ return row.indexOf(name + '=') === 0; });
+                 return found ? decodeURIComponent(found.split('=')[1]) : '';
+             }
+             function normalizeTheme(t){
+                 return (t === 'd' || t === 'l') ? t : 'l';
+             }
+             function saveTheme(t){
+                 t = normalizeTheme(t);
+                 localStorage.setItem('pms-theme', t);
+                 document.cookie = 'pms-theme=' + encodeURIComponent(t) + '; max-age=31536000; path=/; SameSite=Lax';
+             }
              function applyTheme(){
-                 var t = localStorage.getItem('pms-theme') || 'l';
+                 var t = normalizeTheme(localStorage.getItem('pms-theme') || readCookie('pms-theme') || 'l');
+                 saveTheme(t);
+                 document.documentElement.setAttribute('data-pms-theme', t);
+                 if(document.body){ document.body.setAttribute('data-pms-theme', t); }
                  var r = document.getElementById('pms-' + t);
                  if(r && !r.checked){ r.checked = true; }
              }
@@ -4341,17 +4350,21 @@ def inject_theme_toggle():
              }
              applyTheme();
              tagSpecialBtns();
-             var debounce;
-             window._pmsThemeObs = new MutationObserver(function(){
-                 clearTimeout(debounce);
-                 debounce = setTimeout(function(){ applyTheme(); tagSpecialBtns(); }, 80);
-             });
-             window._pmsThemeObs.observe(document.body, {childList:true, subtree:true});
-             document.addEventListener('change', function(e){
-                 if(e.target && e.target.name === 'pms-theme'){
-                     localStorage.setItem('pms-theme', e.target.id.replace('pms-',''));
-                 }
-             });
+             if(!window._pmsThemeReady){
+                 window._pmsThemeReady = true;
+                 var debounce;
+                 window._pmsThemeObs = new MutationObserver(function(){
+                     clearTimeout(debounce);
+                     debounce = setTimeout(function(){ applyTheme(); tagSpecialBtns(); }, 80);
+                 });
+                 window._pmsThemeObs.observe(document.body, {childList:true, subtree:true});
+                 document.addEventListener('change', function(e){
+                     if(e.target && e.target.name === 'pms-theme'){
+                         saveTheme(e.target.id.replace('pms-',''));
+                         applyTheme();
+                     }
+                 });
+             }
          })()"
          style="display:none" alt="">
     """, unsafe_allow_html=True)
