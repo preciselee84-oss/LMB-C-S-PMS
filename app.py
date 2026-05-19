@@ -395,6 +395,8 @@ def render_manual_perf_input_table(base):
             font-size:12px; color:#2D3748; padding:5px 10px;
             border-bottom:1px solid #EDF2F7; white-space:nowrap;
             text-align:center;
+            height:28px !important; line-height:18px !important;
+            box-sizing:border-box !important;
         }
         .pif-e { background:#FFFFFF; }
         .pif-o { background:#F7FAFC; }
@@ -408,7 +410,9 @@ def render_manual_perf_input_table(base):
         [data-testid="stHorizontalBlock"]:has(.pif-cell),
         [data-testid="stHorizontalBlock"]:has(.pif-hdr) { gap: 0 !important; }
         [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stVerticalBlock"],
-        [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stVerticalBlock"] { gap: 0 !important; }
+        [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stVerticalBlock"] {
+            gap: 0 !important; padding: 0 !important; margin: 0 !important;
+        }
         [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stElementContainer"],
         [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stElementContainer"] {
             margin: 0 !important; padding: 0 !important;
