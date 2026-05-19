@@ -394,17 +394,28 @@ def render_manual_perf_input_table(base):
             justify-content:center !important;
             text-align:center !important;
         }
-        body:has(#pms-d:checked) [data-testid="stDataEditor"] {
+        body:has(#pms-d:checked) [data-testid="stDataEditor"],
+        body:has(#pms-d:checked) [data-testid="stDataFrame"] {
+            background:#252535 !important;
             border-color:#45475a !important;
         }
-        body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"] {
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"],
+        body:has(#pms-d:checked) [data-testid="stDataFrame"] [role="columnheader"] {
             background:#0f0f1f !important;
             color:#ffffff !important;
         }
-        body:has(#pms-d:checked) [data-testid="stDataEditor"] canvas {
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] canvas,
+        body:has(#pms-d:checked) [data-testid="stDataFrame"] canvas {
             filter: invert(1) hue-rotate(180deg) brightness(0.88) contrast(1.08);
         }
-        body:has(#pms-d:checked) [data-testid="stDataEditor"] input {
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] [class*="dvn"],
+        body:has(#pms-d:checked) [data-testid="stDataFrame"] [class*="dvn"],
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] [class*="glide"],
+        body:has(#pms-d:checked) [data-testid="stDataFrame"] [class*="glide"] {
+            background:#252535 !important;
+        }
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] input,
+        body:has(#pms-d:checked) [data-testid="stDataFrame"] input {
             background:#252535 !important;
             color:#ffffff !important;
             border-color:#45475a !important;
