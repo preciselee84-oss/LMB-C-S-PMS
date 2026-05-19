@@ -430,8 +430,8 @@ def build_other_validation_errors(df):
 
         if "운영" in activity_detail and "본사 개설완료일자" in df_check.columns:
             open_date = parse_compare_date(row.get("본사 개설완료일자"))
-            if pd.notna(open_date) and open_date.normalize() < activity_date.normalize():
-                append_error(row, activity_date, activity_detail, "운영 활동의 본사 개설완료일자가 활동일보다 이전")
+            if pd.notna(open_date) and open_date.normalize() > activity_date.normalize():
+                append_error(row, activity_date, activity_detail, "운영 활동의 본사 개설완료일자가 활동일보다 이후")
 
     prev_df = st.session_state.get("auto_prev_df")
     if prev_df is not None and not prev_df.empty and biz_col and detail_col:
