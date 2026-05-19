@@ -3626,7 +3626,7 @@ def inject_theme_toggle():
     body:has(#pms-d:checked) label { color: #ffffff !important; }
     /* span: 인라인 style 색상이 있는 셀(대비/증감)은 제외하고 흰색 적용 */
     body:has(#pms-d:checked) span:not([style*="color"]) { color: #ffffff !important; }
-    body:has(#pms-d:checked) [data-testid="stMarkdownContainer"] span { color: #ffffff !important; }
+    body:has(#pms-d:checked) [data-testid="stMarkdownContainer"] span:not([style*="color"]) { color: #ffffff !important; }
     body:has(#pms-d:checked) [data-testid="stSidebar"] span { color: #ffffff !important; }
     body:has(#pms-d:checked) .stButton span { color: #ffffff !important; }
     body:has(#pms-d:checked) [data-baseweb="tab"] span { color: inherit !important; }
@@ -3862,6 +3862,25 @@ def inject_theme_toggle():
     body:has(#pms-d:checked) [class*="ag-theme"] .ag-center-cols-container {
         background-color: #252535 !important;
     }
+    /* stDataEditor 전역 다크모드 (직원 목록 등 모든 data_editor 포함) */
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] {
+        border-color: #45475a !important; box-shadow: none !important;
+    }
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"] {
+        background-color: #0f0f1f !important; color: #ffffff !important;
+        border-bottom-color: #45475a !important; border-right-color: #45475a !important;
+    }
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"] * {
+        color: #ffffff !important;
+    }
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"] {
+        border-right-color: #313244 !important;
+    }
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"]:not([style*="color"]),
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"]:not([style*="color"]) * {
+        color: #ffffff !important;
+    }
+
     /* HTML 테이블 */
     body:has(#pms-d:checked) table { background-color: #252535 !important; border-color: #45475a !important; }
     body:has(#pms-d:checked) th {
@@ -3874,6 +3893,10 @@ def inject_theme_toggle():
     }
     body:has(#pms-d:checked) tr:nth-child(odd) td { background-color: #1e1e30 !important; }
     body:has(#pms-d:checked) tr:hover td { background-color: #2d2d45 !important; }
+
+    /* 증감 색 — 다크모드에서 더 선명하게 */
+    body:has(#pms-d:checked) [style*="color:#E53E3E"] { color: #ff7b7b !important; }
+    body:has(#pms-d:checked) [style*="color:#3182CE"] { color: #74b9ff !important; }
 
     /* 체크박스 / 라디오 */
     body:has(#pms-d:checked) [data-baseweb="checkbox"] div,
