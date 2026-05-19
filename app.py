@@ -3705,17 +3705,37 @@ def inject_theme_toggle():
     body:has(#pms-d:checked) [data-baseweb="select"] div[role="combobox"] {
         background-color: #252535 !important; border-color: #45475a !important; color: #ffffff !important;
     }
+    /* 셀렉트박스 드롭다운 팝업 — 전체 컨테이너 및 모든 하위 요소 */
+    body:has(#pms-d:checked) [data-baseweb="popover"],
+    body:has(#pms-d:checked) [data-baseweb="popover"] > div,
+    body:has(#pms-d:checked) [data-baseweb="popover"] > div > div,
+    body:has(#pms-d:checked) [data-baseweb="popover"] > div > div > div {
+        background-color: #252535 !important;
+        border-color: #45475a !important;
+    }
     body:has(#pms-d:checked) [data-baseweb="menu"],
-    body:has(#pms-d:checked) [data-baseweb="popover"] {
-        background-color: #2a2a3e !important; border-color: #45475a !important;
+    body:has(#pms-d:checked) [data-baseweb="menu"] ul,
+    body:has(#pms-d:checked) [role="listbox"] {
+        background-color: #252535 !important;
+        border-color: #45475a !important;
     }
     body:has(#pms-d:checked) [data-baseweb="menu"] li,
-    body:has(#pms-d:checked) [data-baseweb="menu"] [role="option"] {
-        background-color: #2a2a3e !important; color: #ffffff !important;
+    body:has(#pms-d:checked) [data-baseweb="menu"] [role="option"],
+    body:has(#pms-d:checked) [role="option"],
+    body:has(#pms-d:checked) [role="listbox"] > div {
+        background-color: #252535 !important;
+        color: #ffffff !important;
+    }
+    body:has(#pms-d:checked) [data-baseweb="menu"] li span,
+    body:has(#pms-d:checked) [data-baseweb="menu"] [role="option"] span,
+    body:has(#pms-d:checked) [role="option"] span {
+        color: #ffffff !important;
     }
     body:has(#pms-d:checked) [data-baseweb="menu"] li:hover,
-    body:has(#pms-d:checked) [data-baseweb="menu"] [aria-selected="true"] {
-        background-color: #313244 !important;
+    body:has(#pms-d:checked) [data-baseweb="menu"] [aria-selected="true"],
+    body:has(#pms-d:checked) [role="option"]:hover,
+    body:has(#pms-d:checked) [role="option"][aria-selected="true"] {
+        background-color: #3a3a5e !important;
     }
     body:has(#pms-d:checked) [data-testid="stNumberInput"] button {
         background-color: #313244 !important; color: #ffffff !important;
