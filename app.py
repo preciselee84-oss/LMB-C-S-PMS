@@ -4012,6 +4012,35 @@ def inject_theme_toggle():
     body:has(#pms-d:checked) [data-testid="stMetricDeltaIcon-Up"]   { color: #a6e3a1 !important; }
     body:has(#pms-d:checked) [data-testid="stMetricDeltaIcon-Down"] { color: #f38ba8 !important; }
 
+    /* Plotly 차트 */
+    body:has(#pms-d:checked) .js-plotly-plot,
+    body:has(#pms-d:checked) .js-plotly-plot .plot-container,
+    body:has(#pms-d:checked) .js-plotly-plot .svg-container {
+        background: transparent !important;
+    }
+    body:has(#pms-d:checked) .js-plotly-plot .main-svg {
+        background: #1e1e2e !important;
+    }
+    body:has(#pms-d:checked) .js-plotly-plot .bg,
+    body:has(#pms-d:checked) .js-plotly-plot .legend rect.bg {
+        fill: #252535 !important;
+        stroke: #45475a !important;
+    }
+    body:has(#pms-d:checked) .js-plotly-plot text {
+        fill: #ffffff !important;
+    }
+    body:has(#pms-d:checked) .js-plotly-plot .gridlayer path {
+        stroke: #45475a !important;
+    }
+    body:has(#pms-d:checked) .js-plotly-plot .zerolinelayer path,
+    body:has(#pms-d:checked) .js-plotly-plot .xlines-below path,
+    body:has(#pms-d:checked) .js-plotly-plot .ylines-below path {
+        stroke: #585b70 !important;
+    }
+    body:has(#pms-d:checked) .js-plotly-plot .modebar-btn path {
+        fill: #cdd6f4 !important;
+    }
+
     /* 알림 박스 */
     body:has(#pms-d:checked) [data-testid="stNotification"],
     body:has(#pms-d:checked) .stAlert { border-radius: 6px !important; }
@@ -4269,6 +4298,33 @@ def inject_theme_toggle():
         body:has(#pms-s:checked) [class*="ag-theme"] .ag-row-odd  { background-color: #1e1e30 !important; }
         body:has(#pms-s:checked) [class*="ag-theme"] .ag-cell,
         body:has(#pms-s:checked) [class*="ag-theme"] .ag-cell-value { color: #ffffff !important; }
+        body:has(#pms-s:checked) .js-plotly-plot,
+        body:has(#pms-s:checked) .js-plotly-plot .plot-container,
+        body:has(#pms-s:checked) .js-plotly-plot .svg-container {
+            background: transparent !important;
+        }
+        body:has(#pms-s:checked) .js-plotly-plot .main-svg {
+            background: #1e1e2e !important;
+        }
+        body:has(#pms-s:checked) .js-plotly-plot .bg,
+        body:has(#pms-s:checked) .js-plotly-plot .legend rect.bg {
+            fill: #252535 !important;
+            stroke: #45475a !important;
+        }
+        body:has(#pms-s:checked) .js-plotly-plot text {
+            fill: #ffffff !important;
+        }
+        body:has(#pms-s:checked) .js-plotly-plot .gridlayer path {
+            stroke: #45475a !important;
+        }
+        body:has(#pms-s:checked) .js-plotly-plot .zerolinelayer path,
+        body:has(#pms-s:checked) .js-plotly-plot .xlines-below path,
+        body:has(#pms-s:checked) .js-plotly-plot .ylines-below path {
+            stroke: #585b70 !important;
+        }
+        body:has(#pms-s:checked) .js-plotly-plot .modebar-btn path {
+            fill: #cdd6f4 !important;
+        }
         body:has(#pms-s:checked) [data-testid="stSidebar"] { background-color: #16162a !important; }
         body:has(#pms-s:checked) .stButton > button,
         body:has(#pms-s:checked) [data-testid="stButton"] button,
