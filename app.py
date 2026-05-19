@@ -232,7 +232,7 @@ def clean_header_logic(df):
         if len(df.columns) > 0 and str(df.columns[0]).startswith("Unnamed"):
             for i in range(min(len(df), 10)):
                 row_text = " ".join(df.iloc[i].astype(str).tolist())
-                if any(k in row_text for k in ["등록자", "담당자", "성명", "업체명", "사업자번호"]):
+                if any(k in row_text for k in ["등록자", "담당자", "성명", "업체명", "사업자번호", "고객번호"]):
                     df.columns = [str(c).strip() for c in df.iloc[i]]
                     df = df.iloc[i + 1:].reset_index(drop=True)
                     break
@@ -459,6 +459,159 @@ def build_other_validation_errors(df):
                     append_error(row, activity_date, activity_detail, "전월에 이미 연계 기록 존재")
 
     return pd.DataFrame(other_errors)
+
+
+def normalize_customer_no(value):
+    if pd.isna(value):
+        return ""
+    text = str(value).strip().replace(",", "")
+    if re.fullmatch(r"\d+\.0+", text):
+        text = text.split(".", 1)[0]
+    digits = re.sub(r"[^0-9]", "", text)
+    if digits and len(digits) < 8:
+        digits = digits.zfill(8)
+    return digits
+
+
+def read_excel_history_file(uploaded_file):
+    df = pd.read_excel(uploaded_file, sheet_name=0)
+    df = clean_header_logic(df)
+    return df.replace({np.nan: ""})
+
+
+def parse_history_date(value):
+    if pd.isna(value) or str(value).strip() == "":
+        return ""
+    if isinstance(value, (datetime, pd.Timestamp)):
+        return pd.to_datetime(value).strftime("%Y-%m-%d")
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        num = float(value)
+        if 20000 <= num <= 60000:
+            return (datetime(1899, 12, 30) + timedelta(days=int(num))).strftime("%Y-%m-%d")
+    text = str(value).strip()
+    digits = re.sub(r"[^0-9]", "", text)
+    if len(digits) >= 8:
+        parsed = pd.to_datetime(digits[:8], format="%Y%m%d", errors="coerce")
+        if pd.notna(parsed):
+            return parsed.strftime("%Y-%m-%d")
+    parsed = pd.to_datetime(text, errors="coerce")
+    return parsed.strftime("%Y-%m-%d") if pd.notna(parsed) else text
+
+
+def infer_activity_detail(row, source_cols):
+    text = " ".join(str(row.get(col, "")) for col in source_cols if col)
+    if "개설" in text:
+        return "개설"
+    if "연계" in text or "ERP" in text.upper():
+        return "연계"
+    return "운영"
+
+
+def hana_customer_biz_map():
+    hana = st.session_state.get("hana_sheet_df")
+    if hana is None or hana.empty:
+        hana = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+        st.session_state.hana_sheet_df = hana
+
+    hana = clean_header_logic(hana.copy())
+    customer_col = find_col(hana, ["고객번호", "고개번호", "고객NO", "고객 No", "고객"])
+    biz_col = find_col(hana, ["사업자번호"])
+    if not customer_col or customer_col not in hana.columns or not biz_col or biz_col not in hana.columns:
+        return {}, "하나은행 구글 시트에서 고객번호 또는 사업자번호 컬럼을 찾을 수 없습니다."
+
+    mapping_df = hana[[customer_col, biz_col]].copy()
+    mapping_df["_customer_key"] = mapping_df[customer_col].apply(normalize_customer_no)
+    mapping_df["_biz_value"] = normalize_biz(mapping_df[biz_col])
+    mapping_df = mapping_df[(mapping_df["_customer_key"] != "") & (mapping_df["_biz_value"] != "")]
+    mapping_df = mapping_df.drop_duplicates("_customer_key")
+    return dict(zip(mapping_df["_customer_key"], mapping_df["_biz_value"])), ""
+
+
+def convert_history_to_sample_df(history_df, user_name):
+    history_df = clean_header_logic(history_df.copy()).replace({np.nan: ""})
+    customer_col = find_col(history_df, ["고객번호", "고개번호", "고객NO", "고객 No", "고객"])
+    staff_col = find_col(history_df, ["담당자", "처리자", "접수자", "등록자", "성명"])
+    date_col = find_col(history_df, ["활동일", "처리일자", "접수일자", "일자"])
+    company_col = find_col(history_df, ["업체명", "고객명", "상호", "회사명"])
+    product_col = find_col(history_df, ["상품", "서비스", "제품"])
+    category_col = find_col(history_df, ["활동구분", "상담구분", "접수구분", "접수유형"])
+    detail_col = find_col(history_df, ["활동상세", "처리유형", "진행상태", "접수유형"])
+    location_col = find_col(history_df, ["방문장소", "주소", "지역"])
+    work_no_col = find_col(history_df, ["업무번호", "플로우", "작성번호"])
+    title_col = find_col(history_df, ["제목", "접수내용", "문의내용", "진행상태"])
+    content_col = find_col(history_df, ["활동내용", "처리내용", "상담내용", "내용"])
+
+    missing = []
+    if not customer_col or customer_col not in history_df.columns:
+        missing.append("고객번호")
+    if not staff_col or staff_col not in history_df.columns:
+        missing.append("담당자")
+    if missing:
+        return pd.DataFrame(), {"error": f"이력 파일에서 {', '.join(missing)} 컬럼을 찾을 수 없습니다."}
+
+    filtered = history_df[history_df[staff_col].astype(str).str.strip() == str(user_name).strip()].copy()
+    if filtered.empty:
+        return pd.DataFrame(), {"error": f"로그인 사용자({user_name})와 담당자가 일치하는 이력이 없습니다."}
+
+    biz_map, map_error = hana_customer_biz_map()
+    if map_error:
+        return pd.DataFrame(), {"error": map_error}
+
+    rows = []
+    unmatched = 0
+    for _, row in filtered.iterrows():
+        customer_key = normalize_customer_no(row.get(customer_col, ""))
+        biz_no = biz_map.get(customer_key, "")
+        if not biz_no:
+            unmatched += 1
+
+        activity_detail = infer_activity_detail(row, [detail_col, title_col, content_col, category_col])
+        activity_category = str(row.get(category_col, "")).strip() if category_col else ""
+        if activity_category not in ["마케팅", "방문B", "부가상품제안", "방문A", "상담"]:
+            activity_category = "상담"
+
+        rows.append({
+            "지사": "하나지사",
+            "상품": row.get(product_col, "통합CMS") if product_col else "통합CMS",
+            "업체명": row.get(company_col, "") if company_col else "",
+            "사업자번호": biz_no,
+            "등록자": user_name,
+            "활동일": parse_history_date(row.get(date_col, "")) if date_col else "",
+            "방문장소 (시, 군, 구까지)": row.get(location_col, "") if location_col else "",
+            "활동구분": activity_category,
+            "활동상세": activity_detail,
+            "업무번호 \n(플로우에 식권, 비즈플레이, 플로우 작성번호)": row.get(work_no_col, "") if work_no_col else "",
+            "제목": row.get(title_col, "") if title_col else "",
+            "활동내용": row.get(content_col, "") if content_col else "",
+        })
+
+    return pd.DataFrame(rows), {"total": len(rows), "unmatched": unmatched}
+
+
+def sample_format_excel_bytes(df):
+    from openpyxl import load_workbook
+
+    output = BytesIO()
+    if os.path.exists(EXCEL_SAMPLE_FILE):
+        wb = load_workbook(EXCEL_SAMPLE_FILE)
+        ws = wb.worksheets[0]
+        if ws.max_row > 2:
+            ws.delete_rows(3, ws.max_row - 2)
+        def header_key(value):
+            return re.sub(r"\s+", "", str(value or ""))
+
+        header_map = {header_key(ws.cell(row=2, column=col).value): col for col in range(1, ws.max_column + 1)}
+        for row_idx, (_, row) in enumerate(df.iterrows(), start=3):
+            for header, value in row.items():
+                col_idx = header_map.get(header_key(header))
+                if not col_idx:
+                    continue
+                ws.cell(row=row_idx, column=col_idx, value=value)
+        wb.save(output)
+    else:
+        output.write(dataframe_to_excel_bytes({"Sheet0": df}))
+    output.seek(0)
+    return output.getvalue()
 
 
 def criteria_df():
@@ -1765,6 +1918,43 @@ def show_user_history():
                 )
         else:
             st.button("샘플파일 다운로드", use_container_width=True, disabled=True)
+
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    conv_col1, conv_col2, conv_col3 = st.columns([1, 1, 4])
+    with conv_col1:
+        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>기존 이력 파일 변환</div>", unsafe_allow_html=True)
+        history_file = st.file_uploader("기존 이력 파일 변환", type=["xls", "xlsx"], key="history_convert_upload", label_visibility="collapsed")
+    with conv_col2:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        if history_file is not None:
+            try:
+                with st.spinner("기존 이력을 샘플 양식으로 변환 중입니다."):
+                    history_df = read_excel_history_file(history_file)
+                    converted_df, convert_info = convert_history_to_sample_df(history_df, st.session_state.user_name)
+                if converted_df.empty:
+                    st.button("변환파일 다운로드", use_container_width=True, disabled=True)
+                    st.warning(convert_info.get("error", "변환할 데이터가 없습니다."))
+                else:
+                    converted_bytes = sample_format_excel_bytes(converted_df)
+                    converted_ym = get_uploaded_month(converted_df).replace("-", "") or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
+                    st.download_button(
+                        "변환파일 다운로드",
+                        data=converted_bytes,
+                        file_name=f"LMB월간 활동실적_{converted_ym}_{st.session_state.user_name}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                    )
+                    unmatched = int(convert_info.get("unmatched", 0))
+                    if unmatched:
+                        st.caption(f"고객번호 매핑 실패 {unmatched}건은 사업자번호가 공란으로 저장됩니다.")
+            except ImportError:
+                st.button("변환파일 다운로드", use_container_width=True, disabled=True)
+                st.error("xls 파일 변환을 위해 xlrd 패키지가 필요합니다. 배포 후 requirements.txt 반영을 확인해주세요.")
+            except Exception as e:
+                st.button("변환파일 다운로드", use_container_width=True, disabled=True)
+                st.error(f"이력 파일 변환 실패: {e}")
+        else:
+            st.button("변환파일 다운로드", use_container_width=True, disabled=True)
 
     # 파일이 제거되면 데이터 초기화
     if u_file is None:
