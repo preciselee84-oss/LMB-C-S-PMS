@@ -2079,13 +2079,13 @@ def show_user_history():
                 st.error(f"은행 이력 업로드 실패: {e}")
         else:
             st.button("변환파일 다운로드", use_container_width=True, disabled=True)
+    with col2:
+        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>본사이력 업로드</div>", unsafe_allow_html=True)
+        u_file = st.file_uploader("본사이력 업로드", type=["xlsx"], label_visibility="collapsed")
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-    conv_col1, conv_col2, conv_col3 = st.columns([1, 1, 4])
-    with conv_col1:
-        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>은행 엑셀파일 업로드</div>", unsafe_allow_html=True)
-        u_file = st.file_uploader("은행 엑셀파일 업로드", type=["xlsx"], label_visibility="collapsed")
-    with conv_col2:
+    _, sample_col, _ = st.columns([1, 1, 4])
+    with sample_col:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
         if os.path.exists(EXCEL_SAMPLE_FILE):
             with open(EXCEL_SAMPLE_FILE, "rb") as sample_file:
@@ -2113,7 +2113,7 @@ def show_user_history():
         # 파일이 변경되었을 때만 처리
         if st.session_state.get("user_excel_file_key") != file_key:
             st.session_state.user_excel_file_key = file_key
-            with st.spinner("은행 엑셀 파일을 변환 중입니다..."):
+            with st.spinner("본사이력 파일을 변환 중입니다..."):
                 # cloud_sheet_df가 없을 때만 로드 시도
                 if st.session_state.get("cloud_sheet_df") is None:
                     try:
