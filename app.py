@@ -382,7 +382,7 @@ def render_manual_perf_input_table(base):
         /* ── 헤더 셀 ── */
         .pif-hdr {
             background:#EDF2F7; color:#4A5568; font-weight:800; font-size:12px;
-            padding:8px 6px; text-align:center; border-bottom:2px solid #CBD5E0;
+            padding:6px 8px; text-align:center; border-bottom:2px solid #CBD5E0;
             white-space:nowrap;
         }
         body:has(#pms-d:checked) .pif-hdr {
@@ -390,11 +390,11 @@ def render_manual_perf_input_table(base):
             border-bottom-color:#45475a !important;
         }
 
-        /* ── 데이터 셀 ── */
+        /* ── 데이터 셀: pms-report-table td와 동일한 높이·정렬 ── */
         .pif-cell {
-            font-size:12px; color:#2D3748; padding:6px 8px;
+            font-size:12px; color:#2D3748; padding:5px 10px;
             border-bottom:1px solid #EDF2F7; white-space:nowrap;
-            height:36px; line-height:24px;
+            text-align:center;
         }
         .pif-e { background:#FFFFFF; }
         .pif-o { background:#F7FAFC; }
@@ -404,60 +404,46 @@ def render_manual_perf_input_table(base):
         body:has(#pms-d:checked) .pif-e { background:#252535 !important; }
         body:has(#pms-d:checked) .pif-o { background:#1e1e30 !important; }
 
-        /* ── 행 간격 제거: pif 행의 Streamlit 여백 전부 0 ── */
+        /* ── 행 간격 제거 ── */
         [data-testid="stHorizontalBlock"]:has(.pif-cell),
-        [data-testid="stHorizontalBlock"]:has(.pif-hdr) {
-            gap: 0 !important;
-        }
+        [data-testid="stHorizontalBlock"]:has(.pif-hdr) { gap: 0 !important; }
         [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stVerticalBlock"],
-        [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stVerticalBlock"] {
-            gap: 0 !important;
-        }
+        [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stVerticalBlock"] { gap: 0 !important; }
         [data-testid="stHorizontalBlock"]:has(.pif-cell) [data-testid="stElementContainer"],
         [data-testid="stHorizontalBlock"]:has(.pif-hdr) [data-testid="stElementContainer"] {
-            margin: 0 !important;
-            padding: 0 !important;
+            margin: 0 !important; padding: 0 !important;
         }
-        /* 부모 stVerticalBlock 행 간격 제거 */
-        [data-testid="stVerticalBlock"]:has(.pif-cell) {
-            gap: 0 !important;
+        [data-testid="stVerticalBlock"]:has(.pif-cell) { gap: 0 !important; }
+
+        /* ── 입력(건) 열: stColumn 자체에 행 배경색 적용 (흰색 노출 원천 차단) ── */
+        [data-testid="stHorizontalBlock"]:has(.pif-e) [data-testid="stColumn"]:last-child { background:#FFFFFF; }
+        [data-testid="stHorizontalBlock"]:has(.pif-o) [data-testid="stColumn"]:last-child { background:#F7FAFC; }
+        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-e) [data-testid="stColumn"]:last-child {
+            background:#252535 !important;
+        }
+        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-o) [data-testid="stColumn"]:last-child {
+            background:#1e1e30 !important;
         }
 
-        /* ── number input: 라벨 공간 제거 ── */
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] label {
-            display: none !important;
-            height: 0 !important;
-            margin: 0 !important;
-        }
-        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] {
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-        /* ── number input: 라이트모드 외관 ── */
+        /* ── number input: 라벨·버튼 제거, 래퍼 투명화 ── */
         div[data-testid="stNumberInput"] button { display:none !important; }
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] label {
+            display:none !important; height:0 !important; margin:0 !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"],
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] > div,
+        [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] > div > div,
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] [data-baseweb="input"] {
-            border: 1px solid #CBD5E0 !important; box-shadow: none !important;
-            height: 36px !important; border-radius: 4px !important;
-            background: #F8FAFC !important;
+            background: transparent !important; border: none !important;
+            box-shadow: none !important; margin:0 !important; padding:0 !important;
         }
         [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] input {
-            font-size:12px !important; text-align:right !important;
-            padding:0 6px !important; background: transparent !important;
-        }
-
-        /* ── number input: 다크모드 — 짝수행(pif-e), 홀수행(pif-o) 배경 일치 ── */
-        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-e) div[data-testid="stNumberInput"] > div,
-        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-e) div[data-testid="stNumberInput"] [data-baseweb="input"] {
-            background: #252535 !important; border-color: #45475a !important;
-        }
-        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-o) div[data-testid="stNumberInput"] > div,
-        body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-o) div[data-testid="stNumberInput"] [data-baseweb="input"] {
-            background: #1e1e30 !important; border-color: #45475a !important;
+            font-size:12px !important; text-align:center !important;
+            padding:5px 6px !important; background:transparent !important;
+            border:none !important; box-shadow:none !important;
         }
         body:has(#pms-d:checked) [data-testid="stHorizontalBlock"]:has(.pif-cell) div[data-testid="stNumberInput"] input {
-            color: #ffffff !important; background: transparent !important;
+            color:#ffffff !important;
         }
         </style>""",
         unsafe_allow_html=True,
@@ -465,15 +451,15 @@ def render_manual_perf_input_table(base):
 
     COLS = [18, 40, 11, 12, 19]
 
-    # 헤더 행
+    # 헤더 행 (가운데 정렬)
     hc = st.columns(COLS)
-    hc[0].markdown("<div class='pif-hdr' style='text-align:left;'>활동구분</div>", unsafe_allow_html=True)
-    hc[1].markdown("<div class='pif-hdr' style='text-align:left;'>구분</div>", unsafe_allow_html=True)
+    hc[0].markdown("<div class='pif-hdr'>활동구분</div>", unsafe_allow_html=True)
+    hc[1].markdown("<div class='pif-hdr'>구분</div>", unsafe_allow_html=True)
     hc[2].markdown("<div class='pif-hdr'>단위 점수</div>", unsafe_allow_html=True)
     hc[3].markdown("<div class='pif-hdr'>월 최대점수</div>", unsafe_allow_html=True)
     hc[4].markdown("<div class='pif-hdr'>입력(건)</div>", unsafe_allow_html=True)
 
-    # 데이터 행
+    # 데이터 행 (모두 가운데 정렬)
     results = {}
     rows_list = list(base.iterrows())
     for i, (_, row) in enumerate(rows_list):
@@ -484,9 +470,9 @@ def render_manual_perf_input_table(base):
         with rc[1]:
             st.markdown(f"<div class='pif-cell {ec}'>{html.escape(str(row['구분']))}</div>", unsafe_allow_html=True)
         with rc[2]:
-            st.markdown(f"<div class='pif-cell {ec}' style='text-align:right;'>{row['단위 점수']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='pif-cell {ec}'>{row['단위 점수']}</div>", unsafe_allow_html=True)
         with rc[3]:
-            st.markdown(f"<div class='pif-cell {ec}' style='text-align:right;'>{row['월 최대점수']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='pif-cell {ec}'>{row['월 최대점수']}</div>", unsafe_allow_html=True)
         with rc[4]:
             val = st.number_input(
                 "입력(건)", min_value=0, value=int(row["입력(건)"]),
