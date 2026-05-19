@@ -220,6 +220,9 @@ def init_state():
         if key not in st.session_state:
             st.session_state[key] = value
 
+    if st.session_state.current_menu == "이력확인 및 작성":
+        st.session_state.current_menu = "은행 이력 업로드"
+
 
 init_state()
 
@@ -1523,7 +1526,7 @@ def show_sidebar():
 
         st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
         st.markdown("사용자 메뉴")
-        for menu_name in ["이력확인 및 작성", "최종 실적 확인"]:
+        for menu_name in ["은행 이력 업로드", "최종 실적 확인"]:
             if st.button(menu_name, use_container_width=True):
                 st.session_state.current_menu = menu_name
                 st.rerun()
@@ -1702,7 +1705,7 @@ MENU_GUIDES = {
         "🔄 [데이터 새로고침] 버튼으로 최신 데이터를 불러옵니다.",
         "⚠️ URL이 잘못된 경우 데이터를 불러오지 못할 수 있습니다.",
     ],
-    "이력확인 및 작성": [
+    "은행 이력 업로드": [
         "📝 본인의 활동 이력을 엑셀 파일로 업로드합니다.",
         "🔍 업로드 후 중복·초과 방문, 오류 데이터를 탭에서 확인하세요.",
         "💾 [저장] 버튼으로 임시 저장 후 [실적 결과 전송]으로 제출합니다.",
@@ -1710,7 +1713,7 @@ MENU_GUIDES = {
     ],
     "최종 실적 확인": [
         "📊 전송된 실적 데이터를 최종 확인합니다.",
-        "🔁 수정이 필요한 경우 [이력확인 및 작성] 메뉴로 돌아가 재전송하세요.",
+        "🔁 수정이 필요한 경우 [은행 이력 업로드] 메뉴로 돌아가 재전송하세요.",
         "✅ 내용 확인 후 관리자에게 마감을 요청하세요.",
     ],
 }
@@ -2374,7 +2377,7 @@ def show_final_check():
     select_prev_month("auto_prev_df", "user_prev_month_sel")
 
     if st.session_state.user_excel_data is None:
-        st.info("먼저 이력확인 및 작성 메뉴에서 엑셀을 업로드해주세요.")
+        st.info("먼저 은행 이력 업로드 메뉴에서 엑셀을 업로드해주세요.")
         return
 
     # cloud_sheet_df가 없을 때만 로드 시도
@@ -3966,7 +3969,7 @@ def show_dashboard():
             "- **VOC**: 고객 개선 아이디어 제출 — 건당 10pt, 월 최대 50pt\n\n"
             "위 활동들은 개설·연계 실적 없이도 단독으로 포인트를 적립할 수 있는 가장 현실적인 방법입니다."
         )
-        st.info("💡 위 활동들은 **[이력확인 및 작성] 메뉴 → 추가 실적 입력** 표에서 건수를 직접 입력하여 포인트를 적립할 수 있습니다.")
+        st.info("💡 위 활동들은 **[은행 이력 업로드] 메뉴 → 추가 실적 입력** 표에서 건수를 직접 입력하여 포인트를 적립할 수 있습니다.")
 
 
 
@@ -4737,7 +4740,7 @@ def show_main():
 
     if menu == "대시보드":
         show_dashboard()
-    elif menu == "이력확인 및 작성":
+    elif menu == "은행 이력 업로드":
         show_user_history()
     elif menu == "최종 실적 확인":
         show_final_check()
