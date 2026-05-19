@@ -138,6 +138,12 @@ def filter_by_staff(df, name_col="담당자"):
     return df[df[name_col].isin(staff_names)].reset_index(drop=True)
 
 
+def hide_department_heads(df):
+    if df is None or df.empty or "직급" not in df.columns:
+        return df
+    return df[df["직급"].astype(str).str.strip() != "부서장"].reset_index(drop=True)
+
+
 def dataframe_to_upload_payload(df):
     safe_df = strip_activity_time_columns(df).copy()
     safe_df = safe_df.replace({np.nan: ""})
@@ -665,6 +671,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
 
         res_df = pd.DataFrame(rows)
         res_df = apply_rank_from_user_db(res_df)
+        res_df = hide_department_heads(res_df)
         res_df = sort_by_rank_name(res_df)
 
         if prev_df_raw is not None:
@@ -718,6 +725,10 @@ def style_report_logic(df, compact=False):
         return
 
     df = strip_activity_time_columns(df)
+    df = hide_department_heads(df)
+    if df.empty:
+        st.info("표시할 데이터가 없습니다.")
+        return
 
     # 지사, 상품 컬럼 제거
     df = df.drop(columns=["지사", "상품"], errors="ignore")
