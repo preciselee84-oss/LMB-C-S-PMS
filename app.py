@@ -803,8 +803,7 @@ def show_auth_page():
         ._profileContainer_gzau3_53,
         ._profilePreview_gzau3_63,
         [class*="viewerBadge"],
-        [class*="StatusWidget"],
-        [class*="toolbar"] {
+        [class*="StatusWidget"] {
             display: none !important;
             visibility: hidden !important;
         }
@@ -1065,16 +1064,9 @@ def show_sidebar():
             .viewerBadge_container__r5tak,
             .viewerBadge_link__qRIco,
             [class*="viewerBadge"],
-            [class*="StatusWidget"],
-            [class*="toolbar"] {
+            [class*="StatusWidget"] {
                 display: none !important;
                 visibility: hidden !important;
-            }
-            [data-testid="stSidebarCollapseButton"],
-            [data-testid="collapsedControl"],
-            [data-testid="stSidebarCollapsedControl"] {
-                display: flex !important;
-                visibility: visible !important;
             }
             [data-testid="stSidebar"] {
                 background-color: #2D2D2D !important;
