@@ -1070,17 +1070,21 @@ def show_sidebar():
             }
             header[data-testid="stHeader"] {
                 background: transparent !important;
-                height: 40px !important;
-                min-height: 40px !important;
+                height: 0px !important;
+                min-height: 0px !important;
+                overflow: hidden !important;
+            }
+            [data-testid="stSidebar"] {
+                display: flex !important;
+                transform: none !important;
+                visibility: visible !important;
+                min-width: 240px !important;
+                width: 240px !important;
             }
             [data-testid="stSidebarCollapseButton"],
             [data-testid="collapsedControl"],
-            [data-testid="stSidebarCollapsedControl"],
-            header[data-testid="stHeader"] button {
-                display: flex !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                z-index: 999999 !important;
+            [data-testid="stSidebarCollapsedControl"] {
+                display: none !important;
             }
             [data-testid="stSidebar"] {
                 background-color: #2D2D2D !important;
