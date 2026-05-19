@@ -3231,7 +3231,9 @@ def show_staff_admin():
     st.markdown("#### 직원 정보 수정")
 
     uid_options = [f"{r['ID']} — {r['성명']}" for r in staff_rows]
-    sel = st.selectbox("수정할 직원 선택", ["선택안함"] + uid_options, key="staff_edit_sel")
+    sel_col, _ = st.columns([0.32, 0.68])
+    with sel_col:
+        sel = st.selectbox("수정할 직원 선택", ["선택안함"] + uid_options, key="staff_edit_sel")
 
     if sel == "선택안함":
         return
@@ -3241,7 +3243,7 @@ def show_staff_admin():
 
     st.markdown(f"**메일주소:** {info.get('email', '—')}")
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4, c5, c6 = st.columns([1, 1, 1, 1.15, 1.15, 1.2])
     with c1:
         new_rank = st.selectbox("직급", ["부서장", "팀장", "과장", "대리", "주임", "직원"],
                                 index=["부서장", "팀장", "과장", "대리", "주임", "직원"].index(info.get("rank", "직원")),
@@ -3250,21 +3252,23 @@ def show_staff_admin():
         new_staff_type = st.selectbox("직원구분", ["정규직", "계약직", "파견직", "외주"],
                                       index=["정규직", "계약직", "파견직", "외주"].index(info.get("staff_type", "정규직")),
                                       key="edit_staff_type")
+    with c3:
         new_outsource = st.selectbox("외주여부", ["아니오", "예"],
                                      index=["아니오", "예"].index(info.get("outsource", "아니오")),
                                      key="edit_outsource")
-    with c3:
+    with c4:
         period_opts = ["해당없음", "1년 미만", "1년 이상", "2년 이상"]
         new_period = st.selectbox("외주 근무기간", period_opts,
                                   index=period_opts.index(info.get("outsource_period", "해당없음")),
                                   key="edit_period")
+    with c5:
         new_access = st.selectbox("로그인 허용 여부", ["허용", "불가"],
                                   index=["허용", "불가"].index(info.get("access", "불가")),
                                   key="edit_access")
-
-    new_role = st.selectbox("메뉴 접근 권한", ["사용자 메뉴", "관리자 메뉴"],
-                            index=0 if info.get("role") != "관리자" else 1,
-                            key="edit_role")
+    with c6:
+        new_role = st.selectbox("메뉴 접근 권한", ["사용자 메뉴", "관리자 메뉴"],
+                                index=0 if info.get("role") != "관리자" else 1,
+                                key="edit_role")
 
     bc1, bc2, _ = st.columns([0.15, 0.15, 0.7])
     with bc1:
