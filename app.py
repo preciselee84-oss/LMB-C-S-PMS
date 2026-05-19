@@ -570,11 +570,15 @@ def convert_history_to_sample_df(history_df, user_name):
 
         activity_detail = infer_activity_detail(row, [detail_col, title_col, content_col, category_col])
         activity_category = str(row.get(category_col, "")).strip() if category_col else ""
-        if activity_category not in ["마케팅", "방문B", "부가상품제안", "방문A", "상담"]:
+        if "방문" in activity_category:
+            activity_category = "방문"
+        elif "원격" in activity_category:
+            activity_category = "원격"
+        elif activity_category not in ["방문", "상담", "원격"]:
             activity_category = "상담"
 
         rows.append({
-            "지사": "하나지사",
+            "지사": "HANA지사",
             "상품": row.get(product_col, "통합CMS") if product_col else "통합CMS",
             "업체명": row.get(company_col, "") if company_col else "",
             "사업자번호": biz_no,
@@ -585,7 +589,7 @@ def convert_history_to_sample_df(history_df, user_name):
             "활동상세": activity_detail,
             "업무번호 \n(플로우에 식권, 비즈플레이, 플로우 작성번호)": row.get(work_no_col, "") if work_no_col else "",
             "제목": row.get(title_col, "") if title_col else "",
-            "활동내용": row.get(content_col, "") if content_col else "",
+            "활동내역": row.get(content_col, "") if content_col else "",
         })
 
     return pd.DataFrame(rows), {"total": len(rows), "unmatched": unmatched}
@@ -604,9 +608,10 @@ def sample_format_excel_bytes(df):
             return re.sub(r"\s+", "", str(value or ""))
 
         header_map = {header_key(ws.cell(row=2, column=col).value): col for col in range(1, ws.max_column + 1)}
+        aliases = {"활동내역": "활동내용"}
         for row_idx, (_, row) in enumerate(df.iterrows(), start=3):
             for header, value in row.items():
-                col_idx = header_map.get(header_key(header))
+                col_idx = header_map.get(header_key(header)) or header_map.get(header_key(aliases.get(header, "")))
                 if not col_idx:
                     continue
                 ws.cell(row=row_idx, column=col_idx, value=value)
@@ -2045,6 +2050,8 @@ def convert_bank_excel_to_activity(bank_df):
 
 def show_user_history():
     converted_preview_df = None
+    converted_ym = ""
+    convert_info = {}
     col1, col_convert, col_upload, col_sample, _ = st.columns([1, 1, 1, 1, 2])
     with col1:
         st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>은행 이력 업로드</div>", unsafe_allow_html=True)
@@ -2061,9 +2068,17 @@ def show_user_history():
                     st.button("변환파일 다운로드", use_container_width=True, disabled=True)
                     st.warning(convert_info.get("error", "변환할 데이터가 없습니다."))
                 else:
+                    converted_df = converted_df.copy()
+                    converted_df["지사"] = "HANA지사"
                     converted_preview_df = converted_df
-                    converted_bytes = sample_format_excel_bytes(converted_df)
-                    converted_ym = get_uploaded_month(converted_df).replace("-", "") or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
+                    edited_key = "history_convert_preview_editor"
+                    edited_df = st.session_state.get(edited_key, converted_df)
+                    if not isinstance(edited_df, pd.DataFrame) or list(edited_df.columns) != list(converted_df.columns):
+                        edited_df = converted_df
+                    edited_df = edited_df.copy()
+                    edited_df["지사"] = "HANA지사"
+                    converted_bytes = sample_format_excel_bytes(edited_df)
+                    converted_ym = get_uploaded_month(edited_df).replace("-", "") or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
                     st.download_button(
                         "변환파일 다운로드",
                         data=converted_bytes,
@@ -2101,7 +2116,29 @@ def show_user_history():
 
     if converted_preview_df is not None and not converted_preview_df.empty:
         st.markdown("#### 변환파일 미리보기")
-        render_plain_html_table(converted_preview_df)
+        converted_preview_df = converted_preview_df.copy()
+        converted_preview_df["지사"] = "HANA지사"
+        st.data_editor(
+            converted_preview_df,
+            key="history_convert_preview_editor",
+            use_container_width=True,
+            hide_index=True,
+            disabled=[col for col in converted_preview_df.columns if col not in ["활동구분", "활동상세"]],
+            column_config={
+                "지사": st.column_config.TextColumn("지사", disabled=True),
+                "활동구분": st.column_config.SelectboxColumn(
+                    "활동구분",
+                    options=["방문", "상담", "원격"],
+                    required=True,
+                ),
+                "활동상세": st.column_config.SelectboxColumn(
+                    "활동상세",
+                    options=["운영", "개설", "연계"],
+                    required=True,
+                ),
+                "활동내역": st.column_config.TextColumn("활동내역"),
+            },
+        )
         st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
     # 파일이 제거되면 데이터 초기화
