@@ -335,9 +335,25 @@ def filter_visit_rows(df):
     if df.empty:
         return df.copy()
     visit_col = find_col(df, ["접수유형", "활동구분"])
+    visit_mask = pd.Series(False, index=df.index)
+    if visit_col and visit_col in df.columns:
+        visit_mask = visit_mask | df[visit_col].astype(str).str.strip().str.contains("방문", na=False)
+
+    text_cols = [
+        col for col in [
+            find_col(df, ["제목"]),
+            find_col(df, ["활동내역", "활동내용", "처리내용", "상담내용", "내용"]),
+            find_col(df, ["활동상세"]),
+        ]
+        if col and col in df.columns
+    ]
+    if text_cols:
+        visit_text = df[text_cols].astype(str).agg(" ".join, axis=1)
+        visit_mask = visit_mask | visit_text.str.contains("방문", na=False)
+
     if not visit_col or visit_col not in df.columns:
-        return df.copy()
-    return df[df[visit_col].astype(str).str.strip().str.contains("방문", na=False)].copy()
+        return df[visit_mask].copy() if visit_mask.any() else df.copy()
+    return df[visit_mask].copy()
 
 
 def render_history_search_filters(source_df, key_prefix):
@@ -686,7 +702,8 @@ def convert_history_to_sample_df(history_df, user_name):
 
         activity_detail = infer_activity_detail(row, [detail_col, title_col, content_col, category_col])
         activity_category = str(row.get(category_col, "")).strip() if category_col else ""
-        if "방문" in activity_category:
+        activity_text = " ".join(str(row.get(col, "")) for col in [category_col, title_col, content_col, detail_col] if col)
+        if "방문" in activity_text:
             activity_category = "방문"
         elif "원격" in activity_category:
             activity_category = "원격"
