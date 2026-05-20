@@ -226,6 +226,27 @@ def init_state():
 
 init_state()
 
+# F5 새로고침 후 자동 로그인 복원
+if not st.session_state.logged_in:
+    try:
+        _cm_auto = CookieController()
+        _saved_uid = _cm_auto.get("auto_login_uid") or ""
+        if _saved_uid:
+            _db = st.session_state.user_db
+            if _saved_uid == "1":
+                st.session_state.logged_in = True
+                st.session_state.user_role = "관리자"
+                st.session_state.user_name = "최고관리자"
+                st.session_state.login_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
+            elif _saved_uid in _db and _db[_saved_uid].get("access") == "허용":
+                _user = _db[_saved_uid]
+                st.session_state.logged_in = True
+                st.session_state.user_role = _user.get("role", "사용자")
+                st.session_state.user_name = _user.get("name", "")
+                st.session_state.login_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        pass
+
 
 def clean_header_logic(df):
     try:
@@ -339,6 +360,9 @@ def attach_cloud_dates(user_df):
     if not biz_col_user or not biz_col_cloud:
         return df
 
+    div_col = find_col(cloud, ["신규/이행구분", "이행구분", "신규이행"])
+    add_col = find_col(cloud, ["이행추가연계"])
+
     cloud_cols = [biz_col_cloud]
     rename_map = {}
 
@@ -348,6 +372,12 @@ def attach_cloud_dates(user_df):
     if erp_col:
         cloud_cols.append(erp_col)
         rename_map[erp_col] = "본사 ERP연계일자"
+    if div_col:
+        cloud_cols.append(div_col)
+        rename_map[div_col] = "본사 신규이행구분"
+    if add_col:
+        cloud_cols.append(add_col)
+        rename_map[add_col] = "본사 이행추가연계"
 
     if len(cloud_cols) == 1:
         return df
@@ -512,7 +542,7 @@ def hana_customer_biz_map():
 def convert_history_to_sample_df(history_df, user_name):
     history_df = clean_header_logic(history_df.copy()).replace({np.nan: ""})
     customer_col = find_col(history_df, ["고객번호", "고개번호", "고객NO", "고객 No", "고객"])
-    staff_col = find_col(history_df, ["담당자", "처리자", "접수자", "등록자", "성명"])
+    staff_col = find_col(history_df, ["담당자"]) or find_col(history_df, ["처리자", "접수자", "등록자", "성명"])
     date_col = find_col(history_df, ["활동일", "처리일자", "접수일자", "일자"])
     company_col = find_col(history_df, ["업체명", "고객명", "상호", "회사명"])
     product_col = find_col(history_df, ["상품", "서비스", "제품"])
@@ -1283,11 +1313,13 @@ def show_auth_page():
             cookie_manager = CookieController()
             sid = cookie_manager.get("saved_id") or ""
 
-            u_id = st.text_input("아이디", value=sid, placeholder="아이디를 입력하세요", key="l_id")
-            u_pw = st.text_input("비밀번호", type="password", placeholder="비밀번호를 입력하세요", key="l_pw")
-            save_id_cb = st.checkbox("아이디 저장", value=bool(sid))
+            with st.form("login_form", border=False):
+                u_id = st.text_input("아이디", value=sid, placeholder="아이디를 입력하세요", key="l_id")
+                u_pw = st.text_input("비밀번호", type="password", placeholder="비밀번호를 입력하세요", key="l_pw")
+                save_id_cb = st.checkbox("아이디 저장", value=bool(sid))
+                _login_submitted = st.form_submit_button("로그인", use_container_width=True, type="primary")
 
-            if st.button("로그인", use_container_width=True, type="primary"):
+            if _login_submitted:
                 db = st.session_state.user_db
                 u_id_str = str(u_id).strip() if u_id else ""
                 u_pw_str = str(u_pw).strip() if u_pw else ""
@@ -1305,6 +1337,14 @@ def show_auth_page():
                     else:
                         try:
                             cookie_manager.remove("saved_id")
+                        except Exception:
+                            pass
+                    # 세션 유지용 쿠키 저장 (F5 새로고침 후 자동 로그인)
+                    try:
+                        cookie_manager.set("auto_login_uid", u_id_str, max_age=60 * 60 * 24 * 30)
+                    except Exception:
+                        try:
+                            cookie_manager.set("auto_login_uid", u_id_str)
                         except Exception:
                             pass
 
@@ -1563,6 +1603,11 @@ def show_sidebar():
         if st.button("로그아웃", use_container_width=True):
             st.session_state.logged_in = False
             st.session_state.auth_mode = "login"
+            try:
+                _cm_logout = CookieController()
+                _cm_logout.remove("auto_login_uid")
+            except Exception:
+                pass
             st.rerun()
 
 
@@ -1872,9 +1917,16 @@ def validation_tabs_with_refresh(key):
         """,
         unsafe_allow_html=True,
     )
-    tabs_col, refresh_col = st.columns([0.955, 0.045])
+    tabs_col, link_col, refresh_col = st.columns([0.91, 0.045, 0.045])
     with tabs_col:
         tabs = st.tabs(["중복 이력", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
+    with link_col:
+        _url_sync = st.session_state.get("url_sync", "")
+        if _url_sync:
+            _sheet_url = _url_sync.split("/export")[0] + "/edit"
+            st.link_button("🔗", _sheet_url, use_container_width=True, help="본사 구글시트 바로가기")
+        else:
+            st.button("🔗", disabled=True, use_container_width=True, key=f"{key}_link")
     with refresh_col:
         st.markdown("<div class='refresh-tab-button'>", unsafe_allow_html=True)
         if st.button("↻", use_container_width=True, key=key, help="구글시트 데이터 다시 조회"):
@@ -2522,6 +2574,11 @@ def show_user_history():
         missing_erp = target[
             pd.isna(target["본사 ERP연계일자"]) | (target["본사 ERP연계일자"].astype(str).str.strip() == "")
         ]
+        # 신규/이행구분이 "이행"이고 이행추가연계가 비어있으면 ERP연계 불필요 → 제외
+        if "본사 신규이행구분" in missing_erp.columns and "본사 이행추가연계" in missing_erp.columns:
+            _is_ihang = missing_erp["본사 신규이행구분"].astype(str).str.strip() == "이행"
+            _add_empty = pd.isna(missing_erp["본사 이행추가연계"]) | (missing_erp["본사 이행추가연계"].astype(str).str.strip() == "")
+            missing_erp = missing_erp[~(_is_ihang & _add_empty)]
 
     # 검증 이슈 확인
     has_validation_issues = (
@@ -3889,6 +3946,33 @@ def show_dashboard():
     c2.metric("전월 대비", f"{prev['합계포인트']:,} pt", delta=f"{diff_prev:+,} pt")
     c3.metric("전년 동월 대비", f"{py['합계포인트']:,} pt", delta=f"{diff_year:+,} pt")
     c4.metric("최대 추가 가능", f"{max_add:,} pt")
+
+    # ── 이번달 고객사 개설/운영 현황 ──────────────────────
+    curr_g = filter_month_gaeseol(df_user_hana, curr_ym)
+    curr_y = filter_month_yeonge(df_user_hana, curr_ym)
+    if not curr_g.empty or not curr_y.empty:
+        st.markdown(f"**{curr_ym} 고객사 진행 현황**")
+        _comp_col = next((c for c in df_user_hana.columns if any(k in c for k in ["업체명", "고객명", "상호"])), None)
+        _dg, _dy = st.columns(2)
+        with _dg:
+            st.caption(f"개설/이행 ({len(curr_g)}건)")
+            if not curr_g.empty:
+                _dcols = [c for c in [_comp_col, gubun_col, gaeseol_date_col] if c and c in curr_g.columns]
+                _show = curr_g[_dcols].copy() if _dcols else curr_g.iloc[:, :3].copy()
+                _show[gaeseol_date_col] = _show[gaeseol_date_col].dt.strftime("%Y-%m-%d") if gaeseol_date_col in _show.columns else _show.get(gaeseol_date_col, "")
+                st.dataframe(_show.reset_index(drop=True), use_container_width=True, hide_index=True)
+            else:
+                st.info("이번달 개설/이행 없음")
+        with _dy:
+            st.caption(f"연계 ({len(curr_y)}건)")
+            if not curr_y.empty:
+                _dcols2 = [c for c in [_comp_col, yeonge_date_col] if c and c in curr_y.columns]
+                _show2 = curr_y[_dcols2].copy() if _dcols2 else curr_y.iloc[:, :2].copy()
+                if yeonge_date_col in _show2.columns:
+                    _show2[yeonge_date_col] = _show2[yeonge_date_col].dt.strftime("%Y-%m-%d")
+                st.dataframe(_show2.reset_index(drop=True), use_container_width=True, hide_index=True)
+            else:
+                st.info("이번달 연계 없음")
 
     st.markdown("---")
 
