@@ -4236,20 +4236,24 @@ def show_staff_admin():
 def show_target_customers():
     st.markdown("### 이번달 활동 대상고객 추천")
 
-    # 본사 구글시트 로드
+    # 하나은행 구글시트 로드 (개설 미완료용)
+    hana_sheet = None
+    try:
+        hana_raw = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+        hana_sheet = hana_raw
+    except Exception as e:
+        st.error(f"하나은행 구글시트를 불러오지 못했습니다: {e}")
+
+    # 본사 구글시트 로드 (ERP연계 미완료용)
     if st.session_state.get("cloud_sheet_df") is None:
         try:
             load_csv_to_state("url_sync", "cloud_sheet_df")
         except Exception as e:
             st.error(f"본사 구글시트를 불러오지 못했습니다: {e}")
-            return
 
     cloud = st.session_state.get("cloud_sheet_df")
-    if cloud is None or cloud.empty:
-        st.info("본사 구글시트 데이터가 없습니다. 관리자에게 URL 설정을 확인해주세요.")
-        return
 
-    # 하나은행 시트 로드
+    # 활동 이력 시트 로드 (최근 활동 정보용)
     if st.session_state.get("analysis_lookup_df") is None:
         try:
             load_csv_to_state("url_analysis", "analysis_lookup_df")
@@ -4377,67 +4381,68 @@ def show_target_customers():
 
         return d
 
-    # ── 개설 미완료 ───────────────────────────────────────────
+    # ── 개설 미완료 (하나은행 시트 기반) ──────────────────────
     st.markdown("#### 🟠 개설 미완료 고객")
 
-    # 디버깅: 특정 고객 추적
-    debug_biz = "1348206813"
-    if biz_col and biz_col in df.columns:
-        debug_customer = df[normalize_biz(df[biz_col]) == debug_biz]
-        if not debug_customer.empty and user_name == "이성환":
-            with st.expander("🔍 디버깅: 서울예술대학교 산학협력단 필터링 상태"):
-                st.write(f"**1단계: 전체 데이터에서 찾기** - {'✅ 발견' if not debug_customer.empty else '❌ 없음'}")
-                if not debug_customer.empty:
-                    st.write(f"- 개설완료일자: {debug_customer.iloc[0].get(open_col, 'N/A')}")
-                    st.write(f"- 개설상태: {debug_customer.iloc[0].get(open_status_col, 'N/A') if open_status_col else 'N/A'}")
-                    st.write(f"- 관리구분: {debug_customer.iloc[0].get(manage_div_col, 'N/A') if manage_div_col else 'N/A'}")
-                    st.write(f"- 신규/이행구분: {debug_customer.iloc[0].get(div_col, 'N/A') if div_col else 'N/A'}")
-                    st.write(f"- 개설취소: {debug_customer.iloc[0].get(open_cancel_col, 'N/A') if open_cancel_col else 'N/A'}")
-                    st.write(f"- 상태항목: {debug_customer.iloc[0].get(status_col, 'N/A') if status_col else 'N/A'}")
+    if hana_sheet is not None and not hana_sheet.empty:
+        hana_df_open = hana_sheet.copy()
 
-    gaeseol_needed = df[_empty(open_col)].copy()
+        # 컬럼명 확인
+        hana_owner_col = "담당자"
+        hana_guchuk_col = "구축구분"
+        hana_manage_col = "관리구분"
+        hana_open_status_col = "개설상태"
+        hana_open_date_col = "개설/이행일"
+        hana_comp_col = find_col(hana_df_open, ["업체명", "고객명", "상호"])
+        hana_biz_col = find_col(hana_df_open, ["사업자번호"])
 
-    if biz_col and user_name == "이성환":
-        debug_in_step1 = normalize_biz(gaeseol_needed[biz_col]).isin([debug_biz]).any() if biz_col in gaeseol_needed.columns else False
-        if not debug_customer.empty:
-            with st.expander("🔍 디버깅: 필터링 단계별 상태", expanded=False):
-                st.write(f"**2단계: 개설완료일자 비어있음** - {'✅ 통과' if debug_in_step1 else '❌ 제외됨'}")
+        # 필터링 조건 적용
+        # 1. 본인 담당자
+        if hana_owner_col in hana_df_open.columns:
+            hana_df_open = hana_df_open[hana_df_open[hana_owner_col].astype(str).str.strip() == str(user_name).strip()]
 
-    # 개설상태가 "개설대기" 또는 "개설진행"인 고객만 표시
-    if open_status_col and open_status_col in gaeseol_needed.columns:
-        before_count = len(gaeseol_needed)
-        gaeseol_needed = gaeseol_needed[
-            gaeseol_needed[open_status_col].astype(str).str.strip().isin(["개설대기", "개설진행"])
-        ]
-        if biz_col and user_name == "이성환":
-            debug_in_step2 = normalize_biz(gaeseol_needed[biz_col]).isin([debug_biz]).any() if biz_col in gaeseol_needed.columns else False
-            if not debug_customer.empty and before_count > 0:
-                with st.expander("🔍 디버깅: 필터링 단계별 상태", expanded=False):
-                    st.write(f"**3단계: 개설상태 확인** - {'✅ 통과' if debug_in_step2 else '❌ 제외됨'}")
+        # 2. 구축구분 = 신규
+        if hana_guchuk_col in hana_df_open.columns:
+            hana_df_open = hana_df_open[hana_df_open[hana_guchuk_col].astype(str).str.strip() == "신규"]
 
-    # 개설취소 제외
-    if open_cancel_col and open_cancel_col in gaeseol_needed.columns:
-        gaeseol_needed = gaeseol_needed[
-            gaeseol_needed[open_cancel_col].astype(str).str.strip().str.lower() != "취소"
-        ]
+        # 3. 관리구분 = 정상
+        if hana_manage_col in hana_df_open.columns:
+            hana_df_open = hana_df_open[hana_df_open[hana_manage_col].astype(str).str.strip() == "정상"]
 
-    # 이행 고객 제외
-    if div_col and div_col in gaeseol_needed.columns:
-        gaeseol_needed = gaeseol_needed[
-            gaeseol_needed[div_col].astype(str).str.strip() != "이행"
-        ]
+        # 4. 개설상태 = 개설대기
+        if hana_open_status_col in hana_df_open.columns:
+            hana_df_open = hana_df_open[hana_df_open[hana_open_status_col].astype(str).str.strip() == "개설대기"]
 
-    # 상태항목이 "취소"인 경우 제외
-    if status_col and status_col in gaeseol_needed.columns:
-        gaeseol_needed = gaeseol_needed[
-            gaeseol_needed[status_col].astype(str).str.strip() != "취소"
-        ]
+        # 5. 개설/이행일 = 공백
+        if hana_open_date_col in hana_df_open.columns:
+            hana_df_open[hana_open_date_col] = pd.to_datetime(hana_df_open[hana_open_date_col], errors="coerce")
+            hana_df_open = hana_df_open[hana_df_open[hana_open_date_col].isna()]
 
-    if not gaeseol_needed.empty:
-        st.caption(f"{len(gaeseol_needed)}건")
-        st.dataframe(fmt_df(gaeseol_needed), use_container_width=True, hide_index=True)
+        # 결과 표시
+        if not hana_df_open.empty:
+            # 표시할 컬럼 선택
+            display_cols = [c for c in [hana_comp_col, hana_biz_col, hana_guchuk_col, hana_manage_col, hana_open_status_col, hana_open_date_col] if c and c in hana_df_open.columns]
+
+            # 활동 이력 추가
+            result_df = hana_df_open[display_cols].copy().reset_index(drop=True)
+
+            if hana_biz_col and hana_biz_col in result_df.columns:
+                activities = []
+                for _, row in result_df.iterrows():
+                    biz_no = row.get(hana_biz_col, "")
+                    activity = get_recent_activity(biz_no)
+                    activities.append(activity)
+
+                result_df["최근활동일"] = [a["last_date"] for a in activities]
+                result_df["최근활동내용"] = [a["last_detail"] for a in activities]
+                result_df["총활동건수"] = [a["activity_count"] for a in activities]
+
+            st.caption(f"{len(result_df)}건")
+            st.dataframe(result_df, use_container_width=True, hide_index=True)
+        else:
+            st.success("개설 미완료 고객 없음")
     else:
-        st.success("개설 미완료 고객 없음")
+        st.warning("하나은행 시트 데이터를 불러올 수 없습니다.")
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
