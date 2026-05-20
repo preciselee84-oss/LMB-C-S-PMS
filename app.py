@@ -5242,6 +5242,42 @@ def inject_theme_toggle():
     body:has(#pms-d:checked) .pms-sw-track { background: #313244; }
     body:has(#pms-d:checked) .pms-btn { color: #ffffff; }
 
+    /* Streamlit canvas-backed tables */
+    html[data-pms-theme="d"] [data-testid="stDataEditor"],
+    html[data-pms-theme="d"] [data-testid="stDataFrame"],
+    body[data-pms-theme="d"] [data-testid="stDataEditor"],
+    body[data-pms-theme="d"] [data-testid="stDataFrame"],
+    .stApp:has(#pms-d:checked) [data-testid="stDataEditor"],
+    .stApp:has(#pms-d:checked) [data-testid="stDataFrame"],
+    body:has(#pms-d:checked) [data-testid="stDataEditor"],
+    body:has(#pms-d:checked) [data-testid="stDataFrame"] {
+        background-color: #252535 !important;
+        border-color: #45475a !important;
+        color: #ffffff !important;
+    }
+    html[data-pms-theme="d"] [data-testid="stDataEditor"] canvas,
+    html[data-pms-theme="d"] [data-testid="stDataFrame"] canvas,
+    body[data-pms-theme="d"] [data-testid="stDataEditor"] canvas,
+    body[data-pms-theme="d"] [data-testid="stDataFrame"] canvas,
+    .stApp:has(#pms-d:checked) [data-testid="stDataEditor"] canvas,
+    .stApp:has(#pms-d:checked) [data-testid="stDataFrame"] canvas,
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] canvas,
+    body:has(#pms-d:checked) [data-testid="stDataFrame"] canvas {
+        filter: invert(1) hue-rotate(180deg) brightness(0.74) contrast(1.2) saturate(0.82) !important;
+    }
+    html[data-pms-theme="d"] [data-testid="stDataEditor"] [role="columnheader"],
+    html[data-pms-theme="d"] [data-testid="stDataEditor"] [role="gridcell"],
+    html[data-pms-theme="d"] [data-testid="stDataFrame"] [role="columnheader"],
+    html[data-pms-theme="d"] [data-testid="stDataFrame"] [role="gridcell"],
+    .stApp:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"],
+    .stApp:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"],
+    .stApp:has(#pms-d:checked) [data-testid="stDataFrame"] [role="columnheader"],
+    .stApp:has(#pms-d:checked) [data-testid="stDataFrame"] [role="gridcell"] {
+        background-color: #252535 !important;
+        border-color: #45475a !important;
+        color: #ffffff !important;
+    }
+
     @media (prefers-color-scheme: dark) {
         body:has(#pms-s:checked) .stApp,
         body:has(#pms-s:checked) [data-testid="stAppViewContainer"],
