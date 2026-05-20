@@ -2235,6 +2235,11 @@ def show_user_history():
         else:
             st.button("샘플파일 다운로드", use_container_width=True, disabled=True)
 
+    # 미리보기 에디터를 분석 이전에 렌더링 → 편집 결과가 같은 사이클에 분석에 반영됨
+    if converted_preview_df is not None and not converted_preview_df.empty:
+        st.divider()
+        render_converted_preview_editor(converted_preview_df)
+
     if False and converted_preview_df is not None and not converted_preview_df.empty:
         st.markdown("#### 변환파일 미리보기")
         st.markdown(
@@ -2361,16 +2366,12 @@ def show_user_history():
         st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
     if converted_preview_df is not None and not converted_preview_df.empty:
-        converted_preview_df = normalize_converted_history_df(converted_preview_df)
-        data_key = "history_convert_preview_data"
-        editor_key = "history_convert_preview_editor"
-        prepared_df = st.session_state.get(editor_key)
-        if not isinstance(prepared_df, pd.DataFrame) or list(prepared_df.columns) != list(converted_preview_df.columns):
-            prepared_df = st.session_state.get(data_key, converted_preview_df)
-        if not isinstance(prepared_df, pd.DataFrame) or list(prepared_df.columns) != list(converted_preview_df.columns):
-            prepared_df = converted_preview_df
-        analysis_df = normalize_converted_history_df(prepared_df)
-        st.session_state[data_key] = analysis_df
+        _norm_cpdf = normalize_converted_history_df(converted_preview_df)
+        _saved_preview = st.session_state.get("history_convert_preview_data")
+        if isinstance(_saved_preview, pd.DataFrame) and list(_saved_preview.columns) == list(_norm_cpdf.columns):
+            analysis_df = _saved_preview
+        else:
+            analysis_df = _norm_cpdf
 
     # 파일이 제거되면 데이터 초기화
     if u_file is None:
@@ -2582,28 +2583,6 @@ def show_user_history():
         total += min(score, limit_map[item]) if item in limit_map else score
 
     st.metric("추가 실적 합산 점수", f"{total:,} PT")
-
-    # 미리보기 편집 전 해시 저장 — 편집 후 변경 감지 시 자동 rerun으로 검증 탭 갱신
-    _pre_hash = None
-    _tmp_prev = st.session_state.get("history_convert_preview_data")
-    if isinstance(_tmp_prev, pd.DataFrame) and not _tmp_prev.empty:
-        try:
-            _pre_hash = int(pd.util.hash_pandas_object(_tmp_prev).sum())
-        except Exception:
-            pass
-
-    if converted_preview_df is not None and not converted_preview_df.empty:
-        st.divider()
-        render_converted_preview_editor(converted_preview_df)
-
-    _tmp_cur = st.session_state.get("history_convert_preview_data")
-    if isinstance(_tmp_cur, pd.DataFrame) and not _tmp_cur.empty:
-        try:
-            _post_hash = int(pd.util.hash_pandas_object(_tmp_cur).sum())
-            if _pre_hash is not None and _post_hash != _pre_hash:
-                st.rerun()
-        except Exception:
-            pass
 
     t1, t2, t3, t4, t5 = validation_tabs_with_refresh("refresh_user_history_validation")
     with t1:
