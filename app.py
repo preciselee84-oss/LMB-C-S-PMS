@@ -4379,13 +4379,41 @@ def show_target_customers():
 
     # ── 개설 미완료 ───────────────────────────────────────────
     st.markdown("#### 🟠 개설 미완료 고객")
+
+    # 디버깅: 특정 고객 추적
+    debug_biz = "1348206813"
+    if biz_col and biz_col in df.columns:
+        debug_customer = df[normalize_biz(df[biz_col]) == debug_biz]
+        if not debug_customer.empty and user_name == "이성환":
+            with st.expander("🔍 디버깅: 서울예술대학교 산학협력단 필터링 상태"):
+                st.write(f"**1단계: 전체 데이터에서 찾기** - {'✅ 발견' if not debug_customer.empty else '❌ 없음'}")
+                if not debug_customer.empty:
+                    st.write(f"- 개설완료일자: {debug_customer.iloc[0].get(open_col, 'N/A')}")
+                    st.write(f"- 개설상태: {debug_customer.iloc[0].get(open_status_col, 'N/A') if open_status_col else 'N/A'}")
+                    st.write(f"- 관리구분: {debug_customer.iloc[0].get(manage_div_col, 'N/A') if manage_div_col else 'N/A'}")
+                    st.write(f"- 신규/이행구분: {debug_customer.iloc[0].get(div_col, 'N/A') if div_col else 'N/A'}")
+                    st.write(f"- 개설취소: {debug_customer.iloc[0].get(open_cancel_col, 'N/A') if open_cancel_col else 'N/A'}")
+                    st.write(f"- 상태항목: {debug_customer.iloc[0].get(status_col, 'N/A') if status_col else 'N/A'}")
+
     gaeseol_needed = df[_empty(open_col)].copy()
+
+    if biz_col and user_name == "이성환":
+        debug_in_step1 = normalize_biz(gaeseol_needed[biz_col]).isin([debug_biz]).any() if biz_col in gaeseol_needed.columns else False
+        if not debug_customer.empty:
+            with st.expander("🔍 디버깅: 필터링 단계별 상태", expanded=False):
+                st.write(f"**2단계: 개설완료일자 비어있음** - {'✅ 통과' if debug_in_step1 else '❌ 제외됨'}")
 
     # 개설상태가 "개설대기" 또는 "개설진행"인 고객만 표시
     if open_status_col and open_status_col in gaeseol_needed.columns:
+        before_count = len(gaeseol_needed)
         gaeseol_needed = gaeseol_needed[
             gaeseol_needed[open_status_col].astype(str).str.strip().isin(["개설대기", "개설진행"])
         ]
+        if biz_col and user_name == "이성환":
+            debug_in_step2 = normalize_biz(gaeseol_needed[biz_col]).isin([debug_biz]).any() if biz_col in gaeseol_needed.columns else False
+            if not debug_customer.empty and before_count > 0:
+                with st.expander("🔍 디버깅: 필터링 단계별 상태", expanded=False):
+                    st.write(f"**3단계: 개설상태 확인** - {'✅ 통과' if debug_in_step2 else '❌ 제외됨'}")
 
     # 개설취소 제외
     if open_cancel_col and open_cancel_col in gaeseol_needed.columns:
