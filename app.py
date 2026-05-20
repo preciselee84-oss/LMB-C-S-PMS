@@ -2105,6 +2105,10 @@ def show_user_history():
         st.markdown(
             """
             <style>
+            body[data-pms-theme="d"] [data-testid="stDataEditor"],
+            body[data-pms-theme="d"] [data-testid="stDataEditor"] > div,
+            body[data-pms-theme="d"] [data-testid="stDataEditor"] [role="grid"],
+            body[data-pms-theme="d"] [data-testid="stDataEditor"] canvas,
             body:has(#pms-d:checked) [data-testid="stDataEditor"],
             body:has(#pms-d:checked) [data-testid="stDataEditor"] > div,
             body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="grid"],
@@ -2112,14 +2116,60 @@ def show_user_history():
                 background-color: #252535 !important;
                 color: #ffffff !important;
             }
+            body[data-pms-theme="d"] [data-testid="stDataEditor"] canvas,
             body:has(#pms-d:checked) [data-testid="stDataEditor"] canvas {
-                filter: invert(1) hue-rotate(180deg) brightness(0.78) contrast(1.1);
+                filter: invert(1) hue-rotate(180deg) brightness(0.72) contrast(1.18) saturate(0.85) !important;
             }
+            body[data-pms-theme="d"] [data-testid="stDataEditor"] [role="columnheader"],
+            body[data-pms-theme="d"] [data-testid="stDataEditor"] [role="gridcell"],
             body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"],
             body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"] {
                 background-color: #252535 !important;
                 color: #ffffff !important;
                 border-color: #45475a !important;
+            }
+            body[data-pms-theme="d"] [data-testid="stDataEditor"] input,
+            body[data-pms-theme="d"] [data-testid="stDataEditor"] textarea,
+            body[data-pms-theme="d"] [data-testid="stDataEditor"] [contenteditable="true"],
+            body[data-pms-theme="d"] [data-testid="stDataEditor"] [data-baseweb="input"] input,
+            body:has(#pms-d:checked) [data-testid="stDataEditor"] input,
+            body:has(#pms-d:checked) [data-testid="stDataEditor"] textarea,
+            body:has(#pms-d:checked) [data-testid="stDataEditor"] [contenteditable="true"],
+            body:has(#pms-d:checked) [data-testid="stDataEditor"] [data-baseweb="input"] input {
+                background-color: #0f0f1f !important;
+                color: #ffffff !important;
+                caret-color: #ffffff !important;
+                border-color: #89b4fa !important;
+                -webkit-text-fill-color: #ffffff !important;
+            }
+            body[data-pms-theme="d"] [data-testid="stDataEditor"] input::selection,
+            body[data-pms-theme="d"] [data-testid="stDataEditor"] textarea::selection,
+            body:has(#pms-d:checked) [data-testid="stDataEditor"] input::selection,
+            body:has(#pms-d:checked) [data-testid="stDataEditor"] textarea::selection {
+                background-color: #4f46e5 !important;
+                color: #ffffff !important;
+            }
+            @media (prefers-color-scheme: dark) {
+                body:has(#pms-s:checked) [data-testid="stDataEditor"],
+                body:has(#pms-s:checked) [data-testid="stDataEditor"] > div,
+                body:has(#pms-s:checked) [data-testid="stDataEditor"] [role="grid"],
+                body:has(#pms-s:checked) [data-testid="stDataEditor"] canvas {
+                    background-color: #252535 !important;
+                    color: #ffffff !important;
+                }
+                body:has(#pms-s:checked) [data-testid="stDataEditor"] canvas {
+                    filter: invert(1) hue-rotate(180deg) brightness(0.72) contrast(1.18) saturate(0.85) !important;
+                }
+                body:has(#pms-s:checked) [data-testid="stDataEditor"] input,
+                body:has(#pms-s:checked) [data-testid="stDataEditor"] textarea,
+                body:has(#pms-s:checked) [data-testid="stDataEditor"] [contenteditable="true"],
+                body:has(#pms-s:checked) [data-testid="stDataEditor"] [data-baseweb="input"] input {
+                    background-color: #0f0f1f !important;
+                    color: #ffffff !important;
+                    caret-color: #ffffff !important;
+                    border-color: #89b4fa !important;
+                    -webkit-text-fill-color: #ffffff !important;
+                }
             }
             </style>
             """,
