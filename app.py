@@ -1740,14 +1740,14 @@ def show_sidebar():
 
         if st.session_state.user_role == "관리자":
             st.markdown("관리자 메뉴")
-            for menu_name in ["실적 분석/계산", "실적 보고서"]:
+            for menu_name in ["실적 분석/계산", "실적 보고서", "주간보고 취합"]:
                 if st.button(menu_name, use_container_width=True):
                     st.session_state.current_menu = menu_name
                     st.rerun()
 
         st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
         st.markdown("사용자 메뉴")
-        for menu_name in ["업로드 및 실적 확인", "이번달 활동 대상고객 추천"]:
+        for menu_name in ["업로드 및 실적 확인", "이번달 활동 대상고객 추천", "주간보고 이력 작성"]:
             if st.button(menu_name, use_container_width=True):
                 st.session_state.current_menu = menu_name
                 st.rerun()
@@ -2016,7 +2016,7 @@ def render_page_title(menu):
     if menu != "대시보드":
         st.markdown(f"## {menu}")
     settings_menus = ["직원 및 권한설정", "구글 스트레드시트 연동"]
-    admin_menus = ["실적 분석/계산", "실적 보고서"]
+    admin_menus = ["실적 분석/계산", "실적 보고서", "주간보고 취합"]
     if menu in settings_menus:
         parent_nav = "설정"
     elif menu in admin_menus:
@@ -4181,6 +4181,14 @@ def show_target_customers():
     st.caption(f"총 담당 고객 {len(df)}건 · 본사 구글시트 기준")
 
 
+def show_weekly_report_user():
+    st.info("주간보고 이력 작성 기능은 준비 중입니다.")
+
+
+def show_weekly_report_admin():
+    st.info("주간보고 취합 기능은 준비 중입니다.")
+
+
 def show_dashboard():
     import plotly.graph_objects as go
 
@@ -5313,6 +5321,10 @@ def show_main():
         show_staff_admin()
     elif menu == "구글 스트레드시트 연동":
         show_google_sync()
+    elif menu == "주간보고 이력 작성":
+        show_weekly_report_user()
+    elif menu == "주간보고 취합":
+        show_weekly_report_admin()
 
 
 if st.session_state.logged_in:
