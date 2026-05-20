@@ -334,28 +334,11 @@ def filter_visit_rows(df):
         return pd.DataFrame()
     if df.empty:
         return df.copy()
-    visit_col = find_col(df, ["접수유형", "활동구분"])
-    visit_mask = pd.Series(False, index=df.index)
-    if visit_col and visit_col in df.columns:
-        visit_mask = visit_mask | df[visit_col].astype(str).str.strip().str.contains("방문", na=False)
-
-    text_cols = [
-        col for col in [
-            find_col(df, ["제목"]),
-            find_col(df, ["활동내역", "활동내용", "처리내용", "상담내용", "내용"]),
-            find_col(df, ["활동상세"]),
-        ]
-        if col and col in df.columns
-    ]
-    if text_cols:
-        visit_text = df[text_cols[0]].fillna("").astype(str)
-        for _tc in text_cols[1:]:
-            visit_text = visit_text + " " + df[_tc].fillna("").astype(str)
-        visit_mask = visit_mask | visit_text.str.contains("방문", na=False)
-
+    visit_col = find_col(df, ["활동구분", "접수유형"])
     if not visit_col or visit_col not in df.columns:
-        return df[visit_mask].copy() if visit_mask.any() else df.copy()
-    return df[visit_mask].copy()
+        return df.copy()
+    mask = df[visit_col].astype(str).str.strip().str.contains("방문", na=False)
+    return df[mask].copy()
 
 
 def render_history_search_filters(source_df, key_prefix):
