@@ -4244,6 +4244,15 @@ def show_target_customers():
     except Exception as e:
         st.error(f"하나은행 구글시트를 불러오지 못했습니다: {e}")
 
+    # 하나은행 청구 시트 로드 (운영 관리 대상용)
+    hana_billing_sheet = None
+    try:
+        billing_raw = pd.read_csv(st.session_state.get("url_hana_billing", DEFAULT_URL_HANA_BILLING))
+        billing_raw = billing_raw.dropna(how="all").reset_index(drop=True)
+        hana_billing_sheet = billing_raw
+    except Exception as e:
+        st.error(f"하나은행 청구 시트를 불러오지 못했습니다: {e}")
+
     # 본사 구글시트 로드 (ERP연계 미완료용)
     if st.session_state.get("cloud_sheet_df") is None:
         try:
@@ -4505,17 +4514,180 @@ def show_target_customers():
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
-    # ── 운영 관리 대상 (개설+연계 완료) ──────────────────────
+    # ── 운영 관리 대상 (하나은행 청구 시트 기반) ─────────────
     st.markdown("#### 🟢 운영 관리 대상 고객")
-    ops = df[~_empty(open_col) & ~_empty(erp_col)].copy()
-    if not ops.empty:
-        st.caption(f"{len(ops)}건")
-        st.dataframe(fmt_df(ops), use_container_width=True, hide_index=True)
+
+    if hana_billing_sheet is not None and not hana_billing_sheet.empty:
+        billing_df = hana_billing_sheet.copy()
+
+        # 컬럼명 확인
+        billing_owner_col = find_col(billing_df, ["담당자"])
+        billing_open_date_col = find_col(billing_df, ["개설/이행일", "개설일"])
+        billing_login_col = find_col(billing_df, ["최종로그인일자", "로그인일자"])
+        billing_transfer_col = find_col(billing_df, ["최종이체일자", "이체일자"])
+        billing_comp_col = find_col(billing_df, ["업체명", "고객명", "상호"])
+        billing_biz_col = find_col(billing_df, ["사업자번호"])
+
+        # 본인 담당자만 필터
+        if billing_owner_col and billing_owner_col in billing_df.columns:
+            billing_df = billing_df[billing_df[billing_owner_col].astype(str).str.strip() == str(user_name).strip()]
+
+        # 날짜 컬럼 변환
+        if billing_open_date_col and billing_open_date_col in billing_df.columns:
+            billing_df[billing_open_date_col] = pd.to_datetime(billing_df[billing_open_date_col], errors="coerce")
+        if billing_login_col and billing_login_col in billing_df.columns:
+            billing_df[billing_login_col] = pd.to_datetime(billing_df[billing_login_col], errors="coerce")
+        if billing_transfer_col and billing_transfer_col in billing_df.columns:
+            billing_df[billing_transfer_col] = pd.to_datetime(billing_df[billing_transfer_col], errors="coerce")
+
+        # 현재 날짜 기준
+        today = pd.Timestamp.now()
+        two_months_ago = today - pd.DateOffset(months=2)
+        this_year_start = pd.Timestamp(today.year, 1, 1)
+
+        # 1. 로그인 이력 없는 고객사
+        st.markdown("##### 📍 로그인 이력 없는 고객사")
+
+        # 1-1) 직전 2개월 이내 개설 + 로그인 없음
+        if billing_open_date_col and billing_login_col:
+            no_login_2m = billing_df[
+                (billing_df[billing_open_date_col] >= two_months_ago) &
+                (billing_df[billing_login_col].isna())
+            ].copy()
+
+            if not no_login_2m.empty:
+                st.caption(f"📌 직전 2개월 이내 개설 ({len(no_login_2m)}건)")
+                display_cols = [c for c in [billing_comp_col, billing_biz_col, billing_open_date_col, billing_login_col] if c and c in no_login_2m.columns]
+                result_2m = no_login_2m[display_cols].copy().reset_index(drop=True)
+
+                # 날짜 포맷팅
+                if billing_open_date_col in result_2m.columns:
+                    result_2m[billing_open_date_col] = result_2m[billing_open_date_col].dt.strftime("%Y-%m-%d")
+
+                # 활동 이력 추가
+                if billing_biz_col and billing_biz_col in result_2m.columns:
+                    activities = []
+                    for _, row in result_2m.iterrows():
+                        biz_no = row.get(billing_biz_col, "")
+                        activity = get_recent_activity(biz_no)
+                        activities.append(activity)
+
+                    result_2m["최근활동일"] = [a["last_date"] for a in activities]
+                    result_2m["최근활동내용"] = [a["last_detail"] for a in activities]
+                    result_2m["총활동건수"] = [a["activity_count"] for a in activities]
+
+                st.dataframe(result_2m, use_container_width=True, hide_index=True)
+            else:
+                st.info("직전 2개월 이내 개설 고객 중 로그인 없는 고객 없음")
+
+        # 1-2) 올해 개설 + 로그인 없음
+        if billing_open_date_col and billing_login_col:
+            no_login_year = billing_df[
+                (billing_df[billing_open_date_col] >= this_year_start) &
+                (billing_df[billing_login_col].isna())
+            ].copy()
+
+            if not no_login_year.empty:
+                st.caption(f"📌 올해 개설 ({len(no_login_year)}건)")
+                display_cols = [c for c in [billing_comp_col, billing_biz_col, billing_open_date_col, billing_login_col] if c and c in no_login_year.columns]
+                result_year = no_login_year[display_cols].copy().reset_index(drop=True)
+
+                # 날짜 포맷팅
+                if billing_open_date_col in result_year.columns:
+                    result_year[billing_open_date_col] = result_year[billing_open_date_col].dt.strftime("%Y-%m-%d")
+
+                # 활동 이력 추가
+                if billing_biz_col and billing_biz_col in result_year.columns:
+                    activities = []
+                    for _, row in result_year.iterrows():
+                        biz_no = row.get(billing_biz_col, "")
+                        activity = get_recent_activity(biz_no)
+                        activities.append(activity)
+
+                    result_year["최근활동일"] = [a["last_date"] for a in activities]
+                    result_year["최근활동내용"] = [a["last_detail"] for a in activities]
+                    result_year["총활동건수"] = [a["activity_count"] for a in activities]
+
+                st.dataframe(result_year, use_container_width=True, hide_index=True)
+            else:
+                st.info("올해 개설 고객 중 로그인 없는 고객 없음")
+
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+        # 2. 이체 이력이 없는 고객사
+        st.markdown("##### 💳 이체 이력이 없는 고객사")
+
+        # 2-1) 직전 2개월 이내 개설 + 로그인 있음 + 이체 없음
+        if billing_open_date_col and billing_login_col and billing_transfer_col:
+            no_transfer_2m = billing_df[
+                (billing_df[billing_open_date_col] >= two_months_ago) &
+                (billing_df[billing_login_col].notna()) &
+                (billing_df[billing_transfer_col].isna())
+            ].copy()
+
+            if not no_transfer_2m.empty:
+                st.caption(f"📌 직전 2개월 이내 개설 ({len(no_transfer_2m)}건)")
+                display_cols = [c for c in [billing_comp_col, billing_biz_col, billing_open_date_col, billing_login_col, billing_transfer_col] if c and c in no_transfer_2m.columns]
+                result_trans_2m = no_transfer_2m[display_cols].copy().reset_index(drop=True)
+
+                # 날짜 포맷팅
+                for date_col in [billing_open_date_col, billing_login_col]:
+                    if date_col and date_col in result_trans_2m.columns:
+                        result_trans_2m[date_col] = result_trans_2m[date_col].dt.strftime("%Y-%m-%d")
+
+                # 활동 이력 추가
+                if billing_biz_col and billing_biz_col in result_trans_2m.columns:
+                    activities = []
+                    for _, row in result_trans_2m.iterrows():
+                        biz_no = row.get(billing_biz_col, "")
+                        activity = get_recent_activity(biz_no)
+                        activities.append(activity)
+
+                    result_trans_2m["최근활동일"] = [a["last_date"] for a in activities]
+                    result_trans_2m["최근활동내용"] = [a["last_detail"] for a in activities]
+                    result_trans_2m["총활동건수"] = [a["activity_count"] for a in activities]
+
+                st.dataframe(result_trans_2m, use_container_width=True, hide_index=True)
+            else:
+                st.info("직전 2개월 이내 개설 고객 중 이체 없는 고객 없음")
+
+        # 2-2) 올해 개설 + 로그인 있음 + 이체 없음
+        if billing_open_date_col and billing_login_col and billing_transfer_col:
+            no_transfer_year = billing_df[
+                (billing_df[billing_open_date_col] >= this_year_start) &
+                (billing_df[billing_login_col].notna()) &
+                (billing_df[billing_transfer_col].isna())
+            ].copy()
+
+            if not no_transfer_year.empty:
+                st.caption(f"📌 올해 개설 ({len(no_transfer_year)}건)")
+                display_cols = [c for c in [billing_comp_col, billing_biz_col, billing_open_date_col, billing_login_col, billing_transfer_col] if c and c in no_transfer_year.columns]
+                result_trans_year = no_transfer_year[display_cols].copy().reset_index(drop=True)
+
+                # 날짜 포맷팅
+                for date_col in [billing_open_date_col, billing_login_col]:
+                    if date_col and date_col in result_trans_year.columns:
+                        result_trans_year[date_col] = result_trans_year[date_col].dt.strftime("%Y-%m-%d")
+
+                # 활동 이력 추가
+                if billing_biz_col and billing_biz_col in result_trans_year.columns:
+                    activities = []
+                    for _, row in result_trans_year.iterrows():
+                        biz_no = row.get(billing_biz_col, "")
+                        activity = get_recent_activity(biz_no)
+                        activities.append(activity)
+
+                    result_trans_year["최근활동일"] = [a["last_date"] for a in activities]
+                    result_trans_year["최근활동내용"] = [a["last_detail"] for a in activities]
+                    result_trans_year["총활동건수"] = [a["activity_count"] for a in activities]
+
+                st.dataframe(result_trans_year, use_container_width=True, hide_index=True)
+            else:
+                st.info("올해 개설 고객 중 이체 없는 고객 없음")
     else:
-        st.info("해당 고객 없음")
+        st.warning("하나은행 청구 시트 데이터를 불러올 수 없습니다.")
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-    st.caption(f"총 담당 고객 {len(df)}건 · 본사 구글시트 기준")
 
 
 def show_weekly_report_user():
