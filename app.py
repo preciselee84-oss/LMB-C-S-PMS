@@ -2941,8 +2941,9 @@ def show_final_check():
     d_col = find_col(df_for_tabs, ["활동상세", "활동내용"], "활동상세")
     df_user = df_for_tabs[df_for_tabs[u_col] == st.session_state.user_name].copy() if u_col in df_for_tabs.columns else pd.DataFrame()
     df_user = attach_cloud_dates(df_user)
+    df_user_visit = filter_visit_rows(df_user)
 
-    res, err, dup = process_performance_analysis(original_df, st.session_state.get("auto_prev_df"))
+    res, err, dup = process_performance_analysis(filter_visit_rows(original_df), st.session_state.get("auto_prev_df"))
 
     if not isinstance(res, pd.DataFrame) or res.empty:
         st.error(res if isinstance(res, str) else "실적을 계산할 수 없습니다.")
@@ -3008,8 +3009,8 @@ def show_final_check():
     style_report_logic(display_res, compact=True)
 
     # ── 중복방문/초과방문/누락 확인 탭 ──
-    df_user_check = df_user
-    _, err_check, dup_check = process_performance_analysis(original_df, st.session_state.get("auto_prev_df"))
+    df_user_check = df_user_visit
+    _, err_check, dup_check = process_performance_analysis(filter_visit_rows(original_df), st.session_state.get("auto_prev_df"))
 
     # 탭 데이터 미리 계산 (경고 메시지 표시용 - 재업로드한 경우만)
     # 중복 이력
@@ -3036,6 +3037,8 @@ def show_final_check():
         missing_open_final = df_user_check[
             pd.isna(df_user_check["본사 개설완료일자"]) | (df_user_check["본사 개설완료일자"].astype(str).str.strip() == "")
         ]
+        if "본사 신규이행구분" in missing_open_final.columns:
+            missing_open_final = missing_open_final[missing_open_final["본사 신규이행구분"].astype(str).str.strip() != "이행"]
 
     # ERP연계일자 누락
     missing_erp_final = pd.DataFrame()
@@ -3048,6 +3051,10 @@ def show_final_check():
         missing_erp_final = target[
             pd.isna(target["본사 ERP연계일자"]) | (target["본사 ERP연계일자"].astype(str).str.strip() == "")
         ]
+        if "본사 신규이행구분" in missing_erp_final.columns and "본사 이행추가연계" in missing_erp_final.columns:
+            _is_ihang = missing_erp_final["본사 신규이행구분"].astype(str).str.strip() == "이행"
+            _add_empty = pd.isna(missing_erp_final["본사 이행추가연계"]) | (missing_erp_final["본사 이행추가연계"].astype(str).str.strip() == "")
+            missing_erp_final = missing_erp_final[~(_is_ihang & _add_empty)]
 
     # 기타 오류
     other_errors_df_final = build_other_validation_errors(df_user_check)
