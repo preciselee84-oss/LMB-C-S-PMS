@@ -735,45 +735,38 @@ def manual_points_for_user(name):
         perf_db = load_db(PERF_FILE, {})
         saved = perf_db.get(name, {})
 
-    cl = {
-        "타겟고객선별": 5,
-        "메일발송": 2,
-        "제안서전달": 5,
-        "방문설명회&견적발송": 30,
-        "계약진행 시": 50,
-        "유선 (해피콜)": 5,
-        "활성화 (조회업무)": 10,
-        "이체, 집금 활성화": 30,
-        "계열사 추가도입": 30,
-        "신규연계도입": 60,
-        "문서 작성 (본사)": 100,
-        "문서 작성 (가이드)": 50,
-        "문서 작성 (기타)": 20,
-        "VOC (아이디어)": 10,
-        "운영활동(원격)": 10,
-    }
-
-    ll = {
-        "타겟고객선별": 100,
-        "메일발송": 100,
-        "제안서전달": 100,
-        "유선 (해피콜)": 100,
-        "활성화 (조회업무)": 100,
-        "이체, 집금 활성화": 150,
-        "문서 작성 (본사)": 100,
-        "VOC (아이디어)": 50,
-        "운영활동(원격)": 200,
-    }
-
     total = 0
+    criteria = criteria_df()
+    criteria["_key"] = criteria["구분"].astype(str).str.strip()
+    point_map = criteria.set_index("_key")["단위 점수"].to_dict()
+    limit_map = criteria.set_index("_key")["월 최대점수"].to_dict()
     for item, count in saved.items():
         try:
-            score = cl.get(item, 0) * int(count)
-            score = min(score, ll.get(item, 999999))
+            key = str(item).strip()
+            score = int(point_map.get(key, 0)) * int(count)
+            limit_value = limit_map.get(key, "-")
+            if str(limit_value).strip() != "-":
+                score = min(score, int(float(limit_value)))
             total += score
         except Exception:
             pass
     return total
+
+
+def calculate_manual_perf_total(edited_df):
+    if edited_df is None or edited_df.empty:
+        return 0
+    total = 0
+    for _, row in edited_df.iterrows():
+        try:
+            score = int(float(row.get("단위 점수", 0))) * int(float(row.get("입력(건)", 0)))
+            limit_value = row.get("월 최대점수", "-")
+            if str(limit_value).strip() != "-":
+                score = min(score, int(float(limit_value)))
+            total += score
+        except Exception:
+            pass
+    return int(total)
 
 
 def save_manual_perf_override_for_current_user():
@@ -2623,23 +2616,7 @@ def show_user_history():
     manual_override = st.session_state.setdefault("manual_perf_preview_override", {})
     manual_override[st.session_state.user_name] = edited.set_index("구분")["입력(건)"].to_dict()
 
-    limit_map = {
-        "타겟고객선별": 100,
-        "메일발송": 100,
-        "제안서전달": 100,
-        "유선 (해피콜)": 100,
-        "활성화 (조회업무)": 100,
-        "이체, 집금 활성화": 150,
-        "문서 작성 (본사)": 100,
-        "VOC (아이디어)": 50,
-        "운영활동(원격)": 200,
-    }
-
-    total = 0
-    for _, row in edited.iterrows():
-        item = row["구분"]
-        score = int(row["계산점수"])
-        total += min(score, limit_map[item]) if item in limit_map else score
+    total = calculate_manual_perf_total(edited)
 
     st.metric("추가 실적 합산 점수", f"{total:,} PT")
 
