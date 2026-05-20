@@ -33,6 +33,8 @@ DEFAULT_URL_HANA_BILLING = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgR
 GITHUB_REPO = "preciselee84-oss/LMB-C-S-PMS"
 GITHUB_BRANCH = "main"
 GITHUB_DATA_DIR = "data"
+SESSION_UID_COOKIE = "auto_login_uid"
+LAST_MENU_COOKIE = "last_menu"
 
 
 def _get_github_token():
@@ -142,6 +144,69 @@ def cookie_remove(cookie_manager, key):
         return True
     except Exception:
         return False
+
+
+def restore_saved_work_state(user_name):
+    saved_db = load_db(SAVED_STATE_FILE, {})
+    user_saved = saved_db.get(user_name)
+    if user_saved:
+        if user_saved.get("user_excel_data"):
+            st.session_state.user_excel_data = pd.DataFrame.from_dict(user_saved["user_excel_data"])
+        if user_saved.get("user_prev_month_sel"):
+            st.session_state.user_prev_month_sel = user_saved["user_prev_month_sel"]
+
+    admin_analysis = saved_db.get("admin_analysis")
+    if admin_analysis and admin_analysis.get("sent_df"):
+        st.session_state.analysis_result = pd.DataFrame.from_dict(admin_analysis["sent_df"])
+    if admin_analysis and admin_analysis.get("adm_prev_month"):
+        st.session_state.adm_prev_month = admin_analysis["adm_prev_month"]
+    deadline_info = saved_db.get("deadline")
+    if deadline_info:
+        st.session_state.deadline_time = deadline_info.get("time", "")
+    report_closed_info = saved_db.get("report_closed")
+    if report_closed_info:
+        st.session_state.report_closed = report_closed_info.get("time", "")
+
+
+def restore_login_from_cookie():
+    if st.session_state.get("logged_in"):
+        return
+    cookie_manager = safe_cookie_controller()
+    uid = str(cookie_get(cookie_manager, SESSION_UID_COOKIE, "")).strip()
+    if not uid:
+        return
+
+    db = st.session_state.get("user_db", {})
+    is_super = uid == "1"
+    is_user = uid in db and db[uid].get("access") == "허용"
+    if not (is_super or is_user):
+        cookie_remove(cookie_manager, SESSION_UID_COOKIE)
+        return
+
+    user = db.get(uid, {"role": "관리자", "name": "최고관리자"})
+    st.session_state.logged_in = True
+    st.session_state.user_role = user.get("role", "관리자")
+    st.session_state.user_name = user.get("name", "최고관리자")
+    if not st.session_state.get("login_time"):
+        st.session_state.login_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
+
+    last_menu = str(cookie_get(cookie_manager, LAST_MENU_COOKIE, "")).strip()
+    if last_menu:
+        st.session_state.current_menu = last_menu
+
+    restore_saved_work_state(st.session_state.user_name)
+
+
+def persist_login_session(user_id):
+    cookie_manager = safe_cookie_controller()
+    cookie_set(cookie_manager, SESSION_UID_COOKIE, str(user_id), max_age=60 * 60 * 24 * 30)
+
+
+def persist_current_menu():
+    cookie_manager = safe_cookie_controller()
+    menu = st.session_state.get("current_menu", "")
+    if menu:
+        cookie_set(cookie_manager, LAST_MENU_COOKIE, str(menu), max_age=60 * 60 * 24 * 30)
 
 
 def send_kakao_notify(message):
@@ -1411,14 +1476,14 @@ def show_auth_page():
             transition: all 0.18s !important;
         }
         [data-testid="stBaseButton-primary"] {
-            background: #5F5AF6 !important;
+            background: #655CF0 !important;
             color: #FFFFFF !important;
-            border: 1.5px solid #5F5AF6 !important;
-            box-shadow: 0 8px 18px rgba(95,90,246,0.22) !important;
+            border: 1.5px solid #655CF0 !important;
+            box-shadow: 0 8px 18px rgba(101,92,240,0.22) !important;
         }
         [data-testid="stBaseButton-primary"]:hover {
-            background: #4F46E5 !important;
-            border-color: #4F46E5 !important;
+            background: #5A52DF !important;
+            border-color: #5A52DF !important;
             color: #FFFFFF !important;
         }
         [data-testid="stBaseButton-secondary"] {
@@ -1511,7 +1576,7 @@ def show_auth_page():
                             cookie_remove(cookie_manager, "saved_id")
                         except Exception:
                             pass
-                    cookie_remove(cookie_manager, "auto_login_uid")
+                    persist_login_session(u_id_str)
 
                     user = db.get(u_id_str, {"role": "관리자", "name": "최고관리자"})
                     st.session_state.logged_in = True
@@ -1541,6 +1606,7 @@ def show_auth_page():
                         st.session_state.report_closed = report_closed_info.get("time", "")
 
                     st.session_state.current_menu = "대시보드"
+                    persist_current_menu()
                     st.rerun()
                 elif not u_id_str:
                     st.error("아이디를 입력해주세요.")
@@ -1747,6 +1813,7 @@ def show_sidebar():
             for menu_name in ["실적 분석/계산", "실적 보고서", "주간보고 취합"]:
                 if st.button(menu_name, use_container_width=True):
                     st.session_state.current_menu = menu_name
+                    persist_current_menu()
                     st.rerun()
 
         st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
@@ -1754,6 +1821,7 @@ def show_sidebar():
         for menu_name in ["업로드 및 실적 확인", "이번달 활동 대상고객 추천", "주간보고 이력 작성"]:
             if st.button(menu_name, use_container_width=True):
                 st.session_state.current_menu = menu_name
+                persist_current_menu()
                 if menu_name == "업로드 및 실적 확인":
                     st.session_state["show_add_history_form"] = False
                 st.rerun()
@@ -1764,6 +1832,7 @@ def show_sidebar():
             for menu_name in ["직원 및 권한설정", "구글 스트레드시트 연동"]:
                 if st.button(menu_name, use_container_width=True):
                     st.session_state.current_menu = menu_name
+                    persist_current_menu()
                     st.rerun()
 
         st.divider()
@@ -1772,7 +1841,8 @@ def show_sidebar():
             st.session_state.auth_mode = "login"
             try:
                 _cm_logout = safe_cookie_controller()
-                cookie_remove(_cm_logout, "auto_login_uid")
+                cookie_remove(_cm_logout, SESSION_UID_COOKIE)
+                cookie_remove(_cm_logout, LAST_MENU_COOKIE)
             except Exception:
                 pass
             st.rerun()
@@ -1982,16 +2052,14 @@ def render_page_title(menu):
                 height: 75px;
                 display: block;
                 flex: 0 0 auto;
-                background-color: #111827;
-                -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.2 11 12 3l8.8 8a1.55 1.55 0 0 1-1.05 2.7H18v5.8a1.7 1.7 0 0 1-1.7 1.7h-3.1v-5.5h-2.4v5.5H7.7A1.7 1.7 0 0 1 6 19.5v-5.8H4.25A1.55 1.55 0 0 1 3.2 11Z'/%3E%3C/svg%3E") center / contain no-repeat;
-                mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.2 11 12 3l8.8 8a1.55 1.55 0 0 1-1.05 2.7H18v5.8a1.7 1.7 0 0 1-1.7 1.7h-3.1v-5.5h-2.4v5.5H7.7A1.7 1.7 0 0 1 6 19.5v-5.8H4.25A1.55 1.55 0 0 1 3.2 11Z'/%3E%3C/svg%3E") center / contain no-repeat;
+                background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Cpath fill='%23000' d='M32 8h56v56c0 13.255-10.745 24-24 24H8V32C8 18.745 18.745 8 32 8Z'/%3E%3Cpath fill='%23fff' d='M20 52 48 26l28 26h-10v26H30V52H20Z'/%3E%3Cpath fill='%23fff' d='M58 34h12v18H58z'/%3E%3Cpath fill='%23000' d='M41 52h8v8h-8zM53 52h8v8h-8zM41 64h8v8h-8zM53 64h8v8h-8z'/%3E%3C/svg%3E") center / contain no-repeat;
             }
             [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover {
                 background: transparent !important;
                 background-color: transparent !important;
             }
             [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover::before {
-                background-color: #4F46E5;
+                filter: opacity(0.86);
             }
             body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button {
                 background: transparent !important;
@@ -1999,7 +2067,7 @@ def render_page_title(menu):
                 border: none !important;
             }
             body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button::before {
-                background-color: #cdd6f4;
+                filter: none;
             }
             body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover {
                 background: transparent !important;
@@ -2007,7 +2075,7 @@ def render_page_title(menu):
                 border: none !important;
             }
             body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover::before {
-                background-color: #818cf8;
+                filter: opacity(0.86);
             }
             </style>
             <div class="home-btn">
@@ -2016,6 +2084,7 @@ def render_page_title(menu):
         )
         if st.button("🏠", key=f"home_btn_{menu}", help="대시보드로 이동"):
             st.session_state.current_menu = "대시보드"
+            persist_current_menu()
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -4852,12 +4921,10 @@ def inject_theme_toggle():
         height: 75px;
         display: block;
         flex: 0 0 auto;
-        background-color: #111827;
-        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.2 11 12 3l8.8 8a1.55 1.55 0 0 1-1.05 2.7H18v5.8a1.7 1.7 0 0 1-1.7 1.7h-3.1v-5.5h-2.4v5.5H7.7A1.7 1.7 0 0 1 6 19.5v-5.8H4.25A1.55 1.55 0 0 1 3.2 11Z'/%3E%3C/svg%3E") center / contain no-repeat;
-        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.2 11 12 3l8.8 8a1.55 1.55 0 0 1-1.05 2.7H18v5.8a1.7 1.7 0 0 1-1.7 1.7h-3.1v-5.5h-2.4v5.5H7.7A1.7 1.7 0 0 1 6 19.5v-5.8H4.25A1.55 1.55 0 0 1 3.2 11Z'/%3E%3C/svg%3E") center / contain no-repeat;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Cpath fill='%23000' d='M32 8h56v56c0 13.255-10.745 24-24 24H8V32C8 18.745 18.745 8 32 8Z'/%3E%3Cpath fill='%23fff' d='M20 52 48 26l28 26h-10v26H30V52H20Z'/%3E%3Cpath fill='%23fff' d='M58 34h12v18H58z'/%3E%3Cpath fill='%23000' d='M41 52h8v8h-8zM53 52h8v8h-8zM41 64h8v8h-8zM53 64h8v8h-8z'/%3E%3C/svg%3E") center / contain no-repeat;
     }
     button.pms-home-btn:hover::before {
-        background-color: #4F46E5;
+        filter: opacity(0.86);
     }
     body:has(#pms-d:checked) button.pms-home-btn {
         background: transparent !important;
@@ -4866,7 +4933,7 @@ def inject_theme_toggle():
         box-shadow: none !important;
     }
     body:has(#pms-d:checked) button.pms-home-btn::before {
-        background-color: #cdd6f4;
+        filter: none;
     }
     body:has(#pms-d:checked) button.pms-home-btn:hover {
         background: transparent !important;
@@ -4874,7 +4941,7 @@ def inject_theme_toggle():
         border: none !important;
     }
     body:has(#pms-d:checked) button.pms-home-btn:hover::before {
-        background-color: #818cf8;
+        filter: opacity(0.86);
     }
 
     /* 새로고침 버튼 다크모드 */
@@ -5338,6 +5405,7 @@ def show_main():
     apply_global_table_css()
     inject_theme_toggle()
     show_sidebar()
+    persist_current_menu()
 
     menu = st.session_state.current_menu
     render_page_title(menu)
@@ -5364,6 +5432,8 @@ def show_main():
     elif menu == "주간보고 취합":
         show_weekly_report_admin()
 
+
+restore_login_from_cookie()
 
 if st.session_state.logged_in:
     show_main()
