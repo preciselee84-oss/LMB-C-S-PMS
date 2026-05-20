@@ -2589,10 +2589,69 @@ def show_user_history():
 
     t1, t2, t3, t4, t5 = validation_tabs_with_refresh("refresh_user_history_validation")
     with t1:
-        style_report_logic(dup_my)
+        if not dup_my.empty:
+            _dc = next((c for c in dup_my.columns if "활동일자" in c), None) or next((c for c in dup_my.columns if "활동일" in c), None)
+            _bc = next((c for c in dup_my.columns if "사업자번호" in c), None)
+            _uc = next((c for c in dup_my.columns if any(k in c for k in ["등록자", "담당자", "성명"])), None)
+            _cc = next((c for c in dup_my.columns if "업체명" in c or "상호" in c), None)
+            show_cols = [c for c in [_cc, _bc, _uc, _dc] if c]
+            dup_display = dup_my[show_cols].copy().reset_index().rename(columns={"index": "_orig_idx"})
+            _ver = st.session_state.get("dup_editor_ver", 0)
+            edited_dup = st.data_editor(
+                dup_display,
+                key=f"dup_date_editor_{_ver}",
+                use_container_width=True,
+                hide_index=True,
+                disabled=[c for c in dup_display.columns if c != _dc],
+                column_config={"_orig_idx": None},
+            )
+            if _dc and list(edited_dup[_dc]) != list(dup_display[_dc]):
+                _preview = st.session_state.get("history_convert_preview_data")
+                if _preview is not None:
+                    _preview = _preview.copy()
+                    _pd = find_col(_preview, ["활동일자", "활동일"])
+                    if _pd:
+                        for (_, o_row), (_, e_row) in zip(dup_display.iterrows(), edited_dup.iterrows()):
+                            if str(o_row.get(_dc, "")) != str(e_row.get(_dc, "")):
+                                _idx = o_row.get("_orig_idx")
+                                if _idx is not None and _idx in _preview.index:
+                                    _preview.loc[_idx, _pd] = e_row[_dc]
+                        st.session_state["history_convert_preview_data"] = _preview
+                        st.session_state["dup_editor_ver"] = _ver + 1
+                        st.rerun()
+        else:
+            st.info("중복 이력이 없습니다.")
     with t2:
         if not err_filtered.empty:
-            style_report_logic(err_filtered.drop(columns=["월총방문"], errors="ignore"))
+            _disp = err_filtered.drop(columns=["월총방문"], errors="ignore").copy()
+            _ver2 = st.session_state.get("err_editor_ver", 0)
+            edited_err = st.data_editor(
+                _disp,
+                key=f"err_date_editor_{_ver2}",
+                use_container_width=True,
+                hide_index=True,
+                disabled=[c for c in _disp.columns if c != "초과일자"],
+            )
+            if "초과일자" in _disp.columns and list(edited_err["초과일자"]) != list(_disp["초과일자"]):
+                _preview = st.session_state.get("history_convert_preview_data")
+                if _preview is not None:
+                    _preview = _preview.copy()
+                    _pu = find_col(_preview, ["등록자", "담당자", "성명"])
+                    _pb = find_col(_preview, ["사업자번호"])
+                    _pd = find_col(_preview, ["활동일자", "활동일"])
+                    if _pu and _pb and _pd:
+                        for (_, o_row), (_, e_row) in zip(_disp.iterrows(), edited_err.iterrows()):
+                            if str(o_row["초과일자"]) != str(e_row["초과일자"]):
+                                _mask = (
+                                    (_preview[_pb].astype(str) == str(o_row["사업자번호"])) &
+                                    (_preview[_pu].astype(str) == str(o_row["담당자"])) &
+                                    (_preview[_pd].astype(str) == str(o_row["초과일자"]))
+                                )
+                                if _mask.any():
+                                    _preview.loc[_mask, _pd] = e_row["초과일자"]
+                        st.session_state["history_convert_preview_data"] = _preview
+                        st.session_state["err_editor_ver"] = _ver2 + 1
+                        st.rerun()
         else:
             st.info("초과 방문 데이터가 없습니다.")
     with t3:
