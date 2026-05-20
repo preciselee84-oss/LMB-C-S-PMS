@@ -4283,9 +4283,9 @@ def show_target_customers():
     # 본인 담당 고객만 필터
     df = cloud[cloud[owner_col].astype(str).str.strip() == str(user_name).strip()].copy()
 
-    # 관리구분이 "해지"인 고객 제외
+    # 관리구분이 "해지" 또는 "취소"인 고객 제외
     if manage_div_col and manage_div_col in df.columns:
-        df = df[df[manage_div_col].astype(str).str.strip() != "해지"].copy()
+        df = df[~df[manage_div_col].astype(str).str.strip().isin(["해지", "취소"])].copy()
 
     if df.empty:
         st.info(f"구글시트에 {user_name}님 담당 고객이 없습니다.")
