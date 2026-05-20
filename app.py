@@ -34,6 +34,7 @@ PERF_FILE = "manual_perf.json"
 SENT_FILE = "sent_results.json"
 SENT_UPLOADS_FILE = "sent_uploads.json"
 SAVED_STATE_FILE = "saved_state.json"
+WEEKLY_REPORT_FILE = "weekly_reports.json"
 PPT_TEMPLATE_FILE = resolve_template_file("LMB활동실적보고서_202605_하나지사.pptx")
 EXCEL_SAMPLE_FILE = resolve_template_file("LMB월간 활동실적_000000(샘플).xlsx")
 
@@ -405,6 +406,23 @@ def find_col(df, keys, fallback=None):
         if any(k.replace(" ", "").replace("　", "").lower() in c_normalized for k in keys):
             return c
     return fallback
+
+
+def is_blank_value(value):
+    text = "" if pd.isna(value) else str(value).strip()
+    return text == "" or text.lower() in ["nan", "nat", "none", "-", "null"]
+
+
+def parse_sheet_date(value):
+    if is_blank_value(value):
+        return pd.NaT
+    text = str(value).strip()
+    digits = re.sub(r"\D", "", text)
+    if len(digits) >= 8:
+        parsed = pd.to_datetime(digits[:8], format="%Y%m%d", errors="coerce")
+        if pd.notna(parsed):
+            return parsed
+    return pd.to_datetime(text, errors="coerce")
 
 
 def filter_visit_rows(df):
@@ -4691,11 +4709,246 @@ def show_target_customers():
 
 
 def show_weekly_report_user():
-    st.info("주간보고 이력 작성 기능은 준비 중입니다.")
+    categories = ["개설대기", "개설진행", "개설완료", "연계대기", "연계진행", "연계완료", "운영부문"]
+    user_name = st.session_state.get("user_name", "")
+
+    def load_hana_sheet_for_weekly():
+        df = st.session_state.get("hana_sheet_df")
+        if df is None or df.empty:
+            try:
+                df = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+                st.session_state.hana_sheet_df = df
+            except Exception as e:
+                st.error(f"하나은행 구글 시트를 불러오지 못했습니다: {e}")
+                return pd.DataFrame()
+        df = df.copy()
+        df.columns = [str(c).strip() for c in df.columns]
+        return df.dropna(how="all").reset_index(drop=True)
+
+    def weekly_category_mask(df, category):
+        open_status_col = find_col(df, ["개설상태"])
+        open_date_col = find_col(df, ["개설/이행일", "개설일", "이행일"])
+        link_status_col = find_col(df, ["연계상태"])
+        link_date_col = find_col(df, ["연계일자", "연계일"])
+        build_type_col = find_col(df, ["구축형", "구축구분"])
+        end_col = find_col(df, ["해지일자"])
+
+        open_status = df[open_status_col].astype(str).str.strip() if open_status_col else pd.Series("", index=df.index)
+        link_status = df[link_status_col].astype(str).str.strip() if link_status_col else pd.Series("", index=df.index)
+        build_type = df[build_type_col].astype(str).str.strip() if build_type_col else pd.Series("", index=df.index)
+        open_date = df[open_date_col].map(parse_sheet_date).notna() if open_date_col else pd.Series(False, index=df.index)
+        link_date = df[link_date_col].map(parse_sheet_date).notna() if link_date_col else pd.Series(False, index=df.index)
+        active = df[end_col].map(is_blank_value) if end_col else pd.Series(True, index=df.index)
+
+        open_done = active & (open_status.str.contains("완료|이행완료", na=False) | open_date)
+        link_done = active & (link_status.str.contains("완료", na=False) | link_date)
+        open_progress = active & ~open_done & open_status.str.contains("진행|구축중|처리중", na=False)
+        link_progress = active & ~link_done & link_status.str.contains("진행|연계중|처리중", na=False)
+        link_target = active & (build_type.str.contains("연계|이행", na=False) | link_status.ne(""))
+
+        if category == "개설완료":
+            return open_done
+        if category == "개설진행":
+            return open_progress
+        if category == "개설대기":
+            return active & ~open_done & ~open_progress
+        if category == "연계완료":
+            return link_done
+        if category == "연계진행":
+            return link_progress
+        if category == "연계대기":
+            return link_target & ~link_done & ~link_progress
+        if category == "운영부문":
+            return active & open_done & (~link_target | link_done)
+        return pd.Series(True, index=df.index)
+
+    def display_customer_df(df):
+        wanted_keys = ["고객번호", "고객명", "구축구분", "구축형", "신규접수일", "추가연계접수일", "개설상태", "개설/이행일", "연계상태", "연계일자", "구축예정일", "담당자"]
+        cols = []
+        for key in wanted_keys:
+            col = find_col(df, [key])
+            if col and col in df.columns and col not in cols:
+                cols.append(col)
+        if not cols:
+            cols = list(df.columns[:8])
+        show = df[cols].copy()
+        for col in show.columns:
+            if any(k in str(col) for k in ["일자", "일", "예정"]):
+                parsed = show[col].map(parse_sheet_date)
+                show[col] = show[col].where(parsed.isna(), parsed.dt.strftime("%Y-%m-%d"))
+        return show.reset_index(drop=True)
+
+    st.markdown("### 주간보고 작성")
+    st.caption("하나은행 구글 시트의 본인 담당 고객을 기준으로 카테고리별 현황을 선택해 주간보고 이력을 저장합니다.")
+
+    hana = load_hana_sheet_for_weekly()
+    if hana.empty:
+        return
+
+    staff_col = find_col(hana, ["담당자"])
+    company_col = find_col(hana, ["고객명", "업체명", "상호"])
+    branch_col = find_col(hana, ["신청점", "담당 부서", "담당부서"])
+    service_col = find_col(hana, ["구축구분", "서비스"])
+    build_type_col = find_col(hana, ["구축형"])
+    customer_no_col = find_col(hana, ["고객번호"])
+    open_status_col = find_col(hana, ["개설상태"])
+    link_status_col = find_col(hana, ["연계상태"])
+
+    if not staff_col or not company_col:
+        st.error("하나은행 시트에서 담당자 또는 고객명 컬럼을 찾을 수 없습니다.")
+        return
+
+    mine = hana[hana[staff_col].astype(str).str.strip() == str(user_name).strip()].copy()
+    if mine.empty:
+        st.info(f"하나은행 시트에 {user_name}님 담당 고객이 없습니다.")
+        return
+
+    today = datetime.utcnow() + timedelta(hours=9)
+    week_start_default = (today - timedelta(days=today.weekday())).date()
+    week_end_default = week_start_default + timedelta(days=4)
+
+    col_a, col_b, col_c = st.columns([1.1, 1.1, 1.4])
+    with col_a:
+        week_start = st.date_input("보고 시작일", value=week_start_default, key="weekly_report_start")
+    with col_b:
+        week_end = st.date_input("보고 종료일", value=week_end_default, key="weekly_report_end")
+    with col_c:
+        category = st.selectbox("카테고리", categories, key="weekly_report_category")
+
+    categorized = mine[weekly_category_mask(mine, category)].copy()
+    st.markdown(f"#### {category} 현황")
+    st.caption(f"{len(categorized)}건 · 하나은행 구글 시트 기준")
+    render_plain_html_table(display_customer_df(categorized), max_rows=200)
+
+    if categorized.empty and category != "운영부문":
+        st.info("선택한 카테고리에 작성할 고객이 없습니다.")
+
+    options = ["직접입력"]
+    if not categorized.empty:
+        tmp = categorized.copy()
+        tmp["_label"] = tmp.apply(
+            lambda r: f"{str(r.get(company_col, '')).strip()} | {str(r.get(customer_no_col, '')).strip() if customer_no_col else ''}".strip(" |"),
+            axis=1,
+        )
+        options += [v for v in tmp["_label"].tolist() if v and v not in options]
+    label_to_row = {str(row["_label"]): row for _, row in tmp.iterrows()} if not categorized.empty else {}
+
+    selected_label = st.selectbox("고객 선택", options, key="weekly_customer_select")
+    selected_row = label_to_row.get(selected_label)
+    default_company = "" if selected_row is None else str(selected_row.get(company_col, "")).strip()
+    default_customer_no = "" if selected_row is None or not customer_no_col else str(selected_row.get(customer_no_col, "")).strip()
+    default_service = "" if selected_row is None or not service_col else str(selected_row.get(service_col, "")).strip()
+    default_build = "" if selected_row is None or not build_type_col else str(selected_row.get(build_type_col, "")).strip()
+    default_branch = "" if selected_row is None or not branch_col else str(selected_row.get(branch_col, "")).strip()
+    status_default = ""
+    if selected_row is not None:
+        if "연계" in category and link_status_col:
+            status_default = str(selected_row.get(link_status_col, "")).strip()
+        elif open_status_col:
+            status_default = str(selected_row.get(open_status_col, "")).strip()
+
+    with st.form("weekly_report_form", border=True):
+        f1, f2, f3 = st.columns([1.5, 1.0, 1.0])
+        with f1:
+            company = st.text_input("고객명", value=default_company)
+        with f2:
+            service = st.text_input("서비스", value=default_service)
+        with f3:
+            build_type = st.text_input("구분", value=default_build)
+
+        f4, f5, f6 = st.columns([1.2, 1.0, 1.0])
+        with f4:
+            branch = st.text_input("신청점/부서", value=default_branch)
+        with f5:
+            customer_no = st.text_input("고객번호", value=default_customer_no)
+        with f6:
+            status = st.text_input("상태", value=status_default)
+
+        issue = st.text_area("이슈 / 진행내용", height=100, placeholder="PPT 주간보고의 이슈 항목처럼 고객별 진행상황을 작성")
+        plan = st.text_area("금주 조치 / 차주 예정", height=80, placeholder="예정 작업, 고객 회신 필요사항, 은행 전달사항 등")
+        next_date = st.date_input("피드백(예정)일자", value=today.date(), key="weekly_next_date")
+
+        submitted = st.form_submit_button("주간보고 저장", use_container_width=True, type="primary")
+
+    if submitted:
+        if not company.strip():
+            st.warning("고객명을 입력해주세요.")
+        else:
+            db = load_db(WEEKLY_REPORT_FILE, {})
+            entries = db.setdefault(user_name, [])
+            now_text = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
+            entries.append({
+                "id": hashlib.md5(f"{user_name}-{now_text}-{company}-{category}".encode("utf-8")).hexdigest(),
+                "보고시작일": str(week_start),
+                "보고종료일": str(week_end),
+                "카테고리": category,
+                "서비스": service.strip(),
+                "구분": build_type.strip(),
+                "고객명": company.strip(),
+                "고객번호": customer_no.strip(),
+                "신청점": branch.strip(),
+                "이슈": issue.strip(),
+                "조치예정": plan.strip(),
+                "피드백예정일": str(next_date),
+                "상태": status.strip(),
+                "담당자": user_name,
+                "작성시각": now_text,
+            })
+            save_db(WEEKLY_REPORT_FILE, db)
+            st.success("주간보고 이력을 저장했습니다.")
+            st.rerun()
+
+    db = load_db(WEEKLY_REPORT_FILE, {})
+    my_entries = db.get(user_name, [])
+    st.markdown("#### 내 작성 이력")
+    if not my_entries:
+        st.info("아직 저장된 주간보고 이력이 없습니다.")
+        return
+
+    history_df = pd.DataFrame(my_entries)
+    show_cols = ["보고시작일", "보고종료일", "카테고리", "고객명", "이슈", "조치예정", "피드백예정일", "상태", "작성시각"]
+    show_cols = [c for c in show_cols if c in history_df.columns]
+    render_plain_html_table(history_df[show_cols].sort_values("작성시각", ascending=False), max_rows=300, center_align=False)
+
+    delete_options = ["선택안함"] + [
+        f"{row.get('작성시각', '')} | {row.get('카테고리', '')} | {row.get('고객명', '')}"
+        for row in sorted(my_entries, key=lambda x: x.get("작성시각", ""), reverse=True)
+    ]
+    selected_delete = st.selectbox("삭제할 이력", delete_options, key="weekly_delete_select")
+    if st.button("선택 이력 삭제", use_container_width=True, disabled=(selected_delete == "선택안함")):
+        delete_idx = delete_options.index(selected_delete) - 1
+        sorted_entries = sorted(my_entries, key=lambda x: x.get("작성시각", ""), reverse=True)
+        delete_id = sorted_entries[delete_idx].get("id")
+        db[user_name] = [row for row in my_entries if row.get("id") != delete_id]
+        save_db(WEEKLY_REPORT_FILE, db)
+        st.success("선택한 이력을 삭제했습니다.")
+        st.rerun()
 
 
 def show_weekly_report_admin():
-    st.info("주간보고 취합 기능은 준비 중입니다.")
+    db = load_db(WEEKLY_REPORT_FILE, {})
+    rows = []
+    for entries in db.values():
+        rows.extend(entries if isinstance(entries, list) else [])
+    st.markdown("### 주간보고 취합")
+    if not rows:
+        st.info("취합할 주간보고 이력이 없습니다.")
+        return
+    df = pd.DataFrame(rows)
+    categories = ["전체", "개설대기", "개설진행", "개설완료", "연계대기", "연계진행", "연계완료", "운영부문"]
+    c1, c2 = st.columns(2)
+    with c1:
+        category = st.selectbox("카테고리", categories, key="weekly_admin_category")
+    with c2:
+        staff_options = ["전체"] + sorted(df["담당자"].dropna().astype(str).unique().tolist()) if "담당자" in df.columns else ["전체"]
+        staff = st.selectbox("담당자", staff_options, key="weekly_admin_staff")
+    if category != "전체" and "카테고리" in df.columns:
+        df = df[df["카테고리"] == category]
+    if staff != "전체" and "담당자" in df.columns:
+        df = df[df["담당자"] == staff]
+    show_cols = ["보고시작일", "보고종료일", "카테고리", "서비스", "구분", "고객명", "신청점", "이슈", "조치예정", "피드백예정일", "상태", "담당자", "작성시각"]
+    show_cols = [c for c in show_cols if c in df.columns]
+    render_plain_html_table(df[show_cols].sort_values("작성시각", ascending=False), max_rows=1000, center_align=False)
 
 
 def show_dashboard():
