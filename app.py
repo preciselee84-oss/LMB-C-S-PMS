@@ -4761,7 +4761,7 @@ def show_weekly_report_user():
         if category == "연계진행":
             return link_progress
         if category == "연계대기":
-            return link_target & ~link_done & ~link_progress
+            return active & link_status.str.contains("ERP연계대기", na=False)
         if category == "운영부문":
             return active & open_done & (~link_target | link_done)
         return pd.Series(True, index=df.index)
