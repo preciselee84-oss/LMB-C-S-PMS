@@ -4269,6 +4269,9 @@ def show_target_customers():
     erp_col    = find_col(cloud, ["ERP연계일자", "연계일자"])
     div_col    = find_col(cloud, ["신규/이행구분", "이행구분", "신규이행"])
     add_col    = find_col(cloud, ["이행추가연계"])
+    status_col = find_col(cloud, ["상태항목", "상태"])
+    open_cancel_col = find_col(cloud, ["개설취소"])
+    erp_cancel_col = find_col(cloud, ["ERP연계취소", "연계취소"])
 
     if not owner_col:
         st.warning("구글시트에 담당자 컬럼을 찾을 수 없습니다.")
@@ -4367,6 +4370,25 @@ def show_target_customers():
     # ── 개설 미완료 ───────────────────────────────────────────
     st.markdown("#### 🟠 개설 미완료 고객")
     gaeseol_needed = df[_empty(open_col)].copy()
+
+    # 개설취소 제외
+    if open_cancel_col and open_cancel_col in gaeseol_needed.columns:
+        gaeseol_needed = gaeseol_needed[
+            gaeseol_needed[open_cancel_col].astype(str).str.strip().str.lower() != "취소"
+        ]
+
+    # 이행 고객 제외
+    if div_col and div_col in gaeseol_needed.columns:
+        gaeseol_needed = gaeseol_needed[
+            gaeseol_needed[div_col].astype(str).str.strip() != "이행"
+        ]
+
+    # 상태항목이 "취소"인 경우 제외
+    if status_col and status_col in gaeseol_needed.columns:
+        gaeseol_needed = gaeseol_needed[
+            gaeseol_needed[status_col].astype(str).str.strip() != "취소"
+        ]
+
     if not gaeseol_needed.empty:
         st.caption(f"{len(gaeseol_needed)}건")
         st.dataframe(fmt_df(gaeseol_needed), use_container_width=True, hide_index=True)
@@ -4378,11 +4400,25 @@ def show_target_customers():
     # ── ERP연계 미완료 ────────────────────────────────────────
     st.markdown("#### 🔵 ERP연계 미완료 고객")
     erp_needed = df[~_empty(open_col) & _empty(erp_col)].copy()
-    # 이행구분=이행이고 이행추가연계 없으면 제외
+
+    # ERP연계 취소 제외
+    if erp_cancel_col and erp_cancel_col in erp_needed.columns:
+        erp_needed = erp_needed[
+            erp_needed[erp_cancel_col].astype(str).str.strip().str.lower() != "취소"
+        ]
+
+    # 상태항목이 "취소"인 경우 제외
+    if status_col and status_col in erp_needed.columns:
+        erp_needed = erp_needed[
+            erp_needed[status_col].astype(str).str.strip() != "취소"
+        ]
+
+    # 이행구분=이행이고 이행추가연계가 없거나 NONE이면 제외
     if div_col and add_col and div_col in erp_needed.columns and add_col in erp_needed.columns:
         _is_ihang = erp_needed[div_col].astype(str).str.strip() == "이행"
-        _no_add   = erp_needed[add_col].astype(str).str.strip() == ""
+        _no_add   = erp_needed[add_col].astype(str).str.strip().isin(["", "NONE", "None", "none"])
         erp_needed = erp_needed[~(_is_ihang & _no_add)]
+
     if not erp_needed.empty:
         st.caption(f"{len(erp_needed)}건")
         st.dataframe(fmt_df(erp_needed), use_container_width=True, hide_index=True)
