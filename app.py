@@ -2468,7 +2468,6 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
                         st.session_state[data_key] = normalize_converted_history_df(
                             pd.concat([analysis_df, pd.DataFrame([_new_row])], ignore_index=True)
                         )
-                        st.session_state["show_add_history_form"] = False
                         st.session_state.pop("add_form_date_val", None)
                         st.rerun()
             with _fb2:
