@@ -2364,7 +2364,7 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
         }
         body[data-pms-theme="d"] [data-testid="stDataEditor"] canvas,
         body:has(#pms-d:checked) [data-testid="stDataEditor"] canvas {
-            filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(1.1) saturate(0.88) !important;
+            filter: invert(1) hue-rotate(180deg) brightness(1.12) contrast(0.55) saturate(0.9) !important;
         }
         body[data-pms-theme="d"] [data-testid="stDataEditor"] input,
         body[data-pms-theme="d"] [data-testid="stDataEditor"] textarea,
@@ -2395,7 +2395,7 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
                 border-color: #2d2d4a !important;
             }
             body:has(#pms-s:checked) [data-testid="stDataEditor"] canvas {
-                filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(1.1) saturate(0.88) !important;
+                filter: invert(1) hue-rotate(180deg) brightness(1.12) contrast(0.55) saturate(0.9) !important;
             }
             body:has(#pms-s:checked) [data-testid="stDataEditor"] input,
             body:has(#pms-s:checked) [data-testid="stDataEditor"] textarea,
@@ -5251,9 +5251,11 @@ def inject_theme_toggle():
     .stApp:has(#pms-d:checked) [data-testid="stDataFrame"],
     body:has(#pms-d:checked) [data-testid="stDataEditor"],
     body:has(#pms-d:checked) [data-testid="stDataFrame"] {
-        background-color: #252535 !important;
+        background-color: #1f1f2f !important;
         border-color: #45475a !important;
         color: #ffffff !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
     }
     html[data-pms-theme="d"] [data-testid="stDataEditor"] canvas,
     html[data-pms-theme="d"] [data-testid="stDataFrame"] canvas,
@@ -5263,7 +5265,7 @@ def inject_theme_toggle():
     .stApp:has(#pms-d:checked) [data-testid="stDataFrame"] canvas,
     body:has(#pms-d:checked) [data-testid="stDataEditor"] canvas,
     body:has(#pms-d:checked) [data-testid="stDataFrame"] canvas {
-        filter: invert(1) hue-rotate(180deg) brightness(0.74) contrast(1.2) saturate(0.82) !important;
+        filter: invert(1) hue-rotate(180deg) brightness(1.12) contrast(0.55) saturate(0.9) !important;
     }
     html[data-pms-theme="d"] [data-testid="stDataEditor"] [role="columnheader"],
     html[data-pms-theme="d"] [data-testid="stDataEditor"] [role="gridcell"],
