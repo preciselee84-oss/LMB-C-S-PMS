@@ -4273,6 +4273,7 @@ def show_target_customers():
     open_cancel_col = find_col(cloud, ["개설취소"])
     erp_cancel_col = find_col(cloud, ["ERP연계취소", "연계취소"])
     manage_div_col = find_col(cloud, ["관리구분", "관리 구분"])
+    open_status_col = find_col(cloud, ["개설상태"])
 
     if not owner_col:
         st.warning("구글시트에 담당자 컬럼을 찾을 수 없습니다.")
@@ -4375,6 +4376,12 @@ def show_target_customers():
     # ── 개설 미완료 ───────────────────────────────────────────
     st.markdown("#### 🟠 개설 미완료 고객")
     gaeseol_needed = df[_empty(open_col)].copy()
+
+    # 개설상태가 "개설대기" 또는 "개설진행"인 고객만 표시
+    if open_status_col and open_status_col in gaeseol_needed.columns:
+        gaeseol_needed = gaeseol_needed[
+            gaeseol_needed[open_status_col].astype(str).str.strip().isin(["개설대기", "개설진행"])
+        ]
 
     # 개설취소 제외
     if open_cancel_col and open_cancel_col in gaeseol_needed.columns:
