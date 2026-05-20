@@ -2607,7 +2607,7 @@ def show_user_history():
         err_filtered = err_my[err_my["일방문"] >= 6].copy()
 
     # 기타 오류 데이터 계산
-    other_errors_df = build_other_validation_errors(df_user)
+    other_errors_df = build_other_validation_errors(df_user_visit)
 
     # 중복 이력 데이터
     dup_my = pd.DataFrame()
@@ -2620,20 +2620,20 @@ def show_user_history():
 
     # 개설완료일자 누락
     missing_open = pd.DataFrame()
-    if "본사 개설완료일자" in df_user.columns:
-        missing_open = df_user[
-            pd.isna(df_user["본사 개설완료일자"]) | (df_user["본사 개설완료일자"].astype(str).str.strip() == "")
+    if "본사 개설완료일자" in df_user_visit.columns:
+        missing_open = df_user_visit[
+            pd.isna(df_user_visit["본사 개설완료일자"]) | (df_user_visit["본사 개설완료일자"].astype(str).str.strip() == "")
         ]
         if "본사 신규이행구분" in missing_open.columns:
             missing_open = missing_open[missing_open["본사 신규이행구분"].astype(str).str.strip() != "이행"]
 
     # ERP연계일자 누락
     missing_erp = pd.DataFrame()
-    if "본사 ERP연계일자" in df_user.columns:
-        if d_col and d_col in df_user.columns:
-            target = df_user[df_user[d_col].astype(str).str.contains("연계", na=False)]
+    if "본사 ERP연계일자" in df_user_visit.columns:
+        if d_col and d_col in df_user_visit.columns:
+            target = df_user_visit[df_user_visit[d_col].astype(str).str.contains("연계", na=False)]
         else:
-            target = df_user
+            target = df_user_visit
         missing_erp = target[
             pd.isna(target["본사 ERP연계일자"]) | (target["본사 ERP연계일자"].astype(str).str.strip() == "")
         ]
@@ -2704,7 +2704,7 @@ def show_user_history():
         if _changed:
             st.rerun()
 
-    search_filters = render_history_search_filters(df_user, "user_history_validation_search")
+    search_filters = render_history_search_filters(df_user_visit, "user_history_validation_search")
     dup_my = apply_history_search_filters(dup_my, search_filters)
     err_filtered = apply_history_search_filters(err_filtered, search_filters)
     missing_open = apply_history_search_filters(missing_open, search_filters)
