@@ -16,13 +16,26 @@ from streamlit_cookies_controller import CookieController
 
 st.set_page_config(page_title="실적관리 시스템", layout="wide", initial_sidebar_state="expanded")
 
+
+def resolve_template_file(file_name):
+    base_dir = os.path.dirname(__file__)
+    candidates = [
+        os.path.join(base_dir, "templates", file_name),
+        os.path.join(base_dir, "github-work", "templates", file_name),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return candidates[0]
+
+
 DB_FILE = "users.json"
 PERF_FILE = "manual_perf.json"
 SENT_FILE = "sent_results.json"
 SENT_UPLOADS_FILE = "sent_uploads.json"
 SAVED_STATE_FILE = "saved_state.json"
-PPT_TEMPLATE_FILE = os.path.join(os.path.dirname(__file__), "templates", "LMB활동실적보고서_202605_하나지사.pptx")
-EXCEL_SAMPLE_FILE = os.path.join(os.path.dirname(__file__), "templates", "LMB월간 활동실적_000000(샘플).xlsx")
+PPT_TEMPLATE_FILE = resolve_template_file("LMB활동실적보고서_202605_하나지사.pptx")
+EXCEL_SAMPLE_FILE = resolve_template_file("LMB월간 활동실적_000000(샘플).xlsx")
 
 DEFAULT_URL_ANALYSIS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9XPHqrqcaFf9bCOVya7yHORr-c1R4KCF0eEpdE3ESn8qJELP0BkqTOslur9bsGcVabRUIcyOa877R/pub?output=csv"
 DEFAULT_URL_SYNC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9F7R7oLA2B02H-I25kVv2JeYHFgWQq0CT7TeW61hrNpJLdHWJFhFR_iDQGCFAW044o8rRwBDeovKG/pub?gid=1533424484&single=true&output=csv"
