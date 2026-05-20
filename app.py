@@ -2846,6 +2846,19 @@ def show_user_history():
         if _changed:
             st.rerun()
 
+        # 추가 방문 운영 이력 등록 안내
+        _add_visit_cnt = round(total / 30)
+        if _add_visit_cnt > 0:
+            st.markdown(
+                f"<div style='margin-top:10px;padding:12px 16px;background:#EBF8FF;border-left:4px solid #4299E1;border-radius:6px;font-size:14px;color:#2B6CB0;'>"
+                f"<b>📋 추가 이력 등록 안내</b><br>"
+                f"추가 실적 합산 점수 <b>{total:,} PT</b> 기준으로 "
+                f"<b style='font-size:16px;color:#C05621;'>{_add_visit_cnt}건</b>의 방문 운영 이력을 "
+                f"아래 <b>이력 추가</b> 버튼을 통해 등록해주세요."
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
     search_filters = render_history_search_filters(search_source_df, "history_preview_search")
 
     dup_my = apply_history_search_filters(dup_my, search_filters)
