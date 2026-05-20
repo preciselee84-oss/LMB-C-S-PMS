@@ -2074,8 +2074,8 @@ def show_user_history():
         else:
             st.button("변환파일 다운로드", use_container_width=True, disabled=True)
     with col_upload:
-        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>본사이력 업로드</div>", unsafe_allow_html=True)
-        u_file = st.file_uploader("본사이력 업로드", type=["xlsx"], label_visibility="collapsed")
+        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>본사이력 업로드 (선택)</div>", unsafe_allow_html=True)
+        u_file = st.file_uploader("본사이력 업로드 (선택)", type=["xlsx"], label_visibility="collapsed")
     with col_sample:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
         if os.path.exists(EXCEL_SAMPLE_FILE):
@@ -2188,9 +2188,10 @@ def show_user_history():
     df_user = df[df[u_col] == st.session_state.user_name].copy() if u_col in df.columns else pd.DataFrame()
     df_user = attach_cloud_dates(df_user)
 
-    st.markdown("### 담당자 활동 수치")
+    st.markdown("### 담당자 기본 활동 수치")
     res, err, dup = process_performance_analysis(df_user, st.session_state.get("auto_prev_df"))
 
+    base_activity_res = pd.DataFrame()
     if isinstance(res, pd.DataFrame) and not res.empty:
         my_res = res[res["담당자"] == st.session_state.user_name].copy()
 
@@ -2244,9 +2245,11 @@ def show_user_history():
 
             hidden_cols = ["운영건수 (추가 활동)", "운영포인트(추가 활동)"] + [c for c in before_res.columns if "전월대비" in c]
             my_res_display = before_res.drop(columns=hidden_cols, errors="ignore")
+            base_activity_res = before_res.copy()
         else:
             drop_cols = [c for c in my_res.columns if "전월대비" in c]
             my_res_display = my_res.drop(columns=drop_cols, errors="ignore")
+            base_activity_res = my_res.copy()
 
         style_report_logic(my_res_display, compact=True)
     elif isinstance(res, str):
@@ -2388,6 +2391,41 @@ def show_user_history():
         total += min(score, limit_map[item]) if item in limit_map else score
 
     st.metric("추가 실적 합산 점수", f"{total:,} PT")
+
+    if not base_activity_res.empty:
+        expected_res = base_activity_res.copy()
+        row_idx = expected_res.index[0]
+        o_p = int(float(expected_res.loc[row_idx].get("개설포인트", 0)))
+        l_p = int(float(expected_res.loc[row_idx].get("연계포인트", 0)))
+        v_p = int(float(expected_res.loc[row_idx].get("운영포인트 (실제 활동)", 0)))
+        current_v_count = int(float(expected_res.loc[row_idx].get("운영건수 (실제 활동)", 0)))
+        add_v_count = min(int(np.ceil(total / 30.0)) if total else 0, max(0, 60 - current_v_count))
+        expected_total = min(2800, min(1000, o_p + l_p) + min(1800, v_p + total))
+        expected_pay_point = max(0, expected_total - 1000)
+
+        expected_res.loc[row_idx, "운영건수 (추가 활동)"] = add_v_count
+        expected_res.loc[row_idx, "운영포인트(추가 활동)"] = max(0, expected_total - (o_p + l_p + v_p))
+        expected_res.loc[row_idx, "합계포인트"] = expected_total
+        expected_res.loc[row_idx, "지급포인트"] = expected_pay_point
+
+        rank = expected_res.loc[row_idx].get("직급", "")
+        name = expected_res.loc[row_idx].get("담당자", "")
+        name_to_info = {
+            info.get("name"): {"staff_type": info.get("staff_type", "정규직")}
+            for uid, info in st.session_state.user_db.items()
+            if uid != "1"
+        }
+        is_outsource = name_to_info.get(name, {}).get("staff_type", "정규직") == "외주"
+        if is_outsource:
+            expected_pay = int(max(0, expected_pay_point * 500))
+        else:
+            leader_bonus = 500 if rank == "팀장" else 0
+            expected_pay = int(max(0, (expected_pay_point + leader_bonus) * 500))
+        expected_res.loc[row_idx, "지급예상금액"] = expected_pay
+
+        st.markdown("### 담당자 예상 수치")
+        expected_hidden_cols = [c for c in expected_res.columns if "전월대비" in c]
+        style_report_logic(expected_res.drop(columns=expected_hidden_cols, errors="ignore"), compact=True)
 
     _, save_col = st.columns([0.85, 0.15])
     with save_col:
