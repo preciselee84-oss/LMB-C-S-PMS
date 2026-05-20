@@ -367,13 +367,13 @@ def build_other_validation_errors(df):
     if df is None or df.empty:
         return pd.DataFrame()
 
-    date_col = find_col(df, ["활동일", "일자"], "활동일")
-    detail_col = find_col(df, ["활동상세", "활동내용"], "활동상세")
     biz_col = find_col(df, ["사업자번호"], "사업자번호")
     comp_col = find_col(df, ["업체명", "상호"], "업체명")
     user_col = find_col(df, ["등록자", "담당자", "성명"], "등록자")
+    open_col = "본사 개설완료일자"
+    erp_col = "본사 ERP연계일자"
 
-    if not date_col or date_col not in df.columns:
+    if open_col not in df.columns or erp_col not in df.columns:
         return pd.DataFrame()
 
     def parse_compare_date(value):
@@ -388,78 +388,21 @@ def build_other_validation_errors(df):
         return pd.to_datetime(text, errors="coerce")
 
     df_check = df.copy()
-    df_check[date_col] = df_check[date_col].apply(parse_compare_date)
-
-    holidays = [
-        "2026-01-01", "2026-03-01", "2026-05-05", "2026-06-06",
-        "2026-08-15", "2026-10-03", "2026-10-09", "2026-12-25"
-    ]
-    holiday_dates = pd.to_datetime(holidays)
-
-    def append_error(row, activity_date, activity_detail, reason):
-        other_errors.append({
-            "업체명": row.get(comp_col, "") if comp_col else "",
-            "사업자번호": row.get(biz_col, "") if biz_col else "",
-            "등록자": row.get(user_col, "") if user_col else "",
-            "활동일": activity_date.strftime("%Y-%m-%d") if pd.notna(activity_date) else "",
-            "활동상세": activity_detail,
-            "오류 사유": reason
-        })
+    df_check["_open_date"] = df_check[open_col].apply(parse_compare_date)
+    df_check["_erp_date"] = df_check[erp_col].apply(parse_compare_date)
 
     for _, row in df_check.iterrows():
-        activity_date = row[date_col]
-        if pd.isna(activity_date):
-            continue
-
-        activity_detail = str(row.get(detail_col, "")) if detail_col else ""
-
-        error_reason = None
-        if activity_date.weekday() in [5, 6]:
-            day_name = "토요일" if activity_date.weekday() == 5 else "일요일"
-            error_reason = f"주말 활동 ({day_name})"
-        if activity_date.normalize() in holiday_dates:
-            error_reason = "공휴일 활동"
-        if error_reason:
-            append_error(row, activity_date, activity_detail, error_reason)
-
-        if "개설" in activity_detail and "본사 개설완료일자" in df_check.columns:
-            open_date = parse_compare_date(row.get("본사 개설완료일자"))
-            if pd.notna(open_date) and open_date.normalize() < activity_date.normalize():
-                append_error(row, activity_date, activity_detail, "본사 개설완료일자가 활동일보다 이전")
-
-        if "연계" in activity_detail and "본사 ERP연계일자" in df_check.columns:
-            erp_date = parse_compare_date(row.get("본사 ERP연계일자"))
-            if pd.notna(erp_date) and erp_date.normalize() < activity_date.normalize():
-                append_error(row, activity_date, activity_detail, "본사 ERP연계일자가 활동일보다 이전")
-
-        if "운영" in activity_detail and "본사 개설완료일자" in df_check.columns:
-            open_date = parse_compare_date(row.get("본사 개설완료일자"))
-            if pd.notna(open_date) and open_date.normalize() > activity_date.normalize():
-                append_error(row, activity_date, activity_detail, "운영 활동의 본사 개설완료일자가 활동일보다 이후")
-
-    prev_df = st.session_state.get("auto_prev_df")
-    if prev_df is not None and not prev_df.empty and biz_col and detail_col:
-        prev_biz_col = find_col(prev_df, ["사업자번호"], "사업자번호")
-        prev_detail_col = find_col(prev_df, ["활동상세", "활동내용"], "활동상세")
-
-        if prev_biz_col and prev_detail_col:
-            prev_open_biz = prev_df[prev_df[prev_detail_col].astype(str).str.contains("개설", na=False)][prev_biz_col].unique()
-            prev_link_biz = prev_df[prev_detail_col].astype(str).str.contains("연계", na=False)
-            prev_link_biz = prev_df[prev_link_biz][prev_biz_col].unique()
-
-            for _, row in df_check.iterrows():
-                biz_num = str(row.get(biz_col, "")).strip()
-                activity_detail = str(row.get(detail_col, ""))
-                activity_date = row[date_col]
-
-                if not biz_num or pd.isna(activity_date):
-                    continue
-
-                if "개설" in activity_detail and biz_num in prev_open_biz:
-                    append_error(row, activity_date, activity_detail, "전월에 이미 개설 기록 존재")
-
-                if "연계" in activity_detail and biz_num in prev_link_biz:
-                    append_error(row, activity_date, activity_detail, "전월에 이미 연계 기록 존재")
+        open_date = row["_open_date"]
+        erp_date = row["_erp_date"]
+        if pd.notna(open_date) and pd.notna(erp_date) and erp_date.normalize() < open_date.normalize():
+            other_errors.append({
+                "업체명": row.get(comp_col, "") if comp_col else "",
+                "사업자번호": row.get(biz_col, "") if biz_col else "",
+                "등록자": row.get(user_col, "") if user_col else "",
+                open_col: open_date.strftime("%Y-%m-%d"),
+                erp_col: erp_date.strftime("%Y-%m-%d"),
+                "오류 사유": "본사 ERP연계일자가 개설완료일자보다 이전",
+            })
 
     return pd.DataFrame(other_errors)
 
