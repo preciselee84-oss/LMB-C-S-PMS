@@ -2235,11 +2235,6 @@ def show_user_history():
         else:
             st.button("샘플파일 다운로드", use_container_width=True, disabled=True)
 
-    # 미리보기 에디터를 분석 이전에 렌더링 → 편집 결과가 같은 사이클에 분석에 반영됨
-    if converted_preview_df is not None and not converted_preview_df.empty:
-        st.divider()
-        render_converted_preview_editor(converted_preview_df)
-
     if False and converted_preview_df is not None and not converted_preview_df.empty:
         st.markdown("#### 변환파일 미리보기")
         st.markdown(
@@ -2583,6 +2578,27 @@ def show_user_history():
         total += min(score, limit_map[item]) if item in limit_map else score
 
     st.metric("추가 실적 합산 점수", f"{total:,} PT")
+
+    if converted_preview_df is not None and not converted_preview_df.empty:
+        st.divider()
+        _pre_h = None
+        _pd_before = st.session_state.get("history_convert_preview_data")
+        if isinstance(_pd_before, pd.DataFrame) and not _pd_before.empty:
+            try:
+                _pre_h = int(pd.util.hash_pandas_object(_pd_before).sum())
+            except Exception:
+                pass
+        render_converted_preview_editor(converted_preview_df)
+        _changed = False
+        _pd_after = st.session_state.get("history_convert_preview_data")
+        if isinstance(_pd_after, pd.DataFrame) and not _pd_after.empty:
+            try:
+                if _pre_h is not None and int(pd.util.hash_pandas_object(_pd_after).sum()) != _pre_h:
+                    _changed = True
+            except Exception:
+                pass
+        if _changed:
+            st.rerun()
 
     t1, t2, t3, t4, t5 = validation_tabs_with_refresh("refresh_user_history_validation")
     with t1:
