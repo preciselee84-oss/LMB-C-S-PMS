@@ -3761,6 +3761,12 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
     from pptx.util import Pt
     from copy import deepcopy
 
+    if not os.path.exists(PPT_TEMPLATE_FILE):
+        raise FileNotFoundError(f"PPT 템플릿 파일을 찾을 수 없습니다: {PPT_TEMPLATE_FILE}")
+
+    if report_df.empty:
+        raise ValueError("실적 데이터가 비어있습니다. 마감 후 다시 시도해주세요.")
+
     prs = Presentation(PPT_TEMPLATE_FILE)
     ym, _, _ = report_month_info(report_df)
 
@@ -3797,6 +3803,8 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
         return [shape.table for shape in slide.shapes if getattr(shape, "has_table", False)]
 
     def ensure_rows(table, required_rows):
+        if len(table.rows) == 0:
+            return
         while len(table.rows) < required_rows:
             new_tr = deepcopy(table._tbl.tr_lst[-1])
             table._tbl.append(new_tr)
