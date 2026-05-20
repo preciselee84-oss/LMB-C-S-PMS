@@ -2591,11 +2591,7 @@ def show_user_history():
     with t1:
         if not dup_my.empty:
             _dc = next((c for c in dup_my.columns if "활동일자" in c), None) or next((c for c in dup_my.columns if "활동일" in c), None)
-            _bc = next((c for c in dup_my.columns if "사업자번호" in c), None)
-            _uc = next((c for c in dup_my.columns if any(k in c for k in ["등록자", "담당자", "성명"])), None)
-            _cc = next((c for c in dup_my.columns if "업체명" in c or "상호" in c), None)
-            show_cols = [c for c in [_cc, _bc, _uc, _dc] if c]
-            dup_display = dup_my[show_cols].copy().reset_index().rename(columns={"index": "_orig_idx"})
+            dup_display = dup_my.copy().reset_index().rename(columns={"index": "_orig_idx"})
             _ver = st.session_state.get("dup_editor_ver", 0)
             edited_dup = st.data_editor(
                 dup_display,
