@@ -1750,6 +1750,8 @@ def show_sidebar():
         for menu_name in ["업로드 및 실적 확인", "이번달 활동 대상고객 추천", "주간보고 이력 작성"]:
             if st.button(menu_name, use_container_width=True):
                 st.session_state.current_menu = menu_name
+                if menu_name == "업로드 및 실적 확인":
+                    st.session_state["show_add_history_form"] = False
                 st.rerun()
 
         if st.session_state.user_role == "관리자":
@@ -2477,7 +2479,8 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
                         )
                         # 등록 후 업체명·활동일자·활동내역 초기화
                         st.session_state["add_form_date_val"] = ""
-                        for _rk in ["add_form_company", "add_form_date", "add_form_note", "add_form_biz_display"]:
+                        st.session_state["add_form_company"] = "-- 업체명 선택 --"
+                        for _rk in ["add_form_date", "add_form_note", "add_form_biz_display"]:
                             st.session_state.pop(_rk, None)
                         st.rerun()
             with _fb2:
