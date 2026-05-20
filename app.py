@@ -4709,7 +4709,10 @@ def show_target_customers():
 
 
 def show_weekly_report_user():
-    categories = ["개설대기", "개설진행", "개설완료", "연계대기", "연계진행", "연계완료", "운영부문"]
+    opening_categories = ["개설대기", "개설진행", "개설완료"]
+    link_categories = ["연계대기", "연계진행", "연계완료"]
+    report_categories = opening_categories + link_categories
+    categories = ["전체"] + report_categories + ["운영부문"]
     user_name = st.session_state.get("user_name", "")
 
     def load_hana_sheet_for_weekly():
@@ -4782,6 +4785,12 @@ def show_weekly_report_user():
                 show[col] = show[col].where(parsed.isna(), parsed.dt.strftime("%Y-%m-%d"))
         return show.reset_index(drop=True)
 
+    def format_weekly_date(value):
+        parsed = parse_sheet_date(value)
+        if pd.isna(parsed):
+            return "" if is_blank_value(value) else str(value).strip()
+        return pd.Timestamp(parsed).strftime("%Y-%m-%d")
+
     st.markdown("### 주간보고 작성")
     st.caption("하나은행 구글 시트의 본인 담당 고객을 기준으로 카테고리별 현황을 선택해 주간보고 이력을 저장합니다.")
 
@@ -4819,13 +4828,44 @@ def show_weekly_report_user():
     with col_c:
         category = st.selectbox("카테고리", categories, key="weekly_report_category")
 
-    categorized = mine[weekly_category_mask(mine, category, week_start, week_end)].copy()
-    st.markdown(f"#### {category} 현황")
-    st.caption(f"{len(categorized)}건 · 하나은행 구글 시트 기준")
-    render_plain_html_table(display_customer_df(categorized), max_rows=200)
+    if category == "전체":
+        categorized_map = {
+            cat: mine[weekly_category_mask(mine, cat, week_start, week_end)].copy()
+            for cat in report_categories
+        }
+        st.markdown("#### 전체 현황")
+        st.caption("개설 부문과 ERP연계 부문을 PPT 주간보고 구성에 맞춰 표시합니다.")
+        st.markdown("##### 개설 부문")
+        for cat in opening_categories:
+            st.markdown(f"**{cat}**")
+            st.caption(f"{len(categorized_map[cat])}건 · 하나은행 구글 시트 기준")
+            render_plain_html_table(display_customer_df(categorized_map[cat]), max_rows=200)
+        st.markdown("##### ERP연계 부문")
+        for cat in link_categories:
+            st.markdown(f"**{cat}**")
+            st.caption(f"{len(categorized_map[cat])}건 · 하나은행 구글 시트 기준")
+            render_plain_html_table(display_customer_df(categorized_map[cat]), max_rows=200)
+    else:
+        categorized = mine[weekly_category_mask(mine, category, week_start, week_end)].copy()
+        st.markdown(f"#### {category} 현황")
+        st.caption(f"{len(categorized)}건 · 하나은행 구글 시트 기준")
+        render_plain_html_table(display_customer_df(categorized), max_rows=200)
 
-    if categorized.empty and category != "운영부문":
-        st.info("선택한 카테고리에 작성할 고객이 없습니다.")
+        if categorized.empty and category != "운영부문":
+            st.info("선택한 카테고리에 작성할 고객이 없습니다.")
+
+    st.markdown("---")
+    st.markdown("#### 주간보고 이력 입력")
+    if category == "전체":
+        input_part = st.radio("입력 부문", ["개설 부문", "ERP연계 부문"], horizontal=True, key="weekly_input_part")
+        input_category_options = opening_categories if input_part == "개설 부문" else link_categories
+        input_category = st.selectbox("세부 카테고리", input_category_options, key="weekly_input_category")
+    else:
+        input_category = category
+        input_part = "ERP연계 부문" if input_category in link_categories else "개설 부문"
+        st.caption(f"{input_part} · {input_category}")
+
+    categorized = mine[weekly_category_mask(mine, input_category, week_start, week_end)].copy()
 
     options = ["직접입력"]
     if not categorized.empty:
@@ -4844,14 +4884,21 @@ def show_weekly_report_user():
     default_service = "" if selected_row is None or not service_col else str(selected_row.get(service_col, "")).strip()
     default_build = "" if selected_row is None or not build_type_col else str(selected_row.get(build_type_col, "")).strip()
     default_branch = "" if selected_row is None or not branch_col else str(selected_row.get(branch_col, "")).strip()
+    open_receipt_col = find_col(mine, ["신규접수일"])
+    link_receipt_col = find_col(mine, ["추가연계접수일"])
+    schedule_col = find_col(mine, ["구축예정일"])
+    receipt_col = link_receipt_col if input_category in link_categories else open_receipt_col
+    default_receipt_date = "" if selected_row is None or not receipt_col else format_weekly_date(selected_row.get(receipt_col, ""))
+    default_plan_date = "" if selected_row is None or not schedule_col else format_weekly_date(selected_row.get(schedule_col, ""))
     status_default = ""
     if selected_row is not None:
-        if "연계" in category and link_status_col:
+        if input_category in link_categories and link_status_col:
             status_default = str(selected_row.get(link_status_col, "")).strip()
         elif open_status_col:
             status_default = str(selected_row.get(open_status_col, "")).strip()
 
     with st.form("weekly_report_form", border=True):
+        st.markdown(f"##### {input_part} - {input_category}")
         f1, f2, f3 = st.columns([1.5, 1.0, 1.0])
         with f1:
             company = st.text_input("고객명", value=default_company)
@@ -4868,6 +4915,12 @@ def show_weekly_report_user():
         with f6:
             status = st.text_input("상태", value=status_default)
 
+        f7, f8 = st.columns(2)
+        with f7:
+            receipt_date = st.text_input("접수일자", value=default_receipt_date)
+        with f8:
+            plan_date = st.text_input("구축/피드백 예정일", value=default_plan_date)
+
         issue = st.text_area("이슈 / 진행내용", height=100, placeholder="PPT 주간보고의 이슈 항목처럼 고객별 진행상황을 작성")
         plan = st.text_area("금주 조치 / 차주 예정", height=80, placeholder="예정 작업, 고객 회신 필요사항, 은행 전달사항 등")
         next_date = st.date_input("피드백(예정)일자", value=today.date(), key="weekly_next_date")
@@ -4882,15 +4935,18 @@ def show_weekly_report_user():
             entries = db.setdefault(user_name, [])
             now_text = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
             entries.append({
-                "id": hashlib.md5(f"{user_name}-{now_text}-{company}-{category}".encode("utf-8")).hexdigest(),
+                "id": hashlib.md5(f"{user_name}-{now_text}-{company}-{input_category}".encode("utf-8")).hexdigest(),
                 "보고시작일": str(week_start),
                 "보고종료일": str(week_end),
-                "카테고리": category,
+                "부문": input_part,
+                "카테고리": input_category,
                 "서비스": service.strip(),
                 "구분": build_type.strip(),
                 "고객명": company.strip(),
                 "고객번호": customer_no.strip(),
                 "신청점": branch.strip(),
+                "접수일자": receipt_date.strip(),
+                "구축/피드백예정일": plan_date.strip(),
                 "이슈": issue.strip(),
                 "조치예정": plan.strip(),
                 "피드백예정일": str(next_date),
@@ -4910,7 +4966,7 @@ def show_weekly_report_user():
         return
 
     history_df = pd.DataFrame(my_entries)
-    show_cols = ["보고시작일", "보고종료일", "카테고리", "고객명", "이슈", "조치예정", "피드백예정일", "상태", "작성시각"]
+    show_cols = ["보고시작일", "보고종료일", "부문", "카테고리", "고객명", "접수일자", "구축/피드백예정일", "이슈", "조치예정", "피드백예정일", "상태", "작성시각"]
     show_cols = [c for c in show_cols if c in history_df.columns]
     render_plain_html_table(history_df[show_cols].sort_values("작성시각", ascending=False), max_rows=300, center_align=False)
 
@@ -4950,7 +5006,7 @@ def show_weekly_report_admin():
         df = df[df["카테고리"] == category]
     if staff != "전체" and "담당자" in df.columns:
         df = df[df["담당자"] == staff]
-    show_cols = ["보고시작일", "보고종료일", "카테고리", "서비스", "구분", "고객명", "신청점", "이슈", "조치예정", "피드백예정일", "상태", "담당자", "작성시각"]
+    show_cols = ["보고시작일", "보고종료일", "부문", "카테고리", "서비스", "구분", "고객명", "신청점", "접수일자", "구축/피드백예정일", "이슈", "조치예정", "피드백예정일", "상태", "담당자", "작성시각"]
     show_cols = [c for c in show_cols if c in df.columns]
     render_plain_html_table(df[show_cols].sort_values("작성시각", ascending=False), max_rows=1000, center_align=False)
 
