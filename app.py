@@ -4725,7 +4725,7 @@ def show_weekly_report_user():
         df.columns = [str(c).strip() for c in df.columns]
         return df.dropna(how="all").reset_index(drop=True)
 
-    def weekly_category_mask(df, category):
+    def weekly_category_mask(df, category, start_date=None, end_date=None):
         open_status_col = find_col(df, ["개설상태"])
         open_date_col = find_col(df, ["개설/이행일", "개설일", "이행일"])
         link_status_col = find_col(df, ["연계상태"])
@@ -4736,8 +4736,10 @@ def show_weekly_report_user():
         open_status = df[open_status_col].astype(str).str.strip() if open_status_col else pd.Series("", index=df.index)
         link_status = df[link_status_col].astype(str).str.strip() if link_status_col else pd.Series("", index=df.index)
         build_type = df[build_type_col].astype(str).str.strip() if build_type_col else pd.Series("", index=df.index)
-        open_date = df[open_date_col].map(parse_sheet_date).notna() if open_date_col else pd.Series(False, index=df.index)
-        link_date = df[link_date_col].map(parse_sheet_date).notna() if link_date_col else pd.Series(False, index=df.index)
+        open_dates = pd.to_datetime(df[open_date_col].map(parse_sheet_date), errors="coerce") if open_date_col else pd.Series(pd.NaT, index=df.index)
+        link_dates = pd.to_datetime(df[link_date_col].map(parse_sheet_date), errors="coerce") if link_date_col else pd.Series(pd.NaT, index=df.index)
+        open_date = open_dates.notna()
+        link_date = link_dates.notna()
         active = df[end_col].map(is_blank_value) if end_col else pd.Series(True, index=df.index)
 
         open_done = active & (open_status.str.contains("완료|이행완료", na=False) | open_date)
@@ -4747,7 +4749,9 @@ def show_weekly_report_user():
         link_target = active & (build_type.str.contains("연계|이행", na=False) | link_status.ne(""))
 
         if category == "개설완료":
-            return open_done
+            if start_date is not None and end_date is not None:
+                return active & open_dates.between(pd.Timestamp(start_date), pd.Timestamp(end_date), inclusive="both")
+            return active & open_date
         if category == "개설진행":
             return open_progress
         if category == "개설대기":
@@ -4815,7 +4819,7 @@ def show_weekly_report_user():
     with col_c:
         category = st.selectbox("카테고리", categories, key="weekly_report_category")
 
-    categorized = mine[weekly_category_mask(mine, category)].copy()
+    categorized = mine[weekly_category_mask(mine, category, week_start, week_end)].copy()
     st.markdown(f"#### {category} 현황")
     st.caption(f"{len(categorized)}건 · 하나은행 구글 시트 기준")
     render_plain_html_table(display_customer_df(categorized), max_rows=200)
