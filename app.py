@@ -205,8 +205,6 @@ def init_state():
         "cloud_sheet_df": None,
         "analysis_result": None,
         "user_excel_data": None,
-        "final_reupload_df": None,
-        "final_reupload_key": "",
         "temp_cloud_df": None,
         "auto_prev_df": None,
         "deadline_time": "",
@@ -1301,8 +1299,6 @@ def show_auth_page():
                     if user_saved:
                         if user_saved.get("user_excel_data"):
                             st.session_state.user_excel_data = pd.DataFrame.from_dict(user_saved["user_excel_data"])
-                        if user_saved.get("final_reupload_df"):
-                            st.session_state.final_reupload_df = pd.DataFrame.from_dict(user_saved["final_reupload_df"])
                         if user_saved.get("user_prev_month_sel"):
                             st.session_state.user_prev_month_sel = user_saved["user_prev_month_sel"]
 
@@ -2379,8 +2375,6 @@ def show_user_history():
 
                 if not uploaded_df.empty:
                     st.session_state.user_excel_data = uploaded_df
-                    st.session_state.final_reupload_df = None
-                    st.session_state.final_reupload_key = ""
                     st.toast("업로드 완료. 분석이 자동으로 시작됩니다.")
                     st.rerun()
                 else:
@@ -2631,8 +2625,6 @@ def show_final_check():
         user_saved = saved_db.get(st.session_state.user_name)
         if user_saved and user_saved.get("user_excel_data"):
             st.session_state.user_excel_data = pd.DataFrame.from_dict(user_saved["user_excel_data"])
-            if user_saved.get("final_reupload_df"):
-                st.session_state.final_reupload_df = pd.DataFrame.from_dict(user_saved["final_reupload_df"])
             if user_saved.get("user_prev_month_sel"):
                 st.session_state.user_prev_month_sel = user_saved["user_prev_month_sel"]
 
@@ -2718,205 +2710,14 @@ def show_final_check():
     if my_res.empty:
         return
 
-    add_cnt = int(my_res.iloc[0].get("운영건수 (추가 활동)", 0))
-    st.markdown(
-        f"<div style='margin-top:8px;padding:10px 16px;background:#FFFBEB;border:1px solid #F6AD55;border-radius:8px;font-size:14px;color:#92400E;font-weight:600;'>"
-        f"{html.escape(uname)}님은 <span style='color:#C05621;font-size:16px;font-weight:800;'>{add_cnt}건</span>의 활동이력을 추가로 등록 후 엑셀업로드 해주세요.</div>",
-        unsafe_allow_html=True,
-    )
-
-    st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
-
-    col1_reupload, col2_reupload = st.columns([1, 5])
-    with col1_reupload:
-        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>활동실적 엑셀 재업로드</div>", unsafe_allow_html=True)
-        new_file = st.file_uploader("활동실적 엑셀 재업로드", type=["xlsx"], key="final_reupload", label_visibility="collapsed")
-
-    if new_file is not None:
-        file_key = f"{new_file.name}_{new_file.size}"
-
-        if st.session_state.get("final_reupload_key") != file_key:
-            st.session_state.final_reupload_key = file_key
-            uploaded_df = clean_header_logic(pd.read_excel(new_file, sheet_name=0))
-            st.session_state.final_reupload_df = uploaded_df
-            st.toast("업로드 완료. 검증 리포트에 반영됩니다.")
-            st.rerun()
-
-    uploaded_df = st.session_state.get("final_reupload_df")
-    uploaded_my_res = pd.DataFrame()
-
-    if uploaded_df is not None:
-        uploaded_res, _, _ = process_performance_analysis(uploaded_df, st.session_state.get("auto_prev_df"))
-        if isinstance(uploaded_res, pd.DataFrame) and not uploaded_res.empty:
-            uploaded_my_res = uploaded_res[uploaded_res["담당자"] == st.session_state.user_name]
-
-    st.markdown("##### 실적 예상치 검증 리포트")
-
-    uploaded_exists = uploaded_df is not None and not uploaded_my_res.empty
-
-    report_items = [
-        ("개설건수", "개설건수", "compare"),
-        ("개설포인트", "개설포인트", "compare"),
-        ("연계건수", "연계건수", "compare"),
-        ("연계포인트", "연계포인트", "compare"),
-        ("운영건수 (실제 활동)", "운영건수 (실제 활동)", "compare_no_match"),
-        ("운영포인트 (실제 활동)", "운영포인트 (실제 활동)", "compare_no_match"),
-        ("추가 등록건수", "운영건수 (추가 활동)", "compare_no_match"),
-        ("추가운영포인트", "운영포인트(추가 활동)", "compare_no_match"),
-        ("최종 운영건수", None, "final_operation_count"),
-        ("합계포인트", "합계포인트", "compare"),
-        ("지급포인트", "지급포인트", "compare"),
-        ("지급예상금액", "지급예상금액", "compare"),
-    ]
-
-    cmp_rows = []
-
-    for label, source_col, mode in report_items:
-        before_value = ""
-        after_value = ""
-        uploaded_value = ""
-        match_value = ""
-
-        if mode == "final_operation_count":
-            first_actual_count = int(float(my_res.iloc[0].get("운영건수 (실제 활동)", 0)))
-            first_extra_count = int(float(my_res.iloc[0].get("운영건수 (추가 활동)", 0)))
-            first_compare_value = min(60, first_actual_count + first_extra_count)
-
-            # 업로드 전 예상치: 실제 활동만
-            before_value = first_actual_count
-            # 업로드 후 예상치: 실제 + 추가 (최대 60)
-            after_value = first_compare_value
-
-            if uploaded_exists:
-                # 재업로드 Excel에서 직접 계산 (운영+방문+점검 모두 포함)
-                uploaded_df_calc = uploaded_df.copy()
-                u_col_calc = find_col(uploaded_df_calc, ["등록자", "담당자", "성명"], "등록자")
-                d_col_calc = find_col(uploaded_df_calc, ["활동상세", "활동내용"], "활동상세")
-
-                if u_col_calc in uploaded_df_calc.columns and d_col_calc in uploaded_df_calc.columns:
-                    user_data = uploaded_df_calc[uploaded_df_calc[u_col_calc] == st.session_state.user_name]
-                    operation_count = user_data[user_data[d_col_calc].astype(str).str.contains("운영|방문|점검", na=False)].shape[0]
-                    uploaded_value = operation_count  # 실제 건수 표시 (캡 없음)
-                    # 표시값이 다르면 불일치
-                    match_value = "일치" if first_compare_value == operation_count else "불일치"
-                else:
-                    uploaded_value = 0
-                    match_value = "불일치"
-        elif mode == "compare_upload_only":
-            before_value = ""
-            after_value = ""
-
-            if uploaded_exists and source_col in uploaded_my_res.columns:
-                uploaded_value = int(float(uploaded_my_res.iloc[0].get(source_col, 0)))
-        elif mode == "compare_no_match":
-            if source_col in my_res.columns:
-                after_value = int(float(my_res.iloc[0].get(source_col, 0)))
-
-            # 업로드 전 예상치 설정
-            if label in ["운영건수 (실제 활동)", "운영포인트 (실제 활동)"]:
-                # 실제 활동은 추가 활동과 무관하므로 동일
-                before_value = after_value
-            elif label in ["추가 등록건수", "추가운영포인트"]:
-                # 추가 활동은 업로드 전에는 0
-                before_value = 0
-
-            # 운영건수/포인트(실제 활동)은 재업로드 파일에서 "운영"만 카운트
-            if uploaded_exists:
-                if label in ["운영건수 (실제 활동)", "운영포인트 (실제 활동)"]:
-                    uploaded_df_calc = uploaded_df.copy()
-                    u_col_calc = find_col(uploaded_df_calc, ["등록자", "담당자", "성명"], "등록자")
-                    d_col_calc = find_col(uploaded_df_calc, ["활동상세", "활동내용"], "활동상세")
-
-                    if u_col_calc in uploaded_df_calc.columns and d_col_calc in uploaded_df_calc.columns:
-                        user_data = uploaded_df_calc[uploaded_df_calc[u_col_calc] == st.session_state.user_name]
-                        operation_count = user_data[user_data[d_col_calc].astype(str).str.contains("운영", na=False)].shape[0]
-
-                        if label == "운영건수 (실제 활동)":
-                            uploaded_value = operation_count
-                        else:  # 운영포인트 (실제 활동)
-                            uploaded_value = operation_count * 30
-                    else:
-                        uploaded_value = 0
-                elif source_col in uploaded_my_res.columns:
-                    uploaded_value = int(float(uploaded_my_res.iloc[0].get(source_col, 0)))
-            # match_value는 비워둠 (일치여부 체크 안함)
-        else:
-            if source_col in my_res.columns:
-                after_value = int(float(my_res.iloc[0].get(source_col, 0)))
-
-            # 업로드 전 예상치 설정
-            if label in ["개설건수", "개설포인트", "연계건수", "연계포인트"]:
-                # 개설/연계는 추가 활동과 무관하므로 동일
-                before_value = after_value
-            elif label == "합계포인트":
-                # 업로드 전: 개설 + 연계 + 운영(실제)만
-                o_p = int(float(my_res.iloc[0].get("개설포인트", 0)))
-                l_p = int(float(my_res.iloc[0].get("연계포인트", 0)))
-                v_p = int(float(my_res.iloc[0].get("운영포인트 (실제 활동)", 0)))
-                before_value = min(2800, min(1000, o_p + l_p) + min(1800, v_p))
-            elif label == "지급포인트":
-                # 업로드 전 합계포인트 기준
-                o_p = int(float(my_res.iloc[0].get("개설포인트", 0)))
-                l_p = int(float(my_res.iloc[0].get("연계포인트", 0)))
-                v_p = int(float(my_res.iloc[0].get("운영포인트 (실제 활동)", 0)))
-                before_total = min(2800, min(1000, o_p + l_p) + min(1800, v_p))
-                before_value = max(0, before_total - 1000)
-            elif label == "지급예상금액":
-                # 업로드 전 지급포인트 기준
-                o_p = int(float(my_res.iloc[0].get("개설포인트", 0)))
-                l_p = int(float(my_res.iloc[0].get("연계포인트", 0)))
-                v_p = int(float(my_res.iloc[0].get("운영포인트 (실제 활동)", 0)))
-                before_total = min(2800, min(1000, o_p + l_p) + min(1800, v_p))
-                before_pay_point = max(0, before_total - 1000)
-
-                # 팀장 보너스 및 외주 여부 고려
-                rank = my_res.iloc[0].get("직급", "")
-                name = my_res.iloc[0].get("담당자", "")
-                name_to_info = {
-                    info.get("name"): {
-                        "staff_type": info.get("staff_type", "정규직"),
-                    }
-                    for uid, info in st.session_state.user_db.items()
-                    if uid != "1"
-                }
-                is_outsource = name_to_info.get(name, {}).get("staff_type", "정규직") == "외주"
-
-                if is_outsource:
-                    before_value = int(max(0, before_pay_point * 500))
-                else:
-                    leader_bonus = 500 if rank == "팀장" else 0
-                    before_value = int(max(0, (before_pay_point + leader_bonus) * 500))
-
-            if uploaded_exists and source_col in uploaded_my_res.columns:
-                uploaded_value = int(float(uploaded_my_res.iloc[0].get(source_col, 0)))
-                match_value = "일치" if after_value == uploaded_value else "불일치"
-
-        cmp_rows.append(
-            {
-                "항목": label,
-                "업로드 전 예상치": before_value,
-                "업로드 후 예상치": after_value,
-                "업로드 후 결과": uploaded_value,
-                "일치여부": match_value,
-            }
-        )
-
-    cmp_df = pd.DataFrame(cmp_rows)
-    style_report_logic(cmp_df)
+    # 현재 실적 표시
+    st.markdown("##### 실적 현황")
+    display_res = my_res.drop(columns=["전송시각"], errors="ignore")
+    style_report_logic(display_res, compact=True)
 
     # ── 중복방문/초과방문/누락 확인 탭 ──
-    # 재업로드한 파일이 있을 때만 오류 체크
-    if uploaded_df is not None:
-        check_df = uploaded_df.copy()
-        u_col_check = find_col(check_df, ["등록자", "담당자", "성명"], "등록자")
-        df_user_check = check_df[check_df[u_col_check] == st.session_state.user_name].copy() if u_col_check in check_df.columns else pd.DataFrame()
-        df_user_check = attach_cloud_dates(df_user_check)
-        _, err_check, dup_check = process_performance_analysis(check_df, st.session_state.get("auto_prev_df"))
-    else:
-        # 재업로드하지 않았을 때는 검증하지 않음
-        df_user_check = pd.DataFrame()
-        err_check = None
-        dup_check = None
+    df_user_check = df_user
+    _, err_check, dup_check = process_performance_analysis(original_df, st.session_state.get("auto_prev_df"))
 
     # 탭 데이터 미리 계산 (경고 메시지 표시용 - 재업로드한 경우만)
     # 중복 이력
@@ -3022,71 +2823,50 @@ def show_final_check():
     with t5:
         style_report_logic(other_errors_df_final, align_overrides={"오류 사유": "left"}, default_align="center")
 
-    # ── 모든 항목 일치 여부 체크 ──
-    # 일치여부가 빈 항목은 체크에서 제외 (compare_no_match 모드)
-    all_match = uploaded_exists and all(r.get("일치여부") in ["일치", ""] for r in cmp_rows)
-
-    # 검증 이슈 체크 (중복/초과 방문, 누락 데이터, 기타 오류)
+    # 검증 이슈 체크
     has_validation_issues = has_dup_data or has_err_data or has_missing_open or has_missing_erp or has_other_errors
 
     # 전송 가능 여부
-    can_send = all_match and not has_validation_issues
+    can_send = not has_validation_issues
 
-    if not uploaded_exists:
-        st.markdown(
-            "<div style='margin-top:8px;padding:10px 16px;background:#FFFBEB;border:1px solid #F6AD55;border-radius:8px;font-size:13px;color:#92400E;font-weight:700;'>"
-            "📂 엑셀을 재업로드하여 검증을 완료한 후 실적을 전송할 수 있습니다.</div>",
-            unsafe_allow_html=True,
-        )
-    elif not all_match:
+    if has_validation_issues:
         st.markdown(
             "<div style='margin-top:8px;padding:10px 16px;background:#FFF5F5;border:1px solid #FC8181;border-radius:8px;font-size:13px;color:#C53030;font-weight:700;'>"
-            "❌ 일치하지 않는 항목이 있습니다. 모든 항목이 일치해야 실적 결과를 전송할 수 있습니다.</div>",
+            "❌ 검증 오류가 있습니다. 위 탭에서 문제를 해결한 후 실적을 전송해주세요.</div>",
             unsafe_allow_html=True,
         )
     else:
-        # 최종 실적 표시
-        if not my_res.empty:
-            # 실적 표 표시 (전송시각 제외)
-            display_res = my_res.drop(columns=["전송시각"], errors="ignore")
-            style_report_logic(display_res, compact=True)
+        개설건수 = int(my_res.iloc[0].get("개설건수", 0))
+        연계건수 = int(my_res.iloc[0].get("연계건수", 0))
+        운영건수_실제 = int(my_res.iloc[0].get("운영건수 (실제 활동)", 0))
+        운영건수_추가 = int(my_res.iloc[0].get("운영건수 (추가 활동)", 0))
+        운영건수 = min(60, 운영건수_실제 + 운영건수_추가)
+        지급예상금액 = int(my_res.iloc[0].get("지급예상금액", 0))
 
-            개설건수 = int(my_res.iloc[0].get("개설건수", 0))
-            연계건수 = int(my_res.iloc[0].get("연계건수", 0))
-            운영건수_실제 = int(my_res.iloc[0].get("운영건수 (실제 활동)", 0))
-            운영건수_추가 = int(my_res.iloc[0].get("운영건수 (추가 활동)", 0))
-            운영건수 = min(60, 운영건수_실제 + 운영건수_추가)
-            지급예상금액 = int(my_res.iloc[0].get("지급예상금액", 0))
-
-            # 전월대비 정보
-            전월대비_text = ""
-            전월대비_col = next((c for c in my_res.columns if "전월대비" in c), None)
-            if 전월대비_col:
-                전월대비 = int(my_res.iloc[0].get(전월대비_col, 0))
-
-                # 비교 월 표시
-                user_sel = st.session_state.get("user_prev_month_sel", "선택안함")
-                if user_sel and user_sel != "선택안함":
-                    prev_m = str(int(user_sel.split("-")[1])) + "월"
-                    비교월_label = f"{prev_m} 대비"
-                else:
-                    비교월_label = "전월 대비"
-
-                if 전월대비 > 0:
-                    전월대비_text = f" {비교월_label} <b>{전월대비:,}</b>원 증가하였습니다."
-                elif 전월대비 < 0:
-                    전월대비_text = f" {비교월_label} <b>{abs(전월대비):,}</b>원 감소하였습니다."
-
-            st.markdown(
-                f"<div style='margin-top:8px;padding:10px 16px;background:#EBF8FF;border-radius:8px;font-size:13px;color:#2B6CB0;'>"
-                f"<b>{html.escape(uname)}</b>님의 최종 실적은 개설 <b>{개설건수}</b>개, 연계 <b>{연계건수}</b>개, 운영 <b>{운영건수}</b>개 에 금액은 <b>{지급예상금액:,}</b>원 입니다."
-                f"{전월대비_text}</div>",
-                unsafe_allow_html=True,
-            )
+        전월대비_text = ""
+        전월대비_col = next((c for c in my_res.columns if "전월대비" in c), None)
+        if 전월대비_col:
+            전월대비 = int(my_res.iloc[0].get(전월대비_col, 0))
+            user_sel = st.session_state.get("user_prev_month_sel", "선택안함")
+            if user_sel and user_sel != "선택안함":
+                prev_m = str(int(user_sel.split("-")[1])) + "월"
+                비교월_label = f"{prev_m} 대비"
+            else:
+                비교월_label = "전월 대비"
+            if 전월대비 > 0:
+                전월대비_text = f" {비교월_label} <b>{전월대비:,}</b>원 증가하였습니다."
+            elif 전월대비 < 0:
+                전월대비_text = f" {비교월_label} <b>{abs(전월대비):,}</b>원 감소하였습니다."
 
         st.markdown(
+            f"<div style='margin-top:8px;padding:10px 16px;background:#EBF8FF;border-radius:8px;font-size:13px;color:#2B6CB0;'>"
+            f"<b>{html.escape(uname)}</b>님의 최종 실적은 개설 <b>{개설건수}</b>개, 연계 <b>{연계건수}</b>개, 운영 <b>{운영건수}</b>개 에 금액은 <b>{지급예상금액:,}</b>원 입니다."
+            f"{전월대비_text}</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
             "<div style='margin-top:8px;padding:10px 16px;background:#F0FFF4;border:1px solid #9AE6B4;border-radius:8px;font-size:13px;color:#276749;font-weight:700;'>"
-            "✅ 모든 항목이 일치합니다. 실적 결과를 전송할 수 있습니다.</div>",
+            "✅ 실적 결과를 전송할 수 있습니다.</div>",
             unsafe_allow_html=True,
         )
 
@@ -3109,7 +2889,6 @@ def show_final_check():
         saved_db = load_db(SAVED_STATE_FILE, {})
         user_saved = {
             "user_excel_data": st.session_state.user_excel_data.to_dict() if st.session_state.user_excel_data is not None else None,
-            "final_reupload_df": st.session_state.final_reupload_df.to_dict() if st.session_state.final_reupload_df is not None else None,
             "user_prev_month_sel": st.session_state.get("user_prev_month_sel", "선택안함"),
             "saved_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
         }
@@ -3138,34 +2917,17 @@ def show_final_check():
         sent_db[st.session_state.user_name] = row_data
 
         # 본인 이름에 맞는 이력만 저장
-        debug_messages = []
-        if uploaded_df is not None:
-            debug_messages.append(f"📊 엑셀 재업로드 데이터: {len(uploaded_df)}행, {len(uploaded_df.columns)}개 컬럼")
-            u_col = find_col(uploaded_df, ["등록자", "담당자", "성명"], "등록자")
-            if u_col and u_col in uploaded_df.columns:
-                user_only_df = uploaded_df[uploaded_df[u_col] == st.session_state.user_name].copy()
-                debug_messages.append(f"✅ 본인 데이터: {len(user_only_df)}행")
-                debug_messages.append(f"📋 컬럼 목록: {', '.join(user_only_df.columns.tolist())}")
-
-                # 업무번호 컬럼 확인
-                if any("업무번호" in str(col) for col in user_only_df.columns):
-                    debug_messages.append("✓ 업무번호 컬럼 포함됨")
-                else:
-                    debug_messages.append("✗ 업무번호 컬럼 없음")
-
-                sent_uploads_db[st.session_state.user_name] = dataframe_to_upload_payload(user_only_df)
-            else:
-                debug_messages.append(f"⚠️ 등록자 컬럼을 찾을 수 없어 전체 데이터 전송")
-                debug_messages.append(f"📋 컬럼 목록: {', '.join(uploaded_df.columns.tolist())}")
-                sent_uploads_db[st.session_state.user_name] = dataframe_to_upload_payload(uploaded_df)
+        u_col_send = find_col(original_df, ["등록자", "담당자", "성명"], "등록자")
+        if u_col_send and u_col_send in original_df.columns:
+            user_only_df = original_df[original_df[u_col_send] == st.session_state.user_name].copy()
+            sent_uploads_db[st.session_state.user_name] = dataframe_to_upload_payload(user_only_df)
         else:
-            debug_messages.append("⚠️ 엑셀 재업로드 데이터가 없습니다.")
+            sent_uploads_db[st.session_state.user_name] = dataframe_to_upload_payload(original_df)
 
         save_db(SENT_FILE, sent_db)
         save_db(SENT_UPLOADS_FILE, sent_uploads_db)
 
-        # 디버깅 정보와 함께 전송 완료 메시지 표시
-        st.success("전송 완료\n\n" + "\n".join(debug_messages))
+        st.success("전송 완료")
         time.sleep(3)
         st.rerun()
 
