@@ -1747,7 +1747,7 @@ def show_sidebar():
 
         st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
         st.markdown("사용자 메뉴")
-        for menu_name in ["업로드 및 실적 확인"]:
+        for menu_name in ["업로드 및 실적 확인", "이번달 활동 대상고객 추천"]:
             if st.button(menu_name, use_container_width=True):
                 st.session_state.current_menu = menu_name
                 st.rerun()
@@ -3972,6 +3972,112 @@ def show_staff_admin():
             st.rerun()
 
 
+def show_target_customers():
+    st.markdown("### 이번달 활동 대상고객 추천")
+
+    if st.session_state.get("cloud_sheet_df") is None:
+        try:
+            load_csv_to_state("url_sync", "cloud_sheet_df")
+        except Exception as e:
+            st.error(f"본사 구글시트를 불러오지 못했습니다: {e}")
+            return
+
+    cloud = st.session_state.get("cloud_sheet_df")
+    if cloud is None or cloud.empty:
+        st.info("본사 구글시트 데이터가 없습니다. 관리자에게 URL 설정을 확인해주세요.")
+        return
+
+    cloud = clean_header_logic(cloud.copy())
+    user_name = st.session_state.user_name
+
+    # 컬럼 탐색
+    owner_col  = find_col(cloud, ["담당자", "등록자", "성명"])
+    comp_col   = find_col(cloud, ["업체명", "고객명", "상호"])
+    biz_col    = find_col(cloud, ["사업자번호"])
+    open_col   = find_col(cloud, ["개설완료일자", "개설일"])
+    erp_col    = find_col(cloud, ["ERP연계일자", "연계일자"])
+    div_col    = find_col(cloud, ["신규/이행구분", "이행구분", "신규이행"])
+    add_col    = find_col(cloud, ["이행추가연계"])
+
+    if not owner_col:
+        st.warning("구글시트에 담당자 컬럼을 찾을 수 없습니다.")
+        return
+
+    # 본인 담당 고객만 필터
+    df = cloud[cloud[owner_col].astype(str).str.strip() == str(user_name).strip()].copy()
+
+    if df.empty:
+        st.info(f"구글시트에 {user_name}님 담당 고객이 없습니다.")
+        return
+
+    # 날짜 정규화
+    for col in [open_col, erp_col]:
+        if col and col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+
+    def _empty(col):
+        if not col or col not in df.columns:
+            return pd.Series(True, index=df.index)
+        return df[col].isna()
+
+    def _is_ihang_no_add(row):
+        if div_col and div_col in df.columns and add_col and add_col in df.columns:
+            return (str(row.get(div_col, "")).strip() == "이행" and
+                    str(row.get(add_col, "")).strip() == "")
+        return False
+
+    # 표시 컬럼 선택
+    show_cols = [c for c in [comp_col, biz_col, div_col, open_col, erp_col, add_col] if c and c in df.columns]
+
+    def fmt_df(sub):
+        if sub.empty:
+            return sub
+        d = sub[show_cols].copy().reset_index(drop=True)
+        for col in [open_col, erp_col]:
+            if col and col in d.columns:
+                d[col] = pd.to_datetime(d[col], errors="coerce").dt.strftime("%Y-%m-%d").fillna("")
+        return d
+
+    # ── 개설 미완료 ───────────────────────────────────────────
+    st.markdown("#### 🟠 개설 미완료 고객")
+    gaeseol_needed = df[_empty(open_col)].copy()
+    if not gaeseol_needed.empty:
+        st.caption(f"{len(gaeseol_needed)}건")
+        st.dataframe(fmt_df(gaeseol_needed), use_container_width=True, hide_index=True)
+    else:
+        st.success("개설 미완료 고객 없음")
+
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+    # ── ERP연계 미완료 ────────────────────────────────────────
+    st.markdown("#### 🔵 ERP연계 미완료 고객")
+    erp_needed = df[~_empty(open_col) & _empty(erp_col)].copy()
+    # 이행구분=이행이고 이행추가연계 없으면 제외
+    if div_col and add_col and div_col in erp_needed.columns and add_col in erp_needed.columns:
+        _is_ihang = erp_needed[div_col].astype(str).str.strip() == "이행"
+        _no_add   = erp_needed[add_col].astype(str).str.strip() == ""
+        erp_needed = erp_needed[~(_is_ihang & _no_add)]
+    if not erp_needed.empty:
+        st.caption(f"{len(erp_needed)}건")
+        st.dataframe(fmt_df(erp_needed), use_container_width=True, hide_index=True)
+    else:
+        st.success("ERP연계 미완료 고객 없음")
+
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+    # ── 운영 관리 대상 (개설+연계 완료) ──────────────────────
+    st.markdown("#### 🟢 운영 관리 대상 고객")
+    ops = df[~_empty(open_col) & ~_empty(erp_col)].copy()
+    if not ops.empty:
+        st.caption(f"{len(ops)}건")
+        st.dataframe(fmt_df(ops), use_container_width=True, hide_index=True)
+    else:
+        st.info("해당 고객 없음")
+
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    st.caption(f"총 담당 고객 {len(df)}건 · 본사 구글시트 기준")
+
+
 def show_dashboard():
     import plotly.graph_objects as go
 
@@ -5091,6 +5197,8 @@ def show_main():
         show_dashboard()
     elif menu == "업로드 및 실적 확인":
         show_user_history()
+    elif menu == "이번달 활동 대상고객 추천":
+        show_target_customers()
     elif menu == "최종 실적 확인":
         st.session_state.current_menu = "업로드 및 실적 확인"
         st.rerun()
