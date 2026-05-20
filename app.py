@@ -3803,13 +3803,16 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
         return [shape.table for shape in slide.shapes if getattr(shape, "has_table", False)]
 
     def ensure_rows(table, required_rows):
-        if len(table.rows) == 0:
+        if len(table.rows) == 0 or len(table._tbl.tr_lst) == 0:
             return
         while len(table.rows) < required_rows:
-            new_tr = deepcopy(table._tbl.tr_lst[-1])
-            table._tbl.append(new_tr)
-            for cell in table.rows[-1].cells:
-                cell.text = ""
+            try:
+                new_tr = deepcopy(table._tbl.tr_lst[-1])
+                table._tbl.append(new_tr)
+                for cell in table.rows[-1].cells:
+                    cell.text = ""
+            except (IndexError, AttributeError):
+                break
 
     def fill_table_row(table, row_idx, values):
         ensure_rows(table, row_idx + 1)
@@ -3858,7 +3861,11 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
         del slide_id_list[index]
 
     # 전체 브랜치 서비스(BS성과)_운영: 4페이지
-    fill_stats_slide(prs.slides[3], sent_activity_counts(report_df), cloud_customer_counts())
+    try:
+        if len(prs.slides) > 3:
+            fill_stats_slide(prs.slides[3], sent_activity_counts(report_df), cloud_customer_counts())
+    except Exception as e:
+        raise Exception(f"전체 브랜치 슬라이드(4페이지) 처리 중 오류: {e}")
 
     sections = {
         "이성환": [5, 6, 7, 8],
@@ -3876,11 +3883,15 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
         stats_idx = idxs[1]
         open_idx = idxs[2] if len(idxs) > 2 else None
         link_idx = idxs[3] if len(idxs) > 3 else None
-        fill_stats_slide(prs.slides[stats_idx], sent_activity_counts(report_df, name), cloud_customer_counts(name))
-        if open_idx is not None:
-            fill_major_slide(prs.slides[open_idx], uploaded_major_rows(name, "개설", "일반 개설"))
-        if link_idx is not None:
-            fill_major_slide(prs.slides[link_idx], uploaded_major_rows(name, "연계", "추가 연계"))
+        try:
+            if stats_idx < len(prs.slides):
+                fill_stats_slide(prs.slides[stats_idx], sent_activity_counts(report_df, name), cloud_customer_counts(name))
+            if open_idx is not None and open_idx < len(prs.slides):
+                fill_major_slide(prs.slides[open_idx], uploaded_major_rows(name, "개설", "일반 개설"))
+            if link_idx is not None and link_idx < len(prs.slides):
+                fill_major_slide(prs.slides[link_idx], uploaded_major_rows(name, "연계", "추가 연계"))
+        except Exception as e:
+            raise Exception(f"{name} 슬라이드 처리 중 오류: {e}")
 
     # 전송된 담당자 외 개인성과 섹션은 제거
     remove_indices = []
