@@ -3849,7 +3849,8 @@ def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_m
             st.button("실적파일 엑셀 다운로드", use_container_width=True, disabled=True)
 
     with c3:
-        if is_closed:
+        _is_admin = st.session_state.get("user_role") == "관리자"
+        if is_closed or _is_admin:
             try:
                 ppt_bytes = build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_label)
                 st.download_button(
