@@ -2297,6 +2297,9 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
     else:
         analysis_df = normalize_converted_history_df(edited_preview_df)
     st.session_state[data_key] = analysis_df
+    if st.session_state.get("user_excel_source") in (None, "bank"):
+        st.session_state.user_excel_data = analysis_df
+        st.session_state.user_excel_source = "bank"
     _, add_history_col = st.columns([0.88, 0.12])
     with add_history_col:
         if st.button("이력 추가", use_container_width=True, key="add_history_row"):
@@ -2349,6 +2352,8 @@ def show_user_history():
                         edited_df = converted_df
                     edited_df = normalize_converted_history_df(edited_df)
                     st.session_state[data_key] = edited_df
+                    st.session_state.user_excel_data = edited_df
+                    st.session_state.user_excel_source = "bank"
                     analysis_df = edited_df
                     converted_bytes = sample_format_excel_bytes(edited_df)
                     converted_ym = get_uploaded_month(edited_df).replace("-", "") or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
@@ -2519,11 +2524,15 @@ def show_user_history():
             analysis_df = _saved_preview
         else:
             analysis_df = _norm_cpdf
+        if st.session_state.get("user_excel_source") in (None, "bank"):
+            st.session_state.user_excel_data = analysis_df
+            st.session_state.user_excel_source = "bank"
 
     # 파일이 제거되면 데이터 초기화
     if u_file is None:
-        if st.session_state.get("user_excel_data") is not None:
+        if st.session_state.get("user_excel_source") == "hq" and st.session_state.get("user_excel_data") is not None:
             st.session_state.user_excel_data = None
+            st.session_state.user_excel_source = None
             st.session_state.user_excel_file_key = None
             st.rerun()
 
@@ -2546,11 +2555,13 @@ def show_user_history():
 
                 if not uploaded_df.empty:
                     st.session_state.user_excel_data = uploaded_df
+                    st.session_state.user_excel_source = "hq"
                     st.toast("업로드 완료. 분석이 자동으로 시작됩니다.")
                     st.rerun()
                 else:
                     st.error("업로드된 데이터가 없습니다. 파일을 확인해주세요.")
                     st.session_state.user_excel_data = None
+                    st.session_state.user_excel_source = None
 
     if st.session_state.user_excel_data is not None:
         analysis_df = st.session_state.user_excel_data.copy()
