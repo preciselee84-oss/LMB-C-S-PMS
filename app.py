@@ -4774,7 +4774,7 @@ def show_weekly_report_user():
         show = df[cols].copy()
         for col in show.columns:
             if any(k in str(col) for k in ["일자", "일", "예정"]):
-                parsed = show[col].map(parse_sheet_date)
+                parsed = pd.to_datetime(show[col].map(parse_sheet_date), errors="coerce")
                 show[col] = show[col].where(parsed.isna(), parsed.dt.strftime("%Y-%m-%d"))
         return show.reset_index(drop=True)
 
