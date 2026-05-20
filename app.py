@@ -466,6 +466,10 @@ def normalize_converted_history_df(df):
     if df is None or df.empty:
         return pd.DataFrame()
     result = df.copy()
+    for col in list(result.columns):
+        if "업무번호" in str(col):
+            result = result.rename(columns={col: "업무번호"})
+            break
     result["지사"] = "HANA지사"
     if "활동구분" in result.columns:
         result["활동구분"] = result["활동구분"].astype(str).map(
@@ -560,7 +564,7 @@ def convert_history_to_sample_df(history_df, user_name):
             "방문장소 (시, 군, 구까지)": row.get(location_col, "") if location_col else "",
             "활동구분": activity_category,
             "활동상세": activity_detail,
-            "업무번호 \n(플로우에 식권, 비즈플레이, 플로우 작성번호)": row.get(work_no_col, "") if work_no_col else "",
+            "업무번호": row.get(work_no_col, "") if work_no_col else "",
             "제목": title_from_activity_detail(activity_detail),
             "활동내역": row.get(content_col, "") if content_col else "",
         })
@@ -581,7 +585,11 @@ def sample_format_excel_bytes(df):
             return re.sub(r"\s+", "", str(value or ""))
 
         header_map = {header_key(ws.cell(row=2, column=col).value): col for col in range(1, ws.max_column + 1)}
-        aliases = {"활동내역": "활동내용", "활동일자": "활동일"}
+        aliases = {
+            "활동내역": "활동내용",
+            "활동일자": "활동일",
+            "업무번호": "업무번호\n(플로우에 식권, 비즈플레이, 플로우 작성번호)",
+        }
         for row_idx, (_, row) in enumerate(df.iterrows(), start=3):
             for header, value in row.items():
                 col_idx = header_map.get(header_key(header)) or header_map.get(header_key(aliases.get(header, "")))
@@ -2048,10 +2056,12 @@ def show_user_history():
                     converted_df = normalize_converted_history_df(converted_df)
                     converted_preview_df = converted_df
                     edited_key = "history_convert_preview_editor"
-                    edited_df = st.session_state.get(edited_key, converted_df)
+                    data_key = "history_convert_preview_data"
+                    edited_df = st.session_state.get(data_key, converted_df)
                     if not isinstance(edited_df, pd.DataFrame) or list(edited_df.columns) != list(converted_df.columns):
                         edited_df = converted_df
                     edited_df = normalize_converted_history_df(edited_df)
+                    st.session_state[data_key] = edited_df
                     analysis_df = edited_df
                     converted_bytes = sample_format_excel_bytes(edited_df)
                     converted_ym = get_uploaded_month(edited_df).replace("-", "") or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
@@ -2116,12 +2126,18 @@ def show_user_history():
             unsafe_allow_html=True,
         )
         converted_preview_df = normalize_converted_history_df(converted_preview_df)
+        data_key = "history_convert_preview_data"
+        editor_source_df = st.session_state.get(data_key, converted_preview_df)
+        if not isinstance(editor_source_df, pd.DataFrame) or list(editor_source_df.columns) != list(converted_preview_df.columns):
+            editor_source_df = converted_preview_df
+        editor_source_df = normalize_converted_history_df(editor_source_df)
         edited_preview_df = st.data_editor(
-            converted_preview_df,
+            editor_source_df,
             key="history_convert_preview_editor",
             use_container_width=True,
             hide_index=True,
-            disabled=[col for col in converted_preview_df.columns if col not in ["활동일자", "활동구분", "활동상세"]],
+            num_rows="dynamic",
+            disabled=[col for col in editor_source_df.columns if col not in ["활동일자", "활동구분", "활동상세"]],
             column_config={
                 "지사": st.column_config.TextColumn("지사", disabled=True),
                 "활동일자": st.column_config.TextColumn("활동일자"),
@@ -2139,6 +2155,24 @@ def show_user_history():
             },
         )
         analysis_df = normalize_converted_history_df(edited_preview_df)
+        st.session_state[data_key] = analysis_df
+        _, add_history_col = st.columns([0.88, 0.12])
+        with add_history_col:
+            if st.button("이력 추가", use_container_width=True, key="add_history_row"):
+                new_row = {col: "" for col in analysis_df.columns}
+                new_row.update({
+                    "지사": "HANA지사",
+                    "상품": "통합CMS",
+                    "등록자": st.session_state.user_name,
+                    "활동일자": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d"),
+                    "활동구분": "방문",
+                    "활동상세": "운영",
+                    "제목": "운영방문",
+                })
+                st.session_state[data_key] = normalize_converted_history_df(
+                    pd.concat([analysis_df, pd.DataFrame([new_row])], ignore_index=True)
+                )
+                st.rerun()
         st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
     # 파일이 제거되면 데이터 초기화
@@ -2423,7 +2457,7 @@ def show_user_history():
             expected_pay = int(max(0, (expected_pay_point + leader_bonus) * 500))
         expected_res.loc[row_idx, "지급예상금액"] = expected_pay
 
-        st.markdown("### 담당자 예상 수치")
+        st.markdown("### 담당자 예상 수치 (추가활동 포함)")
         expected_hidden_cols = [c for c in expected_res.columns if "전월대비" in c]
         style_report_logic(expected_res.drop(columns=expected_hidden_cols, errors="ignore"), compact=True)
 
