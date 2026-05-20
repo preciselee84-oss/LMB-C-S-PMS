@@ -471,6 +471,8 @@ def normalize_converted_history_df(df):
             result = result.rename(columns={col: "업무번호"})
             break
     result["지사"] = "HANA지사"
+    if "_is_manual" not in result.columns:
+        result["_is_manual"] = False
     if "활동구분" in result.columns:
         result["활동구분"] = result["활동구분"].astype(str).map(
             lambda v: "방문" if "방문" in v else ("원격" if "원격" in v else ("상담" if v == "상담" else "상담"))
@@ -835,8 +837,27 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         else:
             dup_biz_df = pd.DataFrame()
 
+        # 은행 이력(실제 활동)과 이력 추가(추가 활동) 분리
+        _flag = "_is_manual"
+        if _flag in df.columns:
+            df_real = df[~df[_flag].fillna(False).astype(bool)].copy()
+            df_added = df[df[_flag].fillna(False).astype(bool)].copy()
+        else:
+            df_real = df
+            df_added = pd.DataFrame()
+
+        # 이력 추가 행의 포인트를 담당자별로 집계
+        added_pts_by_name = {}
+        if not df_added.empty and u_col in df_added.columns and d_col in df_added.columns:
+            for _n, _g in df_added.dropna(subset=[u_col, d_col]).groupby(u_col):
+                _det = _g[d_col].astype(str)
+                _pts = _det.str.contains("운영|방문|점검").sum() * 30
+                _pts += _det.str.contains("개설").sum() * 90
+                _pts += _det.str.contains("연계").sum() * 120
+                added_pts_by_name[_n] = int(_pts)
+
         summary = (
-            df.dropna(subset=[u_col, d_col])
+            df_real.dropna(subset=[u_col, d_col])
             .groupby(u_col)
             .agg(
                 o=(d_col, lambda x: x.astype(str).str.contains("개설").sum()),
@@ -866,7 +887,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
             o_p = int(row["o"]) * 90
             l_p = int(row["l"]) * 120
             v_actual_p = int(row["v"]) * 30
-            manual_p = manual_points_for_user(name)
+            manual_p = manual_points_for_user(name) + added_pts_by_name.get(name, 0)
             p_sum = min(2800, min(1000, o_p + l_p) + min(1800, v_actual_p + manual_p))
 
             member_stats[name] = {
@@ -2119,6 +2140,7 @@ def render_converted_preview_editor(converted_preview_df):
             "활동구분": st.column_config.SelectboxColumn("활동구분", options=["방문", "상담", "원격"], required=True),
             "활동상세": st.column_config.SelectboxColumn("활동상세", options=["운영", "개설", "연계"], required=True),
             "활동내역": st.column_config.TextColumn("활동내역"),
+            "_is_manual": None,
         },
     )
     analysis_df = normalize_converted_history_df(edited_preview_df)
@@ -2135,6 +2157,7 @@ def render_converted_preview_editor(converted_preview_df):
                 "활동구분": "방문",
                 "활동상세": "운영",
                 "제목": "운영방문",
+                "_is_manual": True,
             })
             st.session_state[data_key] = normalize_converted_history_df(
                 pd.concat([analysis_df, pd.DataFrame([new_row])], ignore_index=True)
