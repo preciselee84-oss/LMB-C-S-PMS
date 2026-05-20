@@ -2526,23 +2526,6 @@ def show_user_history():
     if not other_errors_df.empty:
         error_tabs.append("기타 오류")
 
-    if error_tabs:
-        error_list = ", ".join(error_tabs)
-        st.markdown(
-            f"<div style='margin-top:12px;margin-bottom:12px;padding:12px 16px;background:#FFF3CD;border-left:4px solid #FFC107;border-radius:4px;'>"
-            f"<div style='font-size:14px;color:#856404;'><b>⚠️ 다음 항목을 수정해주세요:</b> {error_list}</div>"
-            f"<div style='margin-top:4px;font-size:13px;color:#856404;'>위 탭에서 문제를 해결한 후 엑셀을 다시 업로드해주세요.</div>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            f"<div style='margin-top:12px;margin-bottom:12px;padding:12px 16px;background:#D4EDDA;border-left:4px solid #28A745;border-radius:4px;'>"
-            f"<div style='font-size:14px;color:#155724;'><b>✓ 잘못된 데이터가 없습니다.</b></div>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-
     st.divider()
     st.markdown("### 추가 실적 표")
 
@@ -2601,6 +2584,23 @@ def show_user_history():
             st.info("본사 구글시트에 ERP연계일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
     with t5:
         style_report_logic(other_errors_df, align_overrides={"오류 사유": "left"}, default_align="center")
+
+    if error_tabs:
+        error_list = ", ".join(error_tabs)
+        st.markdown(
+            f"<div style='margin-top:12px;margin-bottom:12px;padding:12px 16px;background:#FFF3CD;border-left:4px solid #FFC107;border-radius:4px;'>"
+            f"<div style='font-size:14px;color:#856404;'><b>⚠️ 다음 항목을 수정해주세요:</b> {error_list}</div>"
+            f"<div style='margin-top:4px;font-size:13px;color:#856404;'>위 탭에서 문제를 해결한 후 엑셀을 다시 업로드해주세요.</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f"<div style='margin-top:12px;margin-bottom:12px;padding:12px 16px;background:#D4EDDA;border-left:4px solid #28A745;border-radius:4px;'>"
+            f"<div style='font-size:14px;color:#155724;'><b>✓ 잘못된 데이터가 없습니다.</b></div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
     st.divider()
     st.markdown("### 최종 실적 확인")
@@ -2755,36 +2755,6 @@ def show_final_check():
     has_missing_open = not missing_open_final.empty
     has_missing_erp = not missing_erp_final.empty
     has_other_errors = not other_errors_df_final.empty
-
-    # 경고 메시지 표시 (탭 정의 전)
-    error_tabs = []
-    if has_dup_data:
-        error_tabs.append("중복 이력")
-    if has_err_data:
-        error_tabs.append("초과 방문")
-    if has_missing_open:
-        error_tabs.append("본사 개설완료일자 누락")
-    if has_missing_erp:
-        error_tabs.append("본사 ERP연계일자 누락")
-    if has_other_errors:
-        error_tabs.append("기타 오류")
-
-    if error_tabs:
-        error_list = ", ".join(error_tabs)
-        st.markdown(
-            f"<div style='margin-top:12px;margin-bottom:12px;padding:12px 16px;background:#FFF3CD;border-left:4px solid #FFC107;border-radius:4px;'>"
-            f"<div style='font-size:14px;color:#856404;'><b>⚠️ 다음 항목을 수정해주세요:</b> {error_list}</div>"
-            f"<div style='margin-top:4px;font-size:13px;color:#856404;'>위 탭에서 문제를 해결한 후 엑셀을 다시 업로드해주세요.</div>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            f"<div style='margin-top:12px;margin-bottom:12px;padding:12px 16px;background:#D4EDDA;border-left:4px solid #28A745;border-radius:4px;'>"
-            f"<div style='font-size:14px;color:#155724;'><b>✓ 잘못된 데이터가 없습니다.</b></div>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
 
     # 검증 이슈 체크
     has_validation_issues = has_dup_data or has_err_data or has_missing_open or has_missing_erp or has_other_errors
