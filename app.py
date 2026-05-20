@@ -2041,6 +2041,113 @@ def convert_bank_excel_to_activity(bank_df):
         return pd.DataFrame()
 
 
+def render_converted_preview_editor(converted_preview_df):
+    if converted_preview_df is None or converted_preview_df.empty:
+        return None
+
+    st.markdown("#### 변환파일 미리보기")
+    st.markdown(
+        """
+        <style>
+        body[data-pms-theme="d"] [data-testid="stDataEditor"],
+        body[data-pms-theme="d"] [data-testid="stDataEditor"] > div,
+        body[data-pms-theme="d"] [data-testid="stDataEditor"] [role="grid"],
+        body[data-pms-theme="d"] [data-testid="stDataEditor"] canvas,
+        body:has(#pms-d:checked) [data-testid="stDataEditor"],
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] > div,
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="grid"],
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] canvas {
+            background-color: #252535 !important;
+            color: #ffffff !important;
+        }
+        body[data-pms-theme="d"] [data-testid="stDataEditor"] canvas,
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] canvas {
+            filter: invert(1) hue-rotate(180deg) brightness(0.72) contrast(1.18) saturate(0.85) !important;
+        }
+        body[data-pms-theme="d"] [data-testid="stDataEditor"] input,
+        body[data-pms-theme="d"] [data-testid="stDataEditor"] textarea,
+        body[data-pms-theme="d"] [data-testid="stDataEditor"] [contenteditable="true"],
+        body[data-pms-theme="d"] [data-testid="stDataEditor"] [data-baseweb="input"] input,
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] input,
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] textarea,
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] [contenteditable="true"],
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] [data-baseweb="input"] input {
+            background-color: #0f0f1f !important;
+            color: #ffffff !important;
+            caret-color: #ffffff !important;
+            border-color: #89b4fa !important;
+            -webkit-text-fill-color: #ffffff !important;
+        }
+        body[data-pms-theme="d"] [data-testid="stDataEditor"] input::selection,
+        body[data-pms-theme="d"] [data-testid="stDataEditor"] textarea::selection,
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] input::selection,
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] textarea::selection {
+            background-color: #4f46e5 !important;
+            color: #ffffff !important;
+        }
+        @media (prefers-color-scheme: dark) {
+            body:has(#pms-s:checked) [data-testid="stDataEditor"] canvas {
+                filter: invert(1) hue-rotate(180deg) brightness(0.72) contrast(1.18) saturate(0.85) !important;
+            }
+            body:has(#pms-s:checked) [data-testid="stDataEditor"] input,
+            body:has(#pms-s:checked) [data-testid="stDataEditor"] textarea,
+            body:has(#pms-s:checked) [data-testid="stDataEditor"] [contenteditable="true"],
+            body:has(#pms-s:checked) [data-testid="stDataEditor"] [data-baseweb="input"] input {
+                background-color: #0f0f1f !important;
+                color: #ffffff !important;
+                caret-color: #ffffff !important;
+                border-color: #89b4fa !important;
+                -webkit-text-fill-color: #ffffff !important;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    converted_preview_df = normalize_converted_history_df(converted_preview_df)
+    data_key = "history_convert_preview_data"
+    editor_source_df = st.session_state.get(data_key, converted_preview_df)
+    if not isinstance(editor_source_df, pd.DataFrame) or list(editor_source_df.columns) != list(converted_preview_df.columns):
+        editor_source_df = converted_preview_df
+    editor_source_df = normalize_converted_history_df(editor_source_df)
+    edited_preview_df = st.data_editor(
+        editor_source_df,
+        key="history_convert_preview_editor",
+        use_container_width=True,
+        hide_index=True,
+        num_rows="dynamic",
+        disabled=[col for col in editor_source_df.columns if col not in ["활동일자", "활동구분", "활동상세"]],
+        column_config={
+            "지사": st.column_config.TextColumn("지사", disabled=True),
+            "활동일자": st.column_config.TextColumn("활동일자"),
+            "활동구분": st.column_config.SelectboxColumn("활동구분", options=["방문", "상담", "원격"], required=True),
+            "활동상세": st.column_config.SelectboxColumn("활동상세", options=["운영", "개설", "연계"], required=True),
+            "활동내역": st.column_config.TextColumn("활동내역"),
+        },
+    )
+    analysis_df = normalize_converted_history_df(edited_preview_df)
+    st.session_state[data_key] = analysis_df
+    _, add_history_col = st.columns([0.88, 0.12])
+    with add_history_col:
+        if st.button("이력 추가", use_container_width=True, key="add_history_row"):
+            new_row = {col: "" for col in analysis_df.columns}
+            new_row.update({
+                "지사": "HANA지사",
+                "상품": "통합CMS",
+                "등록자": st.session_state.user_name,
+                "활동일자": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d"),
+                "활동구분": "방문",
+                "활동상세": "운영",
+                "제목": "운영방문",
+            })
+            st.session_state[data_key] = normalize_converted_history_df(
+                pd.concat([analysis_df, pd.DataFrame([new_row])], ignore_index=True)
+            )
+            st.rerun()
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+    return analysis_df
+
+
 def show_user_history():
     converted_preview_df = None
     analysis_df = None
@@ -2109,7 +2216,7 @@ def show_user_history():
         else:
             st.button("샘플파일 다운로드", use_container_width=True, disabled=True)
 
-    if converted_preview_df is not None and not converted_preview_df.empty:
+    if False and converted_preview_df is not None and not converted_preview_df.empty:
         st.markdown("#### 변환파일 미리보기")
         st.markdown(
             """
@@ -2233,6 +2340,18 @@ def show_user_history():
                 )
                 st.rerun()
         st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
+    if converted_preview_df is not None and not converted_preview_df.empty:
+        converted_preview_df = normalize_converted_history_df(converted_preview_df)
+        data_key = "history_convert_preview_data"
+        editor_key = "history_convert_preview_editor"
+        prepared_df = st.session_state.get(editor_key)
+        if not isinstance(prepared_df, pd.DataFrame) or list(prepared_df.columns) != list(converted_preview_df.columns):
+            prepared_df = st.session_state.get(data_key, converted_preview_df)
+        if not isinstance(prepared_df, pd.DataFrame) or list(prepared_df.columns) != list(converted_preview_df.columns):
+            prepared_df = converted_preview_df
+        analysis_df = normalize_converted_history_df(prepared_df)
+        st.session_state[data_key] = analysis_df
 
     # 파일이 제거되면 데이터 초기화
     if u_file is None:
@@ -2521,6 +2640,10 @@ def show_user_history():
         st.markdown("### 담당자 예상 수치 (추가활동 포함)")
         expected_hidden_cols = [c for c in expected_res.columns if "전월대비" in c]
         style_report_logic(expected_res.drop(columns=expected_hidden_cols, errors="ignore"), compact=True)
+
+    if converted_preview_df is not None and not converted_preview_df.empty:
+        st.divider()
+        render_converted_preview_editor(converted_preview_df)
 
     st.divider()
     st.markdown("### 최종 실적 확인")
