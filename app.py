@@ -307,8 +307,10 @@ def find_col(df, keys, fallback=None):
 
 
 def filter_visit_rows(df):
-    if df is None or df.empty:
+    if df is None:
         return pd.DataFrame()
+    if df.empty:
+        return df.copy()
     visit_col = find_col(df, ["접수유형", "활동구분"])
     if not visit_col or visit_col not in df.columns:
         return df.copy()
@@ -896,13 +898,14 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
     try:
         df = clean_header_logic(curr_df_raw)
 
-        u_col = find_col(df, ["등록자", "담당자", "성명"], "등록자")
-        d_col = find_col(df, ["활동상세", "활동내용"], "활동상세")
-        date_col = find_col(df, ["활동일", "일자"], "활동일")
+        u_col = find_col(df, ["등록자", "담당자", "성명"])
+        d_col = find_col(df, ["활동상세", "활동내용"])
+        date_col = find_col(df, ["활동일자", "활동일", "일자"])
         biz_col = find_col(df, ["사업자번호"], "사업자번호")
         comp_col = find_col(df, ["업체명", "상호"], "업체명")
 
-        missing = [c for c in [u_col, d_col, date_col] if c not in df.columns]
+        required_cols = [("등록자", u_col), ("활동상세", d_col), ("활동일", date_col)]
+        missing = [label for label, col in required_cols if not col or col not in df.columns]
         if missing:
             return f"필수 컬럼이 없습니다: {', '.join(missing)}", None, None
 
@@ -2565,7 +2568,7 @@ def show_user_history():
     u_col = find_col(df, ["등록자", "담당자", "성명"], "등록자")
     d_col = find_col(df, ["활동상세", "활동내용"], "활동상세")
 
-    df_user = df[df[u_col] == st.session_state.user_name].copy() if u_col in df.columns else pd.DataFrame()
+    df_user = df[df[u_col] == st.session_state.user_name].copy() if u_col in df.columns else df.iloc[0:0].copy()
     df_user = attach_cloud_dates(df_user)
     df_user_visit = filter_visit_rows(df_user)
 
