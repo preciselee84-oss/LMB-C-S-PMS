@@ -2612,12 +2612,27 @@ def show_user_history():
     if converted_preview_df is not None and not converted_preview_df.empty:
         st.divider()
         render_converted_preview_editor(converted_preview_df)
-        (dup_tab,) = st.tabs(["중복 이력"])
-        with dup_tab:
-            if not dup_my.empty:
-                style_report_logic(dup_my)
-            else:
-                st.info("중복 이력이 없습니다.")
+
+    t1, t2, t3, t4, t5 = validation_tabs_with_refresh("refresh_user_history_validation")
+    with t1:
+        style_report_logic(dup_my)
+    with t2:
+        if not err_filtered.empty:
+            style_report_logic(err_filtered.drop(columns=["월총방문"], errors="ignore"))
+        else:
+            st.info("초과 방문 데이터가 없습니다.")
+    with t3:
+        if not missing_open.empty:
+            style_report_logic(missing_open.drop(columns=["본사 ERP연계일자"], errors="ignore"))
+        elif "본사 개설완료일자" not in df_user.columns:
+            st.info("본사 구글시트에 개설완료일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
+    with t4:
+        if not missing_erp.empty:
+            style_report_logic(missing_erp.drop(columns=["본사 개설완료일자"], errors="ignore"))
+        elif "본사 ERP연계일자" not in df_user.columns:
+            st.info("본사 구글시트에 ERP연계일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
+    with t5:
+        style_report_logic(other_errors_df, align_overrides={"오류 사유": "left"}, default_align="center")
 
     st.divider()
     st.markdown("### 최종 실적 확인")
@@ -2802,32 +2817,6 @@ def show_final_check():
             f"</div>",
             unsafe_allow_html=True,
         )
-
-    t1, t2, t3, t4, t5 = validation_tabs_with_refresh("refresh_google_sheets_final_check")
-
-    with t1:
-        style_report_logic(dup_my)
-
-    with t2:
-        if not err_filtered_final.empty:
-            style_report_logic(err_filtered_final.drop(columns=["월총방문"], errors="ignore"))
-        else:
-            st.info("초과 방문 데이터가 없습니다.")
-
-    with t3:
-        if not missing_open_final.empty:
-            style_report_logic(missing_open_final.drop(columns=["본사 ERP연계일자"], errors="ignore"))
-        elif "본사 개설완료일자" not in df_user_check.columns:
-            st.info("본사 구글시트에 개설완료일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
-
-    with t4:
-        if not missing_erp_final.empty:
-            style_report_logic(missing_erp_final.drop(columns=["본사 개설완료일자"], errors="ignore"))
-        elif "본사 ERP연계일자" not in df_user_check.columns:
-            st.info("본사 구글시트에 ERP연계일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
-
-    with t5:
-        style_report_logic(other_errors_df_final, align_overrides={"오류 사유": "left"}, default_align="center")
 
     # 검증 이슈 체크
     has_validation_issues = has_dup_data or has_err_data or has_missing_open or has_missing_erp or has_other_errors
