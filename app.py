@@ -2665,13 +2665,14 @@ def show_user_history():
             dup_display.insert(0, "_orig_idx", dup_my.index.astype(int))
             dup_display = dup_display.reset_index(drop=True)
             _ver = st.session_state.get("dup_editor_ver", 0)
+            _dup_hidden = {c: None for c in dup_display.columns if c.startswith("_")}
             edited_dup = st.data_editor(
                 dup_display,
                 key=f"dup_date_editor_{_ver}",
                 use_container_width=True,
                 hide_index=True,
                 disabled=[c for c in dup_display.columns if c != _dc],
-                column_config={"_orig_idx": None},
+                column_config=_dup_hidden,
             )
             if _dc and list(edited_dup[_dc]) != list(dup_display[_dc]):
                 _preview = st.session_state.get("history_convert_preview_data")
@@ -2696,12 +2697,14 @@ def show_user_history():
         if not err_filtered.empty:
             _disp = err_filtered.drop(columns=["월총방문"], errors="ignore").copy()
             _ver2 = st.session_state.get("err_editor_ver", 0)
+            _err_hidden = {c: None for c in _disp.columns if c.startswith("_")}
             edited_err = st.data_editor(
                 _disp,
                 key=f"err_date_editor_{_ver2}",
                 use_container_width=True,
                 hide_index=True,
                 disabled=[c for c in _disp.columns if c != "초과일자"],
+                column_config=_err_hidden if _err_hidden else None,
             )
             if "초과일자" in _disp.columns and list(edited_err["초과일자"]) != list(_disp["초과일자"]):
                 _preview = st.session_state.get("history_convert_preview_data")
