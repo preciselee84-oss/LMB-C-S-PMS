@@ -915,13 +915,36 @@ def has_performance_required_columns(df):
     )
 
 
+def prepare_history_analysis_df(raw_df):
+    if raw_df is None or not isinstance(raw_df, pd.DataFrame) or raw_df.empty:
+        return pd.DataFrame()
+
+    df = normalize_converted_history_df(clean_header_logic(raw_df.copy()))
+    if has_performance_required_columns(df):
+        return df
+
+    try:
+        converted_df, _ = convert_history_to_sample_df(df, st.session_state.get("user_name", ""))
+        converted_df = normalize_converted_history_df(converted_df)
+        if has_performance_required_columns(converted_df):
+            return converted_df
+    except Exception:
+        pass
+
+    return df
+
+
 def current_history_analysis_df():
     preview_df = st.session_state.get("history_convert_preview_data")
-    if isinstance(preview_df, pd.DataFrame) and has_performance_required_columns(preview_df):
-        return normalize_converted_history_df(preview_df.copy())
+    if isinstance(preview_df, pd.DataFrame):
+        preview_df = prepare_history_analysis_df(preview_df)
+        if has_performance_required_columns(preview_df):
+            return preview_df
     excel_df = st.session_state.get("user_excel_data")
-    if isinstance(excel_df, pd.DataFrame) and has_performance_required_columns(excel_df):
-        return normalize_converted_history_df(excel_df.copy())
+    if isinstance(excel_df, pd.DataFrame):
+        excel_df = prepare_history_analysis_df(excel_df)
+        if has_performance_required_columns(excel_df):
+            return excel_df
     return pd.DataFrame()
 
 
@@ -959,7 +982,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
     try:
         if curr_df_raw is None:
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-        df = clean_header_logic(curr_df_raw)
+        df = normalize_converted_history_df(clean_header_logic(curr_df_raw))
         if df.empty and len(df.columns) == 0:
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
@@ -968,6 +991,16 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         date_col = find_col(df, ["활동일자", "활동일", "일자"])
         biz_col = find_col(df, ["사업자번호"], "사업자번호")
         comp_col = find_col(df, ["업체명", "상호"], "업체명")
+
+        if not all([u_col, d_col, date_col]):
+            prepared_df = prepare_history_analysis_df(curr_df_raw)
+            if not prepared_df.empty:
+                df = prepared_df
+                u_col = find_col(df, ["등록자", "담당자", "성명"])
+                d_col = find_col(df, ["활동상세", "활동내용"])
+                date_col = find_col(df, ["활동일자", "활동일", "일자"])
+                biz_col = find_col(df, ["사업자번호"], "사업자번호")
+                comp_col = find_col(df, ["업체명", "상호"], "업체명")
 
         required_cols = [("등록자", u_col), ("활동상세", d_col), ("활동일", date_col)]
         missing = [label for label, col in required_cols if not col or col not in df.columns]
@@ -2632,7 +2665,7 @@ def show_user_history():
     if not current_df.empty:
         analysis_df = current_df
     elif st.session_state.user_excel_data is not None:
-        analysis_df = st.session_state.user_excel_data.copy()
+        analysis_df = prepare_history_analysis_df(st.session_state.user_excel_data)
 
     if analysis_df is None or analysis_df.empty:
         return
@@ -2964,7 +2997,7 @@ def show_final_check():
 
     original_df = current_history_analysis_df()
     if original_df.empty and st.session_state.user_excel_data is not None:
-        original_df = st.session_state.user_excel_data
+        original_df = prepare_history_analysis_df(st.session_state.user_excel_data)
 
     if original_df is None or original_df.empty:
         st.info("먼저 은행 이력 업로드 메뉴에서 엑셀을 업로드해주세요.")
