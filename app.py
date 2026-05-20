@@ -2468,7 +2468,10 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
                         st.session_state[data_key] = normalize_converted_history_df(
                             pd.concat([analysis_df, pd.DataFrame([_new_row])], ignore_index=True)
                         )
-                        st.session_state.pop("add_form_date_val", None)
+                        # 등록 후 업체명·활동일자·활동내역 초기화
+                        st.session_state["add_form_date_val"] = ""
+                        for _rk in ["add_form_company", "add_form_date", "add_form_note", "add_form_biz_display"]:
+                            st.session_state.pop(_rk, None)
                         st.rerun()
             with _fb2:
                 if st.button("취소", use_container_width=True, key="add_form_cancel"):
