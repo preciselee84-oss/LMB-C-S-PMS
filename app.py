@@ -348,7 +348,9 @@ def filter_visit_rows(df):
         if col and col in df.columns
     ]
     if text_cols:
-        visit_text = df[text_cols].astype(str).apply(lambda row: " ".join(row.tolist()), axis=1)
+        visit_text = df[text_cols[0]].fillna("").astype(str)
+        for _tc in text_cols[1:]:
+            visit_text = visit_text + " " + df[_tc].fillna("").astype(str)
         visit_mask = visit_mask | visit_text.str.contains("방문", na=False)
 
     if not visit_col or visit_col not in df.columns:
