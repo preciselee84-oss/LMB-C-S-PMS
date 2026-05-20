@@ -2583,9 +2583,27 @@ def show_user_history():
 
     st.metric("추가 실적 합산 점수", f"{total:,} PT")
 
+    # 미리보기 편집 전 해시 저장 — 편집 후 변경 감지 시 자동 rerun으로 검증 탭 갱신
+    _pre_hash = None
+    _tmp_prev = st.session_state.get("history_convert_preview_data")
+    if isinstance(_tmp_prev, pd.DataFrame) and not _tmp_prev.empty:
+        try:
+            _pre_hash = int(pd.util.hash_pandas_object(_tmp_prev).sum())
+        except Exception:
+            pass
+
     if converted_preview_df is not None and not converted_preview_df.empty:
         st.divider()
         render_converted_preview_editor(converted_preview_df)
+
+    _tmp_cur = st.session_state.get("history_convert_preview_data")
+    if isinstance(_tmp_cur, pd.DataFrame) and not _tmp_cur.empty:
+        try:
+            _post_hash = int(pd.util.hash_pandas_object(_tmp_cur).sum())
+            if _pre_hash is not None and _post_hash != _pre_hash:
+                st.rerun()
+        except Exception:
+            pass
 
     t1, t2, t3, t4, t5 = validation_tabs_with_refresh("refresh_user_history_validation")
     with t1:
