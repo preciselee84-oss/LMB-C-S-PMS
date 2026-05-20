@@ -3813,6 +3813,8 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
 
     def fill_table_row(table, row_idx, values):
         ensure_rows(table, row_idx + 1)
+        if row_idx >= len(table.rows):
+            return
         for col_idx, value in enumerate(values):
             if col_idx < len(table.columns):
                 set_cell_text(table.cell(row_idx, col_idx), value, PP_ALIGN.CENTER)
