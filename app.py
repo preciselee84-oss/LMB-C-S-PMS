@@ -476,6 +476,8 @@ def normalize_converted_history_df(df):
             lambda v: "연계" if "연계" in v else ("개설" if "개설" in v else "운영")
         )
         result["제목"] = result["활동상세"].map(title_from_activity_detail)
+    if "활동일" in result.columns and "활동일자" not in result.columns:
+        result = result.rename(columns={"활동일": "활동일자"})
     if "활동내용" in result.columns and "활동내역" not in result.columns:
         result = result.rename(columns={"활동내용": "활동내역"})
     return result
@@ -554,7 +556,7 @@ def convert_history_to_sample_df(history_df, user_name):
             "업체명": row.get(company_col, "") if company_col else "",
             "사업자번호": biz_no,
             "등록자": user_name,
-            "활동일": parse_history_date(row.get(date_col, "")) if date_col else "",
+            "활동일자": parse_history_date(row.get(date_col, "")) if date_col else "",
             "방문장소 (시, 군, 구까지)": row.get(location_col, "") if location_col else "",
             "활동구분": activity_category,
             "활동상세": activity_detail,
@@ -579,7 +581,7 @@ def sample_format_excel_bytes(df):
             return re.sub(r"\s+", "", str(value or ""))
 
         header_map = {header_key(ws.cell(row=2, column=col).value): col for col in range(1, ws.max_column + 1)}
-        aliases = {"활동내역": "활동내용"}
+        aliases = {"활동내역": "활동내용", "활동일자": "활동일"}
         for row_idx, (_, row) in enumerate(df.iterrows(), start=3):
             for header, value in row.items():
                 col_idx = header_map.get(header_key(header)) or header_map.get(header_key(aliases.get(header, "")))
@@ -1838,7 +1840,7 @@ def validation_tabs_with_refresh(key):
     )
     tabs_col, refresh_col = st.columns([0.955, 0.045])
     with tabs_col:
-        tabs = st.tabs(["중복 방문", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
+        tabs = st.tabs(["중복 이력", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
     with refresh_col:
         st.markdown("<div class='refresh-tab-button'>", unsafe_allow_html=True)
         if st.button("↻", use_container_width=True, key=key, help="구글시트 데이터 다시 조회"):
@@ -2100,6 +2102,9 @@ def show_user_history():
                 background-color: #252535 !important;
                 color: #ffffff !important;
             }
+            body:has(#pms-d:checked) [data-testid="stDataEditor"] canvas {
+                filter: invert(1) hue-rotate(180deg) brightness(0.78) contrast(1.1);
+            }
             body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"],
             body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"] {
                 background-color: #252535 !important;
@@ -2116,9 +2121,10 @@ def show_user_history():
             key="history_convert_preview_editor",
             use_container_width=True,
             hide_index=True,
-            disabled=[col for col in converted_preview_df.columns if col not in ["활동구분", "활동상세"]],
+            disabled=[col for col in converted_preview_df.columns if col not in ["활동일자", "활동구분", "활동상세"]],
             column_config={
                 "지사": st.column_config.TextColumn("지사", disabled=True),
+                "활동일자": st.column_config.TextColumn("활동일자"),
                 "활동구분": st.column_config.SelectboxColumn(
                     "활동구분",
                     options=["방문", "상담", "원격"],
@@ -2259,7 +2265,7 @@ def show_user_history():
     # 기타 오류 데이터 계산
     other_errors_df = build_other_validation_errors(df_user)
 
-    # 중복 방문 데이터
+    # 중복 이력 데이터
     dup_my = pd.DataFrame()
     if dup is not None and not dup.empty:
         u_col_dup = find_col(dup, ["등록자", "담당자", "성명"], "담당자")
@@ -2298,7 +2304,7 @@ def show_user_history():
     # 경고 메시지 표시
     error_tabs = []
     if not dup_my.empty:
-        error_tabs.append("중복 방문")
+        error_tabs.append("중복 이력")
     if not err_filtered.empty:
         error_tabs.append("초과 방문")
     if not missing_open.empty:
@@ -2692,7 +2698,7 @@ def show_final_check():
         dup_check = None
 
     # 탭 데이터 미리 계산 (경고 메시지 표시용 - 재업로드한 경우만)
-    # 중복 방문
+    # 중복 이력
     dup_my = pd.DataFrame()
     if dup_check is not None and not dup_check.empty:
         u_col_dup = find_col(dup_check, ["등록자", "담당자", "성명"], "담당자")
@@ -2742,7 +2748,7 @@ def show_final_check():
     # 경고 메시지 표시 (탭 정의 전)
     error_tabs = []
     if has_dup_data:
-        error_tabs.append("중복 방문")
+        error_tabs.append("중복 이력")
     if has_err_data:
         error_tabs.append("초과 방문")
     if has_missing_open:
