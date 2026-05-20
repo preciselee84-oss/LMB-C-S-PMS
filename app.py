@@ -860,13 +860,6 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         else:
             error_df = pd.DataFrame(columns=["업체명", "사업자번호", "담당자", "초과일자", "일방문", "월총방문"])
 
-        if biz_col in df_clean.columns:
-            dup_biz_df = df_clean[df_clean.duplicated(subset=[biz_col, u_col, date_col], keep=False)].sort_values(
-                by=[date_col, biz_col, u_col]
-            )
-        else:
-            dup_biz_df = pd.DataFrame()
-
         # 은행 이력(실제 활동)과 이력 추가(추가 활동) 분리
         _flag = "_is_manual"
         if _flag in df.columns:
@@ -875,6 +868,21 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         else:
             df_real = df
             df_added = pd.DataFrame()
+
+        # 중복 이력: 은행 이력 행 중 사업자번호+등록자+활동일자+활동상세 모두 같은 행
+        if biz_col in df_clean.columns:
+            _flag_in_clean = _flag in df_clean.columns
+            _df_bank = df_clean[~df_clean[_flag].fillna(False).astype(bool)].copy() if _flag_in_clean else df_clean.copy()
+            _biz_valid = _df_bank[biz_col].astype(str).str.strip() != ""
+            _df_bank = _df_bank[_biz_valid]
+            _dup_subset = [biz_col, u_col, date_col]
+            if d_col and d_col in _df_bank.columns:
+                _dup_subset.append(d_col)
+            dup_biz_df = _df_bank[_df_bank.duplicated(subset=_dup_subset, keep=False)].sort_values(
+                by=[date_col, biz_col, u_col]
+            )
+        else:
+            dup_biz_df = pd.DataFrame()
 
         # 이력 추가 행의 포인트를 담당자별로 집계
         added_pts_by_name = {}
