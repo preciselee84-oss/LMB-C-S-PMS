@@ -102,6 +102,48 @@ def save_db(file_path, data):
     _github_save(file_path, data)
 
 
+def safe_cookie_controller():
+    try:
+        return CookieController()
+    except Exception:
+        return None
+
+
+def cookie_get(cookie_manager, key, default=""):
+    if cookie_manager is None:
+        return default
+    try:
+        return cookie_manager.get(key) or default
+    except Exception:
+        return default
+
+
+def cookie_set(cookie_manager, key, value, **kwargs):
+    if cookie_manager is None:
+        return False
+    try:
+        cookie_manager.set(key, value, **kwargs)
+        return True
+    except TypeError:
+        try:
+            cookie_manager.set(key, value)
+            return True
+        except Exception:
+            return False
+    except Exception:
+        return False
+
+
+def cookie_remove(cookie_manager, key):
+    if cookie_manager is None:
+        return False
+    try:
+        cookie_manager.remove(key)
+        return True
+    except Exception:
+        return False
+
+
 def send_kakao_notify(message):
     try:
         token = ""
@@ -230,8 +272,8 @@ init_state()
 # F5 새로고침 후 자동 로그인 복원
 if not st.session_state.logged_in:
     try:
-        _cm_auto = CookieController()
-        _saved_uid = _cm_auto.get("auto_login_uid") or ""
+        _cm_auto = safe_cookie_controller()
+        _saved_uid = cookie_get(_cm_auto, "auto_login_uid", "")
         if _saved_uid:
             _db = st.session_state.user_db
             if _saved_uid == "1":
@@ -1420,8 +1462,8 @@ def show_auth_page():
         )
 
         if st.session_state.auth_mode == "login":
-            cookie_manager = CookieController()
-            sid = cookie_manager.get("saved_id") or ""
+            cookie_manager = safe_cookie_controller()
+            sid = cookie_get(cookie_manager, "saved_id", "")
 
             with st.form("login_form", border=False):
                 u_id = st.text_input("아이디", value=sid, placeholder="아이디를 입력하세요", key="l_id")
@@ -1443,18 +1485,18 @@ def show_auth_page():
 
                 if is_super or is_user:
                     if save_id_cb:
-                        cookie_manager.set("saved_id", u_id_str)
+                        cookie_set(cookie_manager, "saved_id", u_id_str)
                     else:
                         try:
-                            cookie_manager.remove("saved_id")
+                            cookie_remove(cookie_manager, "saved_id")
                         except Exception:
                             pass
                     # 세션 유지용 쿠키 저장 (F5 새로고침 후 자동 로그인)
                     try:
-                        cookie_manager.set("auto_login_uid", u_id_str, max_age=60 * 60 * 24 * 30)
+                        cookie_set(cookie_manager, "auto_login_uid", u_id_str, max_age=60 * 60 * 24 * 30)
                     except Exception:
                         try:
-                            cookie_manager.set("auto_login_uid", u_id_str)
+                            cookie_set(cookie_manager, "auto_login_uid", u_id_str)
                         except Exception:
                             pass
 
@@ -1714,8 +1756,8 @@ def show_sidebar():
             st.session_state.logged_in = False
             st.session_state.auth_mode = "login"
             try:
-                _cm_logout = CookieController()
-                _cm_logout.remove("auto_login_uid")
+                _cm_logout = safe_cookie_controller()
+                cookie_remove(_cm_logout, "auto_login_uid")
             except Exception:
                 pass
             st.rerun()
