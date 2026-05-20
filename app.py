@@ -2591,7 +2591,9 @@ def show_user_history():
     with t1:
         if not dup_my.empty:
             _dc = next((c for c in dup_my.columns if "활동일자" in c), None) or next((c for c in dup_my.columns if "활동일" in c), None)
-            dup_display = dup_my.copy().reset_index().rename(columns={"index": "_orig_idx"})
+            dup_display = dup_my.copy()
+            dup_display.insert(0, "_orig_idx", dup_my.index.astype(int))
+            dup_display = dup_display.reset_index(drop=True)
             _ver = st.session_state.get("dup_editor_ver", 0)
             edited_dup = st.data_editor(
                 dup_display,
@@ -2609,9 +2611,11 @@ def show_user_history():
                     if _pd:
                         for (_, o_row), (_, e_row) in zip(dup_display.iterrows(), edited_dup.iterrows()):
                             if str(o_row.get(_dc, "")) != str(e_row.get(_dc, "")):
-                                _idx = o_row.get("_orig_idx")
-                                if _idx is not None and _idx in _preview.index:
+                                try:
+                                    _idx = int(o_row["_orig_idx"])
                                     _preview.loc[_idx, _pd] = e_row[_dc]
+                                except (KeyError, IndexError, TypeError, ValueError):
+                                    pass
                         st.session_state["history_convert_preview_data"] = _preview
                         st.session_state.pop("history_convert_preview_editor", None)
                         st.session_state["dup_editor_ver"] = _ver + 1
