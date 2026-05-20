@@ -2612,6 +2612,12 @@ def show_user_history():
     if converted_preview_df is not None and not converted_preview_df.empty:
         st.divider()
         render_converted_preview_editor(converted_preview_df)
+        (dup_tab,) = st.tabs(["중복 이력"])
+        with dup_tab:
+            if not dup_my.empty:
+                style_report_logic(dup_my)
+            else:
+                st.info("중복 이력이 없습니다.")
 
     st.divider()
     st.markdown("### 최종 실적 확인")
