@@ -319,19 +319,24 @@ def render_history_search_filters(source_df, key_prefix):
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         company = st.text_input("업체명", key=f"{key_prefix}_company")
-    with c2:
-        activity_date = st.text_input("활동일자", placeholder="YYYY-MM-DD", key=f"{key_prefix}_date")
 
+    date_options = ["전체"]
     category_options = ["전체"]
     detail_options = ["전체"]
     if source_df is not None and not source_df.empty:
+        date_col = find_col(source_df, ["활동일자", "활동일", "초과일자", "일자"])
         category_col = find_col(source_df, ["활동구분", "접수유형"])
         detail_col = find_col(source_df, ["활동상세", "활동내용"])
+        if date_col and date_col in source_df.columns:
+            _dates = pd.to_datetime(source_df[date_col], errors="coerce").dropna().dt.strftime("%Y-%m-%d").unique()
+            date_options += sorted(_dates, reverse=True)
         if category_col and category_col in source_df.columns:
             category_options += sorted(v for v in source_df[category_col].astype(str).str.strip().unique() if v)
         if detail_col and detail_col in source_df.columns:
             detail_options += sorted(v for v in source_df[detail_col].astype(str).str.strip().unique() if v)
 
+    with c2:
+        activity_date = st.selectbox("활동일자", date_options, key=f"{key_prefix}_date")
     with c3:
         activity_category = st.selectbox("활동구분", category_options, key=f"{key_prefix}_category")
     with c4:
@@ -339,7 +344,7 @@ def render_history_search_filters(source_df, key_prefix):
 
     return {
         "company": company.strip(),
-        "date": activity_date.strip(),
+        "date": activity_date,
         "category": activity_category,
         "detail": activity_detail,
     }
@@ -347,6 +352,8 @@ def render_history_search_filters(source_df, key_prefix):
 
 def apply_history_search_filters(df, filters):
     if df is None or df.empty:
+        return df
+    if not filters:
         return df
     result = df.copy()
     company_col = find_col(result, ["업체명", "상호", "고객명"])
@@ -356,13 +363,20 @@ def apply_history_search_filters(df, filters):
 
     if filters.get("company") and company_col in result.columns:
         result = result[result[company_col].astype(str).str.contains(filters["company"], case=False, na=False)]
-    if filters.get("date") and date_col in result.columns:
-        result = result[result[date_col].astype(str).str.contains(filters["date"], case=False, na=False)]
+    if filters.get("date") and filters["date"] != "전체" and date_col in result.columns:
+        _date_values = pd.to_datetime(result[date_col], errors="coerce").dt.strftime("%Y-%m-%d")
+        result = result[_date_values == filters["date"]]
     if filters.get("category") and filters["category"] != "전체" and category_col in result.columns:
         result = result[result[category_col].astype(str).str.strip() == filters["category"]]
     if filters.get("detail") and filters["detail"] != "전체" and detail_col in result.columns:
         result = result[result[detail_col].astype(str).str.strip() == filters["detail"]]
     return result
+
+
+def has_active_history_filters(filters):
+    if not filters:
+        return False
+    return bool(filters.get("company")) or filters.get("date") != "전체" or filters.get("category") != "전체" or filters.get("detail") != "전체"
 
 
 def normalize_biz(series):
@@ -772,17 +786,19 @@ def render_manual_perf_input_table(base):
                     st.markdown(f"<div class='manual-input-help'>최대 {max_count}건 입력 가능</div>", unsafe_allow_html=True)
                 else:
                     st.markdown("<div class='manual-input-help'>월 최대점수 제한 없음</div>", unsafe_allow_html=True)
+                widget_key = f"perf_{item}"
                 kwargs = {
                     "label": "입력(건)",
                     "min_value": 0,
                     "value": value,
-                    "key": f"perf_{item}",
+                    "key": widget_key,
                     "label_visibility": "collapsed",
                     "step": 1,
                 }
                 if max_count is not None:
                     kwargs["max_value"] = max_count
-                results[item] = st.number_input(**kwargs)
+                st.number_input(**kwargs)
+                results[item] = int(st.session_state.get(widget_key, value) or 0)
 
     result_df["입력(건)"] = result_df["구분"].map(results).fillna(0).astype(int)
     return result_df
@@ -2170,7 +2186,7 @@ def convert_bank_excel_to_activity(bank_df):
         return pd.DataFrame()
 
 
-def render_converted_preview_editor(converted_preview_df):
+def render_converted_preview_editor(converted_preview_df, filters=None):
     if converted_preview_df is None or converted_preview_df.empty:
         return None
 
@@ -2239,6 +2255,11 @@ def render_converted_preview_editor(converted_preview_df):
     if not isinstance(editor_source_df, pd.DataFrame) or list(editor_source_df.columns) != list(converted_preview_df.columns):
         editor_source_df = converted_preview_df
     editor_source_df = normalize_converted_history_df(editor_source_df)
+    full_editor_df = editor_source_df.copy()
+    active_filters = has_active_history_filters(filters)
+    if active_filters:
+        editor_source_df = apply_history_search_filters(editor_source_df, filters)
+        st.caption(f"검색 결과 {len(editor_source_df):,}건 / 전체 {len(full_editor_df):,}건")
     edited_preview_df = st.data_editor(
         editor_source_df,
         key="history_convert_preview_editor",
@@ -2255,7 +2276,14 @@ def render_converted_preview_editor(converted_preview_df):
             "_is_manual": None,
         },
     )
-    analysis_df = normalize_converted_history_df(edited_preview_df)
+    if active_filters:
+        analysis_df = full_editor_df.copy()
+        common_index = [idx for idx in edited_preview_df.index if idx in analysis_df.index]
+        if common_index:
+            analysis_df.loc[common_index, edited_preview_df.columns] = edited_preview_df.loc[common_index, edited_preview_df.columns]
+        analysis_df = normalize_converted_history_df(analysis_df)
+    else:
+        analysis_df = normalize_converted_history_df(edited_preview_df)
     st.session_state[data_key] = analysis_df
     _, add_history_col = st.columns([0.88, 0.12])
     with add_history_col:
@@ -2683,8 +2711,14 @@ def show_user_history():
 
     st.metric("추가 실적 합산 점수", f"{total:,} PT")
 
+    preview_filters = None
     if converted_preview_df is not None and not converted_preview_df.empty:
         st.divider()
+        preview_source_df = st.session_state.get("history_convert_preview_data", converted_preview_df)
+        if not isinstance(preview_source_df, pd.DataFrame):
+            preview_source_df = converted_preview_df
+        preview_source_df = normalize_converted_history_df(preview_source_df)
+        preview_filters = render_history_search_filters(preview_source_df, "history_preview_search")
         _pre_h = None
         _pd_before = st.session_state.get("history_convert_preview_data")
         if isinstance(_pd_before, pd.DataFrame) and not _pd_before.empty:
@@ -2692,7 +2726,7 @@ def show_user_history():
                 _pre_h = int(pd.util.hash_pandas_object(_pd_before).sum())
             except Exception:
                 pass
-        render_converted_preview_editor(converted_preview_df)
+        render_converted_preview_editor(converted_preview_df, preview_filters)
         _changed = False
         _pd_after = st.session_state.get("history_convert_preview_data")
         if isinstance(_pd_after, pd.DataFrame) and not _pd_after.empty:
@@ -2704,7 +2738,7 @@ def show_user_history():
         if _changed:
             st.rerun()
 
-    search_filters = render_history_search_filters(df_user_visit, "user_history_validation_search")
+    search_filters = preview_filters or render_history_search_filters(df_user_visit, "user_history_validation_search")
     dup_my = apply_history_search_filters(dup_my, search_filters)
     err_filtered = apply_history_search_filters(err_filtered, search_filters)
     missing_open = apply_history_search_filters(missing_open, search_filters)
