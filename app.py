@@ -2711,14 +2711,14 @@ def show_user_history():
 
     st.metric("추가 실적 합산 점수", f"{total:,} PT")
 
-    preview_filters = None
+    st.divider()
+    preview_source_df = st.session_state.get("history_convert_preview_data", converted_preview_df)
+    if not isinstance(preview_source_df, pd.DataFrame):
+        preview_source_df = converted_preview_df if isinstance(converted_preview_df, pd.DataFrame) else df_user_visit
+    preview_source_df = normalize_converted_history_df(preview_source_df)
+    search_filters = render_history_search_filters(preview_source_df if not preview_source_df.empty else df_user_visit, "history_preview_search")
+
     if converted_preview_df is not None and not converted_preview_df.empty:
-        st.divider()
-        preview_source_df = st.session_state.get("history_convert_preview_data", converted_preview_df)
-        if not isinstance(preview_source_df, pd.DataFrame):
-            preview_source_df = converted_preview_df
-        preview_source_df = normalize_converted_history_df(preview_source_df)
-        preview_filters = render_history_search_filters(preview_source_df, "history_preview_search")
         _pre_h = None
         _pd_before = st.session_state.get("history_convert_preview_data")
         if isinstance(_pd_before, pd.DataFrame) and not _pd_before.empty:
@@ -2726,7 +2726,7 @@ def show_user_history():
                 _pre_h = int(pd.util.hash_pandas_object(_pd_before).sum())
             except Exception:
                 pass
-        render_converted_preview_editor(converted_preview_df, preview_filters)
+        render_converted_preview_editor(converted_preview_df, search_filters)
         _changed = False
         _pd_after = st.session_state.get("history_convert_preview_data")
         if isinstance(_pd_after, pd.DataFrame) and not _pd_after.empty:
@@ -2738,7 +2738,6 @@ def show_user_history():
         if _changed:
             st.rerun()
 
-    search_filters = preview_filters or render_history_search_filters(df_user_visit, "user_history_validation_search")
     dup_my = apply_history_search_filters(dup_my, search_filters)
     err_filtered = apply_history_search_filters(err_filtered, search_filters)
     missing_open = apply_history_search_filters(missing_open, search_filters)
