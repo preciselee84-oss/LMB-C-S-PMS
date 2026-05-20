@@ -2387,6 +2387,12 @@ def show_user_history():
     if analysis_df is None or analysis_df.empty:
         return
 
+    if st.session_state.get("cloud_sheet_df") is None:
+        try:
+            load_csv_to_state("url_sync", "cloud_sheet_df")
+        except Exception:
+            pass
+
     df = analysis_df.copy()
     u_col = find_col(df, ["등록자", "담당자", "성명"], "등록자")
     d_col = find_col(df, ["활동상세", "활동내용"], "활동상세")
