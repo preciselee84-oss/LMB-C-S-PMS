@@ -271,27 +271,6 @@ def init_state():
 
 init_state()
 
-# F5 새로고침 후 자동 로그인 복원
-if not st.session_state.logged_in:
-    try:
-        _cm_auto = safe_cookie_controller()
-        _saved_uid = cookie_get(_cm_auto, "auto_login_uid", "")
-        if _saved_uid:
-            _db = st.session_state.user_db
-            if _saved_uid == "1":
-                st.session_state.logged_in = True
-                st.session_state.user_role = "관리자"
-                st.session_state.user_name = "최고관리자"
-                st.session_state.login_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
-            elif _saved_uid in _db and _db[_saved_uid].get("access") == "허용":
-                _user = _db[_saved_uid]
-                st.session_state.logged_in = True
-                st.session_state.user_role = _user.get("role", "사용자")
-                st.session_state.user_name = _user.get("name", "")
-                st.session_state.login_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
-    except Exception:
-        pass
-
 
 def clean_header_logic(df):
     try:
@@ -1526,14 +1505,7 @@ def show_auth_page():
                             cookie_remove(cookie_manager, "saved_id")
                         except Exception:
                             pass
-                    # 세션 유지용 쿠키 저장 (F5 새로고침 후 자동 로그인)
-                    try:
-                        cookie_set(cookie_manager, "auto_login_uid", u_id_str, max_age=60 * 60 * 24 * 30)
-                    except Exception:
-                        try:
-                            cookie_set(cookie_manager, "auto_login_uid", u_id_str)
-                        except Exception:
-                            pass
+                    cookie_remove(cookie_manager, "auto_login_uid")
 
                     user = db.get(u_id_str, {"role": "관리자", "name": "최고관리자"})
                     st.session_state.logged_in = True
