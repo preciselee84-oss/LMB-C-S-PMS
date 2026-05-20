@@ -2613,6 +2613,7 @@ def show_user_history():
                                 if _idx is not None and _idx in _preview.index:
                                     _preview.loc[_idx, _pd] = e_row[_dc]
                         st.session_state["history_convert_preview_data"] = _preview
+                        st.session_state.pop("history_convert_preview_editor", None)
                         st.session_state["dup_editor_ver"] = _ver + 1
                         st.rerun()
         else:
@@ -2646,6 +2647,7 @@ def show_user_history():
                                 if _mask.any():
                                     _preview.loc[_mask, _pd] = e_row["초과일자"]
                         st.session_state["history_convert_preview_data"] = _preview
+                        st.session_state.pop("history_convert_preview_editor", None)
                         st.session_state["err_editor_ver"] = _ver2 + 1
                         st.rerun()
         else:
