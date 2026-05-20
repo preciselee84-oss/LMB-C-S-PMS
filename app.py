@@ -8,6 +8,7 @@ import os
 import html
 import re
 import base64
+import hashlib
 import requests as _requests
 from io import BytesIO
 from datetime import datetime, timedelta
@@ -377,6 +378,13 @@ def has_active_history_filters(filters):
     if not filters:
         return False
     return bool(filters.get("company")) or filters.get("date") != "전체" or filters.get("category") != "전체" or filters.get("detail") != "전체"
+
+
+def history_filter_signature(filters):
+    if not filters:
+        return "all"
+    raw = "|".join(str(filters.get(key, "")) for key in ["company", "date", "category", "detail"])
+    return hashlib.md5(raw.encode("utf-8")).hexdigest()[:10]
 
 
 def normalize_biz(series):
@@ -2260,9 +2268,10 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
     if active_filters:
         editor_source_df = apply_history_search_filters(editor_source_df, filters)
         st.caption(f"검색 결과 {len(editor_source_df):,}건 / 전체 {len(full_editor_df):,}건")
+    editor_key = f"history_convert_preview_editor_{history_filter_signature(filters)}"
     edited_preview_df = st.data_editor(
         editor_source_df,
-        key="history_convert_preview_editor",
+        key=editor_key,
         use_container_width=True,
         hide_index=True,
         num_rows="dynamic",
