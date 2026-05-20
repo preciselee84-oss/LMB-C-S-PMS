@@ -305,6 +305,66 @@ def find_col(df, keys, fallback=None):
     return fallback
 
 
+def filter_visit_rows(df):
+    if df is None or df.empty:
+        return pd.DataFrame()
+    visit_col = find_col(df, ["접수유형", "활동구분"])
+    if not visit_col or visit_col not in df.columns:
+        return df.copy()
+    return df[df[visit_col].astype(str).str.strip().str.contains("방문", na=False)].copy()
+
+
+def render_history_search_filters(source_df, key_prefix):
+    st.markdown("##### 검색 조건")
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        company = st.text_input("업체명", key=f"{key_prefix}_company")
+    with c2:
+        activity_date = st.text_input("활동일자", placeholder="YYYY-MM-DD", key=f"{key_prefix}_date")
+
+    category_options = ["전체"]
+    detail_options = ["전체"]
+    if source_df is not None and not source_df.empty:
+        category_col = find_col(source_df, ["활동구분", "접수유형"])
+        detail_col = find_col(source_df, ["활동상세", "활동내용"])
+        if category_col and category_col in source_df.columns:
+            category_options += sorted(v for v in source_df[category_col].astype(str).str.strip().unique() if v)
+        if detail_col and detail_col in source_df.columns:
+            detail_options += sorted(v for v in source_df[detail_col].astype(str).str.strip().unique() if v)
+
+    with c3:
+        activity_category = st.selectbox("활동구분", category_options, key=f"{key_prefix}_category")
+    with c4:
+        activity_detail = st.selectbox("활동상세", detail_options, key=f"{key_prefix}_detail")
+
+    return {
+        "company": company.strip(),
+        "date": activity_date.strip(),
+        "category": activity_category,
+        "detail": activity_detail,
+    }
+
+
+def apply_history_search_filters(df, filters):
+    if df is None or df.empty:
+        return df
+    result = df.copy()
+    company_col = find_col(result, ["업체명", "상호", "고객명"])
+    date_col = find_col(result, ["활동일자", "활동일", "초과일자", "일자"])
+    category_col = find_col(result, ["활동구분", "접수유형"])
+    detail_col = find_col(result, ["활동상세", "활동내용"])
+
+    if filters.get("company") and company_col in result.columns:
+        result = result[result[company_col].astype(str).str.contains(filters["company"], case=False, na=False)]
+    if filters.get("date") and date_col in result.columns:
+        result = result[result[date_col].astype(str).str.contains(filters["date"], case=False, na=False)]
+    if filters.get("category") and filters["category"] != "전체" and category_col in result.columns:
+        result = result[result[category_col].astype(str).str.strip() == filters["category"]]
+    if filters.get("detail") and filters["detail"] != "전체" and detail_col in result.columns:
+        result = result[result[detail_col].astype(str).str.strip() == filters["detail"]]
+    return result
+
+
 def normalize_biz(series):
     def normalize_one(value):
         if pd.isna(value):
@@ -2470,9 +2530,10 @@ def show_user_history():
 
     df_user = df[df[u_col] == st.session_state.user_name].copy() if u_col in df.columns else pd.DataFrame()
     df_user = attach_cloud_dates(df_user)
+    df_user_visit = filter_visit_rows(df_user)
 
     st.markdown("### 담당자 기본 활동 수치")
-    res, err, dup = process_performance_analysis(df_user, st.session_state.get("auto_prev_df"))
+    res, err, dup = process_performance_analysis(df_user_visit, st.session_state.get("auto_prev_df"))
 
     if isinstance(res, pd.DataFrame) and not res.empty:
         my_res = res[res["담당자"] == st.session_state.user_name].copy()
@@ -2563,6 +2624,8 @@ def show_user_history():
         missing_open = df_user[
             pd.isna(df_user["본사 개설완료일자"]) | (df_user["본사 개설완료일자"].astype(str).str.strip() == "")
         ]
+        if "본사 신규이행구분" in missing_open.columns:
+            missing_open = missing_open[missing_open["본사 신규이행구분"].astype(str).str.strip() != "이행"]
 
     # ERP연계일자 누락
     missing_erp = pd.DataFrame()
@@ -2640,6 +2703,13 @@ def show_user_history():
                 pass
         if _changed:
             st.rerun()
+
+    search_filters = render_history_search_filters(df_user, "user_history_validation_search")
+    dup_my = apply_history_search_filters(dup_my, search_filters)
+    err_filtered = apply_history_search_filters(err_filtered, search_filters)
+    missing_open = apply_history_search_filters(missing_open, search_filters)
+    missing_erp = apply_history_search_filters(missing_erp, search_filters)
+    other_errors_df = apply_history_search_filters(other_errors_df, search_filters)
 
     t1, t2, t3, t4, t5 = validation_tabs_with_refresh("refresh_user_history_validation")
     with t1:
