@@ -4272,6 +4272,7 @@ def show_target_customers():
     status_col = find_col(cloud, ["상태항목", "상태"])
     open_cancel_col = find_col(cloud, ["개설취소"])
     erp_cancel_col = find_col(cloud, ["ERP연계취소", "연계취소"])
+    manage_div_col = find_col(cloud, ["관리구분", "관리 구분"])
 
     if not owner_col:
         st.warning("구글시트에 담당자 컬럼을 찾을 수 없습니다.")
@@ -4279,6 +4280,10 @@ def show_target_customers():
 
     # 본인 담당 고객만 필터
     df = cloud[cloud[owner_col].astype(str).str.strip() == str(user_name).strip()].copy()
+
+    # 관리구분이 "해지"인 고객 제외
+    if manage_div_col and manage_div_col in df.columns:
+        df = df[df[manage_div_col].astype(str).str.strip() != "해지"].copy()
 
     if df.empty:
         st.info(f"구글시트에 {user_name}님 담당 고객이 없습니다.")
