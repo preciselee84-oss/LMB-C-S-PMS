@@ -222,6 +222,8 @@ def init_state():
 
     if st.session_state.current_menu == "이력확인 및 작성":
         st.session_state.current_menu = "은행 이력 업로드"
+    if st.session_state.current_menu == "최종 실적 확인":
+        st.session_state.current_menu = "은행 이력 업로드"
 
 
 init_state()
@@ -697,8 +699,11 @@ def render_manual_perf_input_table(base):
 
 
 def manual_points_for_user(name):
-    perf_db = load_db(PERF_FILE, {})
-    saved = perf_db.get(name, {})
+    override_db = st.session_state.get("manual_perf_preview_override", {})
+    saved = override_db.get(name)
+    if saved is None:
+        perf_db = load_db(PERF_FILE, {})
+        saved = perf_db.get(name, {})
 
     cl = {
         "타겟고객선별": 5,
@@ -739,6 +744,15 @@ def manual_points_for_user(name):
         except Exception:
             pass
     return total
+
+
+def save_manual_perf_override_for_current_user():
+    name = st.session_state.get("user_name")
+    override = st.session_state.get("manual_perf_preview_override", {}).get(name)
+    if name and override is not None:
+        db = load_db(PERF_FILE, {})
+        db[name] = override
+        save_db(PERF_FILE, db)
 
 
 def apply_rank_from_user_db(df):
@@ -1515,7 +1529,7 @@ def show_sidebar():
 
         st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
         st.markdown("사용자 메뉴")
-        for menu_name in ["은행 이력 업로드", "최종 실적 확인"]:
+        for menu_name in ["은행 이력 업로드"]:
             if st.button(menu_name, use_container_width=True):
                 st.session_state.current_menu = menu_name
                 st.rerun()
@@ -1699,11 +1713,6 @@ MENU_GUIDES = {
         "🔍 업로드 후 중복·초과 방문, 오류 데이터를 탭에서 확인하세요.",
         "💾 [저장] 버튼으로 임시 저장 후 [실적 결과 전송]으로 제출합니다.",
         "⚠️ 전송 전 검증 오류 항목을 반드시 확인하세요.",
-    ],
-    "최종 실적 확인": [
-        "📊 전송된 실적 데이터를 최종 확인합니다.",
-        "🔁 수정이 필요한 경우 [은행 이력 업로드] 메뉴로 돌아가 재전송하세요.",
-        "✅ 내용 확인 후 관리자에게 마감을 요청하세요.",
     ],
 }
 
@@ -2455,6 +2464,8 @@ def show_user_history():
 
     edited["입력(건)"] = pd.to_numeric(edited["입력(건)"], errors="coerce").fillna(0).astype(int).clip(lower=0)
     edited["계산점수"] = edited["단위 점수"] * edited["입력(건)"]
+    manual_override = st.session_state.setdefault("manual_perf_preview_override", {})
+    manual_override[st.session_state.user_name] = edited.set_index("구분")["입력(건)"].to_dict()
 
     limit_map = {
         "타겟고객선별": 100,
@@ -2511,18 +2522,9 @@ def show_user_history():
         expected_hidden_cols = [c for c in expected_res.columns if "전월대비" in c]
         style_report_logic(expected_res.drop(columns=expected_hidden_cols, errors="ignore"), compact=True)
 
-    _, save_col = st.columns([0.85, 0.15])
-    with save_col:
-        save_and_check = st.button("저장 후 최종 실적 확인", use_container_width=True, type="primary", disabled=has_validation_issues)
-
-    if save_and_check:
-        db = load_db(PERF_FILE, {})
-        db[st.session_state.user_name] = edited.set_index("구분")["입력(건)"].to_dict()
-        save_db(PERF_FILE, db)
-        st.session_state.current_menu = "최종 실적 확인"
-        st.success("저장 완료")
-        time.sleep(0.5)
-        st.rerun()
+    st.divider()
+    st.markdown("### 최종 실적 확인")
+    show_final_check()
 
 
 def show_final_check():
@@ -3006,6 +3008,7 @@ def show_final_check():
         st.markdown('</div>', unsafe_allow_html=True)
 
     if do_save:
+        save_manual_perf_override_for_current_user()
         saved_db = load_db(SAVED_STATE_FILE, {})
         user_saved = {
             "user_excel_data": st.session_state.user_excel_data.to_dict() if st.session_state.user_excel_data is not None else None,
@@ -3020,6 +3023,7 @@ def show_final_check():
         st.rerun()
 
     if do_send:
+        save_manual_perf_override_for_current_user()
         sent_db = load_db(SENT_FILE, {})
         sent_uploads_db = load_db(SENT_UPLOADS_FILE, {})
         row_data = my_res.iloc[0].to_dict()
@@ -4906,7 +4910,8 @@ def show_main():
     elif menu == "은행 이력 업로드":
         show_user_history()
     elif menu == "최종 실적 확인":
-        show_final_check()
+        st.session_state.current_menu = "은행 이력 업로드"
+        st.rerun()
     elif menu == "실적 분석/계산":
         show_admin_analysis()
     elif menu == "실적 보고서":
