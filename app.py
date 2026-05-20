@@ -4760,7 +4760,10 @@ def show_weekly_report_user():
         if category == "개설대기":
             return active & ~open_done & ~open_progress
         if category == "연계완료":
-            return link_done
+            link_complete = link_status.eq("ERP연계완료")
+            if start_date is not None and end_date is not None:
+                return active & link_complete & link_dates.between(pd.Timestamp(start_date), pd.Timestamp(end_date), inclusive="both")
+            return active & link_complete & link_date
         if category == "연계진행":
             return link_progress
         if category == "연계대기":
