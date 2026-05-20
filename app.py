@@ -1411,30 +1411,34 @@ def show_auth_page():
             transition: all 0.18s !important;
         }
         [data-testid="stBaseButton-primary"] {
-            background: #FFFFFF !important;
-            color: #3D3580 !important;
-            border: 1.5px solid #D8D3F5 !important;
-            box-shadow: 0 2px 10px rgba(104,91,190,0.09) !important;
+            background: #5F5AF6 !important;
+            color: #FFFFFF !important;
+            border: 1.5px solid #5F5AF6 !important;
+            box-shadow: 0 8px 18px rgba(95,90,246,0.22) !important;
         }
         [data-testid="stBaseButton-primary"]:hover {
-            background: #F3F0FF !important;
-            border-color: #7B6FD4 !important;
-            color: #493E9A !important;
+            background: #4F46E5 !important;
+            border-color: #4F46E5 !important;
+            color: #FFFFFF !important;
         }
         [data-testid="stBaseButton-secondary"] {
-            background: #009A5A !important;
-            color: #FFFFFF !important;
-            border: 1.5px solid #009A5A !important;
-            box-shadow: none !important;
+            background: #FAFAFC !important;
+            color: #3D3580 !important;
+            border: 1.5px solid #EEEFF5 !important;
+            box-shadow: 0 2px 8px rgba(30,26,58,0.05) !important;
         }
         [data-testid="stBaseButton-secondary"]:hover {
-            background: #007A47 !important;
-            border-color: #007A47 !important;
+            background: #FFFFFF !important;
+            border-color: #D8D3F5 !important;
+            color: #493E9A !important;
+        }
+        [data-testid="stBaseButton-primary"] p,
+        [data-testid="stBaseButton-primary"] span {
             color: #FFFFFF !important;
         }
         [data-testid="stBaseButton-secondary"] p,
         [data-testid="stBaseButton-secondary"] span {
-            color: #FFFFFF !important;
+            color: #3D3580 !important;
         }
         hr {
             border: 0 !important;
