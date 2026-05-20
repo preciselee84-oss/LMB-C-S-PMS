@@ -2841,7 +2841,13 @@ def show_user_history():
         "detail": st.session_state.get("history_preview_search_detail", "전체"),
     }
 
-    if converted_preview_df is not None and not converted_preview_df.empty:
+    _render_preview = converted_preview_df
+    if _render_preview is None or (isinstance(_render_preview, pd.DataFrame) and _render_preview.empty):
+        _sess_prev = st.session_state.get("history_convert_preview_data")
+        if isinstance(_sess_prev, pd.DataFrame) and not _sess_prev.empty:
+            _render_preview = _sess_prev
+
+    if _render_preview is not None and not _render_preview.empty:
         _pre_h = None
         _pd_before = st.session_state.get("history_convert_preview_data")
         if isinstance(_pd_before, pd.DataFrame) and not _pd_before.empty:
@@ -2849,7 +2855,7 @@ def show_user_history():
                 _pre_h = int(pd.util.hash_pandas_object(_pd_before).sum())
             except Exception:
                 pass
-        render_converted_preview_editor(converted_preview_df, search_filters)
+        render_converted_preview_editor(_render_preview, search_filters)
         _changed = False
         _pd_after = st.session_state.get("history_convert_preview_data")
         if isinstance(_pd_after, pd.DataFrame) and not _pd_after.empty:
