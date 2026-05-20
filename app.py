@@ -4274,6 +4274,7 @@ def show_target_customers():
     erp_cancel_col = find_col(cloud, ["ERP연계취소", "연계취소"])
     manage_div_col = find_col(cloud, ["관리구분", "관리 구분"])
     open_status_col = find_col(cloud, ["개설상태"])
+    erp_status_col = find_col(cloud, ["연계상태", "ERP연계상태"])
 
     if not owner_col:
         st.warning("구글시트에 담당자 컬럼을 찾을 수 없습니다.")
@@ -4412,6 +4413,12 @@ def show_target_customers():
     # ── ERP연계 미완료 ────────────────────────────────────────
     st.markdown("#### 🔵 ERP연계 미완료 고객")
     erp_needed = df[~_empty(open_col) & _empty(erp_col)].copy()
+
+    # 연계상태가 "ERP연계대기" 또는 "ERP연계진행"인 고객만 표시
+    if erp_status_col and erp_status_col in erp_needed.columns:
+        erp_needed = erp_needed[
+            erp_needed[erp_status_col].astype(str).str.strip().isin(["ERP연계대기", "ERP연계진행"])
+        ]
 
     # ERP연계 취소 제외
     if erp_cancel_col and erp_cancel_col in erp_needed.columns:
