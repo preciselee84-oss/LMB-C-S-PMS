@@ -4446,39 +4446,62 @@ def show_target_customers():
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
-    # ── ERP연계 미완료 ────────────────────────────────────────
+    # ── ERP연계 미완료 (하나은행 시트 기반) ───────────────────
     st.markdown("#### 🔵 ERP연계 미완료 고객")
-    erp_needed = df[~_empty(open_col) & _empty(erp_col)].copy()
 
-    # 연계상태가 "ERP연계대기" 또는 "ERP연계진행"인 고객만 표시
-    if erp_status_col and erp_status_col in erp_needed.columns:
-        erp_needed = erp_needed[
-            erp_needed[erp_status_col].astype(str).str.strip().isin(["ERP연계대기", "ERP연계진행"])
-        ]
+    if hana_sheet is not None and not hana_sheet.empty:
+        hana_df_erp = hana_sheet.copy()
 
-    # ERP연계 취소 제외
-    if erp_cancel_col and erp_cancel_col in erp_needed.columns:
-        erp_needed = erp_needed[
-            erp_needed[erp_cancel_col].astype(str).str.strip().str.lower() != "취소"
-        ]
+        # 컬럼명 확인
+        hana_owner_col = "담당자"
+        hana_manage_col = "관리구분"
+        hana_guchuk_type_col = find_col(hana_df_erp, ["구축형", "구축 형"])
+        hana_erp_status_col = find_col(hana_df_erp, ["연계상태", "ERP연계상태"])
+        hana_comp_col = find_col(hana_df_erp, ["업체명", "고객명", "상호"])
+        hana_biz_col = find_col(hana_df_erp, ["사업자번호"])
 
-    # 상태항목이 "취소"인 경우 제외
-    if status_col and status_col in erp_needed.columns:
-        erp_needed = erp_needed[
-            erp_needed[status_col].astype(str).str.strip() != "취소"
-        ]
+        # 필터링 조건 적용
+        # 1. 본인 담당자
+        if hana_owner_col in hana_df_erp.columns:
+            hana_df_erp = hana_df_erp[hana_df_erp[hana_owner_col].astype(str).str.strip() == str(user_name).strip()]
 
-    # 이행구분=이행이고 이행추가연계가 없거나 NONE이면 제외
-    if div_col and add_col and div_col in erp_needed.columns and add_col in erp_needed.columns:
-        _is_ihang = erp_needed[div_col].astype(str).str.strip() == "이행"
-        _no_add   = erp_needed[add_col].astype(str).str.strip().isin(["", "NONE", "None", "none"])
-        erp_needed = erp_needed[~(_is_ihang & _no_add)]
+        # 2. 관리구분 = 정상
+        if hana_manage_col in hana_df_erp.columns:
+            hana_df_erp = hana_df_erp[hana_df_erp[hana_manage_col].astype(str).str.strip() == "정상"]
 
-    if not erp_needed.empty:
-        st.caption(f"{len(erp_needed)}건")
-        st.dataframe(fmt_df(erp_needed), use_container_width=True, hide_index=True)
+        # 3. 구축형 = 연계형
+        if hana_guchuk_type_col and hana_guchuk_type_col in hana_df_erp.columns:
+            hana_df_erp = hana_df_erp[hana_df_erp[hana_guchuk_type_col].astype(str).str.strip() == "연계형"]
+
+        # 4. 연계상태 = ERP연계대기 또는 ERP연계진행
+        if hana_erp_status_col and hana_erp_status_col in hana_df_erp.columns:
+            hana_df_erp = hana_df_erp[hana_df_erp[hana_erp_status_col].astype(str).str.strip().isin(["ERP연계대기", "ERP연계진행"])]
+
+        # 결과 표시
+        if not hana_df_erp.empty:
+            # 표시할 컬럼 선택
+            display_cols = [c for c in [hana_comp_col, hana_biz_col, hana_guchuk_type_col, hana_manage_col, hana_erp_status_col] if c and c in hana_df_erp.columns]
+
+            # 활동 이력 추가
+            result_df = hana_df_erp[display_cols].copy().reset_index(drop=True)
+
+            if hana_biz_col and hana_biz_col in result_df.columns:
+                activities = []
+                for _, row in result_df.iterrows():
+                    biz_no = row.get(hana_biz_col, "")
+                    activity = get_recent_activity(biz_no)
+                    activities.append(activity)
+
+                result_df["최근활동일"] = [a["last_date"] for a in activities]
+                result_df["최근활동내용"] = [a["last_detail"] for a in activities]
+                result_df["총활동건수"] = [a["activity_count"] for a in activities]
+
+            st.caption(f"{len(result_df)}건")
+            st.dataframe(result_df, use_container_width=True, hide_index=True)
+        else:
+            st.success("ERP연계 미완료 고객 없음")
     else:
-        st.success("ERP연계 미완료 고객 없음")
+        st.warning("하나은행 시트 데이터를 불러올 수 없습니다.")
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
