@@ -2342,14 +2342,17 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
         editor_source_df = apply_history_search_filters(editor_source_df, filters)
         st.caption(f"검색 결과 {len(editor_source_df):,}건 / 전체 {len(full_editor_df):,}건")
     editor_key = f"history_convert_preview_editor_{history_filter_signature(filters)}"
-    edited_preview_df = st.data_editor(
+    # _sel 체크박스 컬럼 (맨 왼쪽) — 행 선택용, 저장 시 제거
+    editor_source_df.insert(0, "_sel", False)
+    edited_with_sel = st.data_editor(
         editor_source_df,
         key=editor_key,
         use_container_width=True,
         hide_index=True,
         num_rows="fixed",
-        disabled=[col for col in editor_source_df.columns if col not in ["활동일자", "활동구분", "활동상세"]],
+        disabled=[col for col in editor_source_df.columns if col not in ["_sel", "활동일자", "활동구분", "활동상세"]],
         column_config={
+            "_sel": st.column_config.CheckboxColumn("선택", default=False, width="small"),
             "지사": st.column_config.TextColumn("지사", disabled=True),
             "활동일자": st.column_config.TextColumn("활동일자"),
             "활동구분": st.column_config.SelectboxColumn("활동구분", options=["방문", "상담", "원격"], required=True),
@@ -2358,6 +2361,8 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
             "_is_manual": None,
         },
     )
+    _selected_indices = edited_with_sel[edited_with_sel["_sel"] == True].index.tolist() if "_sel" in edited_with_sel.columns else []
+    edited_preview_df = edited_with_sel.drop(columns=["_sel"], errors="ignore")
     if active_filters:
         analysis_df = full_editor_df.copy()
         common_index = [idx for idx in edited_preview_df.index if idx in analysis_df.index]
@@ -2399,10 +2404,16 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
                     _comp_biz_map[_c] = _b
     _company_list = ["-- 업체명 선택 --"] + sorted(_comp_biz_map.keys())
 
-    # ── 이력 추가 버튼 ────────────────────────────────────────────────────────
+    # ── 하단 버튼 행: [🗑️ 삭제] [spacer] [이력 추가 ＋] ──────────────────────
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-    _, _add_btn_col = st.columns([0.85, 0.15])
-    with _add_btn_col:
+    _del_col, _, _add_col = st.columns([1, 8, 2])
+    with _del_col:
+        _has_sel = len(_selected_indices) > 0
+        if st.button("🗑️ 삭제", disabled=not _has_sel, key="del_selected_btn", use_container_width=True):
+            _new_df = analysis_df.drop(index=_selected_indices).reset_index(drop=True)
+            st.session_state[data_key] = normalize_converted_history_df(_new_df)
+            st.rerun()
+    with _add_col:
         if st.button("이력 추가 ＋", use_container_width=True, key="add_history_row"):
             st.session_state["show_add_history_form"] = not st.session_state.get("show_add_history_form", False)
             st.rerun()
@@ -2431,6 +2442,8 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
             with _fd3:
                 _form_det = st.selectbox("활동상세", ["운영", "개설", "연계"], key="add_form_det")
 
+            _form_note = st.text_input("활동내역", key="add_form_note")
+
             _fb1, _fb2 = st.columns(2)
             with _fb1:
                 if st.button("등록", type="primary", use_container_width=True, key="add_form_submit"):
@@ -2449,6 +2462,7 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
                             "활동구분": _form_cat,
                             "활동상세": _form_det,
                             "제목": _det_title,
+                            "활동내역": _form_note,
                             "_is_manual": True,
                         })
                         st.session_state[data_key] = normalize_converted_history_df(
@@ -2460,30 +2474,6 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
             with _fb2:
                 if st.button("취소", use_container_width=True, key="add_form_cancel"):
                     st.session_state["show_add_history_form"] = False
-                    st.rerun()
-
-    # ── 삭제 기능 ─────────────────────────────────────────────────────────────
-    if not analysis_df.empty:
-        _dc = find_col(analysis_df, ["업체명", "상호", "고객명"])
-        _dd = find_col(analysis_df, ["활동일자", "활동일"])
-        _ds = find_col(analysis_df, ["활동상세"])
-        _row_labels = []
-        for _i, _row in analysis_df.iterrows():
-            _is_m = bool(_row.get("_is_manual", False)) if "_is_manual" in analysis_df.columns else False
-            _tag = "🖊️" if _is_m else "📋"
-            _comp_v = str(_row.get(_dc, "")).strip() if _dc else ""
-            _date_v = str(_row.get(_dd, "")).strip() if _dd else ""
-            _det_v  = str(_row.get(_ds, "")).strip() if _ds else ""
-            _row_labels.append(f"{_tag} {_i+1}. {_comp_v} / {_date_v} / {_det_v}")
-        _label_idx = {lbl: idx for lbl, idx in zip(_row_labels, analysis_df.index)}
-
-        with st.expander("🗑️ 행 삭제"):
-            _del_sel = st.multiselect("삭제할 행 선택 (🖊️ 추가 이력 / 📋 은행 이력)", _row_labels, key="del_row_select")
-            if _del_sel:
-                if st.button("선택 삭제", type="primary", use_container_width=True, key="del_row_btn"):
-                    _del_idx = [_label_idx[k] for k in _del_sel if k in _label_idx]
-                    _new_df = analysis_df.drop(index=_del_idx).reset_index(drop=True)
-                    st.session_state[data_key] = normalize_converted_history_df(_new_df)
                     st.rerun()
 
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
