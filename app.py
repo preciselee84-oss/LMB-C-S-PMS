@@ -1137,7 +1137,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
                     "운영건수 (실제 활동)": int(row["v"]),
                     "운영포인트 (실제 활동)": stats["v_actual_p"],
                     "운영건수 (추가 활동)": min(int(np.ceil(stats["manual_p"] / 30.0)), int(stats["p_sum"] / 30), max(0, 60 - int(row["v"]))),
-                    "운영포인트(추가 활동)": effective_manual_p,
+                    "운영포인트(추가 활동)": int(stats["manual_p"]),
                     "합계포인트": stats["p_sum"],
                     "지급포인트": max(0, stats["p_sum"] - 1000),
                     "지급예상금액": pay,
@@ -2951,7 +2951,7 @@ def show_user_history():
                 f"<b>📋 추가 이력 등록 안내</b><br>"
                 f"추가 실적 합산 점수 <b>{total:,} PT</b> 기준으로 "
                 f"<b style='font-size:16px;color:#C05621;'>{_add_visit_cnt}건</b>의 방문 운영 이력을 "
-                f"아래 <b>이력 추가</b> 버튼을 통해 등록해주세요."
+                f"우측 <b>이력 추가</b> 버튼을 통해 등록해주세요."
                 f"</div>",
                 unsafe_allow_html=True,
             )
@@ -3232,8 +3232,21 @@ def show_final_check():
     # 검증 이슈 체크
     has_validation_issues = has_dup_data or has_err_data or has_missing_open or has_missing_erp or has_other_errors
 
+    # 추가 이력 등록건수 불일치 체크
+    _req_visit_cnt = round(total / 30) if total > 0 else 0
+    _preview_df_check = st.session_state.get("history_convert_preview_data")
+    if _req_visit_cnt > 0 and isinstance(_preview_df_check, pd.DataFrame) and not _preview_df_check.empty:
+        _is_manual_mask = _preview_df_check.get("_is_manual", pd.Series([False] * len(_preview_df_check))).fillna(False).astype(bool)
+        _is_visit_mask = _preview_df_check["활동구분"].astype(str).str.contains("방문", na=False) if "활동구분" in _preview_df_check.columns else pd.Series([False] * len(_preview_df_check))
+        _is_oper_mask = _preview_df_check["활동상세"].astype(str).str.contains("운영", na=False) if "활동상세" in _preview_df_check.columns else pd.Series([False] * len(_preview_df_check))
+        _actual_visit_cnt = int((_is_manual_mask & _is_visit_mask & _is_oper_mask).sum())
+        _visit_count_mismatch = _actual_visit_cnt != _req_visit_cnt
+    else:
+        _actual_visit_cnt = 0
+        _visit_count_mismatch = False
+
     # 전송 가능 여부
-    can_send = not has_validation_issues
+    can_send = not has_validation_issues and not _visit_count_mismatch
 
     if has_validation_issues:
         st.markdown(
@@ -3241,7 +3254,14 @@ def show_final_check():
             "❌ 검증 오류가 있습니다. 위 탭에서 문제를 해결한 후 실적을 전송해주세요.</div>",
             unsafe_allow_html=True,
         )
-    else:
+    if _visit_count_mismatch:
+        st.markdown(
+            f"<div style='margin-top:8px;padding:10px 16px;background:#FFFAF0;border:1px solid #F6AD55;border-radius:8px;font-size:13px;color:#C05621;font-weight:700;'>"
+            f"⚠️ 추가 이력등록건수 불일치 — 안내 기준 <b>{_req_visit_cnt}건</b> 필요, 현재 등록 <b>{_actual_visit_cnt}건</b>.<br>"
+            f"방문 운영 이력을 <b>{_req_visit_cnt}건</b> 등록 후 전송해주세요.</div>",
+            unsafe_allow_html=True,
+        )
+    if not has_validation_issues and not my_res.empty:
         개설건수 = int(my_res.iloc[0].get("개설건수", 0))
         연계건수 = int(my_res.iloc[0].get("연계건수", 0))
         운영건수_실제 = int(my_res.iloc[0].get("운영건수 (실제 활동)", 0))
@@ -3270,11 +3290,12 @@ def show_final_check():
             f"{전월대비_text}</div>",
             unsafe_allow_html=True,
         )
-        st.markdown(
-            "<div style='margin-top:8px;padding:10px 16px;background:#F0FFF4;border:1px solid #9AE6B4;border-radius:8px;font-size:13px;color:#276749;font-weight:700;'>"
-            "✅ 실적 결과를 전송할 수 있습니다.</div>",
-            unsafe_allow_html=True,
-        )
+        if not _visit_count_mismatch:
+            st.markdown(
+                "<div style='margin-top:8px;padding:10px 16px;background:#F0FFF4;border:1px solid #9AE6B4;border-radius:8px;font-size:13px;color:#276749;font-weight:700;'>"
+                "✅ 실적 결과를 전송할 수 있습니다.</div>",
+                unsafe_allow_html=True,
+            )
 
     st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
 
