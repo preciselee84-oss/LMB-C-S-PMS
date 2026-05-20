@@ -2901,6 +2901,7 @@ def show_user_history():
     manual_override[st.session_state.user_name] = edited.set_index("구분")["입력(건)"].to_dict()
 
     total = calculate_manual_perf_total(edited)
+    st.session_state["_manual_perf_total"] = total
 
     st.metric("추가 실적 합산 점수", f"{total:,} PT")
 
@@ -3233,6 +3234,7 @@ def show_final_check():
     has_validation_issues = has_dup_data or has_err_data or has_missing_open or has_missing_erp or has_other_errors
 
     # 추가 이력 등록건수 불일치 체크
+    total = st.session_state.get("_manual_perf_total", 0)
     _req_visit_cnt = round(total / 30) if total > 0 else 0
     _preview_df_check = st.session_state.get("history_convert_preview_data")
     if _req_visit_cnt > 0 and isinstance(_preview_df_check, pd.DataFrame) and not _preview_df_check.empty:
