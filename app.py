@@ -2347,7 +2347,7 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
         key=editor_key,
         use_container_width=True,
         hide_index=True,
-        num_rows="dynamic",
+        num_rows="fixed",
         disabled=[col for col in editor_source_df.columns if col not in ["활동일자", "활동구분", "활동상세"]],
         column_config={
             "지사": st.column_config.TextColumn("지사", disabled=True),
@@ -2370,24 +2370,122 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
     if st.session_state.get("user_excel_source") in (None, "bank"):
         st.session_state.user_excel_data = analysis_df
         st.session_state.user_excel_source = "bank"
-    _, add_history_col = st.columns([0.88, 0.12])
-    with add_history_col:
-        if st.button("이력 추가", use_container_width=True, key="add_history_row"):
-            new_row = {col: "" for col in analysis_df.columns}
-            new_row.update({
-                "지사": "HANA지사",
-                "상품": "통합CMS",
-                "등록자": st.session_state.user_name,
-                "활동일자": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d"),
-                "활동구분": "방문",
-                "활동상세": "운영",
-                "제목": "운영방문",
-                "_is_manual": True,
-            })
-            st.session_state[data_key] = normalize_converted_history_df(
-                pd.concat([analysis_df, pd.DataFrame([new_row])], ignore_index=True)
-            )
+
+    # ── 업체명↔사업자번호 매핑 (구글시트 + 기존 미리보기 데이터) ──────────
+    _comp_biz_map = {}
+    _cloud_raw = st.session_state.get("cloud_sheet_df")
+    if _cloud_raw is not None and not _cloud_raw.empty:
+        _cc = clean_header_logic(_cloud_raw.copy())
+        _ow = find_col(_cc, ["담당자", "등록자", "성명"])
+        _cm = find_col(_cc, ["업체명", "고객명", "상호"])
+        _bm = find_col(_cc, ["사업자번호"])
+        if _cm and _bm:
+            _sub = _cc if not _ow else _cc[_cc[_ow].astype(str).str.strip() == str(st.session_state.user_name).strip()]
+            for _, _r in _sub.iterrows():
+                _c = str(_r.get(_cm, "")).strip()
+                _b = str(_r.get(_bm, "")).strip()
+                if _c and _c not in _comp_biz_map:
+                    _comp_biz_map[_c] = _b
+    # 기존 미리보기 데이터에서도 보완
+    _pv = st.session_state.get(data_key)
+    if isinstance(_pv, pd.DataFrame) and not _pv.empty:
+        _pc = find_col(_pv, ["업체명", "상호", "고객명"])
+        _pb = find_col(_pv, ["사업자번호"])
+        if _pc and _pb:
+            for _, _r in _pv.iterrows():
+                _c = str(_r.get(_pc, "")).strip()
+                _b = str(_r.get(_pb, "")).strip()
+                if _c and _c not in _comp_biz_map:
+                    _comp_biz_map[_c] = _b
+    _company_list = ["-- 업체명 선택 --"] + sorted(_comp_biz_map.keys())
+
+    # ── 이력 추가 버튼 ────────────────────────────────────────────────────────
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+    _, _add_btn_col = st.columns([0.85, 0.15])
+    with _add_btn_col:
+        if st.button("이력 추가 ＋", use_container_width=True, key="add_history_row"):
+            st.session_state["show_add_history_form"] = not st.session_state.get("show_add_history_form", False)
             st.rerun()
+
+    # ── 이력 추가 폼 ──────────────────────────────────────────────────────────
+    if st.session_state.get("show_add_history_form", False):
+        with st.container(border=True):
+            st.markdown("##### 이력 추가")
+            _fc1, _fc2 = st.columns([0.6, 0.4])
+            with _fc1:
+                _sel_comp = st.selectbox("업체명", _company_list, key="add_form_company")
+                _sel_comp = "" if _sel_comp == "-- 업체명 선택 --" else _sel_comp
+            with _fc2:
+                _auto_biz = _comp_biz_map.get(_sel_comp, "")
+                st.text_input("사업자번호 (자동입력)", value=_auto_biz, disabled=True, key="add_form_biz_display")
+
+            _fd1, _fd2, _fd3 = st.columns(3)
+            with _fd1:
+                _form_date = st.text_input(
+                    "활동일자",
+                    value=st.session_state.get("add_form_date_val", (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d")),
+                    key="add_form_date",
+                )
+            with _fd2:
+                _form_cat = st.selectbox("활동구분", ["방문", "상담", "원격"], key="add_form_cat")
+            with _fd3:
+                _form_det = st.selectbox("활동상세", ["운영", "개설", "연계"], key="add_form_det")
+
+            _fb1, _fb2 = st.columns(2)
+            with _fb1:
+                if st.button("등록", type="primary", use_container_width=True, key="add_form_submit"):
+                    if not _sel_comp:
+                        st.warning("업체명을 선택해주세요.")
+                    else:
+                        _det_title = {"운영": "운영방문", "개설": "개설 방문", "연계": "연계 방문"}.get(_form_det, "운영방문")
+                        _new_row = {col: "" for col in analysis_df.columns}
+                        _new_row.update({
+                            "지사": "HANA지사",
+                            "상품": "통합CMS",
+                            "등록자": st.session_state.user_name,
+                            "업체명": _sel_comp,
+                            "사업자번호": _auto_biz,
+                            "활동일자": _form_date,
+                            "활동구분": _form_cat,
+                            "활동상세": _form_det,
+                            "제목": _det_title,
+                            "_is_manual": True,
+                        })
+                        st.session_state[data_key] = normalize_converted_history_df(
+                            pd.concat([analysis_df, pd.DataFrame([_new_row])], ignore_index=True)
+                        )
+                        st.session_state["show_add_history_form"] = False
+                        st.session_state.pop("add_form_date_val", None)
+                        st.rerun()
+            with _fb2:
+                if st.button("취소", use_container_width=True, key="add_form_cancel"):
+                    st.session_state["show_add_history_form"] = False
+                    st.rerun()
+
+    # ── 삭제 기능 ─────────────────────────────────────────────────────────────
+    if not analysis_df.empty:
+        _dc = find_col(analysis_df, ["업체명", "상호", "고객명"])
+        _dd = find_col(analysis_df, ["활동일자", "활동일"])
+        _ds = find_col(analysis_df, ["활동상세"])
+        _row_labels = []
+        for _i, _row in analysis_df.iterrows():
+            _is_m = bool(_row.get("_is_manual", False)) if "_is_manual" in analysis_df.columns else False
+            _tag = "🖊️" if _is_m else "📋"
+            _comp_v = str(_row.get(_dc, "")).strip() if _dc else ""
+            _date_v = str(_row.get(_dd, "")).strip() if _dd else ""
+            _det_v  = str(_row.get(_ds, "")).strip() if _ds else ""
+            _row_labels.append(f"{_tag} {_i+1}. {_comp_v} / {_date_v} / {_det_v}")
+        _label_idx = {lbl: idx for lbl, idx in zip(_row_labels, analysis_df.index)}
+
+        with st.expander("🗑️ 행 삭제"):
+            _del_sel = st.multiselect("삭제할 행 선택 (🖊️ 추가 이력 / 📋 은행 이력)", _row_labels, key="del_row_select")
+            if _del_sel:
+                if st.button("선택 삭제", type="primary", use_container_width=True, key="del_row_btn"):
+                    _del_idx = [_label_idx[k] for k in _del_sel if k in _label_idx]
+                    _new_df = analysis_df.drop(index=_del_idx).reset_index(drop=True)
+                    st.session_state[data_key] = normalize_converted_history_df(_new_df)
+                    st.rerun()
+
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
     return analysis_df
 
