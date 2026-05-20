@@ -2082,12 +2082,8 @@ def validation_tabs_with_refresh(key):
     with tabs_col:
         tabs = st.tabs(["중복 이력", "초과 방문", "본사 개설완료일자 누락", "본사 ERP연계일자 누락", "기타 오류"])
     with link_col:
-        _url_sync = st.session_state.get("url_sync", "")
-        if _url_sync:
-            _sheet_url = _url_sync.split("/export")[0] + "/edit"
-            st.link_button("🔗", _sheet_url, use_container_width=True, help="본사 구글시트 바로가기")
-        else:
-            st.button("🔗", disabled=True, use_container_width=True, key=f"{key}_link")
+        _sheet_url = "https://docs.google.com/spreadsheets/d/1yS4gaES-iuzt1NSRTSdj9Ivg1fjbN5mIyX4pGnvEYN0/edit?gid=1533424484#gid=1533424484"
+        st.link_button("🔗", _sheet_url, use_container_width=True, help="본사 구글시트 바로가기")
     with refresh_col:
         st.markdown("<div class='refresh-tab-button'>", unsafe_allow_html=True)
         if st.button("↻", use_container_width=True, key=key, help="구글시트 데이터 다시 조회"):
