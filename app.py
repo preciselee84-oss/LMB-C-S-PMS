@@ -510,6 +510,34 @@ def infer_activity_detail(row, source_cols):
     return "운영"
 
 
+def title_from_activity_detail(value):
+    detail = str(value).strip()
+    if "연계" in detail:
+        return "연계 방문"
+    if "개설" in detail:
+        return "개설 방문"
+    return "운영방문"
+
+
+def normalize_converted_history_df(df):
+    if df is None or df.empty:
+        return pd.DataFrame()
+    result = df.copy()
+    result["지사"] = "HANA지사"
+    if "활동구분" in result.columns:
+        result["활동구분"] = result["활동구분"].astype(str).map(
+            lambda v: "방문" if "방문" in v else ("원격" if "원격" in v else ("상담" if v == "상담" else "상담"))
+        )
+    if "활동상세" in result.columns:
+        result["활동상세"] = result["활동상세"].astype(str).map(
+            lambda v: "연계" if "연계" in v else ("개설" if "개설" in v else "운영")
+        )
+        result["제목"] = result["활동상세"].map(title_from_activity_detail)
+    if "활동내용" in result.columns and "활동내역" not in result.columns:
+        result = result.rename(columns={"활동내용": "활동내역"})
+    return result
+
+
 def hana_customer_biz_map():
     hana = st.session_state.get("hana_sheet_df")
     if hana is None or hana.empty:
@@ -588,11 +616,11 @@ def convert_history_to_sample_df(history_df, user_name):
             "활동구분": activity_category,
             "활동상세": activity_detail,
             "업무번호 \n(플로우에 식권, 비즈플레이, 플로우 작성번호)": row.get(work_no_col, "") if work_no_col else "",
-            "제목": row.get(title_col, "") if title_col else "",
+            "제목": title_from_activity_detail(activity_detail),
             "활동내역": row.get(content_col, "") if content_col else "",
         })
 
-    return pd.DataFrame(rows), {"total": len(rows), "unmatched": unmatched}
+    return normalize_converted_history_df(pd.DataFrame(rows)), {"total": len(rows), "unmatched": unmatched}
 
 
 def sample_format_excel_bytes(df):
@@ -956,13 +984,12 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         return f"ERR: {str(e)}", None, None
 
 
-def render_plain_html_table(df, max_rows=500, center_align=False):
+def render_plain_html_table(df, max_rows=500, center_align=True):
     """AG Grid 없이 순수 HTML 테이블로 렌더링 — 다크모드 완전 호환."""
     if df is None or df.empty:
         st.info("표시할 데이터가 없습니다.")
         return
     df = df.head(max_rows).reset_index(drop=True)
-    td_align = "text-align:center;" if center_align else ""
     th = "background:#EDF2F7;color:#4A5568;font-weight:700;font-size:12px;padding:6px 10px;white-space:nowrap;border-bottom:2px solid #E2E8F0;text-align:center;"
     headers = "".join(f"<th style='{th}'>{html.escape(str(c))}</th>" for c in df.columns)
     body = ""
@@ -971,6 +998,8 @@ def render_plain_html_table(df, max_rows=500, center_align=False):
         tds = ""
         for col in df.columns:
             val = "" if pd.isna(row[col]) else html.escape(str(row[col]))
+            align = "left" if str(col).strip() == "활동내역" else ("center" if center_align else "left")
+            td_align = f"text-align:{align};"
             tds += f"<td style='background:{bg};padding:5px 10px;border-bottom:1px solid #EDF2F7;font-size:12px;color:#2D3748;white-space:nowrap;{td_align}'>{val}</td>"
         body += f"<tr>{tds}</tr>"
     st.markdown(
@@ -1056,6 +1085,8 @@ def style_report_logic(df, compact=False, align_overrides=None, default_align=No
         tds = ""
         for col in df.columns:
             align = default_align or ("right" if col in num_cols or col in diff_cols else "center")
+            if str(col).strip() == "활동내역":
+                align = "left"
             align = align_overrides.get(col, align)
             bg = "#FFFFFF" if i % 2 == 0 else "#F7FAFC"
 
@@ -2050,6 +2081,7 @@ def convert_bank_excel_to_activity(bank_df):
 
 def show_user_history():
     converted_preview_df = None
+    analysis_df = None
     converted_ym = ""
     convert_info = {}
     col1, col_convert, col_upload, col_sample, _ = st.columns([1, 1, 1, 1, 2])
@@ -2068,15 +2100,14 @@ def show_user_history():
                     st.button("변환파일 다운로드", use_container_width=True, disabled=True)
                     st.warning(convert_info.get("error", "변환할 데이터가 없습니다."))
                 else:
-                    converted_df = converted_df.copy()
-                    converted_df["지사"] = "HANA지사"
+                    converted_df = normalize_converted_history_df(converted_df)
                     converted_preview_df = converted_df
                     edited_key = "history_convert_preview_editor"
                     edited_df = st.session_state.get(edited_key, converted_df)
                     if not isinstance(edited_df, pd.DataFrame) or list(edited_df.columns) != list(converted_df.columns):
                         edited_df = converted_df
-                    edited_df = edited_df.copy()
-                    edited_df["지사"] = "HANA지사"
+                    edited_df = normalize_converted_history_df(edited_df)
+                    analysis_df = edited_df
                     converted_bytes = sample_format_excel_bytes(edited_df)
                     converted_ym = get_uploaded_month(edited_df).replace("-", "") or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
                     st.download_button(
@@ -2116,9 +2147,28 @@ def show_user_history():
 
     if converted_preview_df is not None and not converted_preview_df.empty:
         st.markdown("#### 변환파일 미리보기")
-        converted_preview_df = converted_preview_df.copy()
-        converted_preview_df["지사"] = "HANA지사"
-        st.data_editor(
+        st.markdown(
+            """
+            <style>
+            body:has(#pms-d:checked) [data-testid="stDataEditor"],
+            body:has(#pms-d:checked) [data-testid="stDataEditor"] > div,
+            body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="grid"],
+            body:has(#pms-d:checked) [data-testid="stDataEditor"] canvas {
+                background-color: #252535 !important;
+                color: #ffffff !important;
+            }
+            body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"],
+            body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"] {
+                background-color: #252535 !important;
+                color: #ffffff !important;
+                border-color: #45475a !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        converted_preview_df = normalize_converted_history_df(converted_preview_df)
+        edited_preview_df = st.data_editor(
             converted_preview_df,
             key="history_convert_preview_editor",
             use_container_width=True,
@@ -2139,6 +2189,7 @@ def show_user_history():
                 "활동내역": st.column_config.TextColumn("활동내역"),
             },
         )
+        analysis_df = normalize_converted_history_df(edited_preview_df)
         st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
     # 파일이 제거되면 데이터 초기화
@@ -2175,10 +2226,13 @@ def show_user_history():
                     st.error("업로드된 데이터가 없습니다. 파일을 확인해주세요.")
                     st.session_state.user_excel_data = None
 
-    if st.session_state.user_excel_data is None:
+    if st.session_state.user_excel_data is not None:
+        analysis_df = st.session_state.user_excel_data.copy()
+
+    if analysis_df is None or analysis_df.empty:
         return
 
-    df = st.session_state.user_excel_data.copy()
+    df = analysis_df.copy()
     u_col = find_col(df, ["등록자", "담당자", "성명"], "등록자")
     d_col = find_col(df, ["활동상세", "활동내용"], "활동상세")
 
