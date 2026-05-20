@@ -2275,20 +2275,21 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
     st.markdown(
         """
         <style>
+        /* ── 변환파일 미리보기 다크모드 ───────────────────────────────────────
+           canvas 에는 background-color 를 주지 않아야 filter 와 충돌하지 않음 */
         body[data-pms-theme="d"] [data-testid="stDataEditor"],
         body[data-pms-theme="d"] [data-testid="stDataEditor"] > div,
         body[data-pms-theme="d"] [data-testid="stDataEditor"] [role="grid"],
-        body[data-pms-theme="d"] [data-testid="stDataEditor"] canvas,
         body:has(#pms-d:checked) [data-testid="stDataEditor"],
         body:has(#pms-d:checked) [data-testid="stDataEditor"] > div,
-        body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="grid"],
-        body:has(#pms-d:checked) [data-testid="stDataEditor"] canvas {
-            background-color: #252535 !important;
-            color: #ffffff !important;
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="grid"] {
+            background-color: #13131f !important;
+            color: #e2e8f0 !important;
+            border-color: #2d2d4a !important;
         }
         body[data-pms-theme="d"] [data-testid="stDataEditor"] canvas,
         body:has(#pms-d:checked) [data-testid="stDataEditor"] canvas {
-            filter: invert(1) hue-rotate(180deg) brightness(0.72) contrast(1.18) saturate(0.85) !important;
+            filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(1.1) saturate(0.88) !important;
         }
         body[data-pms-theme="d"] [data-testid="stDataEditor"] input,
         body[data-pms-theme="d"] [data-testid="stDataEditor"] textarea,
@@ -2298,10 +2299,10 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
         body:has(#pms-d:checked) [data-testid="stDataEditor"] textarea,
         body:has(#pms-d:checked) [data-testid="stDataEditor"] [contenteditable="true"],
         body:has(#pms-d:checked) [data-testid="stDataEditor"] [data-baseweb="input"] input {
-            background-color: #0f0f1f !important;
+            background-color: #1e1e34 !important;
             color: #ffffff !important;
             caret-color: #ffffff !important;
-            border-color: #89b4fa !important;
+            border-color: #6366f1 !important;
             -webkit-text-fill-color: #ffffff !important;
         }
         body[data-pms-theme="d"] [data-testid="stDataEditor"] input::selection,
@@ -2312,17 +2313,23 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
             color: #ffffff !important;
         }
         @media (prefers-color-scheme: dark) {
+            body:has(#pms-s:checked) [data-testid="stDataEditor"],
+            body:has(#pms-s:checked) [data-testid="stDataEditor"] > div,
+            body:has(#pms-s:checked) [data-testid="stDataEditor"] [role="grid"] {
+                background-color: #13131f !important;
+                border-color: #2d2d4a !important;
+            }
             body:has(#pms-s:checked) [data-testid="stDataEditor"] canvas {
-                filter: invert(1) hue-rotate(180deg) brightness(0.72) contrast(1.18) saturate(0.85) !important;
+                filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(1.1) saturate(0.88) !important;
             }
             body:has(#pms-s:checked) [data-testid="stDataEditor"] input,
             body:has(#pms-s:checked) [data-testid="stDataEditor"] textarea,
             body:has(#pms-s:checked) [data-testid="stDataEditor"] [contenteditable="true"],
             body:has(#pms-s:checked) [data-testid="stDataEditor"] [data-baseweb="input"] input {
-                background-color: #0f0f1f !important;
+                background-color: #1e1e34 !important;
                 color: #ffffff !important;
                 caret-color: #ffffff !important;
-                border-color: #89b4fa !important;
+                border-color: #6366f1 !important;
                 -webkit-text-fill-color: #ffffff !important;
             }
         }
