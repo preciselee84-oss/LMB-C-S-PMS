@@ -2716,7 +2716,13 @@ def show_user_history():
     if not isinstance(preview_source_df, pd.DataFrame):
         preview_source_df = converted_preview_df if isinstance(converted_preview_df, pd.DataFrame) else df_user_visit
     preview_source_df = normalize_converted_history_df(preview_source_df)
-    search_filters = render_history_search_filters(preview_source_df if not preview_source_df.empty else df_user_visit, "history_preview_search")
+    search_source_df = preview_source_df if not preview_source_df.empty else df_user_visit
+    search_filters = {
+        "company": str(st.session_state.get("history_preview_search_company", "") or "").strip(),
+        "date": st.session_state.get("history_preview_search_date", "전체"),
+        "category": st.session_state.get("history_preview_search_category", "전체"),
+        "detail": st.session_state.get("history_preview_search_detail", "전체"),
+    }
 
     if converted_preview_df is not None and not converted_preview_df.empty:
         _pre_h = None
@@ -2737,6 +2743,8 @@ def show_user_history():
                 pass
         if _changed:
             st.rerun()
+
+    search_filters = render_history_search_filters(search_source_df, "history_preview_search")
 
     dup_my = apply_history_search_filters(dup_my, search_filters)
     err_filtered = apply_history_search_filters(err_filtered, search_filters)
