@@ -869,18 +869,17 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
             df_real = df
             df_added = pd.DataFrame()
 
-        # 중복 이력: 은행 이력 행 중 사업자번호+등록자+활동일자+활동상세 모두 같은 행
-        if biz_col in df_clean.columns:
-            _flag_in_clean = _flag in df_clean.columns
-            _df_bank = df_clean[~df_clean[_flag].fillna(False).astype(bool)].copy() if _flag_in_clean else df_clean.copy()
-            _biz_valid = _df_bank[biz_col].astype(str).str.strip() != ""
-            _df_bank = _df_bank[_biz_valid]
-            _dup_subset = [biz_col, u_col, date_col]
-            if d_col and d_col in _df_bank.columns:
-                _dup_subset.append(d_col)
-            dup_biz_df = _df_bank[_df_bank.duplicated(subset=_dup_subset, keep=False)].sort_values(
-                by=[date_col, biz_col, u_col]
-            )
+        # 중복 이력: 변환파일 미리보기 기준 사업자번호+등록자+활동일자+활동상세가 모두 같은 행
+        if biz_col in df_clean.columns and u_col in df_clean.columns and date_col in df_clean.columns and d_col in df_clean.columns:
+            _dup_df = df_clean.copy()
+            _dup_df["_dup_biz"] = normalize_biz(_dup_df[biz_col])
+            _dup_df["_dup_user"] = _dup_df[u_col].astype(str).str.strip()
+            _dup_df["_dup_date"] = pd.to_datetime(_dup_df[date_col], errors="coerce").dt.strftime("%Y-%m-%d")
+            _dup_df["_dup_detail"] = _dup_df[d_col].astype(str).str.strip()
+            _dup_keys = ["_dup_biz", "_dup_user", "_dup_date", "_dup_detail"]
+            _dup_df = _dup_df[(_dup_df[_dup_keys] != "").all(axis=1)]
+            dup_biz_df = _dup_df[_dup_df.duplicated(subset=_dup_keys, keep=False)].drop(columns=_dup_keys, errors="ignore")
+            dup_biz_df = dup_biz_df.sort_values(by=[date_col, biz_col, u_col, d_col])
         else:
             dup_biz_df = pd.DataFrame()
 
