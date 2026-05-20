@@ -864,6 +864,25 @@ def save_manual_perf_override_for_current_user():
         save_db(PERF_FILE, db)
 
 
+def has_performance_required_columns(df):
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return False
+    return all(
+        find_col(df, keys) in df.columns
+        for keys in [["등록자", "담당자", "성명"], ["활동상세", "활동내용"], ["활동일자", "활동일", "일자"]]
+    )
+
+
+def current_history_analysis_df():
+    preview_df = st.session_state.get("history_convert_preview_data")
+    if isinstance(preview_df, pd.DataFrame) and has_performance_required_columns(preview_df):
+        return normalize_converted_history_df(preview_df.copy())
+    excel_df = st.session_state.get("user_excel_data")
+    if isinstance(excel_df, pd.DataFrame) and has_performance_required_columns(excel_df):
+        return normalize_converted_history_df(excel_df.copy())
+    return pd.DataFrame()
+
+
 def apply_rank_from_user_db(df):
     if "담당자" not in df.columns or "직급" not in df.columns:
         return df
@@ -896,7 +915,11 @@ def sort_by_rank_name(df):
 
 def process_performance_analysis(curr_df_raw, prev_df_raw=None):
     try:
+        if curr_df_raw is None:
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
         df = clean_header_logic(curr_df_raw)
+        if df.empty and len(df.columns) == 0:
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
         u_col = find_col(df, ["등록자", "담당자", "성명"])
         d_col = find_col(df, ["활동상세", "활동내용"])
@@ -2563,7 +2586,10 @@ def show_user_history():
                     st.session_state.user_excel_data = None
                     st.session_state.user_excel_source = None
 
-    if st.session_state.user_excel_data is not None:
+    current_df = current_history_analysis_df()
+    if not current_df.empty:
+        analysis_df = current_df
+    elif st.session_state.user_excel_data is not None:
         analysis_df = st.session_state.user_excel_data.copy()
 
     if analysis_df is None or analysis_df.empty:
@@ -2884,7 +2910,7 @@ def show_user_history():
 
 def show_final_check():
     # 저장된 데이터가 있으면 로드
-    if st.session_state.user_excel_data is None:
+    if current_history_analysis_df().empty and st.session_state.user_excel_data is None:
         saved_db = load_db(SAVED_STATE_FILE, {})
         user_saved = saved_db.get(st.session_state.user_name)
         if user_saved and user_saved.get("user_excel_data"):
@@ -2894,7 +2920,11 @@ def show_final_check():
 
     select_prev_month("auto_prev_df", "user_prev_month_sel")
 
-    if st.session_state.user_excel_data is None:
+    original_df = current_history_analysis_df()
+    if original_df.empty and st.session_state.user_excel_data is not None:
+        original_df = st.session_state.user_excel_data
+
+    if original_df is None or original_df.empty:
         st.info("먼저 은행 이력 업로드 메뉴에서 엑셀을 업로드해주세요.")
         return
 
@@ -2904,8 +2934,6 @@ def show_final_check():
             load_csv_to_state("url_sync", "cloud_sheet_df")
         except Exception as e:
             st.warning(f"⚠️ 본사 구글시트를 불러오는데 실패했습니다: {str(e)}")
-
-    original_df = st.session_state.user_excel_data
 
     # Filter user data and attach cloud dates for tabs
     df_for_tabs = original_df.copy()
