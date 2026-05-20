@@ -4236,6 +4236,7 @@ def show_staff_admin():
 def show_target_customers():
     st.markdown("### 이번달 활동 대상고객 추천")
 
+    # 본사 구글시트 로드
     if st.session_state.get("cloud_sheet_df") is None:
         try:
             load_csv_to_state("url_sync", "cloud_sheet_df")
@@ -4248,10 +4249,19 @@ def show_target_customers():
         st.info("본사 구글시트 데이터가 없습니다. 관리자에게 URL 설정을 확인해주세요.")
         return
 
+    # 하나은행 시트 로드
+    if st.session_state.get("analysis_lookup_df") is None:
+        try:
+            load_csv_to_state("url_analysis", "analysis_lookup_df")
+        except Exception:
+            pass
+
+    hana_df = st.session_state.get("analysis_lookup_df")
+
     cloud = clean_header_logic(cloud.copy())
     user_name = st.session_state.user_name
 
-    # 컬럼 탐색
+    # 본사 시트 컬럼 탐색
     owner_col  = find_col(cloud, ["담당자", "등록자", "성명"])
     comp_col   = find_col(cloud, ["업체명", "고객명", "상호"])
     biz_col    = find_col(cloud, ["사업자번호"])
@@ -4276,6 +4286,46 @@ def show_target_customers():
         if col and col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
 
+    # 하나은행 시트에서 활동 이력 가져오기
+    def get_recent_activity(biz_no):
+        if hana_df is None or hana_df.empty or not biz_no:
+            return {"last_date": "", "last_detail": "", "activity_count": 0}
+
+        hana_clean = clean_header_logic(hana_df.copy())
+        hana_biz_col = find_col(hana_clean, ["사업자번호"])
+        hana_date_col = find_col(hana_clean, ["활동일", "일자"])
+        hana_detail_col = find_col(hana_clean, ["활동상세", "활동내용"])
+
+        if not hana_biz_col or hana_biz_col not in hana_clean.columns:
+            return {"last_date": "", "last_detail": "", "activity_count": 0}
+
+        # 사업자번호 정규화하여 매칭
+        biz_normalized = normalize_biz(pd.Series([biz_no])).iloc[0]
+        hana_clean[hana_biz_col] = normalize_biz(hana_clean[hana_biz_col])
+
+        matched = hana_clean[hana_clean[hana_biz_col] == biz_normalized].copy()
+
+        if matched.empty:
+            return {"last_date": "", "last_detail": "", "activity_count": 0}
+
+        # 날짜 정렬
+        if hana_date_col and hana_date_col in matched.columns:
+            matched[hana_date_col] = pd.to_datetime(matched[hana_date_col], errors="coerce")
+            matched = matched.sort_values(hana_date_col, ascending=False)
+            last_date = matched.iloc[0][hana_date_col]
+            last_date_str = last_date.strftime("%Y-%m-%d") if pd.notna(last_date) else ""
+        else:
+            last_date_str = ""
+
+        last_detail = matched.iloc[0].get(hana_detail_col, "") if hana_detail_col else ""
+        activity_count = len(matched)
+
+        return {
+            "last_date": last_date_str,
+            "last_detail": str(last_detail),
+            "activity_count": activity_count
+        }
+
     def _empty(col):
         if not col or col not in df.columns:
             return pd.Series(True, index=df.index)
@@ -4287,16 +4337,31 @@ def show_target_customers():
                     str(row.get(add_col, "")).strip() == "")
         return False
 
-    # 표시 컬럼 선택
-    show_cols = [c for c in [comp_col, biz_col, div_col, open_col, erp_col, add_col] if c and c in df.columns]
+    # 표시 컬럼 선택 및 활동 이력 추가
+    base_show_cols = [c for c in [comp_col, biz_col, div_col, open_col, erp_col, add_col] if c and c in df.columns]
 
     def fmt_df(sub):
         if sub.empty:
             return sub
-        d = sub[show_cols].copy().reset_index(drop=True)
+        d = sub[base_show_cols].copy().reset_index(drop=True)
+
+        # 날짜 포맷팅
         for col in [open_col, erp_col]:
             if col and col in d.columns:
                 d[col] = pd.to_datetime(d[col], errors="coerce").dt.strftime("%Y-%m-%d").fillna("")
+
+        # 활동 이력 추가
+        if biz_col and biz_col in d.columns:
+            activities = []
+            for _, row in d.iterrows():
+                biz_no = row.get(biz_col, "")
+                activity = get_recent_activity(biz_no)
+                activities.append(activity)
+
+            d["최근활동일"] = [a["last_date"] for a in activities]
+            d["최근활동내용"] = [a["last_detail"] for a in activities]
+            d["총활동건수"] = [a["activity_count"] for a in activities]
+
         return d
 
     # ── 개설 미완료 ───────────────────────────────────────────
