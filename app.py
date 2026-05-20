@@ -3845,14 +3845,31 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
         if not tables:
             return
         table = tables[0]
+        if len(table.rows) == 0 or len(table.columns) == 0:
+            return
+
         ensure_rows(table, len(rows) + 1)
+
+        # 기존 행 초기화 (헤더 제외)
         for r in range(1, len(table.rows)):
             for c in range(len(table.columns)):
-                set_cell_text(table.cell(r, c), "", font_size=10)
+                try:
+                    set_cell_text(table.cell(r, c), "", font_size=10)
+                except:
+                    pass
+
+        # 데이터 채우기
         for r_idx, row_values in enumerate(rows, start=1):
+            if r_idx >= len(table.rows):
+                break
+            if not isinstance(row_values, (list, tuple)):
+                continue
             for c_idx, value in enumerate(row_values[:len(table.columns)]):
-                align = PP_ALIGN.LEFT if is_major_note_col(table, c_idx) else PP_ALIGN.CENTER
-                set_cell_text(table.cell(r_idx, c_idx), value, align, font_size=10)
+                try:
+                    align = PP_ALIGN.LEFT if is_major_note_col(table, c_idx) else PP_ALIGN.CENTER
+                    set_cell_text(table.cell(r_idx, c_idx), value, align, font_size=10)
+                except:
+                    pass
 
     def delete_slide(index):
         slide_id_list = prs.slides._sldIdLst
