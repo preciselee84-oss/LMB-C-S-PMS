@@ -3260,7 +3260,7 @@ def show_final_check():
         st.markdown(
             f"<div style='margin-top:8px;padding:10px 16px;background:#FFFAF0;border:1px solid #F6AD55;border-radius:8px;font-size:13px;color:#C05621;font-weight:700;'>"
             f"⚠️ 추가 이력등록건수 불일치 — 안내 기준 <b>{_req_visit_cnt}건</b> 필요, 현재 등록 <b>{_actual_visit_cnt}건</b>.<br>"
-            f"방문 운영 이력을 <b>{_req_visit_cnt}건</b> 등록 후 전송해주세요.</div>",
+            f"방문 운영 이력을 <b>{_req_visit_cnt - _actual_visit_cnt}건</b> 추가 등록해주세요.</div>",
             unsafe_allow_html=True,
         )
     if not has_validation_issues and not my_res.empty:
