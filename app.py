@@ -4210,7 +4210,9 @@ def show_report():
 def show_staff_admin():
     st.markdown("### 직원 목록")
 
-    st.session_state.user_db = load_db(DB_FILE, {"1": {"pw": "1", "role": "관리자", "name": "최고관리자", "access": "허용"}})
+    _fresh_db = load_db(DB_FILE, None)
+    if _fresh_db is not None:
+        st.session_state.user_db = _fresh_db
     if st.session_state.pop("reset_staff_edit_sel", False):
         st.session_state.staff_edit_sel = "선택안함"
 
