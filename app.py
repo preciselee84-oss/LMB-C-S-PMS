@@ -5943,8 +5943,8 @@ def show_dashboard():
     # ── 관리자: 전체 직원 현황 2열 그리드 ────────────────
     if st.session_state.user_role == "관리자":
         st.markdown(f"### 전체 직원 {curr_ym} 실적 현황")
-        all_names = [
-            info.get("name", "")
+        staff_items = [
+            (info.get("name", ""), info.get("rank", "직원"))
             for uid, info in st.session_state.user_db.items()
             if uid != "1"
             and info.get("name")
@@ -5953,8 +5953,9 @@ def show_dashboard():
             and info.get("dept_type", "사업부") == "C&S"
             and info.get("staff_type", "정규직") != "파견직"
         ]
+        staff_items = sorted(staff_items, key=lambda item: (_RANK_ORDER.get(item[1], 9), item[0]))
         cards = []
-        for uname in all_names:
+        for uname, _rank in staff_items:
             c = calc_hana_for(uname, curr_ym)
             p = calc_act_for(uname, prev_ym)
             delta = c["합계포인트"] - p["합계포인트"]
