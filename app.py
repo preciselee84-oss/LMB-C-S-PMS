@@ -46,6 +46,16 @@ DEFAULT_URL_HANA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgRHnTZD4eD
 DEFAULT_URL_HANA_BILLING = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgRHnTZD4eDW2UeODQuGxmxFrflKpbQda3sBsVjj1s3qAFWMKcpke2U58UuT6VEDlkbXveZlaroTCr/pub?gid=1172734914&single=true&output=csv"
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def read_csv_cached(url, header=0, cache_buster=0):
+    return pd.read_csv(url, header=header)
+
+
+def read_google_csv(url, header=0, force_refresh=False):
+    cache_buster = int(datetime.utcnow().timestamp()) if force_refresh else 0
+    return read_csv_cached(url, header=header, cache_buster=cache_buster).copy()
+
+
 GITHUB_REPO = "preciselee84-oss/LMB-C-S-PMS"
 GITHUB_BRANCH = "main"
 GITHUB_DATA_DIR = "data"
@@ -728,7 +738,7 @@ def normalize_converted_history_df(df):
 def hana_customer_biz_map():
     hana = st.session_state.get("hana_sheet_df")
     if hana is None or hana.empty:
-        hana = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+        hana = read_google_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
         st.session_state.hana_sheet_df = hana
 
     hana = clean_header_logic(hana.copy())
@@ -2177,13 +2187,13 @@ def render_page_title(menu):
         st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
 
-def load_csv_to_state(url_key, state_key):
-    st.session_state[state_key] = clean_header_logic(pd.read_csv(st.session_state[url_key]))
+def load_csv_to_state(url_key, state_key, force_refresh=False):
+    st.session_state[state_key] = clean_header_logic(read_google_csv(st.session_state[url_key], force_refresh=force_refresh))
 
 
 def refresh_google_sheets_action():
-    load_csv_to_state("url_sync", "cloud_sheet_df")
-    load_csv_to_state("url_analysis", "analysis_lookup_df")
+    st.session_state.cloud_sheet_df = clean_header_logic(read_google_csv(st.session_state.url_sync, force_refresh=True))
+    st.session_state.analysis_lookup_df = clean_header_logic(read_google_csv(st.session_state.url_analysis, force_refresh=True))
     st.toast("구글시트 데이터를 다시 조회했습니다.")
     time.sleep(0.3)
     st.rerun()
@@ -4291,7 +4301,7 @@ def show_target_customers():
     # 하나은행 구글시트 로드 (개설 미완료용)
     hana_sheet = None
     try:
-        hana_raw = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+        hana_raw = read_google_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
         hana_sheet = hana_raw
     except Exception as e:
         st.error(f"하나은행 구글시트를 불러오지 못했습니다: {e}")
@@ -4299,7 +4309,7 @@ def show_target_customers():
     # 하나은행 청구 시트 로드 (운영 관리 대상용)
     hana_billing_sheet = None
     try:
-        billing_raw = pd.read_csv(st.session_state.get("url_hana_billing", DEFAULT_URL_HANA_BILLING))
+        billing_raw = read_google_csv(st.session_state.get("url_hana_billing", DEFAULT_URL_HANA_BILLING))
         billing_raw = billing_raw.dropna(how="all").reset_index(drop=True)
         hana_billing_sheet = billing_raw
     except Exception as e:
@@ -4752,10 +4762,7 @@ def show_weekly_report_user():
     def load_hana_sheet_for_weekly(force_refresh=False):
         try:
             url = st.session_state.get("url_hana", DEFAULT_URL_HANA)
-            if force_refresh:
-                sep = "&" if "?" in url else "?"
-                url = f"{url}{sep}_refresh={int(datetime.utcnow().timestamp())}"
-            df = pd.read_csv(url, header=2)
+            df = read_google_csv(url, header=2, force_refresh=force_refresh)
             st.session_state.hana_sheet_df = df
             st.session_state.weekly_hana_loaded_at = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
         except Exception as e:
@@ -5094,7 +5101,7 @@ def show_weekly_report_user():
 
 def load_weekly_hana_for_status():
     try:
-        df = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+        df = read_google_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
     except Exception:
         df = st.session_state.get("hana_sheet_df")
     if df is None:
@@ -5438,7 +5445,7 @@ def build_weekly_report_ppt_bytes(report_df, week_start="", week_end="", hana_df
                 url = st.session_state.get("url_hana", DEFAULT_URL_HANA)
             except Exception:
                 url = DEFAULT_URL_HANA
-            df_hana = pd.read_csv(url, header=2)
+            df_hana = read_google_csv(url, header=2)
         df_hana = df_hana.copy()
         df_hana.columns = [str(c).strip() for c in df_hana.columns]
         return df_hana.dropna(how="all").reset_index(drop=True)
@@ -5720,7 +5727,7 @@ def show_weekly_report_admin():
     with refresh_col:
         if st.button("새로고침", key="weekly_admin_refresh", use_container_width=True):
             try:
-                st.session_state.hana_sheet_df = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+                st.session_state.hana_sheet_df = read_google_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2, force_refresh=True)
                 st.session_state.weekly_hana_loaded_at = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
                 st.success("새로고침 완료")
             except Exception as e:
@@ -5767,7 +5774,7 @@ def show_weekly_report_admin():
     try:
         hana_for_ppt = None
         try:
-            hana_for_ppt = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+            hana_for_ppt = read_google_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
         except Exception:
             hana_for_ppt = st.session_state.get("hana_sheet_df")
         week_start = ""
@@ -5796,14 +5803,14 @@ def show_weekly_report_admin():
 def show_dashboard():
     import plotly.graph_objects as go
 
-    # ── 대시보드 진입 시 세 데이터 항상 갱신 ─────────────
+    # ── 대시보드 진입 시 캐시된 구글시트 데이터를 재사용 ─────────────
     try:
         with st.spinner("데이터 불러오는 중..."):
-            hana_raw = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+            hana_raw = read_google_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
             st.session_state.hana_sheet_df = hana_raw
-            raw_act = pd.read_csv(st.session_state.get("url_analysis", DEFAULT_URL_ANALYSIS))
+            raw_act = read_google_csv(st.session_state.get("url_analysis", DEFAULT_URL_ANALYSIS))
             st.session_state.analysis_lookup_df = raw_act
-            billing_raw = pd.read_csv(st.session_state.get("url_hana_billing", DEFAULT_URL_HANA_BILLING))
+            billing_raw = read_google_csv(st.session_state.get("url_hana_billing", DEFAULT_URL_HANA_BILLING))
             billing_raw = billing_raw.dropna(how="all").reset_index(drop=True)
             st.session_state.hana_billing_df = billing_raw
     except Exception as e:
@@ -6152,22 +6159,22 @@ def show_google_sync():
     if st.button("데이터 저장", type="primary"):
         errors = []
         try:
-            load_csv_to_state("url_sync", "temp_cloud_df")
+            load_csv_to_state("url_sync", "temp_cloud_df", force_refresh=True)
             st.session_state.cloud_sheet_df = st.session_state.temp_cloud_df
         except Exception:
             errors.append("본사 구글 시트")
         try:
-            load_csv_to_state("url_analysis", "analysis_lookup_df")
+            load_csv_to_state("url_analysis", "analysis_lookup_df", force_refresh=True)
         except Exception:
             errors.append("하나지사 활동이력 구글 시트")
         try:
-            hana_raw = pd.read_csv(st.session_state.url_hana, header=2)
+            hana_raw = read_google_csv(st.session_state.url_hana, header=2, force_refresh=True)
             hana_raw = hana_raw.dropna(how="all").reset_index(drop=True)
             st.session_state.hana_sheet_df = hana_raw
         except Exception:
             errors.append("하나은행 구글 시트")
         try:
-            billing_raw = pd.read_csv(st.session_state.url_hana_billing)
+            billing_raw = read_google_csv(st.session_state.url_hana_billing, force_refresh=True)
             billing_raw = billing_raw.dropna(how="all").reset_index(drop=True)
             st.session_state.hana_billing_df = billing_raw
         except Exception:
