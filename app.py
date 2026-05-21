@@ -5169,10 +5169,37 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     def summed_values(*rows):
         return [sum(values) for values in zip(*rows)]
 
+    def debug_rows(mask, event_date, reason):
+        debug_cols = [
+            find_col(df, ["업체명", "고객명", "상호", "회사명"]),
+            find_col(df, ["담당자"]),
+            find_col(df, ["구축형"]),
+            find_col(df, ["관리구분"]),
+            open_receipt_col,
+            open_status_col,
+            open_date_col,
+            end_col,
+        ]
+        labels = ["고객명", "담당자", "구축형", "관리구분", "신규접수일", "개설상태", "개설/이행일", "해지일자"]
+        rows = []
+        for idx in df[mask].index:
+            row = {}
+            for label, col in zip(labels, debug_cols):
+                row[label] = df.at[idx, col] if col and col in df.columns else ""
+            row["신규접수일(파싱)"] = event_date.at[idx].strftime("%Y-%m-%d") if pd.notna(event_date.at[idx]) else ""
+            row["산출사유"] = reason
+            rows.append(row)
+        return pd.DataFrame(rows, columns=labels + ["신규접수일(파싱)", "산출사유"])
+
     open_wait_values = month_count_values(open_wait, open_receipt_dates)
     open_progress_values = month_count_values(open_progress, open_receipt_dates)
     open_done_values = month_count_values(open_done, open_receipt_dates)
     open_cancel_values = month_count_values(open_cancel, open_receipt_dates)
+    debug_open_wait_prev_year = debug_rows(
+        open_wait & open_receipt_dates.notna() & (open_receipt_dates.dt.year == year - 1) & (open_receipt_dates <= as_of_date),
+        open_receipt_dates,
+        f"{year - 1}년 신규접수 + 기준일 현재 구축대기",
+    )
 
     open_month_rows = [
         ["구축", "접수"] + fmt_values(summed_values(open_wait_values, open_progress_values, open_done_values, open_cancel_values)),
@@ -5264,7 +5291,13 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
         ["연계", "-"] + link_complete_values + [fmt(link_total)],
     ], columns=complete_cols)
 
-    return {"status": status_df, "monthly": monthly_display_df, "monthly_base": monthly_df, "complete": complete_df}
+    return {
+        "status": status_df,
+        "monthly": monthly_display_df,
+        "monthly_base": monthly_df,
+        "complete": complete_df,
+        "debug_open_wait_prev_year": debug_open_wait_prev_year,
+    }
 
 
 def weekly_prev_friday():
@@ -5289,6 +5322,10 @@ def render_weekly_front_status_tables(hana_df, snapshot_end_date=None):
     render_plain_html_table(tables["status"], max_rows=30, center_align=True)
     st.markdown("#### ■ 26년 월별 접수고객 진행 현황 관리")
     render_plain_html_table(tables["monthly"], max_rows=30, center_align=True)
+    debug_open_wait_prev_year = tables.get("debug_open_wait_prev_year")
+    if debug_open_wait_prev_year is not None and not debug_open_wait_prev_year.empty:
+        with st.expander(f"2025년 구축대기 산출내역 ({len(debug_open_wait_prev_year)}건)"):
+            render_plain_html_table(debug_open_wait_prev_year, max_rows=100)
     st.markdown("#### ■ 26년 월별 개설완료 현황 관리")
     render_plain_html_table(tables["complete"], max_rows=10, center_align=True)
 
