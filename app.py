@@ -5047,7 +5047,7 @@ def show_weekly_report_user():
         st.rerun()
 
 
-def build_weekly_report_ppt_bytes(report_df, week_start="", week_end=""):
+def build_weekly_report_ppt_bytes(report_df, week_start="", week_end="", hana_df=None):
     from pptx import Presentation
     from pptx.enum.text import PP_ALIGN
     from pptx.util import Pt
@@ -5106,6 +5106,181 @@ def build_weekly_report_ppt_bytes(report_df, week_start="", week_end=""):
             for c_idx, value in enumerate(values[:len(table.columns)]):
                 align = PP_ALIGN.LEFT if c_idx in left_cols else PP_ALIGN.CENTER
                 set_cell_text(table.cell(r_idx, c_idx), value, font_size=font_size, align=align)
+
+    def normalize_hana(df_hana):
+        if df_hana is None or df_hana.empty:
+            try:
+                url = st.session_state.get("url_hana", DEFAULT_URL_HANA)
+            except Exception:
+                url = DEFAULT_URL_HANA
+            df_hana = pd.read_csv(url, header=2)
+        df_hana = df_hana.copy()
+        df_hana.columns = [str(c).strip() for c in df_hana.columns]
+        return df_hana.dropna(how="all").reset_index(drop=True)
+
+    def event_dates(series):
+        return pd.to_datetime(series.map(parse_sheet_date), errors="coerce")
+
+    def month_columns_for(table, start_col=3, end_col=None):
+        end_col = end_col if end_col is not None else len(table.columns) - 1
+        cols = []
+        for c in range(start_col, end_col):
+            label = clean(table.cell(0, c).text).replace("\n", "").replace(" ", "")
+            m = re.search(r"(\d{2})\.(\d{2})", label)
+            if m:
+                cols.append((c, int(m.group(1)), int(m.group(2))))
+        return cols
+
+    def fmt_count(value):
+        try:
+            value = int(value)
+        except Exception:
+            value = 0
+        return "-" if value == 0 else f"{value:,}"
+
+    def fmt_delta(value):
+        try:
+            value = int(value)
+        except Exception:
+            value = 0
+        if value > 0:
+            return f"▲{value:,}"
+        if value < 0:
+            return f"▼{abs(value):,}"
+        return "-"
+
+    def count_by_month(mask, dates, year, month):
+        return int((mask & dates.notna() & (dates.dt.year == year) & (dates.dt.month == month)).sum())
+
+    def count_before_year(mask, dates, year):
+        return int((mask & dates.notna() & (dates.dt.year < year)).sum())
+
+    def week_mask(dates):
+        if not week_start or not week_end:
+            return pd.Series(False, index=dates.index)
+        return dates.between(pd.Timestamp(week_start), pd.Timestamp(week_end), inclusive="both")
+
+    def fill_monthly_table(table, metric_rows, year=2026, has_prev_year=True):
+        start_col = 3 if has_prev_year else 2
+        month_cols = month_columns_for(table, start_col=start_col, end_col=len(table.columns) - 1)
+        for row_idx, metric in metric_rows.items():
+            mask = metric["mask"]
+            dates = metric["dates"]
+            total = 0
+            if has_prev_year and len(table.columns) > 2:
+                prev_count = count_before_year(mask, dates, year)
+                total += prev_count
+                set_cell_text(table.cell(row_idx, 2), fmt_count(prev_count), font_size=8)
+            for col_idx, yy, mm in month_cols:
+                full_year = 2000 + yy
+                count = count_by_month(mask, dates, full_year, mm)
+                total += count
+                set_cell_text(table.cell(row_idx, col_idx), fmt_count(count), font_size=8)
+                delta_row = row_idx + 1
+                if delta_row < len(table.rows):
+                    delta = int((mask & week_mask(dates) & (dates.dt.year == full_year) & (dates.dt.month == mm)).sum())
+                    set_cell_text(table.cell(delta_row, col_idx), fmt_delta(delta), font_size=8)
+            set_cell_text(table.cell(row_idx, len(table.columns) - 1), fmt_count(total), font_size=8)
+
+    def fill_overall_table(table, metrics):
+        build_type = metrics["build_type"]
+        rows = [
+            ("전체", pd.Series(True, index=metrics["base"].index)),
+            ("기본형", build_type.str.contains("기본", na=False)),
+            ("연계형", build_type.str.contains("연계|이행", na=False)),
+        ]
+        keys = ["open_wait", "open_progress", "open_done", "link_wait", "link_progress", "link_done"]
+        for r_idx, (_, row_mask) in enumerate(rows, start=1):
+            if r_idx >= len(table.rows):
+                break
+            for c_idx, key in enumerate(keys, start=1):
+                value = int((metrics[key] & row_mask).sum())
+                set_cell_text(table.cell(r_idx, c_idx), fmt_count(value), font_size=8)
+
+    def fill_customer_status_slides():
+        try:
+            hana = normalize_hana(hana_df)
+        except Exception:
+            return
+        if hana.empty or len(prs.slides) < 4:
+            return
+
+        open_receipt_col = find_col(hana, ["신규접수일"])
+        link_receipt_col = find_col(hana, ["추가연계접수일"])
+        open_date_col = find_col(hana, ["개설/이행일", "개설일", "이행일"])
+        link_date_col = find_col(hana, ["연계일자", "연계일"])
+        open_status_col = find_col(hana, ["개설상태"])
+        link_status_col = find_col(hana, ["연계상태"])
+        build_type_col = find_col(hana, ["구축형", "구축구분"])
+        end_col = find_col(hana, ["해지일자"])
+
+        if not open_receipt_col or not open_status_col:
+            return
+
+        base = hana.copy()
+        active = base[end_col].map(is_blank_value) if end_col else pd.Series(True, index=base.index)
+        open_status = base[open_status_col].astype(str).str.strip() if open_status_col else pd.Series("", index=base.index)
+        link_status = base[link_status_col].astype(str).str.strip() if link_status_col else pd.Series("", index=base.index)
+        link_clean = link_status.str.replace(r"\s+", "", regex=True)
+        build_type = base[build_type_col].astype(str).str.strip() if build_type_col else pd.Series("", index=base.index)
+
+        open_receipt_dates = event_dates(base[open_receipt_col]) if open_receipt_col else pd.Series(pd.NaT, index=base.index)
+        link_receipt_dates = event_dates(base[link_receipt_col]) if link_receipt_col else open_receipt_dates
+        link_receipt_dates = link_receipt_dates.fillna(open_receipt_dates)
+        open_done_dates = event_dates(base[open_date_col]) if open_date_col else pd.Series(pd.NaT, index=base.index)
+        link_done_dates = event_dates(base[link_date_col]) if link_date_col else pd.Series(pd.NaT, index=base.index)
+
+        open_done = active & (open_status.str.contains("완료|이행완료", na=False) | open_done_dates.notna())
+        open_progress = active & ~open_done & open_status.str.contains("진행|구축중|처리중", na=False)
+        open_wait = active & ~open_done & ~open_progress
+        open_drop = open_status.str.contains("취소|DROP|드랍", case=False, na=False)
+
+        link_done = active & link_clean.eq("ERP연계완료")
+        link_progress = active & ~link_done & link_status.str.contains("ERP연계진행|연계진행|진행", na=False)
+        link_wait = active & link_status.str.contains("ERP연계대기", na=False)
+        link_drop = link_status.str.contains("취소|DROP|드랍", case=False, na=False)
+        link_receipt = active & (link_receipt_dates.notna() | link_wait | link_progress | link_done)
+
+        metrics = {
+            "base": base,
+            "build_type": build_type,
+            "type_col": build_type_col,
+            "open_wait": open_wait,
+            "open_progress": open_progress,
+            "open_done": open_done,
+            "link_wait": link_wait,
+            "link_progress": link_progress,
+            "link_done": link_done,
+        }
+
+        slide2_tables = slide_tables(prs.slides[1])
+        if slide2_tables:
+            fill_monthly_table(slide2_tables[0], {
+                1: {"mask": active & open_receipt_dates.notna(), "dates": open_receipt_dates},
+                3: {"mask": open_wait, "dates": open_receipt_dates},
+                5: {"mask": open_progress, "dates": open_receipt_dates},
+                7: {"mask": open_done, "dates": open_receipt_dates},
+                9: {"mask": open_drop, "dates": open_receipt_dates},
+            }, year=2026, has_prev_year=True)
+
+        slide3_tables = slide_tables(prs.slides[2])
+        if slide3_tables:
+            fill_monthly_table(slide3_tables[0], {
+                1: {"mask": link_receipt, "dates": link_receipt_dates},
+                3: {"mask": link_wait, "dates": link_receipt_dates},
+                5: {"mask": link_progress, "dates": link_receipt_dates},
+                7: {"mask": link_done, "dates": link_receipt_dates},
+                9: {"mask": link_drop, "dates": link_receipt_dates},
+            }, year=2026, has_prev_year=True)
+
+        slide4_tables = slide_tables(prs.slides[3])
+        if slide4_tables:
+            fill_monthly_table(slide4_tables[0], {
+                1: {"mask": open_done, "dates": open_done_dates},
+                3: {"mask": link_done, "dates": link_done_dates},
+            }, year=2026, has_prev_year=False)
+            if len(slide4_tables) > 1:
+                fill_overall_table(slide4_tables[1], metrics)
 
     def update_title_dates():
         date_text = ""
@@ -5232,6 +5407,11 @@ def show_weekly_report_admin():
 
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
     try:
+        hana_for_ppt = None
+        try:
+            hana_for_ppt = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+        except Exception:
+            hana_for_ppt = st.session_state.get("hana_sheet_df")
         week_start = ""
         week_end = ""
         if "보고시작일" in df.columns and "보고종료일" in df.columns and not df.empty:
@@ -5239,7 +5419,7 @@ def show_weekly_report_admin():
             ends = [str(v) for v in df["보고종료일"].dropna().tolist() if str(v).strip()]
             week_start = min(starts) if starts else ""
             week_end = max(ends) if ends else ""
-        ppt_bytes = build_weekly_report_ppt_bytes(df, week_start, week_end)
+        ppt_bytes = build_weekly_report_ppt_bytes(df, week_start, week_end, hana_for_ppt)
         file_period = f"{week_start}_{week_end}".replace("-", "") if week_start and week_end else (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m%d")
         st.download_button(
             "주간보고 PPT 다운로드",
