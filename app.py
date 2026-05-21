@@ -5307,9 +5307,10 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     link_complete_values = []
     open_total = 0
     link_total = 0
+    link_billing_done = link_clean.eq("ERP청구완료")
     for month in range(1, 13):
         ov = count(open_done_by_asof & (open_done_dates.dt.year == year) & (open_done_dates.dt.month == month))
-        lv = count(link_done & link_done_by_asof & (link_done_dates.dt.year == year) & (link_done_dates.dt.month == month))
+        lv = count(link_billing_done & link_done_by_asof & (link_done_dates.dt.year == year) & (link_done_dates.dt.month == month))
         open_complete_values.append(fmt(ov))
         link_complete_values.append(fmt(lv))
         open_total += ov
