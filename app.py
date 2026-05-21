@@ -4796,6 +4796,15 @@ def show_weekly_report_user():
             return "" if is_blank_value(value) else str(value).strip()
         return pd.Timestamp(parsed).strftime("%Y-%m-%d")
 
+    def render_weekly_detail_header(title, key, level=4):
+        title_col, refresh_col = st.columns([0.82, 0.18])
+        with title_col:
+            st.markdown(f"{'#' * level} {title}")
+        with refresh_col:
+            if st.button("새로고침", key=f"weekly_refresh_{key}", use_container_width=True):
+                st.session_state.hana_sheet_df = None
+                st.rerun()
+
     st.markdown("### 주간보고 작성")
     st.caption("하나은행 구글 시트의 본인 담당 고객을 기준으로 카테고리별 현황을 선택해 주간보고 이력을 저장합니다.")
 
@@ -4846,17 +4855,17 @@ def show_weekly_report_user():
         st.caption("개설 부문과 ERP연계 부문을 PPT 주간보고 구성에 맞춰 표시합니다.")
         st.markdown("##### 개설 부문")
         for cat in opening_categories:
-            st.markdown(f"**{cat}**")
+            render_weekly_detail_header(cat, f"all_{cat}", level=5)
             st.caption(f"{len(categorized_map[cat])}건 · 하나은행 구글 시트 기준")
             render_plain_html_table(display_customer_df(categorized_map[cat]), max_rows=200)
         st.markdown("##### ERP연계 부문")
         for cat in link_categories:
-            st.markdown(f"**{cat}**")
+            render_weekly_detail_header(cat, f"all_{cat}", level=5)
             st.caption(f"{len(categorized_map[cat])}건 · 하나은행 구글 시트 기준")
             render_plain_html_table(display_customer_df(categorized_map[cat]), max_rows=200)
     else:
         categorized = mine[weekly_category_mask(mine, category, week_start, week_end)].copy()
-        st.markdown(f"#### {category} 현황")
+        render_weekly_detail_header(f"{category} 현황", f"single_{category}", level=4)
         st.caption(f"{len(categorized)}건 · 하나은행 구글 시트 기준")
         render_plain_html_table(display_customer_df(categorized), max_rows=200)
 
