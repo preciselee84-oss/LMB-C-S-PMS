@@ -4825,11 +4825,12 @@ def show_weekly_report_user():
 
     col_a, col_b, col_c = st.columns([1.1, 1.1, 1.4])
     with col_a:
-        week_start = st.date_input("보고 시작일", value=week_start_default, key="weekly_report_start")
+        week_start = st.date_input("보고 시작일", value=week_start_default, key="weekly_report_start_v2")
     with col_b:
-        week_end = st.date_input("보고 종료일", value=week_end_default, key="weekly_report_end")
+        week_end = st.date_input("보고 종료일", value=week_end_default, key="weekly_report_end_v2")
     with col_c:
         category = st.selectbox("카테고리", categories, key="weekly_report_category")
+    st.caption(f"선택 기간: {week_start} ~ {week_end}")
 
     if category == "전체":
         categorized_map = {
