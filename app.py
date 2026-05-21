@@ -4896,6 +4896,10 @@ def show_weekly_report_user():
         input_part = "ERP연계 부문" if input_category in link_categories else "개설 부문"
         st.caption(f"{input_part} · {input_category}")
 
+    if st.session_state.get("_weekly_prev_input_category") != input_category:
+        st.session_state.pop("weekly_customer_combo", None)
+        st.session_state["_weekly_prev_input_category"] = input_category
+
     categorized = mine[weekly_category_mask(mine, input_category, week_start, week_end)].copy()
 
     tmp = categorized.copy()
