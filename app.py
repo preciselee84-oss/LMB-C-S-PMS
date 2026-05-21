@@ -5934,6 +5934,7 @@ def show_dashboard():
             and info.get("name")
             and info.get("access") == "허용"
             and info.get("rank") != "부서장"
+            and info.get("staff_type", "정규직") != "파견직"
         ]
         cards = []
         for uname in all_names:
