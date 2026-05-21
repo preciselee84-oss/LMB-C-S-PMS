@@ -5125,7 +5125,6 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     transfer = manage.str.contains("이관", na=False)
 
     # 개설상태 명시값 기준 분류 (소거법 사용 X, NaN 제외)
-    # "2026년 기준"은 스냅샷 기준일 = 접수연도 필터 아님 → 전체 접수 대상
     open_cancel = open_received_by_asof & open_status.str.contains("취소|DROP|드랍", case=False, na=False)
     link_cancel = link_received_by_asof & link_status.str.contains("취소|DROP|드랍", case=False, na=False)
     open_done = active & open_received_by_asof & ~open_cancel & (open_status.str.contains("완료|이행완료", na=False) & open_done_by_asof)
@@ -5149,13 +5148,14 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     ]
     status_df = pd.DataFrame(status_rows, columns=["구분", "유형", "구축대기", "구축진행", "구축완료", "연계대기", "연계진행", "연계완료", "해지"])
 
-    month_cols = ["2025년"] + [f"{year}{m:02d}" for m in range(1, 13)] + [f"{str(year)[-2:]}' 합계"]
+    month_cols = ["2025년"] + [f"{year}{m:02d}" for m in range(1, 13)] + ["합계"]
 
     def month_count_values(mask, event_date):
         values = []
         bounded_date = event_date.notna() & (event_date <= as_of_date)
-        values.append(count(mask & bounded_date & (event_date.dt.year == year - 1)))
-        total = 0
+        prev_year_value = count(mask & bounded_date & (event_date.dt.year == year - 1))
+        values.append(prev_year_value)
+        total = prev_year_value
         for month in range(1, 13):
             value = count(mask & bounded_date & (event_date.dt.year == year) & (event_date.dt.month == month))
             values.append(value)
