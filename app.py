@@ -5669,7 +5669,18 @@ def show_weekly_report_admin():
     rows = []
     for entries in db.values():
         rows.extend(entries if isinstance(entries, list) else [])
-    st.markdown("### 주간보고 취합")
+    title_col, refresh_col = st.columns([5, 1])
+    with title_col:
+        st.markdown("### 주간보고 취합")
+    with refresh_col:
+        if st.button("새로고침", key="weekly_admin_refresh", use_container_width=True):
+            try:
+                st.session_state.hana_sheet_df = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+                st.session_state.weekly_hana_loaded_at = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
+                st.success("새로고침 완료")
+            except Exception as e:
+                st.warning(f"새로고침 실패: {e}")
+            st.rerun()
     raw_df_for_period = pd.DataFrame(rows) if rows else pd.DataFrame()
     default_snapshot_end = str(weekly_prev_friday())
     if "보고종료일" in raw_df_for_period.columns and not raw_df_for_period.empty:
