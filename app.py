@@ -5100,8 +5100,15 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     open_done_dates = dates(open_date_col)
     link_done_dates = dates(link_date_col)
     end_dates = dates(end_col)
+    as_of_date = pd.to_datetime(snapshot_end_date, errors="coerce")
+    if pd.isna(as_of_date):
+        as_of_date = pd.Timestamp.max
 
-    active = end_dates.isna()
+    active = end_dates.isna() | (end_dates > as_of_date)
+    open_received_by_asof = open_receipt_dates.notna() & (open_receipt_dates <= as_of_date)
+    link_received_by_asof = link_receipt_dates.notna() & (link_receipt_dates <= as_of_date)
+    open_done_by_asof = open_done_dates.notna() & (open_done_dates <= as_of_date)
+    link_done_by_asof = link_done_dates.notna() & (link_done_dates <= as_of_date)
     open_status = df[open_status_col].astype(str).str.strip()
     link_status = df[link_status_col].astype(str).str.strip() if link_status_col else pd.Series("", index=df.index)
     link_clean = link_status.str.replace(r"\s+", "", regex=True)
@@ -5112,16 +5119,16 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     linked = build_type.str.contains("연계|이행", na=False)
     transfer = manage.str.contains("이관", na=False)
 
-    open_cancel = open_status.str.contains("취소|DROP|드랍", case=False, na=False)
-    link_cancel = link_status.str.contains("취소|DROP|드랍", case=False, na=False)
-    open_done = active & ~open_cancel & (open_status.str.contains("완료|이행완료", na=False) | open_done_dates.notna())
-    open_progress = active & ~open_cancel & ~open_done & open_status.str.contains("진행|구축중|처리중", na=False)
-    open_wait = active & ~open_cancel & ~open_done & ~open_progress
-    link_done = active & ~link_cancel & link_status.str.contains("완료", na=False)
-    link_progress = active & ~link_cancel & ~link_done & link_status.str.contains("ERP연계진행|연계진행|진행", na=False)
-    link_wait = active & ~link_cancel & link_status.str.contains("ERP연계대기", na=False)
-    link_receipt = active & (link_receipt_dates.notna() | link_wait | link_progress | link_done)
-    terminated = end_dates.notna()
+    open_cancel = open_received_by_asof & open_status.str.contains("취소|DROP|드랍", case=False, na=False)
+    link_cancel = link_received_by_asof & link_status.str.contains("취소|DROP|드랍", case=False, na=False)
+    open_done = active & open_received_by_asof & ~open_cancel & (open_status.str.contains("완료|이행완료", na=False) & open_done_by_asof)
+    open_progress = active & open_received_by_asof & ~open_cancel & ~open_done & open_status.str.contains("진행|구축중|처리중", na=False)
+    open_wait = active & open_received_by_asof & ~open_cancel & ~open_done & ~open_progress
+    link_done = active & link_received_by_asof & ~link_cancel & link_status.str.contains("완료", na=False) & link_done_by_asof
+    link_progress = active & link_received_by_asof & ~link_cancel & ~link_done & link_status.str.contains("ERP연계진행|연계진행|진행", na=False)
+    link_wait = active & link_received_by_asof & ~link_cancel & link_status.str.contains("ERP연계대기", na=False)
+    link_receipt = active & (link_received_by_asof | link_wait | link_progress | link_done)
+    terminated = end_dates.notna() & (end_dates <= as_of_date)
 
     status_rows = [
         ["전체", "", count(open_wait), count(open_progress), count(open_done), count(link_wait), count(link_progress), count(link_done), count(terminated)],
@@ -5138,10 +5145,11 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
 
     def month_count_values(mask, event_date):
         values = []
-        values.append(count(mask & event_date.notna() & (event_date.dt.year == year - 1)))
+        bounded_date = event_date.notna() & (event_date <= as_of_date)
+        values.append(count(mask & bounded_date & (event_date.dt.year == year - 1)))
         total = 0
         for month in range(1, 13):
-            value = count(mask & event_date.notna() & (event_date.dt.year == year) & (event_date.dt.month == month))
+            value = count(mask & bounded_date & (event_date.dt.year == year) & (event_date.dt.month == month))
             values.append(value)
             total += value
         values.append(total)
@@ -5237,8 +5245,8 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     open_total = 0
     link_total = 0
     for month in range(1, 13):
-        ov = count(open_done & open_done_dates.notna() & (open_done_dates.dt.year == year) & (open_done_dates.dt.month == month))
-        lv = count(link_done & link_done_dates.notna() & (link_done_dates.dt.year == year) & (link_done_dates.dt.month == month))
+        ov = count(open_done & open_done_by_asof & (open_done_dates.dt.year == year) & (open_done_dates.dt.month == month))
+        lv = count(link_done & link_done_by_asof & (link_done_dates.dt.year == year) & (link_done_dates.dt.month == month))
         open_complete_values.append(fmt(ov))
         link_complete_values.append(fmt(lv))
         open_total += ov
