@@ -4929,6 +4929,15 @@ def show_weekly_report_user():
     receipt_col = link_receipt_col if input_category in link_categories else open_receipt_col
     default_receipt_date = "" if selected_row is None or not receipt_col else format_weekly_date(selected_row.get(receipt_col, ""))
     default_plan_date = "" if selected_row is None or not schedule_col else format_weekly_date(selected_row.get(schedule_col, ""))
+    plan_date_label = "구축/피드백 예정일"
+    if input_category == "개설완료":
+        plan_date_label = "개설완료일자"
+        open_done_col = find_col(mine, ["개설/이행일", "개설일", "이행일"])
+        default_plan_date = "" if selected_row is None or not open_done_col else format_weekly_date(selected_row.get(open_done_col, ""))
+    elif input_category == "연계완료":
+        plan_date_label = "연계완료일자"
+        link_done_col = find_col(mine, ["연계일자", "연계일"])
+        default_plan_date = "" if selected_row is None or not link_done_col else format_weekly_date(selected_row.get(link_done_col, ""))
     status_default = ""
     if selected_row is not None:
         if input_category in link_categories and link_status_col:
@@ -4957,11 +4966,10 @@ def show_weekly_report_user():
         with f7:
             receipt_date = st.text_input("접수일자", value=default_receipt_date)
         with f8:
-            plan_date = st.text_input("구축/피드백 예정일", value=default_plan_date)
+            plan_date = st.text_input(plan_date_label, value=default_plan_date)
 
         issue = st.text_area("이슈 / 진행내용", height=100, placeholder="PPT 주간보고의 이슈 항목처럼 고객별 진행상황을 작성")
-        plan = st.text_area("금주 조치 / 차주 예정", height=80, placeholder="예정 작업, 고객 회신 필요사항, 은행 전달사항 등")
-        next_date = st.date_input("피드백(예정)일자", value=today.date(), key="weekly_next_date")
+        special_note = st.text_area("특이사항", height=80, placeholder="예정 작업, 고객 회신 필요사항, 은행 전달사항 등")
 
         submitted = st.form_submit_button("주간보고 저장", use_container_width=True, type="primary")
 
@@ -4984,10 +4992,10 @@ def show_weekly_report_user():
                 "고객번호": customer_no.strip(),
                 "신청점": branch.strip(),
                 "접수일자": receipt_date.strip(),
-                "구축/피드백예정일": plan_date.strip(),
+                "일자구분": plan_date_label,
+                "일자": plan_date.strip(),
                 "이슈": issue.strip(),
-                "조치예정": plan.strip(),
-                "피드백예정일": str(next_date),
+                "특이사항": special_note.strip(),
                 "상태": status.strip(),
                 "담당자": user_name,
                 "작성시각": now_text,
@@ -5004,7 +5012,7 @@ def show_weekly_report_user():
         return
 
     history_df = pd.DataFrame(my_entries)
-    show_cols = ["보고시작일", "보고종료일", "부문", "카테고리", "고객명", "접수일자", "구축/피드백예정일", "이슈", "조치예정", "피드백예정일", "상태", "작성시각"]
+    show_cols = ["보고시작일", "보고종료일", "부문", "카테고리", "고객명", "접수일자", "일자구분", "일자", "이슈", "특이사항", "상태", "작성시각"]
     show_cols = [c for c in show_cols if c in history_df.columns]
     render_plain_html_table(history_df[show_cols].sort_values("작성시각", ascending=False), max_rows=300, center_align=False)
 
@@ -5044,7 +5052,7 @@ def show_weekly_report_admin():
         df = df[df["카테고리"] == category]
     if staff != "전체" and "담당자" in df.columns:
         df = df[df["담당자"] == staff]
-    show_cols = ["보고시작일", "보고종료일", "부문", "카테고리", "서비스", "구분", "고객명", "신청점", "접수일자", "구축/피드백예정일", "이슈", "조치예정", "피드백예정일", "상태", "담당자", "작성시각"]
+    show_cols = ["보고시작일", "보고종료일", "부문", "카테고리", "서비스", "구분", "고객명", "신청점", "접수일자", "일자구분", "일자", "이슈", "특이사항", "상태", "담당자", "작성시각"]
     show_cols = [c for c in show_cols if c in df.columns]
     render_plain_html_table(df[show_cols].sort_values("작성시각", ascending=False), max_rows=1000, center_align=False)
 
