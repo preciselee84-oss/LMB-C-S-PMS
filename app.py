@@ -35,6 +35,7 @@ SENT_FILE = "sent_results.json"
 SENT_UPLOADS_FILE = "sent_uploads.json"
 SAVED_STATE_FILE = "saved_state.json"
 WEEKLY_REPORT_FILE = "weekly_reports.json"
+WEEKLY_STATUS_SNAPSHOT_FILE = "weekly_status_snapshots.json"
 PPT_TEMPLATE_FILE = resolve_template_file("LMB활동실적보고서_202605_하나지사.pptx")
 WEEKLY_PPT_TEMPLATE_FILE = resolve_template_file("주간보고_통합CMS고객_개설운영_주간보고_템플릿.pptx")
 EXCEL_SAMPLE_FILE = resolve_template_file("LMB월간 활동실적_000000(샘플).xlsx")
@@ -5061,7 +5062,7 @@ def load_weekly_hana_for_status():
     return df.dropna(how="all").reset_index(drop=True)
 
 
-def weekly_customer_status_tables(hana_df, year=2026):
+def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, save_snapshot=False):
     if hana_df is None or hana_df.empty:
         return {}
 
@@ -5179,6 +5180,57 @@ def weekly_customer_status_tables(hana_df, year=2026):
     ]
     monthly_df = pd.DataFrame(open_month_rows + link_month_rows, columns=["구분", "상태"] + month_cols)
 
+    current_group = ""
+    monthly_counts = {}
+    for row in open_month_rows + link_month_rows:
+        if row[0]:
+            current_group = row[0]
+        monthly_counts[f"{current_group}|{row[1]}"] = [int(str(v).replace(",", "").replace("-", "0")) for v in row[2:]]
+
+    snapshot_key = str(snapshot_end_date or "").strip()
+    snapshots = load_db(WEEKLY_STATUS_SNAPSHOT_FILE, {})
+    prev_snapshot = None
+    if snapshot_key and snapshots:
+        prev_keys = sorted(k for k in snapshots.keys() if k < snapshot_key)
+        if prev_keys:
+            prev_snapshot = snapshots.get(prev_keys[-1], {}).get("monthly_counts", {})
+
+    delta_rows = []
+    current_group_for_delta = ""
+    for _, row in monthly_df.iterrows():
+        if str(row["구분"]).strip():
+            current_group_for_delta = str(row["구분"]).strip()
+        status = str(row["상태"]).strip()
+        key = f"{current_group_for_delta}|{status}"
+        current_values = monthly_counts.get(key, [0] * len(month_cols))
+        previous_values = prev_snapshot.get(key, [0] * len(month_cols)) if prev_snapshot else None
+        delta_values = []
+        for idx, current_value in enumerate(current_values):
+            if previous_values is None:
+                delta_values.append("-")
+                continue
+            prev_value = previous_values[idx] if idx < len(previous_values) else 0
+            delta = current_value - int(prev_value)
+            if delta > 0:
+                delta_values.append(f"▲{delta:,}")
+            elif delta < 0:
+                delta_values.append(f"▼{abs(delta):,}")
+            else:
+                delta_values.append("-")
+        delta_rows.append(["", "전주대비"] + delta_values)
+    expanded_rows = []
+    for idx, row in monthly_df.iterrows():
+        expanded_rows.append(row.tolist())
+        expanded_rows.append(delta_rows[idx])
+    monthly_display_df = pd.DataFrame(expanded_rows, columns=monthly_df.columns)
+
+    if save_snapshot and snapshot_key:
+        snapshots[snapshot_key] = {
+            "saved_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
+            "monthly_counts": monthly_counts,
+        }
+        save_db(WEEKLY_STATUS_SNAPSHOT_FILE, snapshots)
+
     complete_cols = ["구분", "-"] + [f"{year}{m:02d}" for m in range(1, 13)] + [f"{str(year)[-2:]}' 합계"]
     open_complete_values = []
     link_complete_values = []
@@ -5196,17 +5248,27 @@ def weekly_customer_status_tables(hana_df, year=2026):
         ["연계", "-"] + link_complete_values + [fmt(link_total)],
     ], columns=complete_cols)
 
-    return {"status": status_df, "monthly": monthly_df, "complete": complete_df}
+    return {"status": status_df, "monthly": monthly_display_df, "monthly_base": monthly_df, "complete": complete_df}
 
 
-def render_weekly_front_status_tables(hana_df):
-    tables = weekly_customer_status_tables(hana_df)
+def weekly_prev_friday():
+    today = datetime.utcnow() + timedelta(hours=9)
+    return (today - timedelta(days=(today.weekday() - 4) % 7 or 7)).date()
+
+
+def save_weekly_status_snapshot(hana_df, snapshot_end_date):
+    weekly_customer_status_tables(hana_df, snapshot_end_date=snapshot_end_date, save_snapshot=True)
+
+
+def render_weekly_front_status_tables(hana_df, snapshot_end_date=None):
+    tables = weekly_customer_status_tables(hana_df, snapshot_end_date=snapshot_end_date)
     if not tables:
         st.warning("하나은행 구글 시트 기준 고객 현황을 계산할 수 없습니다.")
         return
 
-    today = datetime.utcnow() + timedelta(hours=9)
-    prev_friday = today - timedelta(days=(today.weekday() - 4) % 7 or 7)
+    prev_friday = pd.to_datetime(snapshot_end_date, errors="coerce")
+    if pd.isna(prev_friday):
+        prev_friday = pd.Timestamp(weekly_prev_friday())
     st.markdown(f"#### 2026년 기준 (2026.01.01 ~ {prev_friday.strftime('%Y.%m.%d')})")
     render_plain_html_table(tables["status"], max_rows=30, center_align=True)
     st.markdown("#### ■ 26년 월별 접수고객 진행 현황 관리")
@@ -5215,7 +5277,7 @@ def render_weekly_front_status_tables(hana_df):
     render_plain_html_table(tables["complete"], max_rows=10, center_align=True)
 
 
-def build_weekly_report_ppt_bytes(report_df, week_start="", week_end="", hana_df=None):
+def build_weekly_report_ppt_bytes(report_df, week_start="", week_end="", hana_df=None, save_snapshot=False):
     from pptx import Presentation
     from pptx.enum.text import PP_ALIGN
     from pptx.util import Pt
@@ -5372,6 +5434,7 @@ def build_weekly_report_ppt_bytes(report_df, week_start="", week_end="", hana_df
             return
         if hana.empty or len(prs.slides) < 4:
             return
+        front_tables = weekly_customer_status_tables(hana, snapshot_end_date=week_end, save_snapshot=save_snapshot)
 
         open_receipt_col = find_col(hana, ["신규접수일"])
         link_receipt_col = find_col(hana, ["추가연계접수일"])
@@ -5554,8 +5617,14 @@ def show_weekly_report_admin():
     for entries in db.values():
         rows.extend(entries if isinstance(entries, list) else [])
     st.markdown("### 주간보고 취합")
+    raw_df_for_period = pd.DataFrame(rows) if rows else pd.DataFrame()
+    default_snapshot_end = str(weekly_prev_friday())
+    if "보고종료일" in raw_df_for_period.columns and not raw_df_for_period.empty:
+        ends = [str(v) for v in raw_df_for_period["보고종료일"].dropna().tolist() if str(v).strip()]
+        if ends:
+            default_snapshot_end = max(ends)
     hana_status_df = load_weekly_hana_for_status()
-    render_weekly_front_status_tables(hana_status_df)
+    render_weekly_front_status_tables(hana_status_df, default_snapshot_end)
     st.markdown("---")
 
     if not rows:
@@ -5602,6 +5671,8 @@ def show_weekly_report_admin():
             file_name=f"주간보고_통합CMS고객_개설운영_주간보고_{file_period}.pptx",
             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
             use_container_width=True,
+            on_click=save_weekly_status_snapshot,
+            args=(hana_for_ppt, week_end or default_snapshot_end),
         )
     except Exception as e:
         st.button("주간보고 PPT 다운로드", use_container_width=True, disabled=True)
