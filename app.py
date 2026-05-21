@@ -1266,12 +1266,39 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         return f"ERR: {str(e)}", None, None
 
 
-def render_plain_html_table(df, max_rows=500, center_align=True):
+def render_plain_html_table(df, max_rows=500, center_align=True, merge_cols=None):
     """AG Grid 없이 순수 HTML 테이블로 렌더링 — 다크모드 완전 호환."""
     if df is None or df.empty:
         st.info("표시할 데이터가 없습니다.")
         return
     df = df.head(max_rows).reset_index(drop=True)
+    merge_cols = [c for c in (merge_cols or []) if c in df.columns]
+
+    rowspan_map = {}
+    for col in merge_cols:
+        rowspan_map[col] = {}
+        last_value = None
+        start_idx = None
+        span = 0
+        for i, value in enumerate(df[col].tolist()):
+            text = "" if pd.isna(value) else str(value).strip()
+            if text and start_idx is not None and text == last_value:
+                span += 1
+                rowspan_map[col][i] = 0
+            elif text:
+                if start_idx is not None:
+                    rowspan_map[col][start_idx] = span
+                last_value = text
+                start_idx = i
+                span = 1
+            elif start_idx is not None and last_value:
+                span += 1
+                rowspan_map[col][i] = 0
+            else:
+                rowspan_map[col][i] = 1
+        if start_idx is not None:
+            rowspan_map[col][start_idx] = span
+
     th = "background:#EDF2F7;color:#4A5568;font-weight:700;font-size:12px;padding:6px 10px;white-space:nowrap;border-bottom:2px solid #E2E8F0;text-align:center;"
     headers = "".join(f"<th style='{th}'>{html.escape(str(c))}</th>" for c in df.columns)
     body = ""
@@ -1279,10 +1306,15 @@ def render_plain_html_table(df, max_rows=500, center_align=True):
         bg = "#FFFFFF" if i % 2 == 0 else "#F7FAFC"
         tds = ""
         for col in df.columns:
+            if col in rowspan_map and rowspan_map[col].get(i, 1) == 0:
+                continue
             val = "" if pd.isna(row[col]) else html.escape(str(row[col]))
             align = "left" if str(col).strip() == "활동내역" else ("center" if center_align else "left")
             td_align = f"text-align:{align};"
-            tds += f"<td style='background:{bg};padding:5px 10px;border-bottom:1px solid #EDF2F7;font-size:12px;color:#2D3748;white-space:nowrap;{td_align}'>{val}</td>"
+            rowspan = ""
+            if col in rowspan_map and rowspan_map[col].get(i, 1) > 1:
+                rowspan = f" rowspan='{rowspan_map[col][i]}'"
+            tds += f"<td{rowspan} style='background:{bg};padding:5px 10px;border-bottom:1px solid #EDF2F7;font-size:12px;color:#2D3748;white-space:nowrap;vertical-align:middle;{td_align}'>{val}</td>"
         body += f"<tr>{tds}</tr>"
     st.markdown(
         f"""<div class="pms-report-table" style="overflow-x:auto;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.05);margin-bottom:1rem;">
@@ -5151,7 +5183,7 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
         bounded_date = event_date.notna() & (event_date <= as_of_date)
         prev_year_value = count(mask & bounded_date & (event_date.dt.year == year - 1))
         values.append(prev_year_value)
-        total = prev_year_value
+        total = 0
         for month in range(1, 13):
             value = count(mask & bounded_date & (event_date.dt.year == year) & (event_date.dt.month == month))
             values.append(value)
@@ -5315,15 +5347,15 @@ def render_weekly_front_status_tables(hana_df, snapshot_end_date=None):
     if pd.isna(prev_friday):
         prev_friday = pd.Timestamp(weekly_prev_friday())
     st.markdown(f"#### 2026년 기준 (2026.01.01 ~ {prev_friday.strftime('%Y.%m.%d')})")
-    render_plain_html_table(tables["status"], max_rows=30, center_align=True)
+    render_plain_html_table(tables["status"], max_rows=30, center_align=True, merge_cols=["구분"])
     st.markdown("#### ■ 26년 월별 접수고객 진행 현황 관리")
-    render_plain_html_table(tables["monthly"], max_rows=30, center_align=True)
+    render_plain_html_table(tables["monthly"], max_rows=30, center_align=True, merge_cols=["구분"])
     debug_open_wait_prev_year = tables.get("debug_open_wait_prev_year")
     if debug_open_wait_prev_year is not None and not debug_open_wait_prev_year.empty:
         with st.expander(f"2025년 구축대기 산출내역 ({len(debug_open_wait_prev_year)}건)"):
             render_plain_html_table(debug_open_wait_prev_year, max_rows=100)
     st.markdown("#### ■ 26년 월별 개설완료 현황 관리")
-    render_plain_html_table(tables["complete"], max_rows=10, center_align=True)
+    render_plain_html_table(tables["complete"], max_rows=10, center_align=True, merge_cols=["구분"])
 
 
 def build_weekly_report_ppt_bytes(report_df, week_start="", week_end="", hana_df=None, save_snapshot=False):
@@ -5707,7 +5739,12 @@ def show_weekly_report_admin():
         display_df["구축/피드백 예정일"] = display_df["일자"]
     show_cols = ["보고시작일", "보고종료일", "카테고리", "구분", "고객명", "접수일자", "이슈", "상태", "담당자", "구축/피드백 예정일", "작성시각"]
     show_cols = [c for c in show_cols if c in display_df.columns]
-    render_plain_html_table(display_df[show_cols].sort_values("작성시각", ascending=False), max_rows=1000, center_align=False)
+    render_plain_html_table(
+        display_df[show_cols].sort_values("작성시각", ascending=False),
+        max_rows=1000,
+        center_align=False,
+        merge_cols=["보고시작일", "보고종료일", "카테고리", "구분"],
+    )
 
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
     try:
