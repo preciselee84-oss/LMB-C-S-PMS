@@ -306,6 +306,7 @@ def init_state():
                     "email": "",
                     "access": "허용",
                     "role": "관리자",
+                    "dept_type": "사업부",
                     "staff_type": "정규직",
                     "outsource": "아니오",
                     "outsource_period": "해당없음",
@@ -316,6 +317,7 @@ def init_state():
                     "email": "",
                     "access": "허용",
                     "role": "관리자",
+                    "dept_type": "사업부",
                     "staff_type": "정규직",
                     "outsource": "아니오",
                     "outsource_period": "해당없음",
@@ -1724,6 +1726,7 @@ def show_auth_page():
                         "email": r_email,
                         "access": "불가",
                         "role": "사용자",
+                        "dept_type": "사업부",
                         "staff_type": "정규직",
                         "outsource": "아니오",
                         "outsource_period": "해당없음",
@@ -4214,6 +4217,7 @@ def show_staff_admin():
             "성명": info.get("name", ""),
             "직급": info.get("rank", "직원"),
             "메일주소": info.get("email", ""),
+            "부서구분": info.get("dept_type", "사업부"),
             "직원구분": info.get("staff_type", "정규직"),
             "외주여부": info.get("outsource", "아니오"),
             "외주 근무기간": info.get("outsource_period", "해당없음"),
@@ -4244,29 +4248,34 @@ def show_staff_admin():
 
     st.markdown(f"**메일주소:** {info.get('email', '—')}")
 
-    c1, c2, c3, c4, c5, c6 = st.columns([1, 1, 1, 1.15, 1.15, 1.2])
+    c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 1, 1, 1, 1.15, 1.15, 1.2])
     with c1:
         new_rank = st.selectbox("직급", ["부서장", "팀장", "과장", "대리", "주임", "직원"],
                                 index=["부서장", "팀장", "과장", "대리", "주임", "직원"].index(info.get("rank", "직원")),
                                 key="edit_rank")
     with c2:
+        dept_opts = ["사업부", "C&S"]
+        new_dept_type = st.selectbox("부서구분", dept_opts,
+                                     index=dept_opts.index(info.get("dept_type", "사업부")) if info.get("dept_type", "사업부") in dept_opts else 0,
+                                     key="edit_dept_type")
+    with c3:
         new_staff_type = st.selectbox("직원구분", ["정규직", "계약직", "파견직", "외주"],
                                       index=["정규직", "계약직", "파견직", "외주"].index(info.get("staff_type", "정규직")),
                                       key="edit_staff_type")
-    with c3:
+    with c4:
         new_outsource = st.selectbox("외주여부", ["아니오", "예"],
                                      index=["아니오", "예"].index(info.get("outsource", "아니오")),
                                      key="edit_outsource")
-    with c4:
+    with c5:
         period_opts = ["해당없음", "1년 미만", "1년 이상", "2년 이상"]
         new_period = st.selectbox("외주 근무기간", period_opts,
                                   index=period_opts.index(info.get("outsource_period", "해당없음")),
                                   key="edit_period")
-    with c5:
+    with c6:
         new_access = st.selectbox("로그인 허용 여부", ["허용", "불가"],
                                   index=["허용", "불가"].index(info.get("access", "불가")),
                                   key="edit_access")
-    with c6:
+    with c7:
         new_role = st.selectbox("메뉴 접근 권한", ["사용자 메뉴", "관리자 메뉴"],
                                 index=0 if info.get("role") != "관리자" else 1,
                                 key="edit_role")
@@ -4275,6 +4284,7 @@ def show_staff_admin():
     with bc1:
         if st.button("저장", type="primary", use_container_width=True):
             st.session_state.user_db[sel_uid]["rank"] = new_rank
+            st.session_state.user_db[sel_uid]["dept_type"] = new_dept_type
             st.session_state.user_db[sel_uid]["staff_type"] = new_staff_type
             st.session_state.user_db[sel_uid]["outsource"] = new_outsource
             st.session_state.user_db[sel_uid]["outsource_period"] = new_period
