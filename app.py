@@ -4760,7 +4760,7 @@ def show_weekly_report_user():
         if category == "개설대기":
             return active & ~open_done & ~open_progress
         if category == "연계완료":
-            link_complete = link_status.eq("ERP연계완료")
+            link_complete = link_status.str.replace(r"\s+", "", regex=True).eq("ERP연계완료")
             if start_date is not None and end_date is not None:
                 return active & link_complete & link_dates.between(pd.Timestamp(start_date), pd.Timestamp(end_date), inclusive="both")
             return active & link_complete & link_date
@@ -4820,7 +4820,7 @@ def show_weekly_report_user():
         return
 
     today = datetime.utcnow() + timedelta(hours=9)
-    week_start_default = (today - timedelta(days=today.weekday())).date()
+    week_start_default = (today - timedelta(days=today.weekday() + 7)).date()
     week_end_default = week_start_default + timedelta(days=4)
 
     col_a, col_b, col_c = st.columns([1.1, 1.1, 1.4])
