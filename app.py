@@ -5114,8 +5114,11 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     link_received_in_year = link_receipt_dates.notna() & (link_receipt_dates >= year_start) & (link_receipt_dates <= as_of_date)
     open_done_by_asof = open_done_dates.notna() & (open_done_dates <= as_of_date)
     link_done_by_asof = link_done_dates.notna() & (link_done_dates <= as_of_date)
+    _open_status_raw = df[open_status_col] if open_status_col and open_status_col in df.columns else pd.Series(pd.NA, index=df.index)
     open_status = df[open_status_col].astype(str).str.strip()
     link_status = df[link_status_col].astype(str).str.strip() if link_status_col else pd.Series("", index=df.index)
+    # 개설대기 판별: "대기" 명시 OR 원래 NaN/빈값(신규 미입력)
+    open_status_is_wait = open_status.str.contains("대기", na=False) | _open_status_raw.isna() | (open_status == "")
     link_clean = link_status.str.replace(r"\s+", "", regex=True)
     build_type = df[build_type_col].astype(str).str.strip() if build_type_col else pd.Series("", index=df.index)
     manage = df[manage_col].astype(str).str.strip() if manage_col else pd.Series("", index=df.index)
@@ -5129,7 +5132,7 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     link_cancel = link_received_by_asof & link_status.str.contains("취소|DROP|드랍", case=False, na=False)
     open_done = active & open_received_by_asof & ~open_cancel & (open_status.str.contains("완료|이행완료", na=False) & open_done_by_asof)
     open_progress = active & open_received_by_asof & ~open_cancel & ~open_done & open_status.str.contains("진행|구축중|처리중", na=False)
-    open_wait = active & open_received_by_asof & ~open_cancel & ~open_done & ~open_progress & open_status.str.contains("대기", na=False)
+    open_wait = active & open_received_by_asof & ~open_cancel & ~open_done & ~open_progress & open_status_is_wait
     link_done = active & link_received_by_asof & ~link_cancel & link_status.str.contains("완료", na=False) & link_done_by_asof
     link_progress = active & link_received_by_asof & ~link_cancel & ~link_done & link_status.str.contains("ERP연계진행|연계진행|진행", na=False)
     link_wait = active & link_received_by_asof & ~link_cancel & link_status.str.contains("ERP연계대기", na=False)
@@ -5141,7 +5144,7 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     link_cancel_y = link_received_in_year & link_status.str.contains("취소|DROP|드랍", case=False, na=False)
     open_done_y = active & open_received_in_year & ~open_cancel_y & (open_status.str.contains("완료|이행완료", na=False) & open_done_by_asof)
     open_progress_y = active & open_received_in_year & ~open_cancel_y & ~open_done_y & open_status.str.contains("진행|구축중|처리중", na=False)
-    open_wait_y = active & open_received_in_year & ~open_cancel_y & ~open_done_y & ~open_progress_y & open_status.str.contains("대기", na=False)
+    open_wait_y = active & open_received_in_year & ~open_cancel_y & ~open_done_y & ~open_progress_y & open_status_is_wait
     link_done_y = active & link_received_in_year & ~link_cancel_y & link_status.str.contains("완료", na=False) & link_done_by_asof
     link_progress_y = active & link_received_in_year & ~link_cancel_y & ~link_done_y & link_status.str.contains("ERP연계진행|연계진행|진행", na=False)
     link_wait_y = active & link_received_in_year & ~link_cancel_y & link_status.str.contains("ERP연계대기", na=False)
