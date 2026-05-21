@@ -5103,6 +5103,7 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     link_receipt_col = find_col(df, ["추가연계접수일"])
     open_date_col = find_col(df, ["개설/이행일", "개설일", "이행일"])
     link_date_col = find_col(df, ["연계일자", "연계일"])
+    link_billing_date_col = find_col(df, ["연계청구일자", "연계청구일", "청구일자"])
     open_status_col = find_col(df, ["개설상태"])
     link_status_col = find_col(df, ["연계상태"])
     build_type_col = find_col(df, ["구축형"])
@@ -5131,6 +5132,7 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     link_receipt_dates = dates(link_receipt_col).fillna(open_receipt_dates)
     open_done_dates = dates(open_date_col)
     link_done_dates = dates(link_date_col)
+    link_billing_dates = dates(link_billing_date_col)
     end_dates = dates(end_col)
     as_of_date = pd.to_datetime(snapshot_end_date, errors="coerce")
     if pd.isna(as_of_date):
@@ -5146,6 +5148,7 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     link_received_in_year = link_receipt_dates.notna() & (link_receipt_dates >= year_start) & (link_receipt_dates <= as_of_date)
     open_done_by_asof = open_done_dates.notna() & (open_done_dates <= as_of_date)
     link_done_by_asof = link_done_dates.notna() & (link_done_dates <= as_of_date)
+    link_billing_by_asof = link_billing_dates.notna() & (link_billing_dates <= as_of_date)
     open_status = df[open_status_col].astype(str).str.strip()
     link_status = df[link_status_col].astype(str).str.strip() if link_status_col else pd.Series("", index=df.index)
     link_clean = link_status.str.replace(r"\s+", "", regex=True)
@@ -5310,7 +5313,7 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     link_billing_done = link_clean.eq("ERP청구완료")
     for month in range(1, 13):
         ov = count(open_done_by_asof & (open_done_dates.dt.year == year) & (open_done_dates.dt.month == month))
-        lv = count(link_billing_done & link_done_by_asof & (link_done_dates.dt.year == year) & (link_done_dates.dt.month == month))
+        lv = count(link_billing_done & link_billing_by_asof & (link_billing_dates.dt.year == year) & (link_billing_dates.dt.month == month))
         open_complete_values.append(fmt(ov))
         link_complete_values.append(fmt(lv))
         open_total += ov
@@ -5522,6 +5525,7 @@ def build_weekly_report_ppt_bytes(report_df, week_start="", week_end="", hana_df
         link_receipt_col = find_col(hana, ["추가연계접수일"])
         open_date_col = find_col(hana, ["개설/이행일", "개설일", "이행일"])
         link_date_col = find_col(hana, ["연계일자", "연계일"])
+        link_billing_date_col = find_col(hana, ["연계청구일자", "연계청구일", "청구일자"])
         open_status_col = find_col(hana, ["개설상태"])
         link_status_col = find_col(hana, ["연계상태"])
         build_type_col = find_col(hana, ["구축형"])
@@ -5542,6 +5546,7 @@ def build_weekly_report_ppt_bytes(report_df, week_start="", week_end="", hana_df
         link_receipt_dates = link_receipt_dates.fillna(open_receipt_dates)
         open_done_dates = event_dates(base[open_date_col]) if open_date_col else pd.Series(pd.NaT, index=base.index)
         link_done_dates = event_dates(base[link_date_col]) if link_date_col else pd.Series(pd.NaT, index=base.index)
+        link_billing_dates = event_dates(base[link_billing_date_col]) if link_billing_date_col else pd.Series(pd.NaT, index=base.index)
 
         open_done = active & (open_status.str.contains("완료|이행완료", na=False) | open_done_dates.notna())
         open_progress = active & ~open_done & open_status.str.contains("진행|구축중|처리중", na=False)
@@ -5549,6 +5554,7 @@ def build_weekly_report_ppt_bytes(report_df, week_start="", week_end="", hana_df
         open_drop = open_status.str.contains("취소|DROP|드랍", case=False, na=False)
 
         link_done = active & link_status.str.contains("완료", na=False)
+        link_billing_done = active & link_clean.eq("ERP청구완료")
         link_progress = active & ~link_done & link_status.str.contains("ERP연계진행|연계진행|진행", na=False)
         link_wait = active & link_status.str.contains("ERP연계대기", na=False)
         link_drop = link_status.str.contains("취소|DROP|드랍", case=False, na=False)
@@ -5590,7 +5596,7 @@ def build_weekly_report_ppt_bytes(report_df, week_start="", week_end="", hana_df
         if slide4_tables:
             fill_monthly_table(slide4_tables[0], {
                 1: {"mask": open_done, "dates": open_done_dates},
-                3: {"mask": link_done, "dates": link_done_dates},
+                3: {"mask": link_billing_done, "dates": link_billing_dates},
             }, year=2026, has_prev_year=False)
             if len(slide4_tables) > 1:
                 fill_overall_table(slide4_tables[1], metrics)
