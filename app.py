@@ -4898,17 +4898,28 @@ def show_weekly_report_user():
 
     categorized = mine[weekly_category_mask(mine, input_category, week_start, week_end)].copy()
 
+    customer_keyword = st.text_input(
+        "고객명 자동검색",
+        key="weekly_customer_keyword",
+        placeholder="고객명 일부를 입력하면 해당 카테고리 고객만 검색됩니다.",
+    ).strip()
+
+    tmp = categorized.copy()
+    if not tmp.empty and customer_keyword:
+        tmp = tmp[tmp[company_col].astype(str).str.contains(customer_keyword, case=False, regex=False, na=False)].copy()
+
     options = ["직접입력"]
-    if not categorized.empty:
-        tmp = categorized.copy()
+    if not tmp.empty:
         tmp["_label"] = tmp.apply(
             lambda r: f"{str(r.get(company_col, '')).strip()} | {str(r.get(customer_no_col, '')).strip() if customer_no_col else ''}".strip(" |"),
             axis=1,
         )
         options += [v for v in tmp["_label"].tolist() if v and v not in options]
-    label_to_row = {str(row["_label"]): row for _, row in tmp.iterrows()} if not categorized.empty else {}
+    elif customer_keyword:
+        st.info("검색 조건에 맞는 고객이 없습니다. 직접입력으로 작성할 수 있습니다.")
+    label_to_row = {str(row["_label"]): row for _, row in tmp.iterrows()} if not tmp.empty else {}
 
-    selected_label = st.selectbox("고객 선택", options, key="weekly_customer_select")
+    selected_label = st.selectbox("검색 결과 선택", options, key="weekly_customer_select")
     selected_row = label_to_row.get(selected_label)
     default_company = "" if selected_row is None else str(selected_row.get(company_col, "")).strip()
     default_customer_no = "" if selected_row is None or not customer_no_col else str(selected_row.get(customer_no_col, "")).strip()
