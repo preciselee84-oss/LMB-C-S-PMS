@@ -4899,14 +4899,16 @@ def show_weekly_report_user():
     categorized = mine[weekly_category_mask(mine, input_category, week_start, week_end)].copy()
 
     tmp = categorized.copy()
-    customer_options = ["직접입력"]
+    customer_options = []
     if not tmp.empty:
         tmp["_company_label"] = tmp.apply(
             lambda r: f"{str(r.get(company_col, '')).strip()} | {str(r.get(customer_no_col, '')).strip() if customer_no_col else ''}".strip(" |"),
             axis=1,
         )
-        customer_options += [v for v in tmp["_company_label"].tolist() if v and v not in customer_options]
+        customer_options = [v for v in tmp["_company_label"].tolist() if v]
     label_to_row = {str(row["_company_label"]): row for _, row in tmp.iterrows()} if not tmp.empty else {}
+    if not customer_options:
+        customer_options = ["선택 가능한 고객 없음"]
 
     if st.session_state.get("weekly_customer_combo") not in customer_options:
         st.session_state.pop("weekly_customer_combo", None)
@@ -4932,16 +4934,11 @@ def show_weekly_report_user():
 
     with st.form("weekly_report_form", border=True):
         st.markdown(f"##### {input_part} - {input_category}")
-        f1, f2, f3 = st.columns([1.5, 1.0, 1.0])
+        company = default_company
+        f1, f2 = st.columns(2)
         with f1:
-            if selected_company_label == "직접입력":
-                company = st.text_input("고객명 직접입력", value="")
-            else:
-                st.text_input("고객명", value=default_company, disabled=True)
-                company = default_company
-        with f2:
             service = st.text_input("서비스", value=default_service)
-        with f3:
+        with f2:
             build_type = st.text_input("구분", value=default_build)
 
         f4, f5, f6 = st.columns([1.2, 1.0, 1.0])
