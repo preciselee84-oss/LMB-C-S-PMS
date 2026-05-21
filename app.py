@@ -4749,9 +4749,13 @@ def show_weekly_report_user():
     categories = ["전체"] + report_categories + ["운영부문"]
     user_name = st.session_state.get("user_name", "")
 
-    def load_hana_sheet_for_weekly():
+    def load_hana_sheet_for_weekly(force_refresh=False):
         try:
-            df = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+            url = st.session_state.get("url_hana", DEFAULT_URL_HANA)
+            if force_refresh:
+                sep = "&" if "?" in url else "?"
+                url = f"{url}{sep}_refresh={int(datetime.utcnow().timestamp())}"
+            df = pd.read_csv(url, header=2)
             st.session_state.hana_sheet_df = df
             st.session_state.weekly_hana_loaded_at = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
         except Exception as e:
@@ -4844,13 +4848,19 @@ def show_weekly_report_user():
             st.markdown(f"{'#' * level} {title}")
         with refresh_col:
             if st.button("새로고침", key=f"weekly_refresh_{key}", use_container_width=True):
-                st.session_state.hana_sheet_df = None
+                st.session_state.weekly_force_hana_refresh = True
                 st.rerun()
 
-    st.markdown("### 주간보고 작성")
+    title_col, refresh_col = st.columns([0.82, 0.18])
+    with title_col:
+        st.markdown("### 주간보고 작성")
+    force_refresh = bool(st.session_state.pop("weekly_force_hana_refresh", False))
+    with refresh_col:
+        if st.button("새로고침", key="weekly_user_top_refresh", use_container_width=True):
+            force_refresh = True
     st.caption("하나은행 구글 시트의 본인 담당 고객을 기준으로 카테고리별 현황을 선택해 주간보고 이력을 저장합니다.")
 
-    hana = load_hana_sheet_for_weekly()
+    hana = load_hana_sheet_for_weekly(force_refresh=force_refresh)
     if hana.empty:
         return
 
