@@ -5352,7 +5352,7 @@ def render_weekly_front_status_tables(hana_df, snapshot_end_date=None):
         prev_friday = pd.Timestamp(weekly_prev_friday())
     st.markdown(f"#### 2026년 기준 (2026.01.01 ~ {prev_friday.strftime('%Y.%m.%d')})")
     render_plain_html_table(tables["status"], max_rows=30, center_align=True, merge_cols=["구분"])
-    st.markdown("#### ■ 26년 월별 접수고객 진행 현황 관리")
+    st.markdown(f"#### ■ 26년 월별 접수고객 진행 현황 관리 (2026.01.01 ~ {prev_friday.strftime('%Y.%m.%d')})")
     render_plain_html_table(tables["monthly"], max_rows=30, center_align=True, merge_cols=["구분"])
     debug_open_wait_prev_year = tables.get("debug_open_wait_prev_year")
     if debug_open_wait_prev_year is not None and not debug_open_wait_prev_year.empty:
