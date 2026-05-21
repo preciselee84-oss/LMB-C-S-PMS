@@ -5135,7 +5135,7 @@ def weekly_customer_status_tables(hana_df, year=2026):
 
     month_cols = ["2025년"] + [f"{year}{m:02d}" for m in range(1, 13)] + [f"{str(year)[-2:]}' 합계"]
 
-    def month_counts(mask, event_date):
+    def month_count_values(mask, event_date):
         values = []
         values.append(count(mask & event_date.notna() & (event_date.dt.year == year - 1)))
         total = 0
@@ -5144,38 +5144,39 @@ def weekly_customer_status_tables(hana_df, year=2026):
             values.append(value)
             total += value
         values.append(total)
+        return values
+
+    def fmt_values(values):
         return [fmt(v) for v in values]
 
-    def verify_row(prefix, rows):
-        nums = []
-        for idx in range(len(month_cols)):
-            vals = []
-            for row in rows:
-                raw = row[idx + 2]
-                try:
-                    vals.append(int(str(raw).replace(",", "").replace("-", "0")))
-                except Exception:
-                    vals.append(0)
-            nums.append(vals[0] - sum(vals[1:]))
-        return [prefix, "검증"] + [fmt(v) if v != 0 else "0" for v in nums]
+    def summed_values(*rows):
+        return [sum(values) for values in zip(*rows)]
+
+    open_wait_values = month_count_values(open_wait, open_receipt_dates)
+    open_progress_values = month_count_values(open_progress, open_receipt_dates)
+    open_done_values = month_count_values(open_done, open_receipt_dates)
+    open_cancel_values = month_count_values(open_cancel, open_receipt_dates)
 
     open_month_rows = [
-        ["구축", "접수"] + month_counts(active & open_receipt_dates.notna(), open_receipt_dates),
-        ["", "대기"] + month_counts(open_wait, open_receipt_dates),
-        ["", "진행"] + month_counts(open_progress, open_receipt_dates),
-        ["", "완료"] + month_counts(open_done, open_receipt_dates),
-        ["", "취소"] + month_counts(open_cancel, open_receipt_dates),
+        ["구축", "접수"] + fmt_values(summed_values(open_wait_values, open_progress_values, open_done_values, open_cancel_values)),
+        ["", "대기"] + fmt_values(open_wait_values),
+        ["", "진행"] + fmt_values(open_progress_values),
+        ["", "완료"] + fmt_values(open_done_values),
+        ["", "취소"] + fmt_values(open_cancel_values),
     ]
-    open_month_rows.append(verify_row("", open_month_rows))
+
+    link_wait_values = month_count_values(link_wait, link_receipt_dates)
+    link_progress_values = month_count_values(link_progress, link_receipt_dates)
+    link_done_values = month_count_values(link_done, link_receipt_dates)
+    link_cancel_values = month_count_values(link_cancel, link_receipt_dates)
 
     link_month_rows = [
-        ["연계", "접수"] + month_counts(link_receipt, link_receipt_dates),
-        ["", "대기"] + month_counts(link_wait, link_receipt_dates),
-        ["", "진행"] + month_counts(link_progress, link_receipt_dates),
-        ["", "완료"] + month_counts(link_done, link_receipt_dates),
-        ["", "취소"] + month_counts(link_cancel, link_receipt_dates),
+        ["연계", "접수"] + fmt_values(summed_values(link_wait_values, link_progress_values, link_done_values, link_cancel_values)),
+        ["", "대기"] + fmt_values(link_wait_values),
+        ["", "진행"] + fmt_values(link_progress_values),
+        ["", "완료"] + fmt_values(link_done_values),
+        ["", "취소"] + fmt_values(link_cancel_values),
     ]
-    link_month_rows.append(verify_row("", link_month_rows))
     monthly_df = pd.DataFrame(open_month_rows + link_month_rows, columns=["구분", "상태"] + month_cols)
 
     complete_cols = ["구분", "-"] + [f"{year}{m:02d}" for m in range(1, 13)] + [f"{str(year)[-2:]}' 합계"]
@@ -5204,7 +5205,9 @@ def render_weekly_front_status_tables(hana_df):
         st.warning("하나은행 구글 시트 기준 고객 현황을 계산할 수 없습니다.")
         return
 
-    st.markdown("#### 26년 마감 기준 현황")
+    today = datetime.utcnow() + timedelta(hours=9)
+    prev_friday = today - timedelta(days=(today.weekday() - 4) % 7 or 7)
+    st.markdown(f"#### 2026년 기준 (2026.01.01 ~ {prev_friday.strftime('%Y.%m.%d')})")
     render_plain_html_table(tables["status"], max_rows=30, center_align=True)
     st.markdown("#### ■ 26년 월별 접수고객 진행 현황 관리")
     render_plain_html_table(tables["monthly"], max_rows=30, center_align=True)
