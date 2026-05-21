@@ -5401,9 +5401,12 @@ def show_weekly_report_admin():
         df = df[df["카테고리"] == category]
     if staff != "전체" and "담당자" in df.columns:
         df = df[df["담당자"] == staff]
-    show_cols = ["보고시작일", "보고종료일", "부문", "카테고리", "서비스", "구분", "고객명", "신청점", "접수일자", "일자구분", "일자", "이슈", "특이사항", "상태", "담당자", "작성시각"]
-    show_cols = [c for c in show_cols if c in df.columns]
-    render_plain_html_table(df[show_cols].sort_values("작성시각", ascending=False), max_rows=1000, center_align=False)
+    display_df = df.copy()
+    if "일자" in display_df.columns:
+        display_df["구축/피드백 예정일"] = display_df["일자"]
+    show_cols = ["보고시작일", "보고종료일", "카테고리", "구분", "고객명", "접수일자", "이슈", "상태", "담당자", "구축/피드백 예정일", "작성시각"]
+    show_cols = [c for c in show_cols if c in display_df.columns]
+    render_plain_html_table(display_df[show_cols].sort_values("작성시각", ascending=False), max_rows=1000, center_align=False)
 
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
     try:
