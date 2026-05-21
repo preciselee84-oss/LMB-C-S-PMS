@@ -4736,12 +4736,14 @@ def show_weekly_report_user():
         open_date_col = find_col(df, ["개설/이행일", "개설일", "이행일"])
         link_status_col = find_col(df, ["연계상태"])
         link_date_col = find_col(df, ["연계일자", "연계일"])
-        build_type_col = find_col(df, ["구축형", "구축구분"])
+        build_type_col = find_col(df, ["구축형"])
+        build_category_col = find_col(df, ["구축구분"])
         end_col = find_col(df, ["해지일자"])
 
         open_status = df[open_status_col].astype(str).str.strip() if open_status_col else pd.Series("", index=df.index)
         link_status = df[link_status_col].astype(str).str.strip() if link_status_col else pd.Series("", index=df.index)
         build_type = df[build_type_col].astype(str).str.strip() if build_type_col else pd.Series("", index=df.index)
+        build_category = df[build_category_col].astype(str).str.strip() if build_category_col else pd.Series("", index=df.index)
         open_dates = pd.to_datetime(df[open_date_col].map(parse_sheet_date), errors="coerce") if open_date_col else pd.Series(pd.NaT, index=df.index)
         link_dates = pd.to_datetime(df[link_date_col].map(parse_sheet_date), errors="coerce") if link_date_col else pd.Series(pd.NaT, index=df.index)
         open_date = open_dates.notna()
@@ -4752,7 +4754,7 @@ def show_weekly_report_user():
         link_done = active & (link_status.str.contains("완료", na=False) | link_date)
         open_progress = active & ~open_done & open_status.str.contains("진행|구축중|처리중", na=False)
         link_progress = active & ~link_done & link_status.str.contains("진행|연계중|처리중", na=False)
-        link_target = active & (build_type.str.contains("연계|이행", na=False) | link_status.ne(""))
+        link_target = active & (build_type.str.contains("연계|이행", na=False) | build_category.str.contains("연계|이행", na=False) | link_status.ne(""))
 
         if category == "개설완료":
             if start_date is not None and end_date is not None:
@@ -5047,6 +5049,169 @@ def show_weekly_report_user():
         st.rerun()
 
 
+def load_weekly_hana_for_status():
+    try:
+        df = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+    except Exception:
+        df = st.session_state.get("hana_sheet_df")
+    if df is None:
+        return pd.DataFrame()
+    df = df.copy()
+    df.columns = [str(c).strip() for c in df.columns]
+    return df.dropna(how="all").reset_index(drop=True)
+
+
+def weekly_customer_status_tables(hana_df, year=2026):
+    if hana_df is None or hana_df.empty:
+        return {}
+
+    df = hana_df.copy()
+    open_receipt_col = find_col(df, ["신규접수일"])
+    link_receipt_col = find_col(df, ["추가연계접수일"])
+    open_date_col = find_col(df, ["개설/이행일", "개설일", "이행일"])
+    link_date_col = find_col(df, ["연계일자", "연계일"])
+    open_status_col = find_col(df, ["개설상태"])
+    link_status_col = find_col(df, ["연계상태"])
+    build_type_col = find_col(df, ["구축형"])
+    manage_col = find_col(df, ["관리구분"])
+    end_col = find_col(df, ["해지일자"])
+
+    if not open_status_col:
+        return {}
+
+    def dates(col):
+        if not col or col not in df.columns:
+            return pd.Series(pd.NaT, index=df.index)
+        return pd.to_datetime(df[col].map(parse_sheet_date), errors="coerce")
+
+    def fmt(value):
+        try:
+            value = int(value)
+        except Exception:
+            value = 0
+        return "-" if value == 0 else f"{value:,}"
+
+    def count(mask):
+        return int(mask.fillna(False).sum())
+
+    open_receipt_dates = dates(open_receipt_col)
+    link_receipt_dates = dates(link_receipt_col).fillna(open_receipt_dates)
+    open_done_dates = dates(open_date_col)
+    link_done_dates = dates(link_date_col)
+    end_dates = dates(end_col)
+
+    active = end_dates.isna()
+    open_status = df[open_status_col].astype(str).str.strip()
+    link_status = df[link_status_col].astype(str).str.strip() if link_status_col else pd.Series("", index=df.index)
+    link_clean = link_status.str.replace(r"\s+", "", regex=True)
+    build_type = df[build_type_col].astype(str).str.strip() if build_type_col else pd.Series("", index=df.index)
+    manage = df[manage_col].astype(str).str.strip() if manage_col else pd.Series("", index=df.index)
+
+    basic = build_type.str.contains("기본", na=False)
+    linked = build_type.str.contains("연계|이행", na=False)
+    transfer = manage.str.contains("이관", na=False)
+
+    open_cancel = open_status.str.contains("취소|DROP|드랍", case=False, na=False)
+    link_cancel = link_status.str.contains("취소|DROP|드랍", case=False, na=False)
+    open_done = active & ~open_cancel & (open_status.str.contains("완료|이행완료", na=False) | open_done_dates.notna())
+    open_progress = active & ~open_cancel & ~open_done & open_status.str.contains("진행|구축중|처리중", na=False)
+    open_wait = active & ~open_cancel & ~open_done & ~open_progress
+    link_done = active & ~link_cancel & link_status.str.contains("완료", na=False)
+    link_progress = active & ~link_cancel & ~link_done & link_status.str.contains("ERP연계진행|연계진행|진행", na=False)
+    link_wait = active & ~link_cancel & link_status.str.contains("ERP연계대기", na=False)
+    link_receipt = active & (link_receipt_dates.notna() | link_wait | link_progress | link_done)
+    terminated = end_dates.notna()
+
+    status_rows = [
+        ["전체", "", count(open_wait), count(open_progress), count(open_done), count(link_wait), count(link_progress), count(link_done), count(terminated)],
+        ["", "기본형", count(open_wait & basic), count(open_progress & basic), count(open_done & basic), "-", "-", "-", count(terminated & basic)],
+        ["", "연계형", count(open_wait & linked), count(open_progress & linked), count(open_done & linked), count(link_wait & linked), count(link_progress & linked), count(link_done & linked), count(terminated & linked)],
+        ["", "개설취소", count(open_cancel), "-", "-", count(link_cancel), "-", "-", ""],
+        ["이관", "기본형", count(transfer & basic & open_wait), count(transfer & basic & open_progress), "-", "-", "-", "-", ""],
+        ["", "연계형", count(transfer & linked & open_wait), count(transfer & linked & open_progress), count(transfer & linked & open_done), count(transfer & linked & link_wait), count(transfer & linked & link_progress), "-", ""],
+        ["구축취소(누적)", "", count(open_cancel), "-", "연계취소(누적)", count(link_cancel), "-", "-", ""],
+    ]
+    status_df = pd.DataFrame(status_rows, columns=["구분", "유형", "구축대기", "구축진행", "구축완료", "연계대기", "연계진행", "연계완료", "해지"])
+
+    month_cols = ["2025년"] + [f"{year}{m:02d}" for m in range(1, 13)] + [f"{str(year)[-2:]}' 합계"]
+
+    def month_counts(mask, event_date):
+        values = []
+        values.append(count(mask & event_date.notna() & (event_date.dt.year == year - 1)))
+        total = 0
+        for month in range(1, 13):
+            value = count(mask & event_date.notna() & (event_date.dt.year == year) & (event_date.dt.month == month))
+            values.append(value)
+            total += value
+        values.append(total)
+        return [fmt(v) for v in values]
+
+    def verify_row(prefix, rows):
+        nums = []
+        for idx in range(len(month_cols)):
+            vals = []
+            for row in rows:
+                raw = row[idx + 2]
+                try:
+                    vals.append(int(str(raw).replace(",", "").replace("-", "0")))
+                except Exception:
+                    vals.append(0)
+            nums.append(vals[0] - sum(vals[1:]))
+        return [prefix, "검증"] + [fmt(v) if v != 0 else "0" for v in nums]
+
+    open_month_rows = [
+        ["구축", "접수"] + month_counts(active & open_receipt_dates.notna(), open_receipt_dates),
+        ["", "대기"] + month_counts(open_wait, open_receipt_dates),
+        ["", "진행"] + month_counts(open_progress, open_receipt_dates),
+        ["", "완료"] + month_counts(open_done, open_receipt_dates),
+        ["", "취소"] + month_counts(open_cancel, open_receipt_dates),
+    ]
+    open_month_rows.append(verify_row("", open_month_rows))
+
+    link_month_rows = [
+        ["연계", "접수"] + month_counts(link_receipt, link_receipt_dates),
+        ["", "대기"] + month_counts(link_wait, link_receipt_dates),
+        ["", "진행"] + month_counts(link_progress, link_receipt_dates),
+        ["", "완료"] + month_counts(link_done, link_receipt_dates),
+        ["", "취소"] + month_counts(link_cancel, link_receipt_dates),
+    ]
+    link_month_rows.append(verify_row("", link_month_rows))
+    monthly_df = pd.DataFrame(open_month_rows + link_month_rows, columns=["구분", "상태"] + month_cols)
+
+    complete_cols = ["구분", "-"] + [f"{year}{m:02d}" for m in range(1, 13)] + [f"{str(year)[-2:]}' 합계"]
+    open_complete_values = []
+    link_complete_values = []
+    open_total = 0
+    link_total = 0
+    for month in range(1, 13):
+        ov = count(open_done & open_done_dates.notna() & (open_done_dates.dt.year == year) & (open_done_dates.dt.month == month))
+        lv = count(link_done & link_done_dates.notna() & (link_done_dates.dt.year == year) & (link_done_dates.dt.month == month))
+        open_complete_values.append(fmt(ov))
+        link_complete_values.append(fmt(lv))
+        open_total += ov
+        link_total += lv
+    complete_df = pd.DataFrame([
+        ["구축", "-"] + open_complete_values + [fmt(open_total)],
+        ["연계", "-"] + link_complete_values + [fmt(link_total)],
+    ], columns=complete_cols)
+
+    return {"status": status_df, "monthly": monthly_df, "complete": complete_df}
+
+
+def render_weekly_front_status_tables(hana_df):
+    tables = weekly_customer_status_tables(hana_df)
+    if not tables:
+        st.warning("하나은행 구글 시트 기준 고객 현황을 계산할 수 없습니다.")
+        return
+
+    st.markdown("#### 26년 마감 기준 현황")
+    render_plain_html_table(tables["status"], max_rows=30, center_align=True)
+    st.markdown("#### ■ 26년 월별 접수고객 진행 현황 관리")
+    render_plain_html_table(tables["monthly"], max_rows=30, center_align=True)
+    st.markdown("#### ■ 26년 월별 개설완료 현황 관리")
+    render_plain_html_table(tables["complete"], max_rows=10, center_align=True)
+
+
 def build_weekly_report_ppt_bytes(report_df, week_start="", week_end="", hana_df=None):
     from pptx import Presentation
     from pptx.enum.text import PP_ALIGN
@@ -5211,7 +5376,7 @@ def build_weekly_report_ppt_bytes(report_df, week_start="", week_end="", hana_df
         link_date_col = find_col(hana, ["연계일자", "연계일"])
         open_status_col = find_col(hana, ["개설상태"])
         link_status_col = find_col(hana, ["연계상태"])
-        build_type_col = find_col(hana, ["구축형", "구축구분"])
+        build_type_col = find_col(hana, ["구축형"])
         end_col = find_col(hana, ["해지일자"])
 
         if not open_receipt_col or not open_status_col:
@@ -5235,7 +5400,7 @@ def build_weekly_report_ppt_bytes(report_df, week_start="", week_end="", hana_df
         open_wait = active & ~open_done & ~open_progress
         open_drop = open_status.str.contains("취소|DROP|드랍", case=False, na=False)
 
-        link_done = active & link_clean.eq("ERP연계완료")
+        link_done = active & link_status.str.contains("완료", na=False)
         link_progress = active & ~link_done & link_status.str.contains("ERP연계진행|연계진행|진행", na=False)
         link_wait = active & link_status.str.contains("ERP연계대기", na=False)
         link_drop = link_status.str.contains("취소|DROP|드랍", case=False, na=False)
@@ -5386,6 +5551,10 @@ def show_weekly_report_admin():
     for entries in db.values():
         rows.extend(entries if isinstance(entries, list) else [])
     st.markdown("### 주간보고 취합")
+    hana_status_df = load_weekly_hana_for_status()
+    render_weekly_front_status_tables(hana_status_df)
+    st.markdown("---")
+
     if not rows:
         st.info("취합할 주간보고 이력이 없습니다.")
         return
