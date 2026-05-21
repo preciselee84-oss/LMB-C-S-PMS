@@ -4716,14 +4716,16 @@ def show_weekly_report_user():
     user_name = st.session_state.get("user_name", "")
 
     def load_hana_sheet_for_weekly():
-        df = st.session_state.get("hana_sheet_df")
-        if df is None or df.empty:
-            try:
-                df = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
-                st.session_state.hana_sheet_df = df
-            except Exception as e:
+        try:
+            df = pd.read_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2)
+            st.session_state.hana_sheet_df = df
+            st.session_state.weekly_hana_loaded_at = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception as e:
+            df = st.session_state.get("hana_sheet_df")
+            if df is None or df.empty:
                 st.error(f"하나은행 구글 시트를 불러오지 못했습니다: {e}")
                 return pd.DataFrame()
+            st.warning("하나은행 구글 시트 최신 데이터를 불러오지 못해 세션에 저장된 데이터를 사용합니다.")
         df = df.copy()
         df.columns = [str(c).strip() for c in df.columns]
         return df.dropna(how="all").reset_index(drop=True)
@@ -4809,6 +4811,7 @@ def show_weekly_report_user():
     customer_no_col = find_col(hana, ["고객번호"])
     open_status_col = find_col(hana, ["개설상태"])
     link_status_col = find_col(hana, ["연계상태"])
+    link_date_col = find_col(hana, ["연계일자", "연계일"])
 
     if not staff_col or not company_col:
         st.error("하나은행 시트에서 담당자 또는 고객명 컬럼을 찾을 수 없습니다.")
@@ -4831,6 +4834,8 @@ def show_weekly_report_user():
     with col_c:
         category = st.selectbox("카테고리", categories, key="weekly_report_category")
     st.caption(f"선택 기간: {week_start} ~ {week_end}")
+    if st.session_state.get("weekly_hana_loaded_at"):
+        st.caption(f"하나은행 구글 시트 새로고침: {st.session_state.weekly_hana_loaded_at}")
 
     if category == "전체":
         categorized_map = {
@@ -4857,6 +4862,19 @@ def show_weekly_report_user():
 
         if categorized.empty and category != "운영부문":
             st.info("선택한 카테고리에 작성할 고객이 없습니다.")
+            if category == "연계완료" and link_status_col and link_date_col:
+                status_clean = mine[link_status_col].astype(str).str.strip().str.replace(r"\s+", "", regex=True)
+                candidates = mine[status_clean.eq("ERP연계완료")].copy()
+                if not candidates.empty:
+                    candidates["_연계일자변환"] = pd.to_datetime(candidates[link_date_col].map(parse_sheet_date), errors="coerce")
+                    candidates["_선택기간포함"] = candidates["_연계일자변환"].between(pd.Timestamp(week_start), pd.Timestamp(week_end), inclusive="both")
+                    with st.expander("ERP연계완료 후보 확인", expanded=False):
+                        cols = [company_col, link_status_col, link_date_col, "_연계일자변환", "_선택기간포함"]
+                        cols = [c for c in cols if c and c in candidates.columns]
+                        show_candidates = candidates[cols].copy()
+                        if "_연계일자변환" in show_candidates.columns:
+                            show_candidates["_연계일자변환"] = show_candidates["_연계일자변환"].dt.strftime("%Y-%m-%d")
+                        st.dataframe(show_candidates.reset_index(drop=True), use_container_width=True, hide_index=True)
 
     st.markdown("---")
     st.markdown("#### 주간보고 이력 입력")
