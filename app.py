@@ -5124,24 +5124,24 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     linked = build_type.str.contains("연계|이행", na=False)
     transfer = manage.str.contains("이관", na=False)
 
-    # 월별 표 마스크 (접수 연도 무관)
+    # 월별 표 마스크 (접수 연도 무관, 개설상태 명시 값 기준)
     open_cancel = open_received_by_asof & open_status.str.contains("취소|DROP|드랍", case=False, na=False)
     link_cancel = link_received_by_asof & link_status.str.contains("취소|DROP|드랍", case=False, na=False)
     open_done = active & open_received_by_asof & ~open_cancel & (open_status.str.contains("완료|이행완료", na=False) & open_done_by_asof)
     open_progress = active & open_received_by_asof & ~open_cancel & ~open_done & open_status.str.contains("진행|구축중|처리중", na=False)
-    open_wait = active & open_received_by_asof & ~open_cancel & ~open_done & ~open_progress
+    open_wait = active & open_received_by_asof & ~open_cancel & ~open_done & ~open_progress & open_status.str.contains("대기", na=False)
     link_done = active & link_received_by_asof & ~link_cancel & link_status.str.contains("완료", na=False) & link_done_by_asof
     link_progress = active & link_received_by_asof & ~link_cancel & ~link_done & link_status.str.contains("ERP연계진행|연계진행|진행", na=False)
     link_wait = active & link_received_by_asof & ~link_cancel & link_status.str.contains("ERP연계대기", na=False)
     link_receipt = active & (link_received_by_asof | link_wait | link_progress | link_done)
     terminated = end_dates.notna() & (end_dates <= as_of_date)
 
-    # 상태 표 마스크 (year 기준 접수분만)
+    # 상태 표 마스크 (year 기준 접수분만, 개설상태 명시 값 기준)
     open_cancel_y = open_received_in_year & open_status.str.contains("취소|DROP|드랍", case=False, na=False)
     link_cancel_y = link_received_in_year & link_status.str.contains("취소|DROP|드랍", case=False, na=False)
     open_done_y = active & open_received_in_year & ~open_cancel_y & (open_status.str.contains("완료|이행완료", na=False) & open_done_by_asof)
     open_progress_y = active & open_received_in_year & ~open_cancel_y & ~open_done_y & open_status.str.contains("진행|구축중|처리중", na=False)
-    open_wait_y = active & open_received_in_year & ~open_cancel_y & ~open_done_y & ~open_progress_y
+    open_wait_y = active & open_received_in_year & ~open_cancel_y & ~open_done_y & ~open_progress_y & open_status.str.contains("대기", na=False)
     link_done_y = active & link_received_in_year & ~link_cancel_y & link_status.str.contains("완료", na=False) & link_done_by_asof
     link_progress_y = active & link_received_in_year & ~link_cancel_y & ~link_done_y & link_status.str.contains("ERP연계진행|연계진행|진행", na=False)
     link_wait_y = active & link_received_in_year & ~link_cancel_y & link_status.str.contains("ERP연계대기", na=False)
