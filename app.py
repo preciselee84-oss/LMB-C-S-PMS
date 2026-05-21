@@ -5104,9 +5104,14 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     if pd.isna(as_of_date):
         as_of_date = pd.Timestamp.max
 
+    year_start = pd.Timestamp(f"{year}-01-01")
     active = end_dates.isna() | (end_dates > as_of_date)
+    # 월별 표용: 전체 기간(연도 무관)
     open_received_by_asof = open_receipt_dates.notna() & (open_receipt_dates <= as_of_date)
     link_received_by_asof = link_receipt_dates.notna() & (link_receipt_dates <= as_of_date)
+    # 상태 표용: year 기준(2026.01.01~) 필터
+    open_received_in_year = open_receipt_dates.notna() & (open_receipt_dates >= year_start) & (open_receipt_dates <= as_of_date)
+    link_received_in_year = link_receipt_dates.notna() & (link_receipt_dates >= year_start) & (link_receipt_dates <= as_of_date)
     open_done_by_asof = open_done_dates.notna() & (open_done_dates <= as_of_date)
     link_done_by_asof = link_done_dates.notna() & (link_done_dates <= as_of_date)
     open_status = df[open_status_col].astype(str).str.strip()
@@ -5119,6 +5124,7 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     linked = build_type.str.contains("연계|이행", na=False)
     transfer = manage.str.contains("이관", na=False)
 
+    # 월별 표 마스크 (접수 연도 무관)
     open_cancel = open_received_by_asof & open_status.str.contains("취소|DROP|드랍", case=False, na=False)
     link_cancel = link_received_by_asof & link_status.str.contains("취소|DROP|드랍", case=False, na=False)
     open_done = active & open_received_by_asof & ~open_cancel & (open_status.str.contains("완료|이행완료", na=False) & open_done_by_asof)
@@ -5130,14 +5136,25 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     link_receipt = active & (link_received_by_asof | link_wait | link_progress | link_done)
     terminated = end_dates.notna() & (end_dates <= as_of_date)
 
+    # 상태 표 마스크 (year 기준 접수분만)
+    open_cancel_y = open_received_in_year & open_status.str.contains("취소|DROP|드랍", case=False, na=False)
+    link_cancel_y = link_received_in_year & link_status.str.contains("취소|DROP|드랍", case=False, na=False)
+    open_done_y = active & open_received_in_year & ~open_cancel_y & (open_status.str.contains("완료|이행완료", na=False) & open_done_by_asof)
+    open_progress_y = active & open_received_in_year & ~open_cancel_y & ~open_done_y & open_status.str.contains("진행|구축중|처리중", na=False)
+    open_wait_y = active & open_received_in_year & ~open_cancel_y & ~open_done_y & ~open_progress_y
+    link_done_y = active & link_received_in_year & ~link_cancel_y & link_status.str.contains("완료", na=False) & link_done_by_asof
+    link_progress_y = active & link_received_in_year & ~link_cancel_y & ~link_done_y & link_status.str.contains("ERP연계진행|연계진행|진행", na=False)
+    link_wait_y = active & link_received_in_year & ~link_cancel_y & link_status.str.contains("ERP연계대기", na=False)
+    terminated_y = end_dates.notna() & (end_dates >= year_start) & (end_dates <= as_of_date)
+
     status_rows = [
-        ["전체", "", count(open_wait), count(open_progress), count(open_done), count(link_wait), count(link_progress), count(link_done), count(terminated)],
-        ["", "기본형", count(open_wait & basic), count(open_progress & basic), count(open_done & basic), "-", "-", "-", count(terminated & basic)],
-        ["", "연계형", count(open_wait & linked), count(open_progress & linked), count(open_done & linked), count(link_wait & linked), count(link_progress & linked), count(link_done & linked), count(terminated & linked)],
-        ["", "개설취소", count(open_cancel), "-", "-", count(link_cancel), "-", "-", ""],
-        ["이관", "기본형", count(transfer & basic & open_wait), count(transfer & basic & open_progress), "-", "-", "-", "-", ""],
-        ["", "연계형", count(transfer & linked & open_wait), count(transfer & linked & open_progress), count(transfer & linked & open_done), count(transfer & linked & link_wait), count(transfer & linked & link_progress), "-", ""],
-        ["구축취소(누적)", "", count(open_cancel), "-", "연계취소(누적)", count(link_cancel), "-", "-", ""],
+        ["전체", "", count(open_wait_y), count(open_progress_y), count(open_done_y), count(link_wait_y), count(link_progress_y), count(link_done_y), count(terminated_y)],
+        ["", "기본형", count(open_wait_y & basic), count(open_progress_y & basic), count(open_done_y & basic), "-", "-", "-", count(terminated_y & basic)],
+        ["", "연계형", count(open_wait_y & linked), count(open_progress_y & linked), count(open_done_y & linked), count(link_wait_y & linked), count(link_progress_y & linked), count(link_done_y & linked), count(terminated_y & linked)],
+        ["", "개설취소", count(open_cancel_y), "-", "-", count(link_cancel_y), "-", "-", ""],
+        ["이관", "기본형", count(transfer & basic & open_wait_y), count(transfer & basic & open_progress_y), "-", "-", "-", "-", ""],
+        ["", "연계형", count(transfer & linked & open_wait_y), count(transfer & linked & open_progress_y), count(transfer & linked & open_done_y), count(transfer & linked & link_wait_y), count(transfer & linked & link_progress_y), "-", ""],
+        ["구축취소(누적)", "", count(open_cancel_y), "-", "연계취소(누적)", count(link_cancel_y), "-", "-", ""],
     ]
     status_df = pd.DataFrame(status_rows, columns=["구분", "유형", "구축대기", "구축진행", "구축완료", "연계대기", "연계진행", "연계완료", "해지"])
 
