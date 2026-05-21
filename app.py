@@ -36,6 +36,7 @@ SENT_UPLOADS_FILE = "sent_uploads.json"
 SAVED_STATE_FILE = "saved_state.json"
 WEEKLY_REPORT_FILE = "weekly_reports.json"
 PPT_TEMPLATE_FILE = resolve_template_file("LMB활동실적보고서_202605_하나지사.pptx")
+WEEKLY_PPT_TEMPLATE_FILE = resolve_template_file("주간보고_통합CMS고객_개설운영_주간보고_템플릿.pptx")
 EXCEL_SAMPLE_FILE = resolve_template_file("LMB월간 활동실적_000000(샘플).xlsx")
 
 DEFAULT_URL_ANALYSIS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9XPHqrqcaFf9bCOVya7yHORr-c1R4KCF0eEpdE3ESn8qJELP0BkqTOslur9bsGcVabRUIcyOa877R/pub?output=csv"
@@ -5046,6 +5047,164 @@ def show_weekly_report_user():
         st.rerun()
 
 
+def build_weekly_report_ppt_bytes(report_df, week_start="", week_end=""):
+    from pptx import Presentation
+    from pptx.enum.text import PP_ALIGN
+    from pptx.util import Pt
+    from copy import deepcopy
+
+    if not os.path.exists(WEEKLY_PPT_TEMPLATE_FILE):
+        raise FileNotFoundError(f"주간보고 PPT 템플릿 파일을 찾을 수 없습니다: {WEEKLY_PPT_TEMPLATE_FILE}")
+
+    prs = Presentation(WEEKLY_PPT_TEMPLATE_FILE)
+    df = report_df.copy() if report_df is not None else pd.DataFrame()
+    if df.empty:
+        raise ValueError("다운로드할 주간보고 이력이 없습니다.")
+
+    def clean(value):
+        if value is None:
+            return ""
+        try:
+            if pd.isna(value):
+                return ""
+        except Exception:
+            pass
+        text = str(value).strip()
+        return "" if text.lower() in ["nan", "nat", "none"] else text
+
+    def set_cell_text(cell, value, font_size=8, align=PP_ALIGN.CENTER):
+        cell.text = clean(value)
+        for paragraph in cell.text_frame.paragraphs:
+            paragraph.alignment = align
+            for run in paragraph.runs:
+                run.font.name = "맑은 고딕"
+                run.font.size = Pt(font_size)
+
+    def slide_tables(slide):
+        return [shape.table for shape in slide.shapes if getattr(shape, "has_table", False)]
+
+    def ensure_rows(table, required_rows):
+        while len(table.rows) < required_rows:
+            new_tr = deepcopy(table._tbl.tr_lst[-1])
+            table._tbl.append(new_tr)
+            for cell in table.rows[-1].cells:
+                cell.text = ""
+
+    def clear_body(table):
+        for r in range(1, len(table.rows)):
+            for c in range(len(table.columns)):
+                set_cell_text(table.cell(r, c), "", font_size=8)
+
+    def fill_table(table, rows, font_size=8, left_cols=None):
+        left_cols = set(left_cols or [])
+        required_rows = max(2, len(rows) + 1)
+        ensure_rows(table, required_rows)
+        clear_body(table)
+        for r_idx, values in enumerate(rows, start=1):
+            if r_idx >= len(table.rows):
+                break
+            for c_idx, value in enumerate(values[:len(table.columns)]):
+                align = PP_ALIGN.LEFT if c_idx in left_cols else PP_ALIGN.CENTER
+                set_cell_text(table.cell(r_idx, c_idx), value, font_size=font_size, align=align)
+
+    def update_title_dates():
+        date_text = ""
+        if week_start and week_end:
+            date_text = f"{week_start} - {week_end}"
+        elif "보고시작일" in df.columns and "보고종료일" in df.columns:
+            starts = [clean(v) for v in df["보고시작일"].tolist() if clean(v)]
+            ends = [clean(v) for v in df["보고종료일"].tolist() if clean(v)]
+            if starts and ends:
+                date_text = f"{min(starts)} - {max(ends)}"
+        if not date_text or not prs.slides:
+            return
+        for shape in prs.slides[0].shapes:
+            if getattr(shape, "has_text_frame", False) and "2026." in shape.text:
+                shape.text = date_text
+                for paragraph in shape.text_frame.paragraphs:
+                    for run in paragraph.runs:
+                        run.font.name = "맑은 고딕"
+                        run.font.size = Pt(18)
+                break
+
+    def rows_for(category, no_start=1):
+        part = df[df["카테고리"].astype(str) == category].copy() if "카테고리" in df.columns else pd.DataFrame()
+        rows = []
+        for no, (_, row) in enumerate(part.iterrows(), start=no_start):
+            service = clean(row.get("서비스", "")) or "일반"
+            build_type = clean(row.get("구분", ""))
+            company = clean(row.get("고객명", ""))
+            branch = clean(row.get("신청점", ""))
+            receipt = clean(row.get("접수일자", ""))
+            issue = clean(row.get("이슈", ""))
+            note = clean(row.get("특이사항", ""))
+            detail = issue if not note else f"{issue}\n{note}" if issue else note
+            staff = clean(row.get("담당자", ""))
+            date_value = clean(row.get("일자", ""))
+            status = clean(row.get("상태", ""))
+            rows.append({
+                "no": no,
+                "service": service,
+                "type": build_type,
+                "company": company,
+                "branch": branch,
+                "receipt": receipt,
+                "issue": detail,
+                "staff": staff,
+                "date": date_value,
+                "status": status,
+            })
+        return rows
+
+    def opening_wait_rows(rows):
+        return [[r["no"], r["service"], r["type"], r["company"], r["branch"], r["receipt"], r["date"], r["issue"], r["staff"]] for r in rows]
+
+    def opening_progress_rows(rows):
+        return [[r["no"], r["type"], r["company"], r["branch"], r["receipt"], r["issue"], r["staff"], r["date"], r["status"]] for r in rows]
+
+    def link_wait_rows(rows):
+        return [[r["no"], r["company"], r["branch"], r["receipt"], r["date"], r["issue"], r["staff"]] for r in rows]
+
+    def link_progress_rows(rows):
+        return [[r["no"], r["company"], r["branch"], r["receipt"], "", r["status"], r["issue"], r["staff"], r["date"]] for r in rows]
+
+    def operation_rows(rows):
+        return [[r["no"], r["type"], r["company"], r["branch"], r["receipt"], r["issue"], r["staff"], r["date"], r["status"]] for r in rows]
+
+    def fill_slide_table(slide_idx, values, left_cols):
+        if slide_idx >= len(prs.slides):
+            return
+        tables = slide_tables(prs.slides[slide_idx])
+        if tables:
+            fill_table(tables[0], values, font_size=7, left_cols=left_cols)
+
+    update_title_dates()
+    for slide_idx in range(4, min(24, len(prs.slides))):
+        for table in slide_tables(prs.slides[slide_idx]):
+            clear_body(table)
+
+    open_wait = rows_for("개설대기")
+    open_progress = rows_for("개설진행")
+    open_done = rows_for("개설완료")
+    link_wait = rows_for("연계대기")
+    link_progress = rows_for("연계진행")
+    link_done = rows_for("연계완료")
+    operation = rows_for("운영부문")
+
+    fill_slide_table(4, opening_wait_rows(open_wait), left_cols={6, 7})
+    fill_slide_table(7, opening_progress_rows(open_done), left_cols={5})
+    fill_slide_table(9, opening_progress_rows(open_progress), left_cols={5})
+    fill_slide_table(10, link_wait_rows(link_wait), left_cols={5})
+    fill_slide_table(14, link_progress_rows(link_progress), left_cols={6})
+    fill_slide_table(19, link_progress_rows(link_done), left_cols={6})
+    fill_slide_table(21, operation_rows(operation), left_cols={5})
+
+    output = BytesIO()
+    prs.save(output)
+    output.seek(0)
+    return output.getvalue()
+
+
 def show_weekly_report_admin():
     db = load_db(WEEKLY_REPORT_FILE, {})
     rows = []
@@ -5070,6 +5229,28 @@ def show_weekly_report_admin():
     show_cols = ["보고시작일", "보고종료일", "부문", "카테고리", "서비스", "구분", "고객명", "신청점", "접수일자", "일자구분", "일자", "이슈", "특이사항", "상태", "담당자", "작성시각"]
     show_cols = [c for c in show_cols if c in df.columns]
     render_plain_html_table(df[show_cols].sort_values("작성시각", ascending=False), max_rows=1000, center_align=False)
+
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+    try:
+        week_start = ""
+        week_end = ""
+        if "보고시작일" in df.columns and "보고종료일" in df.columns and not df.empty:
+            starts = [str(v) for v in df["보고시작일"].dropna().tolist() if str(v).strip()]
+            ends = [str(v) for v in df["보고종료일"].dropna().tolist() if str(v).strip()]
+            week_start = min(starts) if starts else ""
+            week_end = max(ends) if ends else ""
+        ppt_bytes = build_weekly_report_ppt_bytes(df, week_start, week_end)
+        file_period = f"{week_start}_{week_end}".replace("-", "") if week_start and week_end else (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m%d")
+        st.download_button(
+            "주간보고 PPT 다운로드",
+            data=ppt_bytes,
+            file_name=f"주간보고_통합CMS고객_개설운영_주간보고_{file_period}.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            use_container_width=True,
+        )
+    except Exception as e:
+        st.button("주간보고 PPT 다운로드", use_container_width=True, disabled=True)
+        st.caption(f"PPT 생성 준비 중 오류: {e}")
 
 
 def show_dashboard():
