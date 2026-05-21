@@ -4796,6 +4796,12 @@ def show_weekly_report_user():
             return "" if is_blank_value(value) else str(value).strip()
         return pd.Timestamp(parsed).strftime("%Y-%m-%d")
 
+    def date_input_value(value, fallback):
+        parsed = parse_sheet_date(value)
+        if pd.isna(parsed):
+            return fallback
+        return pd.Timestamp(parsed).date()
+
     def render_weekly_detail_header(title, key, level=4):
         title_col, refresh_col = st.columns([0.82, 0.18])
         with title_col:
@@ -4898,6 +4904,8 @@ def show_weekly_report_user():
 
     if st.session_state.get("_weekly_prev_input_category") != input_category:
         st.session_state.pop("weekly_customer_combo", None)
+        for _cat in ["개설대기", "개설진행", "연계대기", "연계진행"]:
+            st.session_state.pop(f"weekly_plan_date_{_cat}", None)
         st.session_state["_weekly_prev_input_category"] = input_category
 
     categorized = mine[weekly_category_mask(mine, input_category, week_start, week_end)].copy()
@@ -4966,7 +4974,14 @@ def show_weekly_report_user():
         with f7:
             receipt_date = st.text_input("접수일자", value=default_receipt_date)
         with f8:
-            plan_date = st.text_input(plan_date_label, value=default_plan_date)
+            if input_category in ["개설대기", "개설진행", "연계대기", "연계진행"]:
+                plan_date = st.date_input(
+                    plan_date_label,
+                    value=date_input_value(default_plan_date, today.date()),
+                    key=f"weekly_plan_date_{input_category}",
+                ).strftime("%Y-%m-%d")
+            else:
+                plan_date = st.text_input(plan_date_label, value=default_plan_date)
 
         issue = st.text_area("이슈 / 진행내용", height=100, placeholder="PPT 주간보고의 이슈 항목처럼 고객별 진행상황을 작성")
         special_note = st.text_area("특이사항", height=80, placeholder="예정 작업, 고객 회신 필요사항, 은행 전달사항 등")
