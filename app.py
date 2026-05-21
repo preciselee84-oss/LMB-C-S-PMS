@@ -4796,7 +4796,7 @@ def show_weekly_report_user():
         if category == "개설진행":
             return open_progress
         if category == "개설대기":
-            return active & ~open_done & ~open_progress
+            return active & open_status.eq("개설대기")
         if category == "연계완료":
             link_complete = link_status.str.replace(r"\s+", "", regex=True).eq("ERP연계완료")
             if start_date is not None and end_date is not None:
