@@ -5141,10 +5141,6 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
         ["전체", "", count(open_wait), count(open_progress), count(open_done), count(link_wait), count(link_progress), count(link_done), count(terminated)],
         ["", "기본형", count(open_wait & basic), count(open_progress & basic), count(open_done & basic), "-", "-", "-", count(terminated & basic)],
         ["", "연계형", count(open_wait & linked), count(open_progress & linked), count(open_done & linked), count(link_wait & linked), count(link_progress & linked), count(link_done & linked), count(terminated & linked)],
-        ["", "개설취소", count(open_cancel), "-", "-", count(link_cancel), "-", "-", ""],
-        ["이관", "기본형", count(transfer & basic & open_wait), count(transfer & basic & open_progress), "-", "-", "-", "-", ""],
-        ["", "연계형", count(transfer & linked & open_wait), count(transfer & linked & open_progress), count(transfer & linked & open_done), count(transfer & linked & link_wait), count(transfer & linked & link_progress), "-", ""],
-        ["구축취소(누적)", "", count(open_cancel), "-", "연계취소(누적)", count(link_cancel), "-", "-", ""],
     ]
     status_df = pd.DataFrame(status_rows, columns=["구분", "유형", "구축대기", "구축진행", "구축완료", "연계대기", "연계진행", "연계완료", "해지"])
 
