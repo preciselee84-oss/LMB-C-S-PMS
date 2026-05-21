@@ -253,7 +253,13 @@ def send_kakao_notify(message):
 
 
 def get_staff_names():
-    return {info.get("name") for uid, info in st.session_state.get("user_db", {}).items() if uid != "1" and info.get("name")}
+    return {
+        info.get("name")
+        for uid, info in st.session_state.get("user_db", {}).items()
+        if uid != "1"
+        and info.get("name")
+        and info.get("dept_type", "사업부") == "C&S"
+    }
 
 
 def get_current_user_rank():
@@ -5944,6 +5950,7 @@ def show_dashboard():
             and info.get("name")
             and info.get("access") == "허용"
             and info.get("rank") != "부서장"
+            and info.get("dept_type", "사업부") == "C&S"
             and info.get("staff_type", "정규직") != "파견직"
         ]
         cards = []
