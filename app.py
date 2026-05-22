@@ -6487,7 +6487,7 @@ def build_link_billing_status(hana_df, billing_lookup, selected_month):
     if manage_col and manage_col in hana.columns:
         mask &= ~hana[manage_col].astype(str).str.strip().isin(["해지", "취소"])
     if link_status_col and link_status_col in hana.columns:
-        mask &= hana[link_status_col].astype(str).str.strip().eq("ERP연계완료")
+        mask &= hana[link_status_col].astype(str).str.strip().str.contains("연계완료", na=False)
     else:
         return pd.DataFrame()
 
