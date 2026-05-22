@@ -6753,10 +6753,26 @@ def inject_theme_toggle():
     body:has(#pms-d:checked) [data-testid="stDataFrame"] > div > div,
     body:has(#pms-d:checked) [data-testid="stDataFrame"] > div > div > div,
     body:has(#pms-d:checked) [data-testid="stDataEditor"] > div,
-    body:has(#pms-d:checked) [data-testid="stDataEditor"] > div > div {
-        background-color: #252535 !important;
-        border-color: #45475a !important;
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] > div > div,
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="grid"] {
+        background-color: #13131f !important;
+        border-color: #2d2d4a !important;
+        color: #e2e8f0 !important;
+    }
+    /* stDataEditor canvas — invert 필터로 라이트 렌더링을 다크로 반전 */
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] canvas {
+        filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.9) !important;
+    }
+    /* stDataEditor 인라인 편집 입력창 */
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] input,
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] textarea,
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] [contenteditable="true"],
+    body:has(#pms-d:checked) [data-testid="stDataEditor"] [data-baseweb="input"] input {
+        background-color: #1e1e34 !important;
         color: #ffffff !important;
+        caret-color: #ffffff !important;
+        border-color: #6366f1 !important;
+        -webkit-text-fill-color: #ffffff !important;
     }
 
     /* 3. ag-theme 컨테이너 전체 */
