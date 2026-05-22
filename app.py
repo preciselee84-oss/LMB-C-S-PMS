@@ -6455,8 +6455,8 @@ def build_open_billing_status(hana_df, billing_lookup, selected_month):
     out["_고객번호"] = base["_고객번호"]
 
     out = add_bank_compare_columns(out, billing_lookup, "업체명")
-    out = out.rename(columns={"사업자번호_은행": "은행 사업자번호"})
-    return out[["순번", "고객번호", "사업자번호", "업체명", "ERP연계 여부", "접수일자", "구축일자", "방문일자", "담당자", "비고", "청구시트 여부", "최초로그인", "은행 사업자번호", "최종로그인", "로그인횟수", "메뉴클릭수", "청구원본 고객명", "실적파일 고객명"]]
+    out = out.rename(columns={"최종로그인": "최종로그인일자"})
+    return out[["순번", "고객번호", "사업자번호", "업체명", "ERP연계 여부", "접수일자", "구축일자", "방문일자", "담당자", "비고", "최초로그인", "최종로그인일자", "로그인횟수", "메뉴클릭수"]]
 
 
 def build_link_billing_status(hana_df, billing_lookup, selected_month):
