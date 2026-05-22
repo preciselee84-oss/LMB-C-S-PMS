@@ -1974,7 +1974,7 @@ def show_sidebar():
 
         if st.session_state.user_role == "관리자":
             st.markdown("관리자 메뉴")
-            for menu_name in ["실적 분석/계산", "실적 보고서", "주간보고 취합"]:
+            for menu_name in ["실적 분석/계산", "실적 보고서", "청구자료 작성", "주간보고 취합"]:
                 if st.button(menu_name, use_container_width=True):
                     st.session_state.current_menu = menu_name
                     persist_current_menu()
@@ -2255,7 +2255,7 @@ def render_page_title(menu):
     if menu != "대시보드":
         st.markdown(f"## {menu}")
     settings_menus = ["직원 및 권한설정", "구글 스트레드시트 연동"]
-    admin_menus = ["실적 분석/계산", "실적 보고서", "주간보고 취합"]
+    admin_menus = ["실적 분석/계산", "실적 보고서", "청구자료 작성", "주간보고 취합"]
     if menu in settings_menus:
         parent_nav = "설정"
     elif menu in admin_menus:
@@ -6319,6 +6319,119 @@ def show_dashboard():
         )
         st.info("💡 위 활동들은 **[업로드 및 실적 확인] 메뉴 → 추가 실적 입력** 표에서 건수를 직접 입력하여 포인트를 적립할 수 있습니다.")
 
+def load_hana_billing_df(force_refresh=False):
+    billing_raw = read_google_csv(
+        st.session_state.get("url_hana_billing", DEFAULT_URL_HANA_BILLING),
+        force_refresh=force_refresh,
+    )
+    billing_raw = billing_raw.dropna(how="all").reset_index(drop=True)
+    st.session_state.hana_billing_df = billing_raw
+    return billing_raw
+
+
+def show_billing_materials():
+    title_col, refresh_col = st.columns([5, 1])
+    with title_col:
+        st.markdown("### 청구자료 작성")
+    with refresh_col:
+        refresh = st.button("새로고침", key="billing_refresh", use_container_width=True)
+
+    try:
+        billing_df = load_hana_billing_df(force_refresh=refresh)
+        if refresh:
+            st.success("새로고침 완료")
+    except Exception as e:
+        st.error(f"하나은행 청구 시트를 불러오지 못했습니다: {e}")
+        st.info("[구글 스트레드시트 연동] 메뉴에서 하나은행 청구 시트 CSV URL을 확인해주세요.")
+        return
+
+    if billing_df is None or billing_df.empty:
+        st.info("청구자료로 작성할 데이터가 없습니다.")
+        return
+
+    billing_df = billing_df.copy()
+    billing_df.columns = [str(c).strip() for c in billing_df.columns]
+
+    owner_col = find_col(billing_df, ["담당자"])
+    company_col = find_col(billing_df, ["업체명", "고객명", "상호"])
+    biz_col = find_col(billing_df, ["사업자번호"])
+    billing_date_col = find_col(billing_df, ["청구일자", "청구월", "연계청구일자", "연계청구일"])
+    open_date_col = find_col(billing_df, ["개설/이행일", "개설일"])
+    login_col = find_col(billing_df, ["최종로그인일자", "로그인일자"])
+    transfer_col = find_col(billing_df, ["최종이체일자", "이체일자"])
+    status_col = find_col(billing_df, ["상태", "처리상태", "청구상태"])
+
+    period_col = billing_date_col or open_date_col
+    period_series = pd.Series(pd.NaT, index=billing_df.index)
+    if period_col and period_col in billing_df.columns:
+        period_series = billing_df[period_col].apply(parse_sheet_date)
+        billing_df["_청구기준월"] = period_series.dt.strftime("%Y-%m")
+    else:
+        billing_df["_청구기준월"] = ""
+
+    month_values = sorted(
+        [m for m in billing_df["_청구기준월"].dropna().astype(str).unique().tolist() if m],
+        reverse=True,
+    )
+    month_options = ["전체"] + month_values
+    current_month = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m")
+    default_month_index = month_options.index(current_month) if current_month in month_options else 0
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        selected_month = st.selectbox("청구 기준월", month_options, index=default_month_index, key="billing_month")
+    with c2:
+        staff_options = ["전체"]
+        if owner_col and owner_col in billing_df.columns:
+            staff_options += sorted(v for v in billing_df[owner_col].dropna().astype(str).str.strip().unique().tolist() if v)
+        selected_staff = st.selectbox("담당자", staff_options, key="billing_staff")
+    with c3:
+        status_options = ["전체"]
+        if status_col and status_col in billing_df.columns:
+            status_options += sorted(v for v in billing_df[status_col].dropna().astype(str).str.strip().unique().tolist() if v)
+        selected_status = st.selectbox("상태", status_options, key="billing_status")
+
+    filtered_df = billing_df.copy()
+    if selected_month != "전체":
+        filtered_df = filtered_df[filtered_df["_청구기준월"] == selected_month]
+    if selected_staff != "전체" and owner_col and owner_col in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df[owner_col].astype(str).str.strip() == selected_staff]
+    if selected_status != "전체" and status_col and status_col in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df[status_col].astype(str).str.strip() == selected_status]
+
+    display_cols = [
+        c
+        for c in [owner_col, company_col, biz_col, billing_date_col, open_date_col, login_col, transfer_col, status_col]
+        if c and c in filtered_df.columns
+    ]
+    if display_cols:
+        display_df = filtered_df[display_cols].copy()
+    else:
+        display_df = filtered_df.drop(columns=["_청구기준월"], errors="ignore").copy()
+
+    for date_col in [billing_date_col, open_date_col, login_col, transfer_col]:
+        if date_col and date_col in display_df.columns:
+            parsed = display_df[date_col].apply(parse_sheet_date)
+            display_df[date_col] = parsed.dt.strftime("%Y-%m-%d").fillna(display_df[date_col].astype(str))
+
+    total_count = len(display_df)
+    staff_count = display_df[owner_col].nunique() if owner_col and owner_col in display_df.columns else 0
+    m1, m2, m3 = st.columns(3)
+    m1.metric("작성 대상", f"{total_count:,}건")
+    m2.metric("담당자 수", f"{staff_count:,}명")
+    m3.metric("기준월", selected_month)
+
+    render_plain_html_table(display_df, max_rows=1000, center_align=False)
+
+    file_month = selected_month.replace("-", "") if selected_month != "전체" else (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
+    st.download_button(
+        "청구자료 엑셀 다운로드",
+        data=dataframe_to_excel_bytes({"청구자료": display_df}),
+        file_name=f"청구자료_{file_month}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        disabled=display_df.empty,
+    )
 
 
 def show_google_sync():
@@ -7153,6 +7266,8 @@ def show_main():
         show_admin_analysis()
     elif menu == "실적 보고서":
         show_report()
+    elif menu == "청구자료 작성":
+        show_billing_materials()
     elif menu == "직원 및 권한설정":
         show_staff_admin()
     elif menu == "구글 스트레드시트 연동":
