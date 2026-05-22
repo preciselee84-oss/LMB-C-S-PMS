@@ -6329,6 +6329,197 @@ def load_hana_billing_df(force_refresh=False):
     return billing_raw
 
 
+def normalize_billing_customer_no(value):
+    if is_blank_value(value):
+        return ""
+    text = str(value).strip()
+    if re.match(r"^\d+\.0$", text):
+        text = text[:-2]
+    digits = re.sub(r"\D", "", text)
+    if not digits:
+        return ""
+    return digits.zfill(9)
+
+
+def normalize_biz_no(value):
+    if is_blank_value(value):
+        return ""
+    text = str(value).strip()
+    if re.match(r"^\d+\.0$", text):
+        text = text[:-2]
+    digits = re.sub(r"\D", "", text)
+    return digits.zfill(10) if digits else ""
+
+
+def format_yyyymmdd(value):
+    parsed = parse_sheet_date(value)
+    if pd.isna(parsed):
+        return ""
+    return parsed.strftime("%Y%m%d")
+
+
+def series_yyyymm(series):
+    parsed = pd.to_datetime(series.apply(parse_sheet_date), errors="coerce")
+    return parsed.dt.strftime("%Y-%m")
+
+
+def exact_col(df, names):
+    normalized = {str(c).replace(" ", "").replace("\n", "").replace("\r", ""): c for c in df.columns}
+    for name in names:
+        found = normalized.get(str(name).replace(" ", "").replace("\n", "").replace("\r", ""))
+        if found is not None:
+            return found
+    return None
+
+
+def build_billing_lookup(billing_df):
+    lookup = billing_df.copy()
+    lookup.columns = [str(c).strip() for c in lookup.columns]
+
+    customer_col = find_col(lookup, ["고객번호"])
+    company_col = find_col(lookup, ["고객명", "업체명", "상호"])
+    biz_col = find_col(lookup, ["사업자번호", "사업자등록번호"])
+    first_login_col = exact_col(lookup, ["신규일자"]) or find_col(lookup, ["신규일자", "최초신규일자"])
+    last_login_col = find_col(lookup, ["최종로그인일자", "최근로그인", "로그인일자"])
+    login_count_col = find_col(lookup, ["로그인건수", "로그인횟수", "로그인"])
+
+    if not customer_col:
+        return pd.DataFrame(columns=["_고객번호", "_은행고객명", "_은행사업자번호", "_최초로그인", "_최종로그인일자", "_로그인횟수"])
+
+    rows = pd.DataFrame()
+    rows["_고객번호"] = lookup[customer_col].apply(normalize_billing_customer_no)
+    rows["_은행고객명"] = lookup[company_col].astype(str).str.strip() if company_col else ""
+    rows["_은행사업자번호"] = lookup[biz_col].apply(normalize_biz_no) if biz_col else ""
+    rows["_최초로그인"] = lookup[first_login_col].apply(format_yyyymmdd) if first_login_col else ""
+    rows["_최종로그인일자"] = lookup[last_login_col].apply(format_yyyymmdd) if last_login_col else ""
+    rows["_로그인횟수"] = lookup[login_count_col].fillna("").astype(str).str.replace(r"\.0$", "", regex=True) if login_count_col else ""
+    rows = rows[rows["_고객번호"] != ""].drop_duplicates("_고객번호", keep="first")
+    return rows
+
+
+def add_bank_compare_columns(source_df, billing_lookup, source_company_col):
+    result = source_df.merge(billing_lookup, on="_고객번호", how="left")
+    result["최초로그인"] = result.get("_최초로그인", "").fillna("")
+    result["사업자번호_은행"] = result.get("_은행사업자번호", "").fillna("")
+    result["최종로그인일자"] = result.get("_최종로그인일자", "").fillna("")
+    result["로그인횟수"] = result.get("_로그인횟수", "").fillna("")
+    result["청구원본 고객명"] = result[source_company_col].fillna("").astype(str) if source_company_col in result.columns else ""
+    result["실적파일 고객명"] = result.get("_은행고객명", "").fillna("")
+    return result
+
+
+def build_open_billing_status(hana_df, billing_lookup, selected_month):
+    hana = hana_df.copy()
+    hana.columns = [str(c).strip() for c in hana.columns]
+
+    customer_col = find_col(hana, ["고객번호"])
+    biz_col = find_col(hana, ["사업자번호"])
+    company_col = find_col(hana, ["고객명", "업체명", "상호"])
+    build_type_col = find_col(hana, ["구축형"])
+    receipt_col = find_col(hana, ["신규접수일"])
+    open_date_col = find_col(hana, ["개설/이행일", "개설일", "이행일"])
+    owner_col = find_col(hana, ["담당자"])
+    manage_col = find_col(hana, ["관리구분"])
+    open_status_col = find_col(hana, ["개설상태"])
+
+    if not customer_col or not open_date_col:
+        return pd.DataFrame()
+
+    hana["_고객번호"] = hana[customer_col].apply(normalize_billing_customer_no)
+    hana["_기준월"] = series_yyyymm(hana[open_date_col])
+    mask = hana["_고객번호"].ne("") & hana["_기준월"].eq(selected_month)
+    if manage_col and manage_col in hana.columns:
+        mask &= ~hana[manage_col].astype(str).str.strip().isin(["해지", "취소"])
+    if open_status_col and open_status_col in hana.columns:
+        mask &= ~hana[open_status_col].astype(str).str.contains("취소|반려", na=False)
+
+    base = hana[mask].copy().reset_index(drop=True)
+    if base.empty:
+        return pd.DataFrame()
+
+    out = pd.DataFrame()
+    out["순번"] = range(1, len(base) + 1)
+    out["고객번호"] = base["_고객번호"]
+    out["사업자번호"] = base[biz_col].apply(normalize_biz_no) if biz_col else ""
+    out["업체명"] = base[company_col].fillna("").astype(str) if company_col else ""
+    out["ERP연계 여부"] = base[build_type_col].fillna("").astype(str) if build_type_col else ""
+    out["접수일자"] = base[receipt_col].apply(format_yyyymmdd) if receipt_col else ""
+    out["구축일자"] = base[open_date_col].apply(format_yyyymmdd)
+    out["방문일자"] = base[open_date_col].apply(format_yyyymmdd)
+    out["담당자"] = base[owner_col].fillna("").astype(str) if owner_col else ""
+    out["비고"] = ""
+    out["_고객번호"] = base["_고객번호"]
+
+    out = add_bank_compare_columns(out, billing_lookup, "업체명")
+    out = out.rename(columns={"사업자번호_은행": "은행 사업자번호"})
+    return out[["순번", "고객번호", "사업자번호", "업체명", "ERP연계 여부", "접수일자", "구축일자", "방문일자", "담당자", "비고", "최초로그인", "은행 사업자번호", "최종로그인일자", "로그인횟수", "청구원본 고객명", "실적파일 고객명"]]
+
+
+def build_link_billing_status(hana_df, billing_lookup, selected_month):
+    hana = hana_df.copy()
+    hana.columns = [str(c).strip() for c in hana.columns]
+
+    customer_col = find_col(hana, ["고객번호"])
+    biz_col = find_col(hana, ["사업자번호"])
+    company_col = find_col(hana, ["고객명", "업체명", "상호"])
+    add_receipt_col = find_col(hana, ["추가연계접수일"])
+    owner_col = find_col(hana, ["담당자"])
+    open_date_col = find_col(hana, ["개설/이행일", "개설일", "이행일"])
+    link_date_col = find_col(hana, ["연계일자"])
+    link_billing_col = find_col(hana, ["연계청구일자", "연계청구일", "청구일자"])
+    link_status_col = find_col(hana, ["연계상태"])
+    build_type_col = find_col(hana, ["구축형"])
+    manage_col = find_col(hana, ["관리구분"])
+
+    period_col = link_billing_col or link_date_col
+    if not customer_col or not period_col:
+        return pd.DataFrame()
+
+    hana["_고객번호"] = hana[customer_col].apply(normalize_billing_customer_no)
+    hana["_기준월"] = series_yyyymm(hana[period_col])
+    mask = hana["_고객번호"].ne("") & hana["_기준월"].eq(selected_month)
+    if build_type_col and build_type_col in hana.columns:
+        mask &= hana[build_type_col].astype(str).str.contains("연계", na=False)
+    if manage_col and manage_col in hana.columns:
+        mask &= ~hana[manage_col].astype(str).str.strip().isin(["해지", "취소"])
+    if link_status_col and link_status_col in hana.columns:
+        mask &= ~hana[link_status_col].astype(str).str.contains("취소|반려", na=False)
+
+    base = hana[mask].copy().reset_index(drop=True)
+    if base.empty:
+        return pd.DataFrame()
+
+    link_type = pd.Series("신규", index=base.index)
+    if add_receipt_col and add_receipt_col in base.columns:
+        link_type = np.where(base[add_receipt_col].apply(format_yyyymmdd).astype(str).ne(""), "추가", "신규")
+
+    out = pd.DataFrame()
+    out["순서"] = range(1, len(base) + 1)
+    out["고객번호"] = base["_고객번호"]
+    out["사업자번호"] = base[biz_col].apply(normalize_biz_no) if biz_col else ""
+    out["업체명"] = base[company_col].fillna("").astype(str) if company_col else ""
+    out["구분"] = link_type
+    out["추가연계신청일자"] = base[add_receipt_col].apply(format_yyyymmdd) if add_receipt_col else ""
+    out["담당자"] = base[owner_col].fillna("").astype(str) if owner_col else ""
+    out["구축일"] = base[open_date_col].apply(format_yyyymmdd) if open_date_col else ""
+    out["연계시작일자"] = base[link_date_col].apply(format_yyyymmdd) if link_date_col else ""
+    out["은행연계완료일자"] = base[link_billing_col].apply(format_yyyymmdd) if link_billing_col else ""
+    out["수령여부"] = ""
+    out["비고"] = ""
+    out["_고객번호"] = base["_고객번호"]
+
+    out = add_bank_compare_columns(out, billing_lookup, "업체명")
+    out = out.rename(columns={"사업자번호_은행": "은행 사업자번호"})
+    return out[["순서", "고객번호", "사업자번호", "업체명", "구분", "추가연계신청일자", "담당자", "구축일", "연계시작일자", "은행연계완료일자", "수령여부", "비고", "최초로그인", "은행 사업자번호", "최종로그인일자", "로그인횟수", "청구원본 고객명", "실적파일 고객명"]]
+
+
+def build_billing_status_excel_bytes(open_df, link_df):
+    return dataframe_to_excel_bytes({
+        "개설현황": open_df,
+        "연계현황": link_df,
+    })
+
+
 def show_billing_materials():
     title_col, refresh_col = st.columns([5, 1])
     with title_col:
@@ -6337,100 +6528,75 @@ def show_billing_materials():
         refresh = st.button("새로고침", key="billing_refresh", use_container_width=True)
 
     try:
+        hana_df = read_google_csv(
+            st.session_state.get("url_hana", DEFAULT_URL_HANA),
+            header=2,
+            force_refresh=refresh,
+        )
         billing_df = load_hana_billing_df(force_refresh=refresh)
         if refresh:
             st.success("새로고침 완료")
     except Exception as e:
-        st.error(f"하나은행 청구 시트를 불러오지 못했습니다: {e}")
-        st.info("[구글 스트레드시트 연동] 메뉴에서 하나은행 청구 시트 CSV URL을 확인해주세요.")
+        st.error(f"청구자료 생성용 구글 시트를 불러오지 못했습니다: {e}")
+        st.info("[구글 스트레드시트 연동] 메뉴에서 하나은행 구글 시트 CSV URL과 하나은행 청구 시트 CSV URL을 확인해주세요.")
         return
 
-    if billing_df is None or billing_df.empty:
+    if hana_df is None or hana_df.empty or billing_df is None or billing_df.empty:
         st.info("청구자료로 작성할 데이터가 없습니다.")
         return
 
-    billing_df = billing_df.copy()
-    billing_df.columns = [str(c).strip() for c in billing_df.columns]
+    hana_df = hana_df.dropna(how="all").reset_index(drop=True)
+    billing_df = billing_df.dropna(how="all").reset_index(drop=True)
 
-    owner_col = find_col(billing_df, ["담당자"])
-    company_col = find_col(billing_df, ["업체명", "고객명", "상호"])
-    biz_col = find_col(billing_df, ["사업자번호"])
-    billing_date_col = find_col(billing_df, ["청구일자", "청구월", "연계청구일자", "연계청구일"])
-    open_date_col = find_col(billing_df, ["개설/이행일", "개설일"])
-    login_col = find_col(billing_df, ["최종로그인일자", "로그인일자"])
-    transfer_col = find_col(billing_df, ["최종이체일자", "이체일자"])
-    status_col = find_col(billing_df, ["상태", "처리상태", "청구상태"])
+    hana_cols = [str(c).strip() for c in hana_df.columns]
+    hana_df.columns = hana_cols
+    open_date_col = find_col(hana_df, ["개설/이행일", "개설일", "이행일"])
+    link_billing_col = find_col(hana_df, ["연계청구일자", "연계청구일", "청구일자"])
+    link_date_col = find_col(hana_df, ["연계일자"])
 
-    period_col = billing_date_col or open_date_col
-    period_series = pd.Series(pd.NaT, index=billing_df.index)
-    if period_col and period_col in billing_df.columns:
-        period_series = billing_df[period_col].apply(parse_sheet_date)
-        billing_df["_청구기준월"] = period_series.dt.strftime("%Y-%m")
-    else:
-        billing_df["_청구기준월"] = ""
-
-    month_values = sorted(
-        [m for m in billing_df["_청구기준월"].dropna().astype(str).unique().tolist() if m],
-        reverse=True,
-    )
+    month_candidates = []
+    for date_col in [open_date_col, link_billing_col, link_date_col]:
+        if date_col and date_col in hana_df.columns:
+            month_candidates.extend(series_yyyymm(hana_df[date_col]).dropna().astype(str).tolist())
+    month_values = sorted([m for m in set(month_candidates) if m and m != "NaT"], reverse=True)
     month_options = ["전체"] + month_values
     current_month = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m")
     default_month_index = month_options.index(current_month) if current_month in month_options else 0
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns([1, 2])
     with c1:
         selected_month = st.selectbox("청구 기준월", month_options, index=default_month_index, key="billing_month")
     with c2:
-        staff_options = ["전체"]
-        if owner_col and owner_col in billing_df.columns:
-            staff_options += sorted(v for v in billing_df[owner_col].dropna().astype(str).str.strip().unique().tolist() if v)
-        selected_staff = st.selectbox("담당자", staff_options, key="billing_staff")
-    with c3:
-        status_options = ["전체"]
-        if status_col and status_col in billing_df.columns:
-            status_options += sorted(v for v in billing_df[status_col].dropna().astype(str).str.strip().unique().tolist() if v)
-        selected_status = st.selectbox("상태", status_options, key="billing_status")
+        st.caption("하나은행 구글 시트와 하나은행 청구 시트를 고객번호 기준으로 대사해 개설/연계현황을 생성합니다.")
 
-    filtered_df = billing_df.copy()
-    if selected_month != "전체":
-        filtered_df = filtered_df[filtered_df["_청구기준월"] == selected_month]
-    if selected_staff != "전체" and owner_col and owner_col in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df[owner_col].astype(str).str.strip() == selected_staff]
-    if selected_status != "전체" and status_col and status_col in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df[status_col].astype(str).str.strip() == selected_status]
+    if selected_month == "전체":
+        st.info("다운로드할 청구 기준월을 선택해주세요.")
+        return
 
-    display_cols = [
-        c
-        for c in [owner_col, company_col, biz_col, billing_date_col, open_date_col, login_col, transfer_col, status_col]
-        if c and c in filtered_df.columns
-    ]
-    if display_cols:
-        display_df = filtered_df[display_cols].copy()
-    else:
-        display_df = filtered_df.drop(columns=["_청구기준월"], errors="ignore").copy()
+    billing_lookup = build_billing_lookup(billing_df)
+    open_df = build_open_billing_status(hana_df, billing_lookup, selected_month)
+    link_df = build_link_billing_status(hana_df, billing_lookup, selected_month)
 
-    for date_col in [billing_date_col, open_date_col, login_col, transfer_col]:
-        if date_col and date_col in display_df.columns:
-            parsed = display_df[date_col].apply(parse_sheet_date)
-            display_df[date_col] = parsed.dt.strftime("%Y-%m-%d").fillna(display_df[date_col].astype(str))
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("개설현황", f"{len(open_df):,}건")
+    m2.metric("연계현황", f"{len(link_df):,}건")
+    m3.metric("은행 청구자료", f"{len(billing_lookup):,}건")
+    m4.metric("기준월", selected_month)
 
-    total_count = len(display_df)
-    staff_count = display_df[owner_col].nunique() if owner_col and owner_col in display_df.columns else 0
-    m1, m2, m3 = st.columns(3)
-    m1.metric("작성 대상", f"{total_count:,}건")
-    m2.metric("담당자 수", f"{staff_count:,}명")
-    m3.metric("기준월", selected_month)
+    tab_open, tab_link = st.tabs(["개설현황", "연계현황"])
+    with tab_open:
+        render_plain_html_table(open_df, max_rows=1000, center_align=False)
+    with tab_link:
+        render_plain_html_table(link_df, max_rows=1000, center_align=False)
 
-    render_plain_html_table(display_df, max_rows=1000, center_align=False)
-
-    file_month = selected_month.replace("-", "") if selected_month != "전체" else (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
+    file_month = selected_month.replace("-", "")
     st.download_button(
-        "청구자료 엑셀 다운로드",
-        data=dataframe_to_excel_bytes({"청구자료": display_df}),
-        file_name=f"청구자료_{file_month}.xlsx",
+        "개설/연계현황 다운로드",
+        data=build_billing_status_excel_bytes(open_df, link_df),
+        file_name=f"개설_연계현황_{file_month}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
-        disabled=display_df.empty,
+        disabled=open_df.empty and link_df.empty,
     )
 
 
