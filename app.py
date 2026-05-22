@@ -5178,24 +5178,93 @@ def show_weekly_report_user():
         st.info("아직 저장된 주간보고 이력이 없습니다.")
         return
 
-    history_df = pd.DataFrame(my_entries)
+    sorted_entries = sorted(my_entries, key=lambda x: x.get("작성시각", ""), reverse=True)
+    history_df = pd.DataFrame(sorted_entries)
     show_cols = ["보고시작일", "보고종료일", "부문", "카테고리", "고객명", "접수일자", "일자구분", "일자", "이슈", "특이사항", "상태", "작성시각"]
     show_cols = [c for c in show_cols if c in history_df.columns]
-    render_plain_html_table(history_df[show_cols].sort_values("작성시각", ascending=False), max_rows=300, center_align=False)
 
-    delete_options = ["선택안함"] + [
-        f"{row.get('작성시각', '')} | {row.get('카테고리', '')} | {row.get('고객명', '')}"
-        for row in sorted(my_entries, key=lambda x: x.get("작성시각", ""), reverse=True)
-    ]
-    selected_delete = st.selectbox("삭제할 이력", delete_options, key="weekly_delete_select")
-    if st.button("선택 이력 삭제", use_container_width=True, disabled=(selected_delete == "선택안함")):
-        delete_idx = delete_options.index(selected_delete) - 1
-        sorted_entries = sorted(my_entries, key=lambda x: x.get("작성시각", ""), reverse=True)
-        delete_id = sorted_entries[delete_idx].get("id")
-        db[user_name] = [row for row in my_entries if row.get("id") != delete_id]
-        save_db(WEEKLY_REPORT_FILE, db)
-        st.success("선택한 이력을 삭제했습니다.")
+    display_df = history_df[show_cols].copy()
+    display_df.insert(0, "선택", False)
+
+    edited_df = st.data_editor(
+        display_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={"선택": st.column_config.CheckboxColumn("선택", default=False, width="small")},
+        disabled=show_cols,
+        key="weekly_history_editor",
+    )
+
+    selected_indices = [i for i, v in enumerate(edited_df["선택"]) if v]
+    selected_ids = [sorted_entries[i].get("id") for i in selected_indices]
+
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        edit_clicked = st.button("수정", use_container_width=True, disabled=(len(selected_ids) != 1), key="weekly_edit_btn")
+    with btn_col2:
+        del_clicked = st.button("삭제", use_container_width=True, disabled=(len(selected_ids) == 0), key="weekly_del_btn")
+
+    if edit_clicked and len(selected_ids) == 1:
+        st.session_state["weekly_edit_id"] = selected_ids[0]
+        st.session_state["weekly_edit_mode"] = True
         st.rerun()
+
+    if del_clicked and selected_ids:
+        db[user_name] = [row for row in my_entries if row.get("id") not in selected_ids]
+        save_db(WEEKLY_REPORT_FILE, db)
+        st.success(f"{len(selected_ids)}개 이력을 삭제했습니다.")
+        st.rerun()
+
+    if st.session_state.get("weekly_edit_mode") and st.session_state.get("weekly_edit_id"):
+        edit_id = st.session_state["weekly_edit_id"]
+        edit_entry = next((row for row in my_entries if row.get("id") == edit_id), None)
+        if edit_entry:
+            st.markdown("---")
+            st.markdown("##### 선택 이력 수정")
+            with st.form("weekly_edit_form"):
+                ec1, ec2 = st.columns(2)
+                with ec1:
+                    e_start = st.text_input("보고시작일", value=edit_entry.get("보고시작일", ""))
+                    e_category = st.text_input("카테고리", value=edit_entry.get("카테고리", ""))
+                    e_receipt = st.text_input("접수일자", value=edit_entry.get("접수일자", ""))
+                    e_date = st.text_input("일자", value=edit_entry.get("일자", ""))
+                with ec2:
+                    e_end = st.text_input("보고종료일", value=edit_entry.get("보고종료일", ""))
+                    e_status = st.text_input("상태", value=edit_entry.get("상태", ""))
+                    e_date_type = st.text_input("일자구분", value=edit_entry.get("일자구분", ""))
+                e_issue = st.text_area("이슈 / 진행내용", value=edit_entry.get("이슈", ""), height=100)
+                e_special = st.text_area("특이사항", value=edit_entry.get("특이사항", ""), height=80)
+                sc1, sc2 = st.columns(2)
+                with sc1:
+                    save_edit = st.form_submit_button("저장", use_container_width=True, type="primary")
+                with sc2:
+                    cancel_edit = st.form_submit_button("취소", use_container_width=True)
+
+            if save_edit:
+                for i, row in enumerate(db.get(user_name, [])):
+                    if row.get("id") == edit_id:
+                        db[user_name][i].update({
+                            "보고시작일": e_start.strip(),
+                            "보고종료일": e_end.strip(),
+                            "카테고리": e_category.strip(),
+                            "접수일자": e_receipt.strip(),
+                            "일자구분": e_date_type.strip(),
+                            "일자": e_date.strip(),
+                            "상태": e_status.strip(),
+                            "이슈": e_issue.strip(),
+                            "특이사항": e_special.strip(),
+                        })
+                        break
+                save_db(WEEKLY_REPORT_FILE, db)
+                st.session_state["weekly_edit_mode"] = False
+                st.session_state["weekly_edit_id"] = None
+                st.success("수정되었습니다.")
+                st.rerun()
+
+            if cancel_edit:
+                st.session_state["weekly_edit_mode"] = False
+                st.session_state["weekly_edit_id"] = None
+                st.rerun()
 
 
 def load_weekly_hana_for_status():
