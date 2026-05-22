@@ -308,64 +308,74 @@ def upload_payload_to_dataframe(payload):
     return pd.DataFrame(payload.get("rows", []), columns=payload.get("columns", []))
 
 
+_USER_DB_DEFAULT = {
+    "1": {
+        "pw": "1",
+        "name": "최고관리자",
+        "email": "",
+        "access": "허용",
+        "role": "관리자",
+        "dept_type": "사업부",
+        "staff_type": "정규직",
+        "outsource": "아니오",
+        "outsource_period": "해당없음",
+    },
+    "T": {
+        "pw": "1111",
+        "name": "이성환",
+        "email": "",
+        "access": "허용",
+        "role": "관리자",
+        "dept_type": "사업부",
+        "staff_type": "정규직",
+        "outsource": "아니오",
+        "outsource_period": "해당없음",
+    },
+}
+
+
+def load_user_db():
+    """users.json → users.json.bak → GitHub → {} 순서로 로드 후 기본 계정과 병합하여 반환.
+    절대 기본 계정(1, T)이 누락되지 않도록 보장."""
+    loaded = {}
+    # 1) 메인 파일
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r", encoding="utf-8") as f:
+                d = json.load(f)
+            if isinstance(d, dict) and len(d) > 1:
+                loaded = d
+        except Exception:
+            pass
+    # 2) 백업 파일 (메인에서 1명 이하로 로드된 경우만)
+    if len(loaded) <= 1:
+        bak = DB_FILE + ".bak"
+        if os.path.exists(bak):
+            try:
+                with open(bak, "r", encoding="utf-8") as f:
+                    d = json.load(f)
+                if isinstance(d, dict) and len(d) > 1:
+                    loaded = d
+                    # 백업으로 메인 복구
+                    try:
+                        with open(DB_FILE, "w", encoding="utf-8") as f:
+                            json.dump(d, f, ensure_ascii=False, indent=4)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+    # 3) GitHub (로컬에 데이터 없을 때)
+    if len(loaded) <= 1:
+        gh = _github_load(DB_FILE, None)
+        if isinstance(gh, dict) and len(gh) > 1:
+            loaded = gh
+    # 기본 계정을 베이스로, 로드된 데이터로 덮어쓰기 (기본 계정 누락 시 복원)
+    return {**_USER_DB_DEFAULT, **loaded}
+
+
 def init_state():
     if "user_db" not in st.session_state:
-        _default_db = {
-            "1": {
-                "pw": "1",
-                "name": "최고관리자",
-                "email": "",
-                "access": "허용",
-                "role": "관리자",
-                "dept_type": "사업부",
-                "staff_type": "정규직",
-                "outsource": "아니오",
-                "outsource_period": "해당없음",
-            },
-            "T": {
-                "pw": "1111",
-                "name": "이성환",
-                "email": "",
-                "access": "허용",
-                "role": "관리자",
-                "dept_type": "사업부",
-                "staff_type": "정규직",
-                "outsource": "아니오",
-                "outsource_period": "해당없음",
-            },
-        }
-        # 복원 우선순위: users.json → users.json.bak → GitHub → 기본값
-        def _load_user_db():
-            # 1) 메인 파일
-            if os.path.exists(DB_FILE):
-                try:
-                    with open(DB_FILE, "r", encoding="utf-8") as _f:
-                        _d = json.load(_f)
-                    if isinstance(_d, dict) and len(_d) > 1:
-                        return _d
-                except Exception:
-                    pass
-            # 2) 백업 파일
-            _bak = DB_FILE + ".bak"
-            if os.path.exists(_bak):
-                try:
-                    with open(_bak, "r", encoding="utf-8") as _f:
-                        _d = json.load(_f)
-                    if isinstance(_d, dict) and len(_d) > 1:
-                        # 백업에서 복원했으면 메인도 복구
-                        with open(DB_FILE, "w", encoding="utf-8") as _f:
-                            json.dump(_d, _f, ensure_ascii=False, indent=4)
-                        return _d
-                except Exception:
-                    pass
-            # 3) GitHub
-            _gh = _github_load(DB_FILE, None)
-            if isinstance(_gh, dict) and len(_gh) > 1:
-                return _gh
-            return {}
-        _loaded = _load_user_db()
-        # 기본 계정은 항상 베이스로 유지 (누락된 경우 복원)
-        st.session_state.user_db = {**_default_db, **_loaded}
+        st.session_state.user_db = load_user_db()
 
     defaults = {
         "logged_in": False,
@@ -4245,6 +4255,10 @@ def show_report():
 
 def show_staff_admin():
     st.markdown("### 직원 목록")
+
+    # 신규 가입 신청자 등 다른 세션의 변경사항을 반영하기 위해 파일에서 재로드
+    # load_user_db()는 항상 기본 계정과 병합하므로 데이터 유실 없음
+    st.session_state.user_db = load_user_db()
 
     if st.session_state.pop("reset_staff_edit_sel", False):
         st.session_state.staff_edit_sel = "선택안함"
