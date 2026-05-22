@@ -6487,7 +6487,9 @@ def build_link_billing_status(hana_df, billing_lookup, selected_month):
     if manage_col and manage_col in hana.columns:
         mask &= ~hana[manage_col].astype(str).str.strip().isin(["해지", "취소"])
     if link_status_col and link_status_col in hana.columns:
-        mask &= ~hana[link_status_col].astype(str).str.contains("취소|반려", na=False)
+        mask &= hana[link_status_col].astype(str).str.strip().eq("ERP연계완료")
+    else:
+        return pd.DataFrame()
 
     base = hana[mask].copy().reset_index(drop=True)
     if base.empty:
@@ -6595,16 +6597,32 @@ def show_billing_materials():
     with tab_open:
         render_plain_html_table(open_df, max_rows=1000, center_align=False)
     with tab_link:
-        render_plain_html_table(link_df, max_rows=1000, center_align=False)
+        selected_link_df = link_df.copy()
+        if link_df.empty:
+            render_plain_html_table(link_df, max_rows=1000, center_align=False)
+        else:
+            link_select_df = link_df.copy()
+            link_select_df["다운로드"] = False
+            edited_link_df = st.data_editor(
+                link_select_df,
+                use_container_width=True,
+                hide_index=True,
+                num_rows="fixed",
+                disabled=[c for c in link_select_df.columns if c != "다운로드"],
+                column_config={"다운로드": st.column_config.CheckboxColumn("다운로드", default=False, width="small")},
+                key=f"billing_link_select_{selected_month}",
+            )
+            selected_link_df = edited_link_df[edited_link_df["다운로드"]].drop(columns=["다운로드"], errors="ignore")
+            st.caption(f"다운로드 선택: {len(selected_link_df):,}건")
 
     file_month = selected_month.replace("-", "")
     st.download_button(
         "개설/연계현황 다운로드",
-        data=build_billing_status_excel_bytes(open_df, link_df),
+        data=build_billing_status_excel_bytes(open_df, selected_link_df),
         file_name=f"개설_연계현황_{file_month}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
-        disabled=open_df.empty and link_df.empty,
+        disabled=open_df.empty and selected_link_df.empty,
     )
 
 
