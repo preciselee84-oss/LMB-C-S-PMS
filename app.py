@@ -127,6 +127,13 @@ def load_db(file_path, default_data):
 def save_db(file_path, data):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+    # 직원DB는 .bak 백업 파일도 항상 동기화 (로컬 데이터 유실 방지)
+    if file_path == DB_FILE:
+        try:
+            with open(file_path + ".bak", "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+        except Exception:
+            pass
     _github_save(file_path, data)
 
 
@@ -327,9 +334,37 @@ def init_state():
                 "outsource_period": "해당없음",
             },
         }
-        # 파일/GitHub에서 로드한 데이터와 기본값을 병합
-        # 기본 계정(1, T)이 파일에서 누락돼도 항상 복원되도록 default를 베이스로 사용
-        _loaded = load_db(DB_FILE, {})
+        # 복원 우선순위: users.json → users.json.bak → GitHub → 기본값
+        def _load_user_db():
+            # 1) 메인 파일
+            if os.path.exists(DB_FILE):
+                try:
+                    with open(DB_FILE, "r", encoding="utf-8") as _f:
+                        _d = json.load(_f)
+                    if isinstance(_d, dict) and len(_d) > 1:
+                        return _d
+                except Exception:
+                    pass
+            # 2) 백업 파일
+            _bak = DB_FILE + ".bak"
+            if os.path.exists(_bak):
+                try:
+                    with open(_bak, "r", encoding="utf-8") as _f:
+                        _d = json.load(_f)
+                    if isinstance(_d, dict) and len(_d) > 1:
+                        # 백업에서 복원했으면 메인도 복구
+                        with open(DB_FILE, "w", encoding="utf-8") as _f:
+                            json.dump(_d, _f, ensure_ascii=False, indent=4)
+                        return _d
+                except Exception:
+                    pass
+            # 3) GitHub
+            _gh = _github_load(DB_FILE, None)
+            if isinstance(_gh, dict) and len(_gh) > 1:
+                return _gh
+            return {}
+        _loaded = _load_user_db()
+        # 기본 계정은 항상 베이스로 유지 (누락된 경우 복원)
         st.session_state.user_db = {**_default_db, **_loaded}
 
     defaults = {

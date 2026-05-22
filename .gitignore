@@ -6,3 +6,4 @@
 
 # Local JSON data files
 *.json
+*.json.bak
