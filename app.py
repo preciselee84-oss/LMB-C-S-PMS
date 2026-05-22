@@ -5198,7 +5198,7 @@ def show_weekly_report_user():
     selected_indices = [i for i, v in enumerate(edited_df["선택"]) if v]
     selected_ids = [sorted_entries[i].get("id") for i in selected_indices]
 
-    btn_col1, btn_col2 = st.columns(2)
+    btn_col1, btn_col2, _ = st.columns([15, 15, 70])
     with btn_col1:
         edit_clicked = st.button("수정", use_container_width=True, disabled=(len(selected_ids) != 1), key="weekly_edit_btn")
     with btn_col2:
