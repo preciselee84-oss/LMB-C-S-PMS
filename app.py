@@ -303,33 +303,34 @@ def upload_payload_to_dataframe(payload):
 
 def init_state():
     if "user_db" not in st.session_state:
-        st.session_state.user_db = load_db(
-            DB_FILE,
-            {
-                "1": {
-                    "pw": "1",
-                    "name": "최고관리자",
-                    "email": "",
-                    "access": "허용",
-                    "role": "관리자",
-                    "dept_type": "사업부",
-                    "staff_type": "정규직",
-                    "outsource": "아니오",
-                    "outsource_period": "해당없음",
-                },
-                "T": {
-                    "pw": "1111",
-                    "name": "이성환",
-                    "email": "",
-                    "access": "허용",
-                    "role": "관리자",
-                    "dept_type": "사업부",
-                    "staff_type": "정규직",
-                    "outsource": "아니오",
-                    "outsource_period": "해당없음",
-                },
+        _default_db = {
+            "1": {
+                "pw": "1",
+                "name": "최고관리자",
+                "email": "",
+                "access": "허용",
+                "role": "관리자",
+                "dept_type": "사업부",
+                "staff_type": "정규직",
+                "outsource": "아니오",
+                "outsource_period": "해당없음",
             },
-        )
+            "T": {
+                "pw": "1111",
+                "name": "이성환",
+                "email": "",
+                "access": "허용",
+                "role": "관리자",
+                "dept_type": "사업부",
+                "staff_type": "정규직",
+                "outsource": "아니오",
+                "outsource_period": "해당없음",
+            },
+        }
+        # 파일/GitHub에서 로드한 데이터와 기본값을 병합
+        # 기본 계정(1, T)이 파일에서 누락돼도 항상 복원되도록 default를 베이스로 사용
+        _loaded = load_db(DB_FILE, {})
+        st.session_state.user_db = {**_default_db, **_loaded}
 
     defaults = {
         "logged_in": False,
