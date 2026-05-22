@@ -1751,6 +1751,36 @@ def show_auth_page():
                 st.session_state.auth_mode = "signup"
                 st.rerun()
 
+            if st.button("비밀번호 찾기", use_container_width=True):
+                st.session_state.auth_mode = "find_pw"
+                st.rerun()
+
+        elif st.session_state.auth_mode == "find_pw":
+            st.markdown("#### 비밀번호 찾기")
+            st.markdown("아이디와 가입 시 등록한 메일주소를 입력하세요.")
+
+            with st.form("find_pw_form"):
+                fp_id = st.text_input("아이디", key="fp_id")
+                fp_email = st.text_input("메일주소", key="fp_email")
+                fp_submitted = st.form_submit_button("확인", use_container_width=True, type="primary")
+
+            if fp_submitted:
+                fp_id_str = fp_id.strip() if fp_id else ""
+                fp_email_str = fp_email.strip() if fp_email else ""
+                if not fp_id_str or not fp_email_str:
+                    st.error("아이디와 메일주소를 모두 입력해주세요.")
+                else:
+                    db = st.session_state.user_db
+                    user_info = db.get(fp_id_str)
+                    if user_info and user_info.get("email", "").strip() == fp_email_str:
+                        st.success(f"비밀번호: **{user_info.get('pw', '')}**")
+                    else:
+                        st.error("일치하는 계정 정보가 없습니다.")
+
+            if st.button("로그인으로 돌아가기", use_container_width=True, key="fp_back"):
+                st.session_state.auth_mode = "login"
+                st.rerun()
+
         else:
             # 아이디 실시간 중복 확인 (폼 바깥)
             r_id_check = st.text_input("아이디", key="r_id_check")
