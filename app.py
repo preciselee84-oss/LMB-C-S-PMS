@@ -1752,30 +1752,34 @@ def show_auth_page():
                 st.rerun()
 
         else:
-            r_id = st.text_input("아이디", key="r_id")
-            if r_id:
-                if r_id in st.session_state.user_db:
+            # 아이디 실시간 중복 확인 (폼 바깥)
+            r_id_check = st.text_input("아이디", key="r_id_check")
+            if r_id_check:
+                if r_id_check in st.session_state.user_db:
                     st.error("이미 사용 중인 아이디입니다.")
                 else:
                     st.success("사용 가능한 아이디입니다.")
 
-            r_name = st.text_input("성명", key="r_name")
-            r_email = st.text_input("메일주소", key="r_email")
-            r_pw = st.text_input("비밀번호", type="password", key="r_pw")
-            r_pw2 = st.text_input("비밀번호 확인", type="password", key="r_pw2")
+            with st.form("signup_form"):
+                f_id = st.text_input("아이디 (확인용 재입력)", key="f_id")
+                f_name = st.text_input("성명", key="f_name")
+                f_email = st.text_input("메일주소", key="f_email")
+                f_pw = st.text_input("비밀번호", type="password", key="f_pw")
+                f_pw2 = st.text_input("비밀번호 확인", type="password", key="f_pw2")
+                submitted = st.form_submit_button("회원가입", use_container_width=True, type="primary")
 
-            if st.button("회원가입", use_container_width=True, type="primary"):
-                if not r_id or not r_name or not r_email or not r_pw or not r_pw2:
+            if submitted:
+                if not f_id or not f_name or not f_email or not f_pw or not f_pw2:
                     st.error("모든 항목을 입력해주세요.")
-                elif r_pw != r_pw2:
+                elif f_pw != f_pw2:
                     st.error("비밀번호가 일치하지 않습니다.")
-                elif r_id in st.session_state.user_db:
+                elif f_id in st.session_state.user_db:
                     st.error("이미 존재하는 아이디입니다.")
                 else:
-                    st.session_state.user_db[r_id] = {
-                        "pw": r_pw,
-                        "name": r_name,
-                        "email": r_email,
+                    st.session_state.user_db[f_id] = {
+                        "pw": f_pw,
+                        "name": f_name,
+                        "email": f_email,
                         "access": "불가",
                         "role": "사용자",
                         "dept_type": "사업부",
