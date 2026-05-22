@@ -6472,20 +6472,12 @@ def build_link_billing_status(hana_df, billing_lookup, selected_month):
     link_date_col = find_col(hana, ["연계일자"])
     link_billing_col = find_col(hana, ["연계청구일자", "연계청구일", "청구일자"])
     link_status_col = find_col(hana, ["연계상태"])
-    build_type_col = find_col(hana, ["구축형"])
-    manage_col = find_col(hana, ["관리구분"])
 
-    period_col = link_billing_col or link_date_col
-    if not customer_col or not period_col:
+    if not customer_col:
         return pd.DataFrame()
 
     hana["_고객번호"] = hana[customer_col].apply(normalize_billing_customer_no)
-    hana["_기준월"] = series_yyyymm(hana[period_col])
-    mask = hana["_고객번호"].ne("") & hana["_기준월"].eq(selected_month)
-    if build_type_col and build_type_col in hana.columns:
-        mask &= hana[build_type_col].astype(str).str.contains("연계", na=False)
-    if manage_col and manage_col in hana.columns:
-        mask &= ~hana[manage_col].astype(str).str.strip().isin(["해지", "취소"])
+    mask = hana["_고객번호"].ne("")
     if link_status_col and link_status_col in hana.columns:
         mask &= hana[link_status_col].astype(str).str.strip().str.contains("연계완료", na=False)
     else:
