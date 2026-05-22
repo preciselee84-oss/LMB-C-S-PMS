@@ -6382,27 +6382,31 @@ def build_billing_lookup(billing_df):
     first_login_col = exact_col(lookup, ["신규일자"]) or find_col(lookup, ["신규일자", "최초신규일자"])
     last_login_col = find_col(lookup, ["최종로그인일자", "최근로그인", "로그인일자"])
     login_count_col = find_col(lookup, ["로그인건수", "로그인횟수", "로그인"])
+    menu_click_col = exact_col(lookup, ["메뉴사용"]) or find_col(lookup, ["메뉴사용", "메뉴클릭수"])
 
     if not customer_col:
-        return pd.DataFrame(columns=["_고객번호", "_은행고객명", "_은행사업자번호", "_최초로그인", "_최종로그인일자", "_로그인횟수"])
+        return pd.DataFrame(columns=["_고객번호", "_은행고객명", "_은행사업자번호", "_최초로그인", "_최종로그인", "_로그인횟수", "_메뉴클릭수"])
 
     rows = pd.DataFrame()
     rows["_고객번호"] = lookup[customer_col].apply(normalize_billing_customer_no)
     rows["_은행고객명"] = lookup[company_col].astype(str).str.strip() if company_col else ""
     rows["_은행사업자번호"] = lookup[biz_col].apply(normalize_biz_no) if biz_col else ""
     rows["_최초로그인"] = lookup[first_login_col].apply(format_yyyymmdd) if first_login_col else ""
-    rows["_최종로그인일자"] = lookup[last_login_col].apply(format_yyyymmdd) if last_login_col else ""
+    rows["_최종로그인"] = lookup[last_login_col].apply(format_yyyymmdd) if last_login_col else ""
     rows["_로그인횟수"] = lookup[login_count_col].fillna("").astype(str).str.replace(r"\.0$", "", regex=True) if login_count_col else ""
+    rows["_메뉴클릭수"] = lookup[menu_click_col].fillna("").astype(str).str.replace(r"\.0$", "", regex=True) if menu_click_col else ""
     rows = rows[rows["_고객번호"] != ""].drop_duplicates("_고객번호", keep="first")
     return rows
 
 
 def add_bank_compare_columns(source_df, billing_lookup, source_company_col):
     result = source_df.merge(billing_lookup, on="_고객번호", how="left")
+    result["청구시트 여부"] = np.where(result.get("_은행고객명", "").fillna("").astype(str).str.strip().ne(""), "있음", "없음")
     result["최초로그인"] = result.get("_최초로그인", "").fillna("")
     result["사업자번호_은행"] = result.get("_은행사업자번호", "").fillna("")
-    result["최종로그인일자"] = result.get("_최종로그인일자", "").fillna("")
+    result["최종로그인"] = result.get("_최종로그인", "").fillna("")
     result["로그인횟수"] = result.get("_로그인횟수", "").fillna("")
+    result["메뉴클릭수"] = result.get("_메뉴클릭수", "").fillna("")
     result["청구원본 고객명"] = result[source_company_col].fillna("").astype(str) if source_company_col in result.columns else ""
     result["실적파일 고객명"] = result.get("_은행고객명", "").fillna("")
     return result
@@ -6452,7 +6456,7 @@ def build_open_billing_status(hana_df, billing_lookup, selected_month):
 
     out = add_bank_compare_columns(out, billing_lookup, "업체명")
     out = out.rename(columns={"사업자번호_은행": "은행 사업자번호"})
-    return out[["순번", "고객번호", "사업자번호", "업체명", "ERP연계 여부", "접수일자", "구축일자", "방문일자", "담당자", "비고", "최초로그인", "은행 사업자번호", "최종로그인일자", "로그인횟수", "청구원본 고객명", "실적파일 고객명"]]
+    return out[["순번", "고객번호", "사업자번호", "업체명", "ERP연계 여부", "접수일자", "구축일자", "방문일자", "담당자", "비고", "청구시트 여부", "최초로그인", "은행 사업자번호", "최종로그인", "로그인횟수", "메뉴클릭수", "청구원본 고객명", "실적파일 고객명"]]
 
 
 def build_link_billing_status(hana_df, billing_lookup, selected_month):
@@ -6510,7 +6514,7 @@ def build_link_billing_status(hana_df, billing_lookup, selected_month):
 
     out = add_bank_compare_columns(out, billing_lookup, "업체명")
     out = out.rename(columns={"사업자번호_은행": "은행 사업자번호"})
-    return out[["순서", "고객번호", "사업자번호", "업체명", "구분", "추가연계신청일자", "담당자", "구축일", "연계시작일자", "은행연계완료일자", "수령여부", "비고", "최초로그인", "은행 사업자번호", "최종로그인일자", "로그인횟수", "청구원본 고객명", "실적파일 고객명"]]
+    return out[["순서", "고객번호", "사업자번호", "업체명", "구분", "추가연계신청일자", "담당자", "구축일", "연계시작일자", "은행연계완료일자", "수령여부", "비고", "청구시트 여부", "최초로그인", "은행 사업자번호", "최종로그인", "로그인횟수", "메뉴클릭수", "청구원본 고객명", "실적파일 고객명"]]
 
 
 def build_billing_status_excel_bytes(open_df, link_df):
@@ -6577,10 +6581,14 @@ def show_billing_materials():
     open_df = build_open_billing_status(hana_df, billing_lookup, selected_month)
     link_df = build_link_billing_status(hana_df, billing_lookup, selected_month)
 
+    open_missing_billing = 0
+    if "청구시트 여부" in open_df.columns:
+        open_missing_billing = int(open_df["청구시트 여부"].astype(str).eq("없음").sum())
+
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("개설현황", f"{len(open_df):,}건")
     m2.metric("연계현황", f"{len(link_df):,}건")
-    m3.metric("은행 청구자료", f"{len(billing_lookup):,}건")
+    m3.metric("개설 청구시트 없음", f"{open_missing_billing:,}건")
     m4.metric("기준월", selected_month)
 
     tab_open, tab_link = st.tabs(["개설현황", "연계현황"])
