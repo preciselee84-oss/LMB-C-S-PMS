@@ -6595,7 +6595,23 @@ def show_billing_materials():
 
     tab_open, tab_link = st.tabs(["개설현황", "연계현황"])
     with tab_open:
-        render_plain_html_table(open_df, max_rows=1000, center_align=False)
+        selected_open_df = open_df.copy()
+        if open_df.empty:
+            render_plain_html_table(open_df, max_rows=1000, center_align=False)
+        else:
+            open_select_df = open_df.copy()
+            open_select_df["다운로드"] = False
+            edited_open_df = st.data_editor(
+                open_select_df,
+                use_container_width=True,
+                hide_index=True,
+                num_rows="fixed",
+                disabled=[c for c in open_select_df.columns if c != "다운로드"],
+                column_config={"다운로드": st.column_config.CheckboxColumn("다운로드", default=False, width="small")},
+                key=f"billing_open_select_{selected_month}",
+            )
+            selected_open_df = edited_open_df[edited_open_df["다운로드"]].drop(columns=["다운로드"], errors="ignore")
+            st.caption(f"다운로드 선택: {len(selected_open_df):,}건")
     with tab_link:
         selected_link_df = link_df.copy()
         if link_df.empty:
@@ -6618,11 +6634,11 @@ def show_billing_materials():
     file_month = selected_month.replace("-", "")
     st.download_button(
         "개설/연계현황 다운로드",
-        data=build_billing_status_excel_bytes(open_df, selected_link_df),
+        data=build_billing_status_excel_bytes(selected_open_df, selected_link_df),
         file_name=f"개설_연계현황_{file_month}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
-        disabled=open_df.empty and selected_link_df.empty,
+        disabled=selected_open_df.empty and selected_link_df.empty,
     )
 
 
