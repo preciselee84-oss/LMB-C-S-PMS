@@ -4297,6 +4297,44 @@ def show_staff_admin():
     if st.session_state.pop("reset_staff_edit_sel", False):
         st.session_state.staff_edit_sel = "선택안함"
 
+    # ── 직원 직접 추가 ──
+    with st.expander("직원 직접 추가", expanded=False):
+        with st.form("add_staff_form"):
+            ac1, ac2 = st.columns(2)
+            with ac1:
+                new_uid = st.text_input("아이디", key="add_staff_uid")
+                new_name = st.text_input("성명", key="add_staff_name")
+                new_email = st.text_input("메일주소", key="add_staff_email")
+            with ac2:
+                new_pw = st.text_input("비밀번호", type="password", key="add_staff_pw")
+                new_access = st.selectbox("로그인 허용 여부", ["허용", "불가"], key="add_staff_access")
+                new_role = st.selectbox("메뉴 접근 권한", ["사용자 메뉴", "관리자 메뉴"], key="add_staff_role")
+            add_submitted = st.form_submit_button("추가", use_container_width=True, type="primary")
+
+        if add_submitted:
+            uid_str = new_uid.strip()
+            name_str = new_name.strip()
+            pw_str = new_pw.strip()
+            if not uid_str or not name_str or not pw_str:
+                st.error("아이디, 성명, 비밀번호는 필수 입력입니다.")
+            elif uid_str in st.session_state.user_db:
+                st.error(f"이미 존재하는 아이디입니다: {uid_str}")
+            else:
+                st.session_state.user_db[uid_str] = {
+                    "pw": pw_str,
+                    "name": name_str,
+                    "email": new_email.strip(),
+                    "access": new_access,
+                    "role": "관리자" if new_role == "관리자 메뉴" else "사용자",
+                    "dept_type": "사업부",
+                    "staff_type": "정규직",
+                    "outsource": "아니오",
+                    "outsource_period": "해당없음",
+                }
+                save_db(DB_FILE, st.session_state.user_db)
+                st.success(f"직원 '{name_str}({uid_str})'을(를) 추가했습니다.")
+                st.rerun()
+
     staff_rows = []
     for uid, info in st.session_state.user_db.items():
         if uid == "1":
