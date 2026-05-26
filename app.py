@@ -124,7 +124,11 @@ def load_db(file_path, default_data):
     return data
 
 
-def save_db(file_path, data):
+def save_db(file_path, data, allow_shrink=False):
+    if file_path == DB_FILE and not allow_shrink:
+        existing = load_user_db()
+        if len(existing) > len(data):
+            data = merge_user_db(existing, data)
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
     # 직원DB는 .bak 백업 파일도 항상 동기화 (로컬 데이터 유실 방지)
@@ -337,40 +341,61 @@ _USER_DB_DEFAULT = {
 def load_user_db():
     """users.json → users.json.bak → GitHub → {} 순서로 로드 후 기본 계정과 병합하여 반환.
     절대 기본 계정(1, T)이 누락되지 않도록 보장."""
-    loaded = {}
+    candidates = []
+
     # 1) 메인 파일
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r", encoding="utf-8") as f:
                 d = json.load(f)
-            if isinstance(d, dict) and len(d) > 1:
-                loaded = d
+            if isinstance(d, dict):
+                candidates.append(d)
         except Exception:
             pass
-    # 2) 백업 파일 (메인에서 1명 이하로 로드된 경우만)
-    if len(loaded) <= 1:
-        bak = DB_FILE + ".bak"
-        if os.path.exists(bak):
-            try:
-                with open(bak, "r", encoding="utf-8") as f:
-                    d = json.load(f)
-                if isinstance(d, dict) and len(d) > 1:
-                    loaded = d
-                    # 백업으로 메인 복구
-                    try:
-                        with open(DB_FILE, "w", encoding="utf-8") as f:
-                            json.dump(d, f, ensure_ascii=False, indent=4)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-    # 3) GitHub (로컬에 데이터 없을 때)
-    if len(loaded) <= 1:
-        gh = _github_load(DB_FILE, None)
-        if isinstance(gh, dict) and len(gh) > 1:
-            loaded = gh
+
+    # 2) 백업 파일
+    bak = DB_FILE + ".bak"
+    if os.path.exists(bak):
+        try:
+            with open(bak, "r", encoding="utf-8") as f:
+                d = json.load(f)
+            if isinstance(d, dict):
+                candidates.append(d)
+        except Exception:
+            pass
+
+    # 3) GitHub
+    gh = _github_load(DB_FILE, None)
+    if isinstance(gh, dict):
+        candidates.append(gh)
+
+    loaded = {}
+    for candidate in candidates:
+        if len(candidate) > len(loaded):
+            loaded = candidate
+
+    if len(loaded) > 1:
+        try:
+            with open(DB_FILE, "w", encoding="utf-8") as f:
+                json.dump(loaded, f, ensure_ascii=False, indent=4)
+            with open(DB_FILE + ".bak", "w", encoding="utf-8") as f:
+                json.dump(loaded, f, ensure_ascii=False, indent=4)
+        except Exception:
+            pass
+
     # 기본 계정을 베이스로, 로드된 데이터로 덮어쓰기 (기본 계정 누락 시 복원)
     return {**_USER_DB_DEFAULT, **loaded}
+
+
+def merge_user_db(existing, incoming):
+    merged = {**_USER_DB_DEFAULT}
+    if isinstance(existing, dict):
+        merged.update(existing)
+    if isinstance(incoming, dict):
+        for uid, info in incoming.items():
+            if uid not in merged or len(incoming) >= len(existing or {}):
+                merged[uid] = info
+    return merged
 
 
 def init_state():
@@ -4290,9 +4315,8 @@ def show_report():
 def show_staff_admin():
     st.markdown("### 직원 목록")
 
-    # 신규 가입 신청자 등 다른 세션의 변경사항을 반영하기 위해 파일에서 재로드
-    # load_user_db()는 항상 기본 계정과 병합하므로 데이터 유실 없음
-    st.session_state.user_db = load_user_db()
+    # 다른 세션의 변경사항을 반영하되, 현재 세션의 직원목록을 더 작은 로드 결과로 덮어쓰지 않는다.
+    st.session_state.user_db = merge_user_db(st.session_state.get("user_db", {}), load_user_db())
 
     if st.session_state.pop("reset_staff_edit_sel", False):
         st.session_state.staff_edit_sel = "선택안함"
@@ -4425,7 +4449,7 @@ def show_staff_admin():
     with bc2:
         if st.button("삭제", type="secondary", use_container_width=True):
             del st.session_state.user_db[sel_uid]
-            save_db(DB_FILE, st.session_state.user_db)
+            save_db(DB_FILE, st.session_state.user_db, allow_shrink=True)
             st.session_state.reset_staff_edit_sel = True
             st.success(f"{sel} 삭제 완료")
             time.sleep(0.5)
