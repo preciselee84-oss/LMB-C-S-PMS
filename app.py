@@ -5075,13 +5075,18 @@ def show_target_customers():
             st.info("해당 조건의 고객이 없습니다.")
         else:
             years_nl = sorted(nl_df["개설/이행일"].str[:4].dropna().unique().tolist(), reverse=True)
-            yc1, _ = st.columns([2, 8])
+            owners_nl = sorted(nl_df["담당자"].dropna().unique().tolist())
+            yc1, yc2, _ = st.columns([2, 2, 6])
             with yc1:
                 sel_year_nl = st.selectbox("개설/이행일 연도 조회", ["전체"] + years_nl, key="target_no_login_year")
-            filtered_nl = (
-                nl_df if sel_year_nl == "전체"
-                else nl_df[nl_df["개설/이행일"].str.startswith(sel_year_nl)]
-            ).reset_index(drop=True)
+            with yc2:
+                sel_owner_nl = st.selectbox("담당자 조회", ["전체"] + owners_nl, key="target_no_login_owner")
+            filtered_nl = nl_df.copy()
+            if sel_year_nl != "전체":
+                filtered_nl = filtered_nl[filtered_nl["개설/이행일"].str.startswith(sel_year_nl)]
+            if sel_owner_nl != "전체":
+                filtered_nl = filtered_nl[filtered_nl["담당자"] == sel_owner_nl]
+            filtered_nl = filtered_nl.reset_index(drop=True)
             filtered_nl["순번"] = range(1, len(filtered_nl) + 1)
             st.metric("미로그인 고객 수", f"{len(filtered_nl):,}건")
             render_plain_html_table(filtered_nl, max_rows=500, center_align=False)
@@ -6250,15 +6255,19 @@ def show_operation_plan():
                     reverse=True,
                 )
                 year_options = ["전체"] + years_in_data
-                yc1, _ = st.columns([2, 8])
+                owner_options = ["전체"] + sorted(no_login_df["담당자"].dropna().unique().tolist())
+                yc1, yc2, _ = st.columns([2, 2, 6])
                 with yc1:
                     sel_year = st.selectbox("개설/이행일 연도 조회", year_options, key="no_login_year_filter")
+                with yc2:
+                    sel_owner = st.selectbox("담당자 조회", owner_options, key="no_login_owner_filter")
 
-                filtered_nl = (
-                    no_login_df
-                    if sel_year == "전체"
-                    else no_login_df[no_login_df["개설/이행일"].str.startswith(sel_year)]
-                ).reset_index(drop=True)
+                filtered_nl = no_login_df.copy()
+                if sel_year != "전체":
+                    filtered_nl = filtered_nl[filtered_nl["개설/이행일"].str.startswith(sel_year)]
+                if sel_owner != "전체":
+                    filtered_nl = filtered_nl[filtered_nl["담당자"] == sel_owner]
+                filtered_nl = filtered_nl.reset_index(drop=True)
                 filtered_nl["순번"] = range(1, len(filtered_nl) + 1)
 
                 st.metric("미로그인 고객 수", f"{len(filtered_nl):,}건")
