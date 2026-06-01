@@ -5502,8 +5502,9 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     terminated = end_dates.notna() & (end_dates <= as_of_date)
 
     # 상태 표: 스냅샷 기준일 기준 전체 고객 현황 (접수연도 필터 없음)
+    # 연계 컬럼은 월별 표와 동일하게 linked(구축형="연계|이행") 필터 적용
     status_rows = [
-        ["전체", "", count(open_wait), count(open_progress), count(open_done), count(link_wait), count(link_progress), count(link_done), count(terminated)],
+        ["전체", "", count(open_wait), count(open_progress), count(open_done), count(link_wait & linked), count(link_progress & linked), count(link_done & linked), count(terminated)],
         ["", "기본형", count(open_wait & basic), count(open_progress & basic), count(open_done & basic), "-", "-", "-", count(terminated & basic)],
         ["", "연계형", count(open_wait & linked), count(open_progress & linked), count(open_done & linked), count(link_wait & linked), count(link_progress & linked), count(link_done & linked), count(terminated & linked)],
     ]
@@ -5516,7 +5517,8 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
         bounded_date = event_date.notna() & (event_date <= as_of_date)
         prev_year_value = count(mask & bounded_date & (event_date.dt.year == year - 1))
         values.append(prev_year_value)
-        total = 0
+        # 합계 = 2025년 + 2026년 전체 (상태 표 전체 수치와 일치)
+        total = prev_year_value
         for month in range(1, 13):
             value = count(mask & bounded_date & (event_date.dt.year == year) & (event_date.dt.month == month))
             values.append(value)
