@@ -6205,17 +6205,35 @@ def show_operation_plan():
         else:
             hana_df_nl    = hana_df_nl.dropna(how="all").reset_index(drop=True)
             billing_df_nl = billing_df_nl.dropna(how="all").reset_index(drop=True)
-            no_login_df   = build_no_login_after_open(hana_df_nl, billing_df_nl)
+            no_login_df = build_no_login_after_open(hana_df_nl, billing_df_nl)
             if no_login_df.empty:
                 st.info("해당 조건의 고객이 없습니다.")
             else:
-                st.metric("미로그인 고객 수", f"{len(no_login_df):,}건")
-                render_plain_html_table(no_login_df, max_rows=500, center_align=False)
+                # 개설/이행일 연도 추출 → 연도 필터
+                years_in_data = sorted(
+                    no_login_df["개설/이행일"].str[:4].dropna().unique().tolist(),
+                    reverse=True,
+                )
+                year_options = ["전체"] + years_in_data
+                yc1, _ = st.columns([2, 8])
+                with yc1:
+                    sel_year = st.selectbox("개설/이행일 연도 조회", year_options, key="no_login_year_filter")
+
+                filtered_nl = (
+                    no_login_df
+                    if sel_year == "전체"
+                    else no_login_df[no_login_df["개설/이행일"].str.startswith(sel_year)]
+                ).reset_index(drop=True)
+                filtered_nl.insert(0, "순번", range(1, len(filtered_nl) + 1))
+
+                st.metric("미로그인 고객 수", f"{len(filtered_nl):,}건")
+                render_plain_html_table(filtered_nl, max_rows=500, center_align=False)
                 today_str = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m%d")
+                year_tag = sel_year if sel_year != "전체" else "전체"
                 st.download_button(
                     "미로그인 고객 다운로드",
-                    data=no_login_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
-                    file_name=f"미로그인고객_{today_str}.csv",
+                    data=filtered_nl.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
+                    file_name=f"미로그인고객_{year_tag}_{today_str}.csv",
                     mime="text/csv",
                     use_container_width=True,
                 )
