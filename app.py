@@ -127,7 +127,7 @@ def load_db(file_path, default_data):
 def save_db(file_path, data, allow_shrink=False):
     if file_path == DB_FILE and not allow_shrink:
         existing = load_user_db()
-        if len(existing) > len(data):
+        if len(_real_users(existing)) > len(_real_users(data)):
             data = merge_user_db(existing, data)
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
@@ -393,9 +393,14 @@ _USER_DB_DEFAULT = {
 }
 
 
+def _real_users(d):
+    """_deleted 같은 메타키를 제외한 실제 사용자 수 반환."""
+    return {k: v for k, v in d.items() if not k.startswith("_")}
+
+
 def load_user_db():
     """users.json → users.json.bak → GitHub → {} 순서로 로드 후 기본 계정과 병합하여 반환.
-    절대 기본 계정(1, T)이 누락되지 않도록 보장."""
+    _deleted 목록에 있는 ID는 기본 계정이라도 복원하지 않는다."""
     candidates = []
 
     # 1) 메인 파일
@@ -426,10 +431,13 @@ def load_user_db():
 
     loaded = {}
     for candidate in candidates:
-        if len(candidate) > len(loaded):
+        if len(_real_users(candidate)) > len(_real_users(loaded)):
             loaded = candidate
 
-    if len(loaded) > 1:
+    # 삭제된 ID 목록 추출 (파일에만 존재하는 메타 키)
+    deleted_ids = set(loaded.get("_deleted", []))
+
+    if len(_real_users(loaded)) > 1:
         try:
             with open(DB_FILE, "w", encoding="utf-8") as f:
                 json.dump(loaded, f, ensure_ascii=False, indent=4)
@@ -438,18 +446,24 @@ def load_user_db():
         except Exception:
             pass
 
-    # 기본 계정을 베이스로, 로드된 데이터로 덮어쓰기 (기본 계정 누락 시 복원)
-    return {**_USER_DB_DEFAULT, **loaded}
+    # 기본 계정 베이스 + 파일 데이터 병합, _deleted ID는 제외
+    merged = {**_USER_DB_DEFAULT, **_real_users(loaded)}
+    for uid in deleted_ids:
+        merged.pop(uid, None)
+    return merged
 
 
 def merge_user_db(existing, incoming):
+    deleted_ids = set(incoming.get("_deleted", [])) | set(existing.get("_deleted", []))
     merged = {**_USER_DB_DEFAULT}
     if isinstance(existing, dict):
-        merged.update(existing)
+        merged.update(_real_users(existing))
     if isinstance(incoming, dict):
-        for uid, info in incoming.items():
-            if uid not in merged or len(incoming) >= len(existing or {}):
+        for uid, info in _real_users(incoming).items():
+            if uid not in merged or len(_real_users(incoming)) >= len(_real_users(existing or {})):
                 merged[uid] = info
+    for uid in deleted_ids:
+        merged.pop(uid, None)
     return merged
 
 
@@ -4504,7 +4518,19 @@ def show_staff_admin():
     with bc2:
         if st.button("삭제", type="secondary", use_container_width=True):
             del st.session_state.user_db[sel_uid]
-            save_db(DB_FILE, st.session_state.user_db, allow_shrink=True)
+            # _deleted 목록을 파일에 함께 저장해 기본 계정에서도 복원되지 않도록 함
+            _cur_file = {}
+            if os.path.exists(DB_FILE):
+                try:
+                    with open(DB_FILE, "r", encoding="utf-8") as _f:
+                        _cur_file = json.load(_f)
+                except Exception:
+                    pass
+            _deleted_set = set(_cur_file.get("_deleted", []))
+            _deleted_set.add(sel_uid)
+            save_data = dict(st.session_state.user_db)
+            save_data["_deleted"] = list(_deleted_set)
+            save_db(DB_FILE, save_data, allow_shrink=True)
             st.session_state.reset_staff_edit_sel = True
             st.success(f"{sel} 삭제 완료")
             time.sleep(0.5)
