@@ -5062,11 +5062,8 @@ def show_target_customers():
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
     # ── 미로그인 고객 현황 ──────────────────────────────────────────
-    st.divider()
-    _nl_refresh_col, _ = st.columns([2, 8])
-    with _nl_refresh_col:
-        _nl_refresh = st.button("새로고침", key="target_no_login_refresh", use_container_width=True)
-    if _nl_refresh:
+    _tg_force = st.session_state.pop("_nl_rf_tg_nl_refresh", False)
+    if _tg_force:
         try:
             hana_sheet = read_google_csv(
                 st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2, force_refresh=True
@@ -5075,7 +5072,6 @@ def show_target_customers():
                 st.session_state.get("url_hana_billing", DEFAULT_URL_HANA_BILLING), force_refresh=True
             )
             hana_billing_sheet = billing_raw.dropna(how="all").reset_index(drop=True)
-            st.success("새로고침 완료")
         except Exception as e:
             st.error(f"새로고침 실패: {e}")
 
@@ -5090,6 +5086,7 @@ def show_target_customers():
             build_no_login_after_open(_hana, _billing),
             year_key="target_open_year", owner_key="target_open_owner",
             label="미로그인 고객", download_prefix="미로그인고객_개설이행일",
+            refresh_key="tg_nl_refresh", exclude_key="tg_nl_open_exclude",
         )
 
         st.divider()
@@ -5099,6 +5096,7 @@ def show_target_customers():
             build_no_login_after_link_billing(_hana, _billing),
             year_key="target_link_year", owner_key="target_link_owner",
             label="연계청구 미로그인 고객", download_prefix="미로그인고객_연계청구일자",
+            exclude_key="tg_nl_link_exclude",
         )
     else:
         st.divider()
@@ -6231,13 +6229,13 @@ def show_operation_plan():
 
     # ── 탭2: 미로그인 고객 현황 ──
     with tab_no_login:
-        refresh_nl = st.button("새로고침", key="no_login_refresh")
+        _force_nl = st.session_state.pop("_nl_rf_op_nl_refresh", False)
         try:
             hana_df_nl    = read_google_csv(
                 st.session_state.get("url_hana", DEFAULT_URL_HANA),
-                header=2, force_refresh=refresh_nl,
+                header=2, force_refresh=_force_nl,
             )
-            billing_df_nl = load_hana_billing_df(force_refresh=refresh_nl)
+            billing_df_nl = load_hana_billing_df(force_refresh=_force_nl)
         except Exception as e:
             st.error(f"데이터를 불러오지 못했습니다: {e}")
             return
@@ -6253,6 +6251,7 @@ def show_operation_plan():
                 build_no_login_after_open(hana_df_nl, billing_df_nl),
                 year_key="no_login_open_year", owner_key="no_login_open_owner",
                 label="미로그인 고객", download_prefix="미로그인고객_개설이행일",
+                refresh_key="op_nl_refresh", exclude_key="op_nl_open_exclude",
             )
 
             st.divider()
@@ -6262,6 +6261,7 @@ def show_operation_plan():
                 build_no_login_after_link_billing(hana_df_nl, billing_df_nl),
                 year_key="no_login_link_year", owner_key="no_login_link_owner",
                 label="연계청구 미로그인 고객", download_prefix="미로그인고객_연계청구일자",
+                exclude_key="op_nl_link_exclude",
             )
 
 
@@ -6970,24 +6970,39 @@ def build_no_login_after_link_billing(hana_df, billing_df):
     )
 
 
-def _render_no_login_section(df, year_key, owner_key, label, download_prefix):
+def _render_no_login_section(df, year_key, owner_key, label, download_prefix,
+                             refresh_key=None, exclude_key=None):
     """미로그인 고객 공통 렌더링 헬퍼 (연도·담당자 필터 + 표 + 다운로드)."""
     if df.empty:
         st.info("해당 조건의 고객이 없습니다.")
         return
     date_col = "개설/이행일" if "개설/이행일" in df.columns else "연계청구일자"
-    years   = sorted(df[date_col].str[:4].dropna().unique().tolist(), reverse=True)
-    owners  = sorted(df["담당자"].dropna().unique().tolist())
-    fc1, fc2, _ = st.columns([2, 2, 6])
+    years  = sorted(df[date_col].str[:4].dropna().unique().tolist(), reverse=True)
+    owners = sorted(df["담당자"].dropna().unique().tolist())
+
+    fc1, fc2, fc3, fc4 = st.columns([2, 2, 1, 5])
     with fc1:
         sel_year  = st.selectbox("연도 조회",  ["전체"] + years,  key=year_key)
     with fc2:
         sel_owner = st.selectbox("담당자 조회", ["전체"] + owners, key=owner_key)
+    with fc3:
+        if refresh_key and st.button("새로고침", key=refresh_key, use_container_width=True):
+            st.session_state[f"_nl_rf_{refresh_key}"] = True
+            st.rerun()
+    exclude_current = False
+    with fc4:
+        if exclude_key:
+            current_ym = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m")
+            exclude_current = st.checkbox(f"당월({current_ym}) 개설 제외", key=exclude_key)
+
     filtered = df.copy()
     if sel_year  != "전체":
         filtered = filtered[filtered[date_col].str.startswith(sel_year)]
     if sel_owner != "전체":
         filtered = filtered[filtered["담당자"] == sel_owner]
+    if exclude_current:
+        filtered = filtered[~filtered[date_col].str.startswith(current_ym)]
+
     filtered = filtered.reset_index(drop=True)
     filtered["순번"] = range(1, len(filtered) + 1)
     st.metric(f"{label} 수", f"{len(filtered):,}건")
