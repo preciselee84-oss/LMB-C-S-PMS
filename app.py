@@ -6115,80 +6115,110 @@ OPERATION_PLAN_FILE = "operation_plan.json"
 
 def show_operation_plan():
     st.markdown("### 운영계획")
-    db = load_db(OPERATION_PLAN_FILE, {"plans": []})
-    plans = db.get("plans", [])
+    tab_plan, tab_no_login = st.tabs(["운영계획 관리", "미로그인 고객 현황"])
 
-    # ── 신규 계획 등록 ──
-    with st.expander("운영계획 등록", expanded=not plans):
-        with st.form("op_plan_form"):
-            fc1, fc2 = st.columns(2)
-            with fc1:
-                op_title    = st.text_input("제목")
-                op_category = st.text_input("구분 (예: 구축, 연계, 운영 등)")
-                op_start    = st.date_input("시작일")
-            with fc2:
-                op_owner    = st.text_input("담당자")
-                op_status   = st.selectbox("상태", ["예정", "진행중", "완료", "보류"])
-                op_end      = st.date_input("종료일")
-            op_content  = st.text_area("내용", height=100)
-            op_note     = st.text_area("비고", height=60)
-            submitted = st.form_submit_button("등록", use_container_width=True, type="primary")
+    # ── 탭1: 운영계획 관리 ──
+    with tab_plan:
+        db = load_db(OPERATION_PLAN_FILE, {"plans": []})
+        plans = db.get("plans", [])
 
-        if submitted:
-            if not op_title.strip():
-                st.error("제목을 입력해주세요.")
-            else:
-                now_text = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
-                plans.append({
-                    "id": hashlib.md5(f"{op_title}-{now_text}".encode()).hexdigest(),
-                    "제목": op_title.strip(),
-                    "구분": op_category.strip(),
-                    "담당자": op_owner.strip(),
-                    "시작일": str(op_start),
-                    "종료일": str(op_end),
-                    "상태": op_status,
-                    "내용": op_content.strip(),
-                    "비고": op_note.strip(),
-                    "등록시각": now_text,
-                })
-                db["plans"] = plans
+        with st.expander("운영계획 등록", expanded=not plans):
+            with st.form("op_plan_form"):
+                fc1, fc2 = st.columns(2)
+                with fc1:
+                    op_title    = st.text_input("제목")
+                    op_category = st.text_input("구분 (예: 구축, 연계, 운영 등)")
+                    op_start    = st.date_input("시작일")
+                with fc2:
+                    op_owner    = st.text_input("담당자")
+                    op_status   = st.selectbox("상태", ["예정", "진행중", "완료", "보류"])
+                    op_end      = st.date_input("종료일")
+                op_content = st.text_area("내용", height=100)
+                op_note    = st.text_area("비고", height=60)
+                submitted  = st.form_submit_button("등록", use_container_width=True, type="primary")
+
+            if submitted:
+                if not op_title.strip():
+                    st.error("제목을 입력해주세요.")
+                else:
+                    now_text = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
+                    plans.append({
+                        "id": hashlib.md5(f"{op_title}-{now_text}".encode()).hexdigest(),
+                        "제목": op_title.strip(),
+                        "구분": op_category.strip(),
+                        "담당자": op_owner.strip(),
+                        "시작일": str(op_start),
+                        "종료일": str(op_end),
+                        "상태": op_status,
+                        "내용": op_content.strip(),
+                        "비고": op_note.strip(),
+                        "등록시각": now_text,
+                    })
+                    db["plans"] = plans
+                    save_db(OPERATION_PLAN_FILE, db)
+                    st.success("운영계획을 등록했습니다.")
+                    st.rerun()
+
+        if not plans:
+            st.info("등록된 운영계획이 없습니다.")
+        else:
+            all_statuses = ["전체"] + list(dict.fromkeys(p.get("상태", "") for p in plans))
+            f1, _ = st.columns([2, 8])
+            with f1:
+                filter_status = st.selectbox("상태 필터", all_statuses, key="op_plan_status_filter")
+            filtered = plans if filter_status == "전체" else [p for p in plans if p.get("상태") == filter_status]
+            if filtered:
+                show_cols = ["제목", "구분", "담당자", "시작일", "종료일", "상태", "내용", "비고", "등록시각"]
+                render_plain_html_table(
+                    pd.DataFrame(filtered)[[c for c in show_cols if c in pd.DataFrame(filtered).columns]],
+                    center_align=False
+                )
+            st.markdown("---")
+            delete_opts = ["선택안함"] + [f"{p.get('시작일','')} | {p.get('제목','')} | {p.get('담당자','')}" for p in filtered]
+            d1, _ = st.columns([4, 6])
+            with d1:
+                sel_del = st.selectbox("삭제할 계획 선택", delete_opts, key="op_plan_del_sel")
+            if st.button("선택 삭제", disabled=(sel_del == "선택안함"), key="op_plan_del_btn"):
+                del_idx = delete_opts.index(sel_del) - 1
+                del_id = filtered[del_idx].get("id")
+                db["plans"] = [p for p in plans if p.get("id") != del_id]
                 save_db(OPERATION_PLAN_FILE, db)
-                st.success("운영계획을 등록했습니다.")
+                st.success("삭제했습니다.")
                 st.rerun()
 
-    if not plans:
-        st.info("등록된 운영계획이 없습니다.")
-        return
-
-    # ── 필터 ──
-    all_statuses = ["전체"] + list(dict.fromkeys(p.get("상태", "") for p in plans))
-    f1, f2 = st.columns([2, 8])
-    with f1:
-        filter_status = st.selectbox("상태 필터", all_statuses, key="op_plan_status_filter")
-
-    filtered = plans if filter_status == "전체" else [p for p in plans if p.get("상태") == filter_status]
-
-    # ── 목록 표시 ──
-    if filtered:
-        show_cols = ["제목", "구분", "담당자", "시작일", "종료일", "상태", "내용", "비고", "등록시각"]
-        render_plain_html_table(
-            pd.DataFrame(filtered)[[c for c in show_cols if c in pd.DataFrame(filtered).columns]],
-            center_align=False
-        )
-
-    # ── 삭제 ──
-    st.markdown("---")
-    delete_opts = ["선택안함"] + [f"{p.get('시작일','')} | {p.get('제목','')} | {p.get('담당자','')}" for p in filtered]
-    d1, _ = st.columns([4, 6])
-    with d1:
-        sel_del = st.selectbox("삭제할 계획 선택", delete_opts, key="op_plan_del_sel")
-    if st.button("선택 삭제", disabled=(sel_del == "선택안함"), key="op_plan_del_btn"):
-        del_idx = delete_opts.index(sel_del) - 1
-        del_id = filtered[del_idx].get("id")
-        db["plans"] = [p for p in plans if p.get("id") != del_id]
-        save_db(OPERATION_PLAN_FILE, db)
-        st.success("삭제했습니다.")
-        st.rerun()
+    # ── 탭2: 미로그인 고객 현황 ──
+    with tab_no_login:
+        st.markdown("#### 개설/이행일 이후 미로그인 고객")
+        st.caption("구글시트 개설/이행일 기준으로 청구시트 최종로그인일자가 없거나 개설/이행일 이전인 고객입니다.")
+        refresh_nl = st.button("새로고침", key="no_login_refresh")
+        try:
+            hana_df_nl  = read_google_csv(
+                st.session_state.get("url_hana", DEFAULT_URL_HANA),
+                header=2, force_refresh=refresh_nl,
+            )
+            billing_df_nl = load_hana_billing_df(force_refresh=refresh_nl)
+        except Exception as e:
+            st.error(f"데이터를 불러오지 못했습니다: {e}")
+            return
+        if hana_df_nl is None or hana_df_nl.empty or billing_df_nl is None or billing_df_nl.empty:
+            st.info("구글시트 또는 청구시트 데이터가 없습니다.")
+        else:
+            hana_df_nl    = hana_df_nl.dropna(how="all").reset_index(drop=True)
+            billing_df_nl = billing_df_nl.dropna(how="all").reset_index(drop=True)
+            no_login_df   = build_no_login_after_open(hana_df_nl, billing_df_nl)
+            if no_login_df.empty:
+                st.info("해당 조건의 고객이 없습니다.")
+            else:
+                st.metric("미로그인 고객 수", f"{len(no_login_df):,}건")
+                render_plain_html_table(no_login_df, max_rows=500, center_align=False)
+                today_str = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m%d")
+                st.download_button(
+                    "미로그인 고객 다운로드",
+                    data=no_login_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
+                    file_name=f"미로그인고객_{today_str}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                )
 
 
 def show_weekly_report_admin():
@@ -6940,7 +6970,7 @@ def show_billing_materials():
     m3.metric("개설 청구시트 없음", f"{open_missing_billing:,}건")
     m4.metric("기준월", selected_month)
 
-    tab_open, tab_link, tab_no_login = st.tabs(["개설현황", "연계현황", "미로그인 현황"])
+    tab_open, tab_link = st.tabs(["개설현황", "연계현황"])
     with tab_open:
         selected_open_df = open_df.copy()
         if open_df.empty:
@@ -6977,23 +7007,6 @@ def show_billing_materials():
             )
             selected_link_df = edited_link_df[edited_link_df["다운로드"]].drop(columns=["다운로드"], errors="ignore")
             st.caption(f"다운로드 선택: {len(selected_link_df):,}건")
-
-    with tab_no_login:
-        st.markdown("#### 개설/이행일 이후 미로그인 고객")
-        st.caption("구글시트 개설/이행일 기준으로 청구시트 최종로그인일자가 없거나 개설/이행일 이전인 고객입니다.")
-        no_login_df = build_no_login_after_open(hana_df, billing_df)
-        if no_login_df.empty:
-            st.info("해당 조건의 고객이 없습니다.")
-        else:
-            st.metric("미로그인 고객 수", f"{len(no_login_df):,}건")
-            render_plain_html_table(no_login_df, max_rows=500, center_align=False)
-            st.download_button(
-                "미로그인 고객 다운로드",
-                data=no_login_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
-                file_name=f"미로그인고객_{selected_month.replace('-','')}.csv",
-                mime="text/csv",
-                use_container_width=True,
-            )
 
     file_month = selected_month.replace("-", "")
     st.download_button(
