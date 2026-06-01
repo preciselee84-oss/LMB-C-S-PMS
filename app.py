@@ -4605,6 +4605,238 @@ def show_staff_admin():
             st.rerun()
 
 
+KPI_MONTHLY_TARGETS = {
+    "개설": 20,
+    "연계": 12,
+    "운영 순증": 13,
+    "유통 활동": 40,
+}
+
+
+def _kpi_number(value):
+    if is_blank_value(value):
+        return 0
+    parsed = pd.to_numeric(str(value).replace(",", "").strip(), errors="coerce")
+    return int(parsed) if pd.notna(parsed) else 0
+
+
+def build_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name):
+    if hana_sheet is None or billing_sheet is None or hana_sheet.empty or billing_sheet.empty:
+        return pd.DataFrame()
+
+    hana = hana_sheet.copy()
+    billing = billing_sheet.copy()
+    hana.columns = [str(c).strip() for c in hana.columns]
+    billing.columns = [str(c).strip() for c in billing.columns]
+
+    hana_customer_col = find_col(hana, ["고객번호"])
+    hana_owner_col = find_col(hana, ["담당자"])
+    hana_company_col = find_col(hana, ["고객명", "업체명", "상호"])
+    hana_biz_col = find_col(hana, ["사업자번호"])
+    hana_build_type_col = find_col(hana, ["구축형"])
+    hana_open_status_col = find_col(hana, ["개설상태"])
+    hana_link_status_col = find_col(hana, ["연계상태", "ERP연계상태"])
+    hana_manage_col = find_col(hana, ["관리구분"])
+    hana_open_date_col = find_col(hana, ["개설/이행일", "개설일", "이행일"])
+
+    billing_customer_col = find_col(billing, ["고객번호"])
+    billing_company_col = find_col(billing, ["고객명", "업체명", "상호"])
+    billing_biz_col = find_col(billing, ["사업자번호", "사업자등록번호"])
+    billing_new_col = find_col(billing, ["신규일자", "최초신규일자"])
+    billing_login_col = find_col(billing, ["최종로그인일자", "최종로그인", "로그인일자"])
+    billing_transfer_col = find_col(billing, ["최종이체일자", "최종이체", "이체일자"])
+    billing_end_col = find_col(billing, ["해지일자", "해지일", "해약일"])
+    billing_login_count_col = find_col(billing, ["로그인건수", "로그인횟수"])
+    billing_menu_col = exact_col(billing, ["메뉴사용"]) or find_col(billing, ["메뉴사용", "메뉴클릭수"])
+    billing_service_detail_col = find_col(billing, ["서비스상세", "서비스 구분"])
+
+    if not hana_customer_col or not hana_owner_col or not billing_customer_col:
+        return pd.DataFrame()
+
+    hana["_고객번호"] = hana[hana_customer_col].apply(normalize_billing_customer_no)
+    hana = hana[hana["_고객번호"].ne("")]
+    hana = hana[hana[hana_owner_col].astype(str).str.strip() == str(user_name).strip()].copy()
+    if hana_manage_col and hana_manage_col in hana.columns:
+        hana = hana[~hana[hana_manage_col].astype(str).str.strip().str.contains("해지|취소", case=False, na=False)].copy()
+    if hana.empty:
+        return pd.DataFrame()
+
+    base = pd.DataFrame()
+    base["_고객번호"] = hana["_고객번호"]
+    base["담당자"] = hana[hana_owner_col].fillna("").astype(str)
+    base["고객명"] = hana[hana_company_col].fillna("").astype(str) if hana_company_col else ""
+    base["사업자번호"] = hana[hana_biz_col].apply(normalize_biz_no) if hana_biz_col else ""
+    base["구축형"] = hana[hana_build_type_col].fillna("").astype(str) if hana_build_type_col else ""
+    base["개설상태"] = hana[hana_open_status_col].fillna("").astype(str) if hana_open_status_col else ""
+    base["연계상태"] = hana[hana_link_status_col].fillna("").astype(str) if hana_link_status_col else ""
+    base["개설/이행일"] = hana[hana_open_date_col].apply(parse_sheet_date) if hana_open_date_col else pd.NaT
+    base = base.drop_duplicates("_고객번호", keep="first")
+
+    billing["_고객번호"] = billing[billing_customer_col].apply(normalize_billing_customer_no)
+    billing = billing[billing["_고객번호"].ne("")].copy()
+    lookup = pd.DataFrame()
+    lookup["_고객번호"] = billing["_고객번호"]
+    lookup["청구고객명"] = billing[billing_company_col].fillna("").astype(str) if billing_company_col else ""
+    lookup["청구사업자번호"] = billing[billing_biz_col].apply(normalize_biz_no) if billing_biz_col else ""
+    lookup["신규일자"] = billing[billing_new_col].apply(parse_sheet_date) if billing_new_col else pd.NaT
+    lookup["최종로그인일자"] = billing[billing_login_col].apply(parse_sheet_date) if billing_login_col else pd.NaT
+    lookup["최종이체일자"] = billing[billing_transfer_col].apply(parse_sheet_date) if billing_transfer_col else pd.NaT
+    lookup["해지일자"] = billing[billing_end_col].apply(parse_sheet_date) if billing_end_col else pd.NaT
+    lookup["로그인건수"] = billing[billing_login_count_col].apply(_kpi_number) if billing_login_count_col else 0
+    lookup["메뉴사용"] = billing[billing_menu_col].apply(_kpi_number) if billing_menu_col else 0
+    lookup["서비스상세"] = billing[billing_service_detail_col].fillna("").astype(str) if billing_service_detail_col else ""
+    lookup = lookup.drop_duplicates("_고객번호", keep="first")
+
+    merged = base.merge(lookup, on="_고객번호", how="inner")
+    merged = merged[merged["해지일자"].isna()].copy()
+    if merged.empty:
+        return pd.DataFrame()
+
+    today = pd.Timestamp(datetime.utcnow() + timedelta(hours=9)).normalize()
+    rows = []
+    for _, row in merged.iterrows():
+        score = 0
+        areas = []
+        reasons = []
+        guide = []
+        action = "해피콜"
+
+        last_login = row.get("최종로그인일자")
+        last_transfer = row.get("최종이체일자")
+        new_date = row.get("신규일자")
+        login_count = int(row.get("로그인건수", 0) or 0)
+        menu_count = int(row.get("메뉴사용", 0) or 0)
+        build_type = str(row.get("구축형", ""))
+        link_status = str(row.get("연계상태", ""))
+        service_detail = str(row.get("서비스상세", ""))
+
+        days_from_login = None
+        if pd.isna(last_login):
+            score += 55
+            areas.append("운영/MAU")
+            reasons.append("청구 시트상 로그인 이력 없음")
+            guide.append("담당자 변경, 사용 의사, 로그인 장애 여부 확인 후 매뉴얼/방문교육 제안")
+        else:
+            days_from_login = int((today - pd.Timestamp(last_login).normalize()).days)
+            if days_from_login >= 90:
+                score += 45
+                areas.append("해지방어")
+                reasons.append(f"최종 로그인 {days_from_login}일 경과")
+                guide.append("미사용 사유를 유형화하고 해지 가능성 또는 잠재 활성화 여부를 비고에 기록")
+            elif days_from_login >= 30:
+                score += 25
+                areas.append("MAU")
+                reasons.append(f"최종 로그인 {days_from_login}일 경과")
+                guide.append("최근 업무 일정 확인 후 이번 달 1회 사용 목표로 안내")
+
+        if pd.isna(last_transfer):
+            if login_count >= 100:
+                score += 45
+                areas.append("이체 활성화")
+                reasons.append(f"로그인 {login_count}회 이상이나 이체 이력 없음")
+                guide.append("자금이체/지급거래 흐름을 확인하고 지급거래 교육 또는 RM 연계 제안")
+                action = "방문/원격교육"
+            elif login_count > 0:
+                score += 30
+                areas.append("이체 활성화")
+                reasons.append("로그인 이력은 있으나 이체 이력 없음")
+                guide.append("조회만 사용하는 사유 확인 후 첫 이체까지 동행 지원")
+                action = "해피콜+교육"
+
+        if pd.notna(new_date) and (today - pd.Timestamp(new_date).normalize()).days <= 60:
+            score += 25
+            areas.append("초기정착")
+            reasons.append("최근 2개월 내 신규 고객")
+            guide.append("초기 2개월 집중관리 대상으로 방문 또는 사용자 교육 일정 확정")
+
+        is_not_linked = ("연계" not in build_type) or ("완료" not in link_status)
+        if is_not_linked and (login_count >= 30 or menu_count >= 50 or "단독" in service_detail):
+            score += 25
+            areas.append("연계 전환")
+            reasons.append("사용 흔적이 있어 ERP연계 전환 제안 가능")
+            guide.append("사용 ERP, 고도화 여부, 연계 항목, 접속/DB 정보 사전 확인")
+            action = "연계 니즈확인"
+
+        if login_count >= 100 or menu_count >= 100:
+            score += 20
+            areas.append("유통")
+            reasons.append(f"사용량 높음(로그인 {login_count}, 메뉴 {menu_count})")
+            guide.append("대시보드/IHB/We-Hub/이음택스 중 재무업무 니즈 확인")
+
+        if score < 35:
+            continue
+
+        priority = "상" if score >= 85 else "중" if score >= 60 else "하"
+        due = "이번 주" if priority == "상" else "이번 달 2주 내" if priority == "중" else "이번 달 내"
+        customer_name = str(row.get("고객명", "")).strip() or str(row.get("청구고객명", "")).strip()
+        biz_no = str(row.get("사업자번호", "")).strip() or str(row.get("청구사업자번호", "")).strip()
+
+        rows.append({
+            "우선순위": priority,
+            "추천점수": score,
+            "KPI영역": " / ".join(dict.fromkeys(areas)),
+            "고객명": customer_name,
+            "사업자번호": biz_no,
+            "구축형": build_type,
+            "개설상태": row.get("개설상태", ""),
+            "연계상태": link_status,
+            "최종로그인일자": last_login.strftime("%Y-%m-%d") if pd.notna(last_login) else "없음",
+            "최종이체일자": last_transfer.strftime("%Y-%m-%d") if pd.notna(last_transfer) else "없음",
+            "로그인건수": login_count,
+            "메뉴사용": menu_count,
+            "추천활동": action,
+            "활동사유": " / ".join(dict.fromkeys(reasons)),
+            "활동가이드": " / ".join(dict.fromkeys(guide)),
+            "권장기한": due,
+        })
+
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows).sort_values(["추천점수", "로그인건수", "메뉴사용"], ascending=[False, False, False]).reset_index(drop=True)
+
+
+def render_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name):
+    st.markdown("#### KPI 집중 활동 추천")
+    remaining_months = 6
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("개설 잔여 목표", f"{KPI_MONTHLY_TARGETS['개설'] * remaining_months:,}건", "월 20건")
+    c2.metric("연계 잔여 목표", f"{KPI_MONTHLY_TARGETS['연계'] * remaining_months:,}건", "월 12건")
+    c3.metric("운영 순증 잔여 목표", f"{KPI_MONTHLY_TARGETS['운영 순증'] * remaining_months:,}개", "월 13개")
+    c4.metric("유통 활동 잔여 목표", f"{KPI_MONTHLY_TARGETS['유통 활동'] * remaining_months:,}건", "월 40건")
+
+    st.caption("2026년 KPI 계획 기준: 개설 20건/월, 연계 12건/월, 운영 순증 13개/월, 유통 활동 40건/월. 잔여 목표는 남은 6개월 기준입니다.")
+    rec_df = build_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name)
+    if rec_df.empty:
+        st.info("청구 시트와 하나은행 시트 기준으로 추천 가능한 KPI 활동 고객이 없습니다.")
+        return
+
+    f1, f2, f3 = st.columns([2, 2, 6])
+    with f1:
+        area_options = ["전체"] + sorted({area for text in rec_df["KPI영역"].dropna() for area in str(text).split(" / ") if area})
+        selected_area = st.selectbox("KPI영역", area_options, key="kpi_rec_area")
+    with f2:
+        selected_priority = st.selectbox("우선순위", ["전체", "상", "중", "하"], key="kpi_rec_priority")
+
+    filtered = rec_df.copy()
+    if selected_area != "전체":
+        filtered = filtered[filtered["KPI영역"].astype(str).str.contains(selected_area, regex=False, na=False)]
+    if selected_priority != "전체":
+        filtered = filtered[filtered["우선순위"] == selected_priority]
+    filtered = filtered.head(100).reset_index(drop=True)
+    filtered.insert(0, "순번", range(1, len(filtered) + 1))
+
+    st.metric("추천 고객", f"{len(filtered):,}건")
+    render_plain_html_table(filtered, max_rows=100, center_align=False)
+    today_str = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m%d")
+    st.download_button(
+        "KPI 추천 고객 다운로드",
+        data=filtered.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
+        file_name=f"KPI추천고객_{selected_area}_{selected_priority}_{today_str}.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+
 def show_target_customers():
     st.markdown("### 이번달 활동 대상고객 추천")
 
@@ -4643,8 +4875,12 @@ def show_target_customers():
 
     hana_df = st.session_state.get("analysis_lookup_df")
 
-    cloud = clean_header_logic(cloud.copy())
     user_name = st.session_state.user_name
+
+    render_kpi_activity_recommendations(hana_sheet, hana_billing_sheet, user_name)
+    st.divider()
+
+    cloud = clean_header_logic(cloud.copy())
 
     # 본사 시트 컬럼 탐색
     owner_col  = find_col(cloud, ["담당자", "등록자", "성명"])
