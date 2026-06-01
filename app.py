@@ -6757,12 +6757,13 @@ def build_billing_lookup(billing_df):
     lookup = billing_df.copy()
     lookup.columns = [str(c).strip() for c in lookup.columns]
 
-    customer_col = find_col(lookup, ["고객번호"])
+    customer_col = find_col(lookup, ["고객번호", "고객No", "고객no"])
     company_col = find_col(lookup, ["고객명", "업체명", "상호"])
     biz_col = find_col(lookup, ["사업자번호", "사업자등록번호"])
     first_login_col = exact_col(lookup, ["신규일자"]) or find_col(lookup, ["신규일자", "최초신규일자"])
-    last_login_col = find_col(lookup, ["최종로그인일자", "최근로그인", "로그인일자"])
-    login_count_col = find_col(lookup, ["로그인건수", "로그인횟수", "로그인"])
+    # "최종로그인" 단독 컬럼명도 커버 (일자 없는 변형 포함)
+    last_login_col = find_col(lookup, ["최종로그인일자", "최근로그인일자", "최종로그인", "최근로그인", "로그인일자"])
+    login_count_col = find_col(lookup, ["로그인건수", "로그인횟수"])
     menu_click_col = exact_col(lookup, ["메뉴사용"]) or find_col(lookup, ["메뉴사용", "메뉴클릭수"])
 
     if not customer_col:
@@ -6925,9 +6926,10 @@ def _merge_with_billing_lookup(hana_df, billing_df, ref_date_col_keys, ref_date_
     bill_lkp = build_billing_lookup(billing_df)
     merged = hana_valid.merge(bill_lkp, on="_고객번호", how="left")
 
-    # _최종로그인은 "YYYYMMDD" 문자열 → datetime 변환
-    merged["_last_dt"] = pd.to_datetime(
-        merged["_최종로그인"].replace("", pd.NaT), format="%Y%m%d", errors="coerce"
+    # _최종로그인은 format_yyyymmdd 결과("YYYYMMDD" 또는 "") → datetime 변환
+    merged["_last_dt"] = merged["_최종로그인"].apply(
+        lambda v: pd.NaT if (v == "" or pd.isna(v))
+        else pd.to_datetime(str(v).strip(), format="%Y%m%d", errors="coerce")
     )
 
     mask = merged["_last_dt"].isna() | (merged["_last_dt"] <= merged["_ref_dt"])
