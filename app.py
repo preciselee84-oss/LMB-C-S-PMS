@@ -5568,13 +5568,16 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
         ["", "취소"] + fmt_values(open_cancel_values),
     ]
 
-    link_wait_values = month_count_values(link_wait, link_receipt_dates)
-    link_progress_values = month_count_values(link_progress, link_receipt_dates)
-    link_done_values = month_count_values(link_done, link_receipt_dates)
-    link_cancel_values = month_count_values(link_cancel, link_receipt_dates)
+    # 연계형(구축형 컬럼이 "연계|이행") 기준, 접수일 = 추가연계접수일 없으면 신규접수일
+    link_received_mask = linked & link_receipt_dates.notna() & (link_receipt_dates <= as_of_date)
+    link_receipt_count_values = month_count_values(link_received_mask, link_receipt_dates)
+    link_wait_values = month_count_values(link_wait & linked, link_receipt_dates)
+    link_progress_values = month_count_values(link_progress & linked, link_receipt_dates)
+    link_done_values = month_count_values(link_done & linked, link_receipt_dates)
+    link_cancel_values = month_count_values(link_cancel & linked, link_receipt_dates)
 
     link_month_rows = [
-        ["연계", "접수"] + fmt_values(summed_values(link_wait_values, link_progress_values, link_done_values, link_cancel_values)),
+        ["연계", "접수"] + fmt_values(link_receipt_count_values),
         ["", "대기"] + fmt_values(link_wait_values),
         ["", "진행"] + fmt_values(link_progress_values),
         ["", "완료"] + fmt_values(link_done_values),
