@@ -5513,20 +5513,20 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     ]
     status_df = pd.DataFrame(status_rows, columns=["구분", "유형", "구축대기", "구축진행", "구축완료", "연계대기", "연계진행", "연계완료", "해지"])
 
-    month_cols = ["2025년"] + [f"{year}{m:02d}" for m in range(1, 13)] + ["합계"]
+    month_cols = ["2025년"] + [f"{year}{m:02d}" for m in range(1, 13)] + [f"{str(year)[-2:]}년합계", "합계"]
 
     def month_count_values(mask, event_date):
         values = []
         bounded_date = event_date.notna() & (event_date <= as_of_date)
         prev_year_value = count(mask & bounded_date & (event_date.dt.year == year - 1))
         values.append(prev_year_value)
-        # 합계 = 2025년 + 2026년 전체 (상태 표 전체 수치와 일치)
-        total = prev_year_value
+        year_total = 0
         for month in range(1, 13):
             value = count(mask & bounded_date & (event_date.dt.year == year) & (event_date.dt.month == month))
             values.append(value)
-            total += value
-        values.append(total)
+            year_total += value
+        values.append(year_total)                    # 26년합계 (2026년 월별 합산)
+        values.append(prev_year_value + year_total)  # 합계 (2025년 + 2026년)
         return values
 
     def fmt_values(values):
