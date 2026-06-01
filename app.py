@@ -5589,7 +5589,7 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     link_cancel_values   = month_count_values(mt_link_cancel,   link_receipt_dates)
 
     link_month_rows = [
-        ["연계", "접수"] + fmt_values(link_receipt_count_values),
+        ["연계", "접수"] + fmt_values(summed_values(link_wait_values, link_progress_values, link_done_values, link_cancel_values)),
         ["", "대기"] + fmt_values(link_wait_values),
         ["", "진행"] + fmt_values(link_progress_values),
         ["", "완료"] + fmt_values(link_done_values),
