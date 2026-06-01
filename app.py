@@ -5062,6 +5062,23 @@ def show_target_customers():
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
     # ── 미로그인 고객 현황 ──────────────────────────────────────────
+    st.divider()
+    _nl_refresh_col, _ = st.columns([2, 8])
+    with _nl_refresh_col:
+        _nl_refresh = st.button("새로고침", key="target_no_login_refresh", use_container_width=True)
+    if _nl_refresh:
+        try:
+            hana_sheet = read_google_csv(
+                st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2, force_refresh=True
+            )
+            billing_raw = read_google_csv(
+                st.session_state.get("url_hana_billing", DEFAULT_URL_HANA_BILLING), force_refresh=True
+            )
+            hana_billing_sheet = billing_raw.dropna(how="all").reset_index(drop=True)
+            st.success("새로고침 완료")
+        except Exception as e:
+            st.error(f"새로고침 실패: {e}")
+
     if hana_sheet is not None and not hana_sheet.empty and hana_billing_sheet is not None and not hana_billing_sheet.empty:
         _hana = hana_sheet.dropna(how="all").reset_index(drop=True)
         _billing = hana_billing_sheet
