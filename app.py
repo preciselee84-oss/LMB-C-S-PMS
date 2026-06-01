@@ -6914,12 +6914,17 @@ def _merge_with_billing_lookup(hana_df, billing_df, ref_date_col_keys, ref_date_
     owner_col      = find_col(hana, ["담당자"])
     build_type_col = find_col(hana, ["구축형"])
     extra_col      = find_col(hana, extra_hana_col_keys) if extra_hana_col_keys else None
+    end_col        = find_col(hana, ["해지일자", "해지일", "해약일"])
 
     if not all([hana_cust_col, ref_date_col]):
         return pd.DataFrame()
 
     hana["_고객번호"] = hana[hana_cust_col].apply(normalize_billing_customer_no)
     hana["_ref_dt"]   = pd.to_datetime(hana[ref_date_col].map(parse_sheet_date), errors="coerce")
+    # 해지일자 있는 고객 제외
+    if end_col:
+        hana["_end_dt"] = pd.to_datetime(hana[end_col].map(parse_sheet_date), errors="coerce")
+        hana = hana[hana["_end_dt"].isna()].copy()
     hana_valid = hana[hana["_고객번호"].ne("") & hana["_ref_dt"].notna()].copy()
 
     # 기존 검증된 build_billing_lookup 사용 (고객번호 매칭 동일 보장)
