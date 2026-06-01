@@ -5061,6 +5061,41 @@ def show_target_customers():
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
+    # ── 미로그인 고객 현황 ──────────────────────────────────────────
+    st.divider()
+    st.markdown("#### 개설/이행일 이후 미로그인 고객")
+    st.caption("구글시트 개설/이행일 기준으로 청구시트 최종로그인일자가 없거나 개설/이행일 이전인 고객입니다.")
+
+    if hana_sheet is not None and not hana_sheet.empty and hana_billing_sheet is not None and not hana_billing_sheet.empty:
+        nl_df = build_no_login_after_open(
+            hana_sheet.dropna(how="all").reset_index(drop=True),
+            hana_billing_sheet,
+        )
+        if nl_df.empty:
+            st.info("해당 조건의 고객이 없습니다.")
+        else:
+            years_nl = sorted(nl_df["개설/이행일"].str[:4].dropna().unique().tolist(), reverse=True)
+            yc1, _ = st.columns([2, 8])
+            with yc1:
+                sel_year_nl = st.selectbox("개설/이행일 연도 조회", ["전체"] + years_nl, key="target_no_login_year")
+            filtered_nl = (
+                nl_df if sel_year_nl == "전체"
+                else nl_df[nl_df["개설/이행일"].str.startswith(sel_year_nl)]
+            ).reset_index(drop=True)
+            filtered_nl["순번"] = range(1, len(filtered_nl) + 1)
+            st.metric("미로그인 고객 수", f"{len(filtered_nl):,}건")
+            render_plain_html_table(filtered_nl, max_rows=500, center_align=False)
+            today_str = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m%d")
+            st.download_button(
+                "미로그인 고객 다운로드",
+                data=filtered_nl.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
+                file_name=f"미로그인고객_{sel_year_nl}_{today_str}.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+    else:
+        st.warning("하나은행 구글시트 또는 청구시트 데이터를 불러올 수 없습니다.")
+
 
 def show_weekly_report_user():
     opening_categories = ["개설대기", "개설진행", "개설완료"]
