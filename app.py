@@ -6937,6 +6937,13 @@ def _merge_with_billing_lookup(hana_df, billing_df, ref_date_col_keys, ref_date_
     if result.empty:
         return pd.DataFrame()
 
+    # 직전 3개월 구간 계산 (당월 제외 → 이전 3개월)
+    today_kst   = datetime.utcnow() + timedelta(hours=9)
+    month_start = today_kst.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    three_ago   = month_start - pd.DateOffset(months=3)
+    m_labels    = [(three_ago + pd.DateOffset(months=i)).strftime("%m월") for i in range(3)]
+    prev3_label = f"직전3개월({m_labels[0]}~{m_labels[2]})미로그인"
+
     out = pd.DataFrame()
     out["순번"]          = range(1, len(result) + 1)
     out["고객번호"]      = result["_고객번호"]
@@ -6947,6 +6954,15 @@ def _merge_with_billing_lookup(hana_df, billing_df, ref_date_col_keys, ref_date_
     if extra_col:
         out[extra_hana_col_keys[0]] = result[extra_col].fillna("").astype(str)
     out["최종로그인일자"] = result["_last_dt"].dt.strftime("%Y-%m-%d").fillna("없음")
+    # 직전 3개월 내 로그인 이력 없음 여부 (개설/이행일 이후이면서 직전 3개월 내 미로그인)
+    three_ago_ts = pd.Timestamp(three_ago)
+    out[prev3_label] = result.apply(
+        lambda r: "미로그인" if (
+            pd.isna(r["_last_dt"]) or r["_last_dt"] < three_ago_ts
+        ) and (pd.notna(r["_ref_dt"]) and r["_ref_dt"] < three_ago_ts)
+        else "",
+        axis=1,
+    )
     return out
 
 
