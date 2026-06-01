@@ -6825,6 +6825,54 @@ def build_billing_status_excel_bytes(open_df, link_df):
     })
 
 
+def build_no_login_after_open(hana_df, billing_df):
+    """구글시트 개설/이행일 이후 청구시트에 최종로그인일자가 없는 고객 목록 반환."""
+    hana = hana_df.copy()
+    hana.columns = [str(c).strip() for c in hana.columns]
+    billing = billing_df.copy()
+    billing.columns = [str(c).strip() for c in billing.columns]
+
+    hana_cust_col   = find_col(hana,    ["고객번호"])
+    open_date_col   = find_col(hana,    ["개설/이행일", "개설일", "이행일"])
+    company_col     = find_col(hana,    ["고객명", "업체명", "상호"])
+    owner_col       = find_col(hana,    ["담당자"])
+    build_type_col  = find_col(hana,    ["구축형"])
+    open_status_col = find_col(hana,    ["개설상태"])
+    bill_cust_col   = find_col(billing, ["고객번호"])
+    last_login_col  = find_col(billing, ["최종로그인일자", "최근로그인", "로그인일자"])
+
+    if not all([hana_cust_col, open_date_col, bill_cust_col, last_login_col]):
+        return pd.DataFrame()
+
+    hana["_cno"]       = hana[hana_cust_col].apply(normalize_billing_customer_no)
+    hana["_open_dt"]   = pd.to_datetime(hana[open_date_col].map(parse_sheet_date), errors="coerce")
+    hana_valid = hana[hana["_cno"].ne("") & hana["_open_dt"].notna()].copy()
+
+    billing["_cno"]        = billing[bill_cust_col].apply(normalize_billing_customer_no)
+    billing["_last_login"] = pd.to_datetime(billing[last_login_col].map(parse_sheet_date), errors="coerce")
+    bill_lkp = (billing[billing["_cno"].ne("")][["_cno", "_last_login"]]
+                .drop_duplicates("_cno", keep="first"))
+
+    merged = hana_valid.merge(bill_lkp, on="_cno", how="left")
+
+    # 청구시트에 없거나(NaT) 최종로그인 <= 개설/이행일인 고객
+    mask = merged["_last_login"].isna() | (merged["_last_login"] <= merged["_open_dt"])
+    result = merged[mask].copy().reset_index(drop=True)
+    if result.empty:
+        return pd.DataFrame()
+
+    out = pd.DataFrame()
+    out["순번"]        = range(1, len(result) + 1)
+    out["고객번호"]    = result["_cno"]
+    out["고객명"]      = result[company_col].fillna("").astype(str)   if company_col     else ""
+    out["담당자"]      = result[owner_col].fillna("").astype(str)     if owner_col       else ""
+    out["구축형"]      = result[build_type_col].fillna("").astype(str) if build_type_col else ""
+    out["개설상태"]    = result[open_status_col].fillna("").astype(str) if open_status_col else ""
+    out["개설/이행일"] = result["_open_dt"].dt.strftime("%Y-%m-%d")
+    out["최종로그인일자"] = result["_last_login"].dt.strftime("%Y-%m-%d").fillna("없음")
+    return out
+
+
 def show_billing_materials():
     title_col, refresh_col = st.columns([5, 1])
     with title_col:
@@ -6892,7 +6940,7 @@ def show_billing_materials():
     m3.metric("개설 청구시트 없음", f"{open_missing_billing:,}건")
     m4.metric("기준월", selected_month)
 
-    tab_open, tab_link = st.tabs(["개설현황", "연계현황"])
+    tab_open, tab_link, tab_no_login = st.tabs(["개설현황", "연계현황", "미로그인 현황"])
     with tab_open:
         selected_open_df = open_df.copy()
         if open_df.empty:
@@ -6929,6 +6977,23 @@ def show_billing_materials():
             )
             selected_link_df = edited_link_df[edited_link_df["다운로드"]].drop(columns=["다운로드"], errors="ignore")
             st.caption(f"다운로드 선택: {len(selected_link_df):,}건")
+
+    with tab_no_login:
+        st.markdown("#### 개설/이행일 이후 미로그인 고객")
+        st.caption("구글시트 개설/이행일 기준으로 청구시트 최종로그인일자가 없거나 개설/이행일 이전인 고객입니다.")
+        no_login_df = build_no_login_after_open(hana_df, billing_df)
+        if no_login_df.empty:
+            st.info("해당 조건의 고객이 없습니다.")
+        else:
+            st.metric("미로그인 고객 수", f"{len(no_login_df):,}건")
+            render_plain_html_table(no_login_df, max_rows=500, center_align=False)
+            st.download_button(
+                "미로그인 고객 다운로드",
+                data=no_login_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
+                file_name=f"미로그인고객_{selected_month.replace('-','')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
 
     file_month = selected_month.replace("-", "")
     st.download_button(
