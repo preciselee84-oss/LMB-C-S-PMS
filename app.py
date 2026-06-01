@@ -4750,7 +4750,10 @@ def build_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name=None
             reasons.append("최근 2개월 내 신규 고객")
             guide.append("초기 2개월 집중관리 대상으로 방문 또는 사용자 교육 일정 확정")
 
-        is_not_linked = ("연계" not in build_type) or ("완료" not in link_status)
+        open_status = str(row.get("개설상태", ""))
+        # 구축형이 연계형 + 개설상태가 이행완료인 경우 이미 연계 완료 → 연계전환 추천 불가
+        already_linked = ("연계" in build_type) and ("이행완료" in open_status)
+        is_not_linked = (not already_linked) and (("연계" not in build_type) or ("완료" not in link_status))
         if is_not_linked and (login_count >= 30 or menu_count >= 50 or "단독" in service_detail):
             score += 25
             areas.append("연계 전환")
