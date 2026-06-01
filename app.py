@@ -6882,99 +6882,73 @@ def build_billing_status_excel_bytes(open_df, link_df):
     })
 
 
-def build_no_login_after_open(hana_df, billing_df):
-    """구글시트 개설/이행일 이후 청구시트에 최종로그인일자가 없는 고객 목록 반환."""
+def _merge_with_billing_lookup(hana_df, billing_df, ref_date_col_keys, ref_date_label, extra_hana_col_keys=None):
+    """
+    기존 build_billing_lookup을 재사용해 hana_df와 billing_df를 고객번호로 대사한 뒤
+    ref_date_label 이후 최종로그인일자가 없는 고객을 반환하는 공통 헬퍼.
+    """
     hana = hana_df.copy()
     hana.columns = [str(c).strip() for c in hana.columns]
-    billing = billing_df.copy()
-    billing.columns = [str(c).strip() for c in billing.columns]
 
-    hana_cust_col   = find_col(hana,    ["고객번호"])
-    open_date_col   = find_col(hana,    ["개설/이행일", "개설일", "이행일"])
-    company_col     = find_col(hana,    ["고객명", "업체명", "상호"])
-    owner_col       = find_col(hana,    ["담당자"])
-    build_type_col  = find_col(hana,    ["구축형"])
-    open_status_col = find_col(hana,    ["개설상태"])
-    bill_cust_col   = find_col(billing, ["고객번호"])
-    last_login_col  = find_col(billing, ["최종로그인일자", "최근로그인", "로그인일자"])
+    hana_cust_col  = find_col(hana, ["고객번호"])
+    ref_date_col   = find_col(hana, ref_date_col_keys)
+    company_col    = find_col(hana, ["고객명", "업체명", "상호"])
+    owner_col      = find_col(hana, ["담당자"])
+    build_type_col = find_col(hana, ["구축형"])
+    extra_col      = find_col(hana, extra_hana_col_keys) if extra_hana_col_keys else None
 
-    if not all([hana_cust_col, open_date_col, bill_cust_col, last_login_col]):
+    if not all([hana_cust_col, ref_date_col]):
         return pd.DataFrame()
 
-    hana["_cno"]       = hana[hana_cust_col].apply(normalize_billing_customer_no)
-    hana["_open_dt"]   = pd.to_datetime(hana[open_date_col].map(parse_sheet_date), errors="coerce")
-    hana_valid = hana[hana["_cno"].ne("") & hana["_open_dt"].notna()].copy()
+    hana["_고객번호"] = hana[hana_cust_col].apply(normalize_billing_customer_no)
+    hana["_ref_dt"]   = pd.to_datetime(hana[ref_date_col].map(parse_sheet_date), errors="coerce")
+    hana_valid = hana[hana["_고객번호"].ne("") & hana["_ref_dt"].notna()].copy()
 
-    billing["_cno"]        = billing[bill_cust_col].apply(normalize_billing_customer_no)
-    billing["_last_login"] = pd.to_datetime(billing[last_login_col].map(parse_sheet_date), errors="coerce")
-    bill_lkp = (billing[billing["_cno"].ne("")][["_cno", "_last_login"]]
-                .drop_duplicates("_cno", keep="first"))
+    # 기존 검증된 build_billing_lookup 사용 (고객번호 매칭 동일 보장)
+    bill_lkp = build_billing_lookup(billing_df)
+    merged = hana_valid.merge(bill_lkp, on="_고객번호", how="left")
 
-    merged = hana_valid.merge(bill_lkp, on="_cno", how="left")
+    # _최종로그인은 "YYYYMMDD" 문자열 → datetime 변환
+    merged["_last_dt"] = pd.to_datetime(
+        merged["_최종로그인"].replace("", pd.NaT), format="%Y%m%d", errors="coerce"
+    )
 
-    # 청구시트에 없거나(NaT) 최종로그인 <= 개설/이행일인 고객
-    mask = merged["_last_login"].isna() | (merged["_last_login"] <= merged["_open_dt"])
+    mask = merged["_last_dt"].isna() | (merged["_last_dt"] <= merged["_ref_dt"])
     result = merged[mask].copy().reset_index(drop=True)
     if result.empty:
         return pd.DataFrame()
 
     out = pd.DataFrame()
-    out["순번"]        = range(1, len(result) + 1)
-    out["고객번호"]    = result["_cno"]
-    out["고객명"]      = result[company_col].fillna("").astype(str)   if company_col     else ""
-    out["담당자"]      = result[owner_col].fillna("").astype(str)     if owner_col       else ""
-    out["구축형"]      = result[build_type_col].fillna("").astype(str) if build_type_col else ""
-    out["개설상태"]    = result[open_status_col].fillna("").astype(str) if open_status_col else ""
-    out["개설/이행일"] = result["_open_dt"].dt.strftime("%Y-%m-%d")
-    out["최종로그인일자"] = result["_last_login"].dt.strftime("%Y-%m-%d").fillna("없음")
+    out["순번"]          = range(1, len(result) + 1)
+    out["고객번호"]      = result["_고객번호"]
+    out["고객명"]        = result[company_col].fillna("").astype(str)    if company_col    else ""
+    out["담당자"]        = result[owner_col].fillna("").astype(str)      if owner_col      else ""
+    out["구축형"]        = result[build_type_col].fillna("").astype(str) if build_type_col else ""
+    out[ref_date_label]  = result["_ref_dt"].dt.strftime("%Y-%m-%d")
+    if extra_col:
+        out[extra_hana_col_keys[0]] = result[extra_col].fillna("").astype(str)
+    out["최종로그인일자"] = result["_last_dt"].dt.strftime("%Y-%m-%d").fillna("없음")
     return out
+
+
+def build_no_login_after_open(hana_df, billing_df):
+    """구글시트 개설/이행일 이후 청구시트에 최종로그인일자가 없는 고객 목록 반환."""
+    return _merge_with_billing_lookup(
+        hana_df, billing_df,
+        ref_date_col_keys=["개설/이행일", "개설일", "이행일"],
+        ref_date_label="개설/이행일",
+        extra_hana_col_keys=["개설상태"],
+    )
 
 
 def build_no_login_after_link_billing(hana_df, billing_df):
     """구글시트 연계청구일자 이후 청구시트에 최종로그인일자가 없는 고객 목록 반환."""
-    hana = hana_df.copy()
-    hana.columns = [str(c).strip() for c in hana.columns]
-    billing = billing_df.copy()
-    billing.columns = [str(c).strip() for c in billing.columns]
-
-    hana_cust_col      = find_col(hana,    ["고객번호"])
-    link_billing_col   = find_col(hana,    ["연계청구일자", "연계청구일", "청구일자"])
-    company_col        = find_col(hana,    ["고객명", "업체명", "상호"])
-    owner_col          = find_col(hana,    ["담당자"])
-    build_type_col     = find_col(hana,    ["구축형"])
-    link_status_col    = find_col(hana,    ["연계상태"])
-    bill_cust_col      = find_col(billing, ["고객번호"])
-    last_login_col     = find_col(billing, ["최종로그인일자", "최근로그인", "로그인일자"])
-
-    if not all([hana_cust_col, link_billing_col, bill_cust_col, last_login_col]):
-        return pd.DataFrame()
-
-    hana["_cno"]          = hana[hana_cust_col].apply(normalize_billing_customer_no)
-    hana["_link_bill_dt"] = pd.to_datetime(hana[link_billing_col].map(parse_sheet_date), errors="coerce")
-    hana_valid = hana[hana["_cno"].ne("") & hana["_link_bill_dt"].notna()].copy()
-
-    billing["_cno"]        = billing[bill_cust_col].apply(normalize_billing_customer_no)
-    billing["_last_login"] = pd.to_datetime(billing[last_login_col].map(parse_sheet_date), errors="coerce")
-    bill_lkp = (billing[billing["_cno"].ne("")][["_cno", "_last_login"]]
-                .drop_duplicates("_cno", keep="first"))
-
-    merged = hana_valid.merge(bill_lkp, on="_cno", how="left")
-
-    mask = merged["_last_login"].isna() | (merged["_last_login"] <= merged["_link_bill_dt"])
-    result = merged[mask].copy().reset_index(drop=True)
-    if result.empty:
-        return pd.DataFrame()
-
-    out = pd.DataFrame()
-    out["순번"]         = range(1, len(result) + 1)
-    out["고객번호"]     = result["_cno"]
-    out["고객명"]       = result[company_col].fillna("").astype(str)       if company_col      else ""
-    out["담당자"]       = result[owner_col].fillna("").astype(str)         if owner_col        else ""
-    out["구축형"]       = result[build_type_col].fillna("").astype(str)    if build_type_col   else ""
-    out["연계상태"]     = result[link_status_col].fillna("").astype(str)   if link_status_col  else ""
-    out["연계청구일자"] = result["_link_bill_dt"].dt.strftime("%Y-%m-%d")
-    out["최종로그인일자"] = result["_last_login"].dt.strftime("%Y-%m-%d").fillna("없음")
-    return out
+    return _merge_with_billing_lookup(
+        hana_df, billing_df,
+        ref_date_col_keys=["연계청구일자", "연계청구일", "청구일자"],
+        ref_date_label="연계청구일자",
+        extra_hana_col_keys=["연계상태"],
+    )
 
 
 def _render_no_login_section(df, year_key, owner_key, label, download_prefix):
