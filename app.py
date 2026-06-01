@@ -5493,9 +5493,11 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     open_done = active & open_received_by_asof & ~open_cancel & (open_status.str.contains("완료|이행완료", na=False) & open_done_by_asof)
     open_progress = active & open_received_by_asof & ~open_cancel & ~open_done & open_status.str.contains("진행|구축중|처리중", na=False)
     open_wait = active & open_received_by_asof & ~open_cancel & ~open_done & ~open_progress & open_status.str.contains("대기", na=False)
-    link_done = active & link_received_by_asof & ~link_cancel & link_status.str.contains("완료", na=False) & link_done_by_asof
-    link_progress = active & link_received_by_asof & ~link_cancel & ~link_done & link_status.str.contains("ERP연계진행|연계진행|진행", na=False)
-    link_wait = active & link_received_by_asof & ~link_cancel & link_status.str.contains("ERP연계대기", na=False)
+    # 연계완료: 연계일자 유무와 관계없이 상태값 "완료" 기준으로 판단
+    link_done = active & link_received_by_asof & ~link_cancel & link_status.str.contains("완료", na=False)
+    # 연계진행/대기: 패턴을 넓혀 "진행", "대기" 포함 변형 모두 매칭
+    link_progress = active & link_received_by_asof & ~link_cancel & ~link_done & link_status.str.contains("진행", na=False)
+    link_wait = active & link_received_by_asof & ~link_cancel & ~link_done & ~link_progress & link_status.str.contains("대기", na=False)
     link_receipt = active & (link_received_by_asof | link_wait | link_progress | link_done)
     terminated = end_dates.notna() & (end_dates <= as_of_date)
 
