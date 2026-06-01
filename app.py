@@ -4877,6 +4877,25 @@ def show_target_customers():
 
     user_name = st.session_state.user_name
 
+    def _user_customer_ids(source):
+        if source is None or source.empty:
+            return set()
+        src = source.copy()
+        src.columns = [str(c).strip() for c in src.columns]
+        cust_col = find_col(src, ["고객번호"])
+        owner = find_col(src, ["담당자"])
+        if not cust_col or not owner:
+            return set()
+        mine = src[src[owner].astype(str).str.strip() == str(user_name).strip()].copy()
+        return set(mine[cust_col].apply(normalize_billing_customer_no).loc[lambda s: s.ne("")])
+
+    def _only_current_user_rows(result_df):
+        if result_df is None or result_df.empty or "담당자" not in result_df.columns:
+            return result_df
+        return result_df[result_df["담당자"].astype(str).str.strip() == str(user_name).strip()].reset_index(drop=True)
+
+    user_customer_ids = _user_customer_ids(hana_sheet)
+
     render_kpi_activity_recommendations(hana_sheet, hana_billing_sheet, user_name)
     st.divider()
 
@@ -5135,10 +5154,15 @@ def show_target_customers():
         billing_transfer_col = find_col(billing_df, ["최종이체일자", "이체일자"])
         billing_comp_col = find_col(billing_df, ["업체명", "고객명", "상호"])
         billing_biz_col = find_col(billing_df, ["사업자번호"])
+        billing_customer_col = find_col(billing_df, ["고객번호"])
 
-        # 본인 담당자만 필터
+        # 본인 담당자만 필터. 청구 시트에 담당자 컬럼이 없으면 하나은행 시트의 고객번호 매칭 사용.
         if billing_owner_col and billing_owner_col in billing_df.columns:
             billing_df = billing_df[billing_df[billing_owner_col].astype(str).str.strip() == str(user_name).strip()]
+        elif billing_customer_col and user_customer_ids:
+            billing_df = billing_df[
+                billing_df[billing_customer_col].apply(normalize_billing_customer_no).isin(user_customer_ids)
+            ].copy()
 
         # 날짜 컬럼 변환
         if billing_open_date_col and billing_open_date_col in billing_df.columns:
@@ -5319,7 +5343,7 @@ def show_target_customers():
         st.markdown("#### 개설/이행일 이후 미로그인 고객")
         st.caption("개설/이행일 기준으로 청구시트 최종로그인일자가 없거나 개설/이행일 이전인 고객")
         _render_no_login_section(
-            build_no_login_after_open(_hana, _billing),
+            _only_current_user_rows(build_no_login_after_open(_hana, _billing)),
             year_key="target_open_year", owner_key="target_open_owner",
             label="미로그인 고객", download_prefix="미로그인고객_개설이행일",
             refresh_key="tg_nl_refresh", exclude_key="tg_nl_open_exclude",
@@ -5329,7 +5353,7 @@ def show_target_customers():
         st.markdown("#### 연계청구일자 이후 미로그인 고객")
         st.caption("연계청구일자 기준으로 청구시트 최종로그인일자가 없거나 연계청구일자 이전인 고객")
         _render_no_login_section(
-            build_no_login_after_link_billing(_hana, _billing),
+            _only_current_user_rows(build_no_login_after_link_billing(_hana, _billing)),
             year_key="target_link_year", owner_key="target_link_owner",
             label="연계청구 미로그인 고객", download_prefix="미로그인고객_연계청구일자",
             exclude_key="tg_nl_link_exclude",
@@ -5339,7 +5363,7 @@ def show_target_customers():
         st.markdown("#### 로그인 100회 이상 · 미이체 고객")
         st.caption("청구시트 기준 로그인 100회 이상이지만 이체 이력이 없는 고객 (해지 제외)")
         _render_high_login_no_transfer(
-            build_high_login_no_transfer(_hana, _billing),
+            _only_current_user_rows(build_high_login_no_transfer(_hana, _billing)),
             owner_key="tg_high_login_owner",
             download_prefix="미이체고객",
         )
