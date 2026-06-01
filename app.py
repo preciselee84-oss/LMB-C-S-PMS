@@ -5509,7 +5509,7 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     status_rows = [
         ["전체", "", count(open_wait), count(open_progress), count(open_done), count(st_link_wait), count(st_link_progress), count(st_link_done), count(terminated)],
         ["", "기본형", count(open_wait & basic), count(open_progress & basic), count(open_done & basic), "-", "-", "-", count(terminated & basic)],
-        ["", "연계형", count(open_wait & linked), count(open_progress & linked), count(open_done & linked), count(st_link_wait & linked), count(st_link_progress & linked), count(st_link_done & linked), count(terminated & linked)],
+        ["", "연계형", count(open_wait & linked), count(open_progress & linked), count(open_done & linked), count(st_link_wait), count(st_link_progress), count(st_link_done), count(terminated & linked)],
     ]
     status_df = pd.DataFrame(status_rows, columns=["구분", "유형", "구축대기", "구축진행", "구축완료", "연계대기", "연계진행", "연계완료", "해지"])
 
@@ -5575,14 +5575,13 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
         ["", "취소"] + fmt_values(open_cancel_values),
     ]
 
-    # 연계형 월별 표: 상태 표와 동일하게 연계상태 텍스트 단순 매칭
-    # (active·mutual exclusion 제거 → 구글시트 기준과 일치)
+    # 연계 월별 표: 연계상태 텍스트만 매칭 (구축형 필터 없음 → 전체 행 기준과 일치)
     _lr = link_receipt_dates.notna() & (link_receipt_dates <= as_of_date)
-    link_received_mask   = linked & _lr
-    mt_link_wait         = linked & _lr & link_status.str.contains("대기", na=False)
-    mt_link_progress     = linked & _lr & link_status.str.contains("진행", na=False)
-    mt_link_done         = linked & _lr & link_status.str.contains("완료", na=False)
-    mt_link_cancel       = linked & _lr & link_status.str.contains("취소|DROP|드랍", case=False, na=False)
+    link_received_mask   = _lr
+    mt_link_wait         = _lr & link_status.str.contains("대기", na=False)
+    mt_link_progress     = _lr & link_status.str.contains("진행", na=False)
+    mt_link_done         = _lr & link_status.str.contains("완료", na=False)
+    mt_link_cancel       = _lr & link_status.str.contains("취소|DROP|드랍", case=False, na=False)
     link_receipt_count_values = month_count_values(link_received_mask, link_receipt_dates)
     link_wait_values     = month_count_values(mt_link_wait,     link_receipt_dates)
     link_progress_values = month_count_values(mt_link_progress, link_receipt_dates)
