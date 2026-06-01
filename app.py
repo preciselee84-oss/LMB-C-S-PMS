@@ -4384,8 +4384,8 @@ def show_report():
 def show_staff_admin():
     st.markdown("### 직원 목록")
 
-    # 다른 세션의 변경사항을 반영하되, 현재 세션의 직원목록을 더 작은 로드 결과로 덮어쓰지 않는다.
-    st.session_state.user_db = merge_user_db(st.session_state.get("user_db", {}), load_user_db())
+    # 파일 기준으로 재로드 (_deleted 목록 포함 반영)
+    st.session_state.user_db = load_user_db()
 
     if st.session_state.pop("reset_staff_edit_sel", False):
         st.session_state.staff_edit_sel = "선택안함"
