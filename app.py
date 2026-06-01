@@ -7074,16 +7074,24 @@ def build_high_login_no_transfer(hana_df, billing_df, login_threshold=100):
     return out
 
 
-def _render_high_login_no_transfer(df, owner_key, download_prefix):
+def _render_high_login_no_transfer(df, owner_key, download_prefix, year_key=None):
     """로그인 100회+ 미이체 고객 렌더링 헬퍼."""
     if df.empty:
         st.info("해당 조건의 고객이 없습니다.")
         return
+    date_col = "개설/이행일" if "개설/이행일" in df.columns else None
+    years  = sorted(df[date_col].str[:4].dropna().unique().tolist(), reverse=True) if date_col else []
     owners = sorted(df["담당자"].dropna().unique().tolist())
-    fc1, _ = st.columns([2, 8])
+    fc1, fc2, _ = st.columns([2, 2, 6])
     with fc1:
+        sel_year = st.selectbox("연도 조회", ["전체"] + years, key=year_key or f"{owner_key}_year")
+    with fc2:
         sel_owner = st.selectbox("담당자 조회", ["전체"] + owners, key=owner_key)
-    filtered = df.copy() if sel_owner == "전체" else df[df["담당자"] == sel_owner].copy()
+    filtered = df.copy()
+    if sel_year != "전체" and date_col:
+        filtered = filtered[filtered[date_col].str.startswith(sel_year)]
+    if sel_owner != "전체":
+        filtered = filtered[filtered["담당자"] == sel_owner]
     filtered = filtered.reset_index(drop=True)
     filtered["순번"] = range(1, len(filtered) + 1)
     st.metric("미이체 고객 수", f"{len(filtered):,}건")
@@ -7092,7 +7100,7 @@ def _render_high_login_no_transfer(df, owner_key, download_prefix):
     st.download_button(
         "미이체 고객 다운로드",
         data=filtered.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
-        file_name=f"{download_prefix}_{today_str}.csv",
+        file_name=f"{download_prefix}_{sel_year}_{today_str}.csv",
         mime="text/csv",
         use_container_width=True,
     )
