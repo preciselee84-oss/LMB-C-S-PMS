@@ -5098,6 +5098,15 @@ def show_target_customers():
             label="연계청구 미로그인 고객", download_prefix="미로그인고객_연계청구일자",
             exclude_key="tg_nl_link_exclude",
         )
+
+        st.divider()
+        st.markdown("#### 로그인 100회 이상 · 미이체 고객")
+        st.caption("청구시트 기준 로그인 100회 이상이지만 이체 이력이 없는 고객 (해지 제외)")
+        _render_high_login_no_transfer(
+            build_high_login_no_transfer(_hana, _billing),
+            owner_key="tg_high_login_owner",
+            download_prefix="미이체고객",
+        )
     else:
         st.divider()
         st.warning("하나은행 구글시트 또는 청구시트 데이터를 불러올 수 없습니다.")
@@ -6264,6 +6273,15 @@ def show_operation_plan():
                 exclude_key="op_nl_link_exclude",
             )
 
+            st.divider()
+            st.markdown("#### 로그인 100회 이상 · 미이체 고객")
+            st.caption("청구시트 기준 로그인 100회 이상이지만 이체 이력이 없는 고객 (해지 제외)")
+            _render_high_login_no_transfer(
+                build_high_login_no_transfer(hana_df_nl, billing_df_nl),
+                owner_key="op_high_login_owner",
+                download_prefix="미이체고객",
+            )
+
 
 def show_weekly_report_admin():
     db = load_db(WEEKLY_REPORT_FILE, {})
@@ -6763,20 +6781,24 @@ def build_billing_lookup(billing_df):
     first_login_col = exact_col(lookup, ["신규일자"]) or find_col(lookup, ["신규일자", "최초신규일자"])
     # "최종로그인" 단독 컬럼명도 커버 (일자 없는 변형 포함)
     last_login_col = find_col(lookup, ["최종로그인일자", "최근로그인일자", "최종로그인", "최근로그인", "로그인일자"])
-    login_count_col = find_col(lookup, ["로그인건수", "로그인횟수"])
-    menu_click_col = exact_col(lookup, ["메뉴사용"]) or find_col(lookup, ["메뉴사용", "메뉴클릭수"])
+    login_count_col  = find_col(lookup, ["로그인건수", "로그인횟수"])
+    menu_click_col   = exact_col(lookup, ["메뉴사용"]) or find_col(lookup, ["메뉴사용", "메뉴클릭수"])
+    transfer_col     = find_col(lookup, ["최종이체일자", "이체일자", "최종이체"])
+    transfer_cnt_col = find_col(lookup, ["이체건수", "이체횟수"])
 
     if not customer_col:
-        return pd.DataFrame(columns=["_고객번호", "_은행고객명", "_은행사업자번호", "_최초로그인", "_최종로그인", "_로그인횟수", "_메뉴클릭수"])
+        return pd.DataFrame(columns=["_고객번호", "_은행고객명", "_은행사업자번호", "_최초로그인", "_최종로그인", "_로그인횟수", "_메뉴클릭수", "_최종이체일자", "_이체건수"])
 
     rows = pd.DataFrame()
-    rows["_고객번호"] = lookup[customer_col].apply(normalize_billing_customer_no)
-    rows["_은행고객명"] = lookup[company_col].astype(str).str.strip() if company_col else ""
+    rows["_고객번호"]     = lookup[customer_col].apply(normalize_billing_customer_no)
+    rows["_은행고객명"]   = lookup[company_col].astype(str).str.strip() if company_col else ""
     rows["_은행사업자번호"] = lookup[biz_col].apply(normalize_biz_no) if biz_col else ""
-    rows["_최초로그인"] = lookup[first_login_col].apply(format_yyyymmdd) if first_login_col else ""
-    rows["_최종로그인"] = lookup[last_login_col].apply(format_yyyymmdd) if last_login_col else ""
-    rows["_로그인횟수"] = lookup[login_count_col].fillna("").astype(str).str.replace(r"\.0$", "", regex=True) if login_count_col else ""
-    rows["_메뉴클릭수"] = lookup[menu_click_col].fillna("").astype(str).str.replace(r"\.0$", "", regex=True) if menu_click_col else ""
+    rows["_최초로그인"]   = lookup[first_login_col].apply(format_yyyymmdd) if first_login_col else ""
+    rows["_최종로그인"]   = lookup[last_login_col].apply(format_yyyymmdd) if last_login_col else ""
+    rows["_로그인횟수"]   = lookup[login_count_col].fillna("").astype(str).str.replace(r"\.0$", "", regex=True) if login_count_col else ""
+    rows["_메뉴클릭수"]   = lookup[menu_click_col].fillna("").astype(str).str.replace(r"\.0$", "", regex=True) if menu_click_col else ""
+    rows["_최종이체일자"] = lookup[transfer_col].apply(format_yyyymmdd) if transfer_col else ""
+    rows["_이체건수"]     = lookup[transfer_cnt_col].fillna("").astype(str).str.replace(r"\.0$", "", regex=True) if transfer_cnt_col else ""
     rows = rows[rows["_고객번호"] != ""].drop_duplicates("_고객번호", keep="first")
     return rows
 
@@ -6988,6 +7010,91 @@ def build_no_login_after_link_billing(hana_df, billing_df):
         ref_date_col_keys=["연계청구일자", "연계청구일", "청구일자"],
         ref_date_label="연계청구일자",
         extra_hana_col_keys=["연계상태"],
+    )
+
+
+def build_high_login_no_transfer(hana_df, billing_df, login_threshold=100):
+    """로그인 100회 이상이지만 이체 이력이 없는 고객 목록 반환."""
+    hana = hana_df.copy()
+    hana.columns = [str(c).strip() for c in hana.columns]
+
+    hana_cust_col  = find_col(hana, ["고객번호"])
+    company_col    = find_col(hana, ["고객명", "업체명", "상호"])
+    owner_col      = find_col(hana, ["담당자"])
+    build_type_col = find_col(hana, ["구축형"])
+    open_date_col  = find_col(hana, ["개설/이행일", "개설일", "이행일"])
+    open_status_col= find_col(hana, ["개설상태"])
+    end_col        = find_col(hana, ["해지일자", "해지일", "해약일"])
+
+    if not hana_cust_col:
+        return pd.DataFrame()
+
+    hana["_고객번호"] = hana[hana_cust_col].apply(normalize_billing_customer_no)
+
+    # 해지 고객 제외
+    if end_col:
+        hana["_end_dt"] = pd.to_datetime(hana[end_col].map(parse_sheet_date), errors="coerce")
+        hana = hana[hana["_end_dt"].isna()].copy()
+
+    hana_valid = hana[hana["_고객번호"].ne("")].copy()
+
+    bill_lkp = build_billing_lookup(billing_df)
+    merged = hana_valid.merge(bill_lkp, on="_고객번호", how="inner")  # 청구시트에 있는 고객만
+
+    # 로그인횟수 숫자 변환
+    merged["_login_cnt"] = pd.to_numeric(
+        merged["_로그인횟수"].replace("", "0"), errors="coerce"
+    ).fillna(0)
+
+    # 조건: 로그인 >= threshold AND 최종이체일자 없음
+    mask = (merged["_login_cnt"] >= login_threshold) & (merged["_최종이체일자"].eq("") | merged["_최종이체일자"].isna())
+    result = merged[mask].copy().reset_index(drop=True)
+    if result.empty:
+        return pd.DataFrame()
+
+    out = pd.DataFrame()
+    out["순번"]        = range(1, len(result) + 1)
+    out["고객번호"]    = result["_고객번호"]
+    out["고객명"]      = result[company_col].fillna("").astype(str)    if company_col     else ""
+    out["담당자"]      = result[owner_col].fillna("").astype(str)      if owner_col       else ""
+    out["구축형"]      = result[build_type_col].fillna("").astype(str) if build_type_col  else ""
+    out["개설상태"]    = result[open_status_col].fillna("").astype(str) if open_status_col else ""
+    out["개설/이행일"] = result[open_date_col].apply(parse_sheet_date).apply(
+        lambda d: d.strftime("%Y-%m-%d") if pd.notna(d) else ""
+    ) if open_date_col else ""
+    out["로그인횟수"]   = result["_로그인횟수"]
+    out["최종로그인일자"] = result["_최종로그인"].apply(
+        lambda v: pd.to_datetime(v, format="%Y%m%d", errors="coerce").strftime("%Y-%m-%d")
+        if v and not pd.isna(v) else "없음"
+    )
+    out["최종이체일자"] = result["_최종이체일자"].apply(
+        lambda v: pd.to_datetime(v, format="%Y%m%d", errors="coerce").strftime("%Y-%m-%d")
+        if v and not pd.isna(v) else "없음"
+    )
+    return out
+
+
+def _render_high_login_no_transfer(df, owner_key, download_prefix):
+    """로그인 100회+ 미이체 고객 렌더링 헬퍼."""
+    if df.empty:
+        st.info("해당 조건의 고객이 없습니다.")
+        return
+    owners = sorted(df["담당자"].dropna().unique().tolist())
+    fc1, _ = st.columns([2, 8])
+    with fc1:
+        sel_owner = st.selectbox("담당자 조회", ["전체"] + owners, key=owner_key)
+    filtered = df.copy() if sel_owner == "전체" else df[df["담당자"] == sel_owner].copy()
+    filtered = filtered.reset_index(drop=True)
+    filtered["순번"] = range(1, len(filtered) + 1)
+    st.metric("미이체 고객 수", f"{len(filtered):,}건")
+    render_plain_html_table(filtered, max_rows=500, center_align=False)
+    today_str = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m%d")
+    st.download_button(
+        "미이체 고객 다운로드",
+        data=filtered.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
+        file_name=f"{download_prefix}_{today_str}.csv",
+        mime="text/csv",
+        use_container_width=True,
     )
 
 
