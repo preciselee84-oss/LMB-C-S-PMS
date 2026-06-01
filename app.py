@@ -4620,7 +4620,7 @@ def _kpi_number(value):
     return int(parsed) if pd.notna(parsed) else 0
 
 
-def build_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name):
+def build_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name=None):
     if hana_sheet is None or billing_sheet is None or hana_sheet.empty or billing_sheet.empty:
         return pd.DataFrame()
 
@@ -4655,7 +4655,8 @@ def build_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name):
 
     hana["_고객번호"] = hana[hana_customer_col].apply(normalize_billing_customer_no)
     hana = hana[hana["_고객번호"].ne("")]
-    hana = hana[hana[hana_owner_col].astype(str).str.strip() == str(user_name).strip()].copy()
+    if user_name:
+        hana = hana[hana[hana_owner_col].astype(str).str.strip() == str(user_name).strip()].copy()
     if hana_manage_col and hana_manage_col in hana.columns:
         hana = hana[~hana[hana_manage_col].astype(str).str.strip().str.contains("해지|취소", case=False, na=False)].copy()
     if hana.empty:
@@ -4775,6 +4776,7 @@ def build_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name):
             "우선순위": priority,
             "추천점수": score,
             "KPI영역": " / ".join(dict.fromkeys(areas)),
+            "담당자": str(row.get("담당자", "")).strip(),
             "고객명": customer_name,
             "사업자번호": biz_no,
             "구축형": build_type,
@@ -4795,7 +4797,7 @@ def build_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name):
     return pd.DataFrame(rows).sort_values(["추천점수", "로그인건수", "메뉴사용"], ascending=[False, False, False]).reset_index(drop=True)
 
 
-def render_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name):
+def render_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name=None, key_prefix="kpi_rec"):
     st.markdown("#### KPI 집중 활동 추천")
     remaining_months = 6
     c1, c2, c3, c4 = st.columns(4)
@@ -4810,18 +4812,23 @@ def render_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name):
         st.info("청구 시트와 하나은행 시트 기준으로 추천 가능한 KPI 활동 고객이 없습니다.")
         return
 
-    f1, f2, f3 = st.columns([2, 2, 6])
+    f1, f2, f3, f4 = st.columns([2, 2, 2, 4])
     with f1:
         area_options = ["전체"] + sorted({area for text in rec_df["KPI영역"].dropna() for area in str(text).split(" / ") if area})
-        selected_area = st.selectbox("KPI영역", area_options, key="kpi_rec_area")
+        selected_area = st.selectbox("KPI영역", area_options, key=f"{key_prefix}_area")
     with f2:
-        selected_priority = st.selectbox("우선순위", ["전체", "상", "중", "하"], key="kpi_rec_priority")
+        selected_priority = st.selectbox("우선순위", ["전체", "상", "중", "하"], key=f"{key_prefix}_priority")
+    with f3:
+        owner_options = ["전체"] + sorted(v for v in rec_df["담당자"].dropna().astype(str).str.strip().unique().tolist() if v)
+        selected_owner = st.selectbox("담당자", owner_options, key=f"{key_prefix}_owner")
 
     filtered = rec_df.copy()
     if selected_area != "전체":
         filtered = filtered[filtered["KPI영역"].astype(str).str.contains(selected_area, regex=False, na=False)]
     if selected_priority != "전체":
         filtered = filtered[filtered["우선순위"] == selected_priority]
+    if selected_owner != "전체":
+        filtered = filtered[filtered["담당자"] == selected_owner]
     filtered = filtered.head(100).reset_index(drop=True)
     filtered.insert(0, "순번", range(1, len(filtered) + 1))
 
@@ -4896,7 +4903,7 @@ def show_target_customers():
 
     user_customer_ids = _user_customer_ids(hana_sheet)
 
-    render_kpi_activity_recommendations(hana_sheet, hana_billing_sheet, user_name)
+    render_kpi_activity_recommendations(hana_sheet, hana_billing_sheet, user_name, key_prefix="target_kpi_rec")
     st.divider()
 
     cloud = clean_header_logic(cloud.copy())
@@ -6425,7 +6432,7 @@ OPERATION_PLAN_FILE = "operation_plan.json"
 
 def show_operation_plan():
     st.markdown("### 운영계획")
-    tab_plan, tab_no_login = st.tabs(["운영계획 관리", "미로그인 고객 현황"])
+    tab_plan, tab_kpi_rec, tab_no_login = st.tabs(["운영계획 관리", "KPI 집중 추천", "미로그인 고객 현황"])
 
     # ── 탭1: 운영계획 관리 ──
     with tab_plan:
@@ -6495,6 +6502,37 @@ def show_operation_plan():
                 save_db(OPERATION_PLAN_FILE, db)
                 st.success("삭제했습니다.")
                 st.rerun()
+
+    # ── 탭2: KPI 집중 추천 ──
+    with tab_kpi_rec:
+        _force_kpi = st.session_state.pop("_op_kpi_refresh", False)
+        refresh_col, _ = st.columns([1, 5])
+        with refresh_col:
+            if st.button("새로고침", key="op_kpi_refresh_btn", use_container_width=True):
+                st.session_state["_op_kpi_refresh"] = True
+                st.rerun()
+        try:
+            hana_df_kpi = read_google_csv(
+                st.session_state.get("url_hana", DEFAULT_URL_HANA),
+                header=2, force_refresh=_force_kpi,
+            )
+            billing_df_kpi = load_hana_billing_df(force_refresh=_force_kpi)
+        except Exception as e:
+            st.error(f"데이터를 불러오지 못했습니다: {e}")
+            hana_df_kpi = pd.DataFrame()
+            billing_df_kpi = pd.DataFrame()
+
+        if hana_df_kpi is None or hana_df_kpi.empty or billing_df_kpi is None or billing_df_kpi.empty:
+            st.info("KPI 추천에 사용할 하나은행 구글시트 또는 청구시트 데이터가 없습니다.")
+        else:
+            hana_df_kpi = hana_df_kpi.dropna(how="all").reset_index(drop=True)
+            billing_df_kpi = billing_df_kpi.dropna(how="all").reset_index(drop=True)
+            render_kpi_activity_recommendations(
+                hana_df_kpi,
+                billing_df_kpi,
+                user_name=None,
+                key_prefix="op_kpi_rec",
+            )
 
     # ── 탭2: 미로그인 고객 현황 ──
     with tab_no_login:
