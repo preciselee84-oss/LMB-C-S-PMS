@@ -5501,12 +5501,15 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
     link_receipt = active & (link_received_by_asof | link_wait | link_progress | link_done)
     terminated = end_dates.notna() & (end_dates <= as_of_date)
 
-    # 상태 표: 스냅샷 기준일 기준 전체 고객 현황 (접수연도 필터 없음)
-    # 연계 컬럼은 월별 표와 동일하게 linked(구축형="연계|이행") 필터 적용
+    # 상태 표: 구글시트 기준과 동일하게 연계상태 컬럼값만으로 단순 집계
+    # active/link_received_by_asof 등 부가 조건 없이 연계상태 텍스트만 매칭
+    st_link_wait     = link_status.str.contains("대기", na=False)
+    st_link_progress = link_status.str.contains("진행", na=False)
+    st_link_done     = link_status.str.contains("완료", na=False)
     status_rows = [
-        ["전체", "", count(open_wait), count(open_progress), count(open_done), count(link_wait & linked), count(link_progress & linked), count(link_done & linked), count(terminated)],
+        ["전체", "", count(open_wait), count(open_progress), count(open_done), count(st_link_wait), count(st_link_progress), count(st_link_done), count(terminated)],
         ["", "기본형", count(open_wait & basic), count(open_progress & basic), count(open_done & basic), "-", "-", "-", count(terminated & basic)],
-        ["", "연계형", count(open_wait & linked), count(open_progress & linked), count(open_done & linked), count(link_wait & linked), count(link_progress & linked), count(link_done & linked), count(terminated & linked)],
+        ["", "연계형", count(open_wait & linked), count(open_progress & linked), count(open_done & linked), count(st_link_wait & linked), count(st_link_progress & linked), count(st_link_done & linked), count(terminated & linked)],
     ]
     status_df = pd.DataFrame(status_rows, columns=["구분", "유형", "구축대기", "구축진행", "구축완료", "연계대기", "연계진행", "연계완료", "해지"])
 
