@@ -1952,8 +1952,8 @@ def show_sidebar():
                 display: flex !important;
                 transform: none !important;
                 visibility: visible !important;
-                min-width: 240px !important;
-                width: 240px !important;
+                min-width: 272px !important;
+                width: 272px !important;
             }
             [data-testid="stSidebarCollapseButton"],
             [data-testid="collapsedControl"],
@@ -1961,140 +1961,208 @@ def show_sidebar():
                 display: none !important;
             }
             [data-testid="stSidebar"] {
-                background-color: #2D2D2D !important;
+                background-color: #171717 !important;
+                border-right: 1px solid #2f2f2f !important;
             }
             [data-testid="stSidebar"] > div:first-child {
                 padding-top: 0 !important;
             }
             [data-testid="stSidebarContent"] {
-                padding-top: 0 !important;
+                padding: 10px 10px 12px !important;
+                background-color: #171717 !important;
             }
             [data-testid="stSidebar"] * {
-                color: #E2E8F0 !important;
+                color: #ececec !important;
             }
-            [data-testid="stSidebar"] .sidebar-title {
-                font-size: 22px;
+            [data-testid="stSidebar"] .gpt-side-shell {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                padding: 4px 2px 8px;
+            }
+            [data-testid="stSidebar"] .gpt-brand {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-height: 44px;
+                padding: 6px 8px;
+                border-radius: 10px;
+            }
+            [data-testid="stSidebar"] .gpt-brand-mark {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 28px;
+                height: 28px;
+                border: 1px solid #3a3a3a;
+                border-radius: 8px;
+                color: #ffffff !important;
+                font-size: 13px;
                 font-weight: 900;
-                color: #FFFFFF !important;
-                text-align: center;
-                padding: 0 0 4px;
-                margin-top: 0;
-                letter-spacing: -0.5px;
+                letter-spacing: 0;
+                background: #212121;
+            }
+            [data-testid="stSidebar"] .gpt-brand-text {
+                display: flex;
+                flex-direction: column;
+                line-height: 1.2;
+            }
+            [data-testid="stSidebar"] .gpt-brand-title {
+                font-size: 15px;
+                font-weight: 800;
+                color: #f5f5f5 !important;
+            }
+            [data-testid="stSidebar"] .gpt-brand-subtitle {
+                margin-top: 2px;
+                font-size: 12px;
+                color: #a7a7a7 !important;
+                font-weight: 500;
+            }
+            [data-testid="stSidebar"] .gpt-user-card {
+                margin: 2px 2px 8px;
+                padding: 10px;
+                border: 1px solid #2f2f2f;
+                border-radius: 12px;
+                background: #212121;
+            }
+            [data-testid="stSidebar"] .gpt-user-name {
+                font-size: 14px;
+                font-weight: 800;
+                color: #ffffff !important;
+                line-height: 1.25;
+            }
+            [data-testid="stSidebar"] .gpt-user-meta {
+                margin-top: 4px;
+                font-size: 11px;
+                color: #9b9b9b !important;
+                font-weight: 500;
+                line-height: 1.35;
+            }
+            [data-testid="stSidebar"] .gpt-section {
+                margin: 16px 8px 6px;
+                font-size: 12px;
+                color: #8e8e8e !important;
+                font-weight: 700;
+                letter-spacing: 0;
+            }
+            [data-testid="stSidebar"] .gpt-section:first-of-type {
+                margin-top: 8px;
+            }
+            [data-testid="stSidebar"] .gpt-sidebar-spacer {
+                height: 10px;
+            }
+            [data-testid="stSidebar"] .gpt-sidebar-divider {
+                height: 1px;
+                margin: 12px 8px;
+                background: #2f2f2f;
             }
             [data-testid="stSidebar"] div.stButton {
-                margin-bottom: -12px !important;
+                margin: 1px 0 !important;
                 padding-bottom: 0 !important;
             }
             [data-testid="stSidebar"] div.stButton > button {
                 margin-bottom: 0 !important;
-                padding-top: 2px !important;
-                padding-bottom: 2px !important;
-                height: 36px !important;
-            }
-            [data-testid="stSidebar"] .sidebar-user {
-                text-align: center;
-                padding: 6px 0 2px;
-            }
-            [data-testid="stSidebar"] .sidebar-user .name-row {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 6px;
-            }
-            [data-testid="stSidebar"] .sidebar-user .name {
-                font-size: 15px;
-                font-weight: 700;
-                color: #FFFFFF !important;
-            }
-            [data-testid="stSidebar"] .sidebar-user .greet {
-                font-size: 13px;
-                color: #A0AEC0 !important;
-            }
-            [data-testid="stSidebar"] .sidebar-user .login-time {
-                font-size: 11px;
-                color: #718096 !important;
-                margin-top: 2px;
+                min-height: 38px !important;
+                height: auto !important;
             }
             [data-testid="stSidebar"] hr {
-                border-color: #4A4A4A !important;
+                border-color: #2f2f2f !important;
+                margin: 10px 0 !important;
             }
             [data-testid="stSidebar"] div.stButton > button {
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
-                color: #FFFFFF !important;
-                font-size: 15px !important;
-                font-weight: 800 !important;
+                color: #ececec !important;
+                font-size: 14px !important;
+                font-weight: 600 !important;
                 text-align: left !important;
-                padding: 8px 12px !important;
+                padding: 8px 10px !important;
                 border-radius: 8px !important;
+                justify-content: flex-start !important;
+                transition: background 0.12s ease, color 0.12s ease !important;
             }
             [data-testid="stSidebar"] div.stButton > button p,
             [data-testid="stSidebar"] div.stButton > button span,
             [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] p,
             [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span {
-                font-size: 15px !important;
-                font-weight: 800 !important;
-                color: #FFFFFF !important;
+                font-size: 14px !important;
+                font-weight: 600 !important;
+                color: #ececec !important;
+                white-space: normal !important;
+                line-height: 1.25 !important;
             }
             [data-testid="stSidebar"] div.stButton > button:hover {
-                background: #3D3D3D !important;
-                color: #FFFFFF !important;
+                background: #2f2f2f !important;
+                color: #ffffff !important;
             }
-            [data-testid="stSidebarContent"] [data-testid="stMarkdownContainer"] p {
-                color: #FFFFFF !important;
-                font-size: 20px !important;
-                font-weight: 800 !important;
-                letter-spacing: 0.3px !important;
-                margin: 12px 0 4px 4px !important;
+            [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.gpt-nav-active) + div [data-testid="stButton"] button,
+            [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.gpt-nav-active) + [data-testid="stElementContainer"] [data-testid="stButton"] button {
+                background: #2f2f2f !important;
+                color: #ffffff !important;
+            }
+            [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.gpt-nav-active) + div [data-testid="stButton"] button p,
+            [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.gpt-nav-active) + [data-testid="stElementContainer"] [data-testid="stButton"] button p {
+                color: #ffffff !important;
+                font-weight: 700 !important;
+            }
+            [data-testid="stSidebar"] .gpt-logout-marker + div [data-testid="stButton"] button,
+            [data-testid="stSidebar"] .gpt-logout-marker + [data-testid="stElementContainer"] [data-testid="stButton"] button {
+                color: #d9d9d9 !important;
+            }
+            [data-testid="stSidebar"] .gpt-logout-marker + div [data-testid="stButton"] button:hover,
+            [data-testid="stSidebar"] .gpt-logout-marker + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover {
+                background: #3a2424 !important;
+                color: #ffffff !important;
             }
             </style>
             """,
             unsafe_allow_html=True,
         )
-        _lt = st.session_state.get("login_time", "")
-        st.markdown(
-            f"<div class='sidebar-title'>실적관리 시스템</div>"
-            f"<div class='sidebar-user'>"
-            f"<div class='name-row'>"
-            f"<span class='name'>{st.session_state.user_name}님</span>"
-            f"<span class='greet'>반갑습니다.</span>"
-            f"</div>"
-            f"<div class='login-time'>접속 {_lt}</div>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-        st.divider()
 
-        if st.session_state.user_role == "관리자":
-            st.markdown("관리자 메뉴")
-            for menu_name in ["실적 분석/계산", "실적 보고서", "청구자료 작성", "주간보고 취합"]:
-                if st.button(menu_name, use_container_width=True):
-                    st.session_state.current_menu = menu_name
-                    persist_current_menu()
-                    st.rerun()
-
-        st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
-        st.markdown("사용자 메뉴")
-        for menu_name in ["업로드 및 실적 확인", "이번달 활동 대상고객 추천", "주간보고 이력 작성"]:
-            if st.button(menu_name, use_container_width=True):
+        def render_nav_button(menu_name):
+            active_class = " gpt-nav-active" if st.session_state.current_menu == menu_name else ""
+            st.markdown(f"<div class='gpt-nav-marker{active_class}'></div>", unsafe_allow_html=True)
+            if st.button(menu_name, use_container_width=True, key=f"nav_{menu_name}"):
                 st.session_state.current_menu = menu_name
                 persist_current_menu()
                 if menu_name == "업로드 및 실적 확인":
                     st.session_state["show_add_history_form"] = False
                 st.rerun()
 
-        if st.session_state.user_role == "관리자":
-            st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
-            st.markdown("설정")
-            for menu_name in ["직원 및 권한설정", "구글 스트레드시트 연동"]:
-                if st.button(menu_name, use_container_width=True):
-                    st.session_state.current_menu = menu_name
-                    persist_current_menu()
-                    st.rerun()
+        _lt = st.session_state.get("login_time", "")
+        st.markdown(
+            f"<div class='gpt-side-shell'>"
+            f"<div class='gpt-brand'>"
+            f"<div class='gpt-brand-mark'>P</div>"
+            f"<div class='gpt-brand-text'>"
+            f"<div class='gpt-brand-title'>실적관리 시스템</div>"
+            f"<div class='gpt-brand-subtitle'>Performance workspace</div>"
+            f"</div></div>"
+            f"<div class='gpt-user-card'>"
+            f"<div class='gpt-user-name'>{html.escape(st.session_state.user_name)}님</div>"
+            f"<div class='gpt-user-meta'>반갑습니다.<br>접속 {_lt}</div>"
+            f"</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
-        st.divider()
-        if st.button("로그아웃", use_container_width=True):
+        if st.session_state.user_role == "관리자":
+            st.markdown("<div class='gpt-section'>관리자 메뉴</div>", unsafe_allow_html=True)
+            for menu_name in ["실적 분석/계산", "실적 보고서", "청구자료 작성", "주간보고 취합", "운영계획"]:
+                render_nav_button(menu_name)
+
+        st.markdown("<div class='gpt-section'>사용자 메뉴</div>", unsafe_allow_html=True)
+        for menu_name in ["업로드 및 실적 확인", "이번달 활동 대상고객 추천", "주간보고 이력 작성"]:
+            render_nav_button(menu_name)
+
+        if st.session_state.user_role == "관리자":
+            st.markdown("<div class='gpt-section'>설정</div>", unsafe_allow_html=True)
+            for menu_name in ["직원 및 권한설정", "구글 스트레드시트 연동"]:
+                render_nav_button(menu_name)
+
+        st.markdown("<div class='gpt-sidebar-divider'></div><div class='gpt-logout-marker'></div>", unsafe_allow_html=True)
+        if st.button("로그아웃", use_container_width=True, key="nav_logout"):
             st.session_state.logged_in = False
             st.session_state.auth_mode = "login"
             try:
@@ -2349,7 +2417,7 @@ def render_page_title(menu):
     if menu != "대시보드":
         st.markdown(f"## {menu}")
     settings_menus = ["직원 및 권한설정", "구글 스트레드시트 연동"]
-    admin_menus = ["실적 분석/계산", "실적 보고서", "청구자료 작성", "주간보고 취합"]
+    admin_menus = ["실적 분석/계산", "실적 보고서", "청구자료 작성", "주간보고 취합", "운영계획"]
     if menu in settings_menus:
         parent_nav = "설정"
     elif menu in admin_menus:
@@ -6042,6 +6110,87 @@ def build_weekly_report_ppt_bytes(report_df, week_start="", week_end="", hana_df
     return output.getvalue()
 
 
+OPERATION_PLAN_FILE = "operation_plan.json"
+
+
+def show_operation_plan():
+    st.markdown("### 운영계획")
+    db = load_db(OPERATION_PLAN_FILE, {"plans": []})
+    plans = db.get("plans", [])
+
+    # ── 신규 계획 등록 ──
+    with st.expander("운영계획 등록", expanded=not plans):
+        with st.form("op_plan_form"):
+            fc1, fc2 = st.columns(2)
+            with fc1:
+                op_title    = st.text_input("제목")
+                op_category = st.text_input("구분 (예: 구축, 연계, 운영 등)")
+                op_start    = st.date_input("시작일")
+            with fc2:
+                op_owner    = st.text_input("담당자")
+                op_status   = st.selectbox("상태", ["예정", "진행중", "완료", "보류"])
+                op_end      = st.date_input("종료일")
+            op_content  = st.text_area("내용", height=100)
+            op_note     = st.text_area("비고", height=60)
+            submitted = st.form_submit_button("등록", use_container_width=True, type="primary")
+
+        if submitted:
+            if not op_title.strip():
+                st.error("제목을 입력해주세요.")
+            else:
+                now_text = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
+                plans.append({
+                    "id": hashlib.md5(f"{op_title}-{now_text}".encode()).hexdigest(),
+                    "제목": op_title.strip(),
+                    "구분": op_category.strip(),
+                    "담당자": op_owner.strip(),
+                    "시작일": str(op_start),
+                    "종료일": str(op_end),
+                    "상태": op_status,
+                    "내용": op_content.strip(),
+                    "비고": op_note.strip(),
+                    "등록시각": now_text,
+                })
+                db["plans"] = plans
+                save_db(OPERATION_PLAN_FILE, db)
+                st.success("운영계획을 등록했습니다.")
+                st.rerun()
+
+    if not plans:
+        st.info("등록된 운영계획이 없습니다.")
+        return
+
+    # ── 필터 ──
+    all_statuses = ["전체"] + list(dict.fromkeys(p.get("상태", "") for p in plans))
+    f1, f2 = st.columns([2, 8])
+    with f1:
+        filter_status = st.selectbox("상태 필터", all_statuses, key="op_plan_status_filter")
+
+    filtered = plans if filter_status == "전체" else [p for p in plans if p.get("상태") == filter_status]
+
+    # ── 목록 표시 ──
+    if filtered:
+        show_cols = ["제목", "구분", "담당자", "시작일", "종료일", "상태", "내용", "비고", "등록시각"]
+        render_plain_html_table(
+            pd.DataFrame(filtered)[[c for c in show_cols if c in pd.DataFrame(filtered).columns]],
+            center_align=False
+        )
+
+    # ── 삭제 ──
+    st.markdown("---")
+    delete_opts = ["선택안함"] + [f"{p.get('시작일','')} | {p.get('제목','')} | {p.get('담당자','')}" for p in filtered]
+    d1, _ = st.columns([4, 6])
+    with d1:
+        sel_del = st.selectbox("삭제할 계획 선택", delete_opts, key="op_plan_del_sel")
+    if st.button("선택 삭제", disabled=(sel_del == "선택안함"), key="op_plan_del_btn"):
+        del_idx = delete_opts.index(sel_del) - 1
+        del_id = filtered[del_idx].get("id")
+        db["plans"] = [p for p in plans if p.get("id") != del_id]
+        save_db(OPERATION_PLAN_FILE, db)
+        st.success("삭제했습니다.")
+        st.rerun()
+
+
 def show_weekly_report_admin():
     db = load_db(WEEKLY_REPORT_FILE, {})
     rows = []
@@ -6949,7 +7098,7 @@ def inject_theme_toggle():
     /* 사이드바 */
     body:has(#pms-d:checked) [data-testid="stSidebar"],
     body:has(#pms-d:checked) [data-testid="stSidebarContent"] {
-        background-color: #16162a !important;
+        background-color: #171717 !important;
     }
     body:has(#pms-d:checked) [data-testid="stSidebar"] p,
     body:has(#pms-d:checked) [data-testid="stSidebar"] span,
@@ -6961,7 +7110,7 @@ def inject_theme_toggle():
         border-color: transparent !important; box-shadow: none !important;
     }
     body:has(#pms-d:checked) [data-testid="stSidebar"] .stButton > button:hover {
-        background-color: rgba(255,255,255,0.08) !important;
+        background-color: #2f2f2f !important;
     }
 
     /* 입력 컨트롤 */
@@ -7499,7 +7648,10 @@ def inject_theme_toggle():
         body:has(#pms-s:checked) .js-plotly-plot .modebar-btn path {
             fill: #cdd6f4 !important;
         }
-        body:has(#pms-s:checked) [data-testid="stSidebar"] { background-color: #16162a !important; }
+        body:has(#pms-s:checked) [data-testid="stSidebar"],
+        body:has(#pms-s:checked) [data-testid="stSidebarContent"] {
+            background-color: #171717 !important;
+        }
         body:has(#pms-s:checked) .stButton > button,
         body:has(#pms-s:checked) [data-testid="stButton"] button,
         body:has(#pms-s:checked) button[data-testid^="baseButton"] {
@@ -7634,6 +7786,8 @@ def show_main():
         show_weekly_report_user()
     elif menu == "주간보고 취합":
         show_weekly_report_admin()
+    elif menu == "운영계획":
+        show_operation_plan()
 
 
 restore_login_from_cookie()
