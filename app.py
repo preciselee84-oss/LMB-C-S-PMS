@@ -6224,7 +6224,7 @@ def show_operation_plan():
                     if sel_year == "전체"
                     else no_login_df[no_login_df["개설/이행일"].str.startswith(sel_year)]
                 ).reset_index(drop=True)
-                filtered_nl.insert(0, "순번", range(1, len(filtered_nl) + 1))
+                filtered_nl["순번"] = range(1, len(filtered_nl) + 1)
 
                 st.metric("미로그인 고객 수", f"{len(filtered_nl):,}건")
                 render_plain_html_table(filtered_nl, max_rows=500, center_align=False)
