@@ -5575,13 +5575,19 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
         ["", "취소"] + fmt_values(open_cancel_values),
     ]
 
-    # 연계형(구축형 컬럼이 "연계|이행") 기준, 접수일 = 추가연계접수일 없으면 신규접수일
-    link_received_mask = linked & link_receipt_dates.notna() & (link_receipt_dates <= as_of_date)
+    # 연계형 월별 표: 상태 표와 동일하게 연계상태 텍스트 단순 매칭
+    # (active·mutual exclusion 제거 → 구글시트 기준과 일치)
+    _lr = link_receipt_dates.notna() & (link_receipt_dates <= as_of_date)
+    link_received_mask   = linked & _lr
+    mt_link_wait         = linked & _lr & link_status.str.contains("대기", na=False)
+    mt_link_progress     = linked & _lr & link_status.str.contains("진행", na=False)
+    mt_link_done         = linked & _lr & link_status.str.contains("완료", na=False)
+    mt_link_cancel       = linked & _lr & link_status.str.contains("취소|DROP|드랍", case=False, na=False)
     link_receipt_count_values = month_count_values(link_received_mask, link_receipt_dates)
-    link_wait_values = month_count_values(link_wait & linked, link_receipt_dates)
-    link_progress_values = month_count_values(link_progress & linked, link_receipt_dates)
-    link_done_values = month_count_values(link_done & linked, link_receipt_dates)
-    link_cancel_values = month_count_values(link_cancel & linked, link_receipt_dates)
+    link_wait_values     = month_count_values(mt_link_wait,     link_receipt_dates)
+    link_progress_values = month_count_values(mt_link_progress, link_receipt_dates)
+    link_done_values     = month_count_values(mt_link_done,     link_receipt_dates)
+    link_cancel_values   = month_count_values(mt_link_cancel,   link_receipt_dates)
 
     link_month_rows = [
         ["연계", "접수"] + fmt_values(link_receipt_count_values),
