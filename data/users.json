@@ -110,5 +110,16 @@
         "staff_type": "정규직",
         "outsource": "아니오",
         "outsource_period": "해당없음"
+    },
+    "xxabideby": {
+        "pw": "wnstn12!",
+        "name": "전준수",
+        "email": "xxabideby@webcash.co.kr",
+        "access": "불가",
+        "role": "사용자",
+        "dept_type": "사업부",
+        "staff_type": "정규직",
+        "outsource": "아니오",
+        "outsource_period": "해당없음"
     }
 }
