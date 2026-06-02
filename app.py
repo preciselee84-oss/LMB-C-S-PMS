@@ -1848,6 +1848,33 @@ def show_auth_page():
         }
         body:has(#pms-d:checked) div[data-testid="stCheckbox"] label { color: #cdd6f4 !important; }
         body:has(#pms-d:checked) hr { border-top-color: #45475a !important; }
+        /* 모바일: 로그인 화면 */
+        @media (max-width: 768px) {
+            .main .block-container {
+                padding: 24px 16px 32px !important;
+                max-width: 100% !important;
+            }
+            /* 컬럼 가로 배치 해제 → 전체 폭 사용 */
+            [data-testid="stHorizontalBlock"] {
+                flex-direction: column !important;
+            }
+            [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+                width: 100% !important;
+                min-width: 100% !important;
+                flex: 1 1 100% !important;
+            }
+            .auth-logo-title {
+                font-size: 32px !important;
+            }
+            .auth-logo-sub {
+                font-size: 14px !important;
+                word-break: keep-all !important;
+            }
+            .auth-logo-card {
+                padding: 12px 16px 10px !important;
+                margin-bottom: 8px !important;
+            }
+        }
         </style>
         """,
         unsafe_allow_html=True,
