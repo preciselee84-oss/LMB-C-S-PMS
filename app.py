@@ -2136,14 +2136,18 @@ def show_sidebar():
                 line-height: 1.35;
             }
             [data-testid="stSidebar"] .gpt-section {
-                margin: 16px 8px 6px;
+                margin: 8px 8px 2px;
                 font-size: 12px;
                 color: #8e8e8e !important;
                 font-weight: 700;
                 letter-spacing: 0;
             }
             [data-testid="stSidebar"] .gpt-section:first-of-type {
-                margin-top: 8px;
+                margin-top: 4px;
+            }
+            [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+                margin-bottom: 0 !important;
+                padding-bottom: 0 !important;
             }
             [data-testid="stSidebar"] .gpt-sidebar-spacer {
                 height: 10px;
