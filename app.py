@@ -2261,7 +2261,7 @@ def show_sidebar():
                 render_nav_button(menu_name)
 
         st.markdown("<div class='gpt-section'>사용자 메뉴</div>", unsafe_allow_html=True)
-        for menu_name in ["업로드 및 실적 확인", "이번달 활동 대상고객 추천", "주간보고 이력 작성"]:
+        for menu_name in ["업로드 및 실적 확인", "이번달 활동 대상고객 추천", "주간보고 이력 작성", "방문이력 작성"]:
             render_nav_button(menu_name)
 
         if st.session_state.user_role == "관리자":
@@ -5341,6 +5341,96 @@ def show_target_customers():
         st.warning("하나은행 구글시트 또는 청구시트 데이터를 불러올 수 없습니다.")
 
 
+VISIT_HISTORY_FILE = "visit_history.json"
+
+
+def show_visit_history():
+    st.markdown("### 방문이력 작성")
+    user_name = st.session_state.get("user_name", "")
+    db = load_db(VISIT_HISTORY_FILE, {})
+    my_entries = db.get(user_name, [])
+
+    # ── 등록 폼 ──
+    with st.expander("방문이력 등록", expanded=True):
+        with st.form("visit_form"):
+            vc1, vc2 = st.columns(2)
+            with vc1:
+                v_date     = st.date_input("방문일자")
+                v_customer = st.text_input("고객명")
+                v_biz_no   = st.text_input("사업자번호")
+            with vc2:
+                v_type     = st.selectbox("방문유형", ["방문", "원격지원", "전화", "이메일", "기타"])
+                v_purpose  = st.text_input("방문목적")
+                v_result   = st.selectbox("처리결과", ["완료", "진행중", "재방문필요", "보류"])
+            v_content  = st.text_area("상담내용", height=100)
+            v_note     = st.text_area("특이사항", height=60)
+            v_submitted = st.form_submit_button("등록", use_container_width=True, type="primary")
+
+        if v_submitted:
+            if not v_customer.strip():
+                st.error("고객명을 입력해주세요.")
+            else:
+                now_text = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
+                entry = {
+                    "id": hashlib.md5(f"{user_name}-{now_text}-{v_customer}".encode()).hexdigest(),
+                    "방문일자": str(v_date),
+                    "고객명": v_customer.strip(),
+                    "사업자번호": v_biz_no.strip(),
+                    "방문유형": v_type,
+                    "방문목적": v_purpose.strip(),
+                    "처리결과": v_result,
+                    "상담내용": v_content.strip(),
+                    "특이사항": v_note.strip(),
+                    "담당자": user_name,
+                    "작성시각": now_text,
+                }
+                db.setdefault(user_name, []).append(entry)
+                save_db(VISIT_HISTORY_FILE, db)
+                st.success("방문이력을 등록했습니다.")
+                st.rerun()
+
+    # ── 이력 목록 ──
+    st.markdown("#### 내 방문이력")
+    if not my_entries:
+        st.info("등록된 방문이력이 없습니다.")
+        return
+
+    sorted_entries = sorted(my_entries, key=lambda x: x.get("방문일자", ""), reverse=True)
+    show_cols = ["방문일자", "고객명", "사업자번호", "방문유형", "방문목적", "처리결과", "상담내용", "특이사항", "작성시각"]
+    display_df = pd.DataFrame(sorted_entries)
+    display_df = display_df[[c for c in show_cols if c in display_df.columns]].copy()
+    display_df.insert(0, "선택", False)
+
+    edited_df = st.data_editor(
+        display_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={"선택": st.column_config.CheckboxColumn("선택", default=False, width="small")},
+        disabled=[c for c in display_df.columns if c != "선택"],
+        key="visit_history_editor",
+    )
+
+    selected_ids = [sorted_entries[i].get("id") for i, v in enumerate(edited_df["선택"]) if v]
+    btn1, btn2, _ = st.columns([15, 15, 70])
+    with btn2:
+        if st.button("삭제", use_container_width=True, disabled=not selected_ids, key="visit_del_btn"):
+            db[user_name] = [r for r in my_entries if r.get("id") not in selected_ids]
+            save_db(VISIT_HISTORY_FILE, db)
+            st.success(f"{len(selected_ids)}건 삭제했습니다.")
+            st.rerun()
+
+    # CSV 다운로드
+    today_str = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m%d")
+    dl_df = pd.DataFrame(sorted_entries)[[c for c in show_cols if c in pd.DataFrame(sorted_entries).columns]]
+    st.download_button(
+        "방문이력 다운로드",
+        data=dl_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
+        file_name=f"방문이력_{user_name}_{today_str}.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+
 def show_weekly_report_user():
     opening_categories = ["개설대기", "개설진행", "개설완료"]
     link_categories = ["연계대기", "연계진행", "연계완료"]
@@ -8318,6 +8408,8 @@ def show_main():
         show_google_sync()
     elif menu == "주간보고 이력 작성":
         show_weekly_report_user()
+    elif menu == "방문이력 작성":
+        show_visit_history()
     elif menu == "주간보고 취합":
         show_weekly_report_admin()
     elif menu == "운영계획":
