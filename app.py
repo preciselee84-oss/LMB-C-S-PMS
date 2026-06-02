@@ -7548,20 +7548,20 @@ def show_google_sync():
             st.success("불러오기 및 저장 완료")
 
     if st.session_state.temp_cloud_df is not None:
-        st.markdown("**본사 구글 시트 데이터**")
-        render_plain_html_table(strip_activity_time_columns(st.session_state.temp_cloud_df))
+        st.markdown("**본사 구글 시트 데이터** (상위 20행)")
+        render_plain_html_table(strip_activity_time_columns(st.session_state.temp_cloud_df), max_rows=20)
 
     if st.session_state.analysis_lookup_df is not None:
-        st.markdown("**하나지사 활동이력 구글 시트 데이터**")
-        render_plain_html_table(strip_activity_time_columns(st.session_state.analysis_lookup_df))
+        st.markdown("**하나지사 활동이력 구글 시트 데이터** (상위 20행)")
+        render_plain_html_table(strip_activity_time_columns(st.session_state.analysis_lookup_df), max_rows=20)
 
     if st.session_state.hana_sheet_df is not None:
-        st.markdown("**하나은행 구글 시트 데이터**")
-        render_plain_html_table(strip_activity_time_columns(st.session_state.hana_sheet_df))
+        st.markdown("**하나은행 구글 시트 데이터** (상위 20행)")
+        render_plain_html_table(strip_activity_time_columns(st.session_state.hana_sheet_df), max_rows=20)
 
     if st.session_state.hana_billing_df is not None:
-        st.markdown("**하나은행 청구 시트 데이터**")
-        render_plain_html_table(strip_activity_time_columns(st.session_state.hana_billing_df))
+        st.markdown("**하나은행 청구 시트 데이터** (상위 20행)")
+        render_plain_html_table(strip_activity_time_columns(st.session_state.hana_billing_df), max_rows=20)
 
 
 def inject_theme_toggle():
