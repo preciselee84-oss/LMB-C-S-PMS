@@ -8399,6 +8399,61 @@ def inject_theme_toggle():
          style="display:none" alt="">
     """, unsafe_allow_html=True)
 
+    # ── 모바일 반응형 CSS ──────────────────────────────────────────
+    st.markdown("""
+    <style>
+    @media (max-width: 768px) {
+        /* 메인 컨텐츠 패딩 축소 */
+        .block-container {
+            padding-left: 0.8rem !important;
+            padding-right: 0.8rem !important;
+            padding-top: 0.5rem !important;
+        }
+        /* 테마 토글 버튼 크기 축소 */
+        .pms-sw-outer { top: 8px; right: 8px; }
+        .pms-btn { padding: 0 7px; height: 24px; font-size: 11px; }
+        /* 표 가로 스크롤 */
+        .pms-report-table { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+        table { font-size: 11px !important; }
+        table th, table td { padding: 4px 6px !important; white-space: nowrap; }
+        /* 버튼 터치 영역 확보 */
+        .stButton > button {
+            min-height: 44px !important;
+            font-size: 14px !important;
+        }
+        /* 입력 폼 폰트 */
+        input, textarea, select {
+            font-size: 16px !important;
+        }
+        /* 메트릭 카드 폰트 */
+        [data-testid="stMetricValue"] { font-size: 1.2rem !important; }
+        [data-testid="stMetricLabel"] { font-size: 0.75rem !important; }
+        /* 컬럼 레이아웃 — 좁은 화면에서 최소 너비 확보 */
+        [data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+        }
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+            min-width: 140px !important;
+        }
+        /* 사이드바 토글 버튼 크게 */
+        [data-testid="stSidebarCollapsedControl"] button {
+            width: 44px !important;
+            height: 44px !important;
+        }
+        /* data_editor 가로 스크롤 */
+        [data-testid="stDataEditor"] {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+        }
+        /* 제목 폰트 크기 조정 */
+        h1 { font-size: 1.4rem !important; }
+        h2 { font-size: 1.2rem !important; }
+        h3 { font-size: 1.1rem !important; }
+        h4 { font-size: 1.0rem !important; }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 
 def show_main():
     apply_global_table_css()
