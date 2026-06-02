@@ -3024,9 +3024,16 @@ def show_user_history():
                     converted_preview_df = converted_df
                     edited_key = "history_convert_preview_editor"
                     data_key = "history_convert_preview_data"
-                    edited_df = st.session_state.get(data_key, converted_df)
-                    if not isinstance(edited_df, pd.DataFrame) or list(edited_df.columns) != list(converted_df.columns):
+                    # 새 파일 업로드 여부 확인 → 파일이 바뀌면 preview 초기화
+                    _file_id = f"{history_file.name}_{history_file.size}"
+                    if st.session_state.get("_bank_file_id") != _file_id:
+                        st.session_state["_bank_file_id"] = _file_id
+                        st.session_state[data_key] = converted_df
                         edited_df = converted_df
+                    else:
+                        edited_df = st.session_state.get(data_key, converted_df)
+                        if not isinstance(edited_df, pd.DataFrame) or list(edited_df.columns) != list(converted_df.columns):
+                            edited_df = converted_df
                     edited_df = normalize_converted_history_df(edited_df)
                     st.session_state[data_key] = edited_df
                     st.session_state.user_excel_data = edited_df
