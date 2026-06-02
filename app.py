@@ -2166,6 +2166,13 @@ def show_sidebar():
                 min-height: 34px !important;
                 height: auto !important;
             }
+            [data-testid="stSidebar"] [data-testid="stElementContainer"] {
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+                gap: 2px !important;
+            }
             [data-testid="stSidebar"] hr {
                 border-color: #2f2f2f !important;
                 margin: 10px 0 !important;
