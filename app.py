@@ -2047,25 +2047,24 @@ def show_auth_page():
 
 
 def show_sidebar():
-    # 모바일: 메뉴 클릭 후 사이드바 자동 닫기
+    # 모바일: 메뉴 클릭 후 사이드바를 CSS로 숨김
     if st.session_state.pop("_close_sidebar_mobile", False):
-        st.markdown(
-            """<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-            onload="(function(){
-                if(window.innerWidth > 768) return;
-                var sel = [
-                    '[data-testid=\\'stSidebarCollapseButton\\'] button',
-                    'button[data-testid=\\'stSidebarCollapseButton\\']',
-                    '[data-testid=\\'collapsedControl\\'] button',
-                    'button.st-emotion-cache-usj992'
-                ];
-                for(var i=0;i<sel.length;i++){
-                    var btn = document.querySelector(sel[i]);
-                    if(btn){ btn.click(); break; }
-                }
-            })()" style="display:none" alt="">""",
-            unsafe_allow_html=True,
-        )
+        st.markdown("""
+        <style>
+        @media (max-width: 768px) {
+            [data-testid="stSidebar"] {
+                transform: translateX(-100vw) !important;
+                visibility: hidden !important;
+                pointer-events: none !important;
+                transition: none !important;
+            }
+            [data-testid="stSidebarCollapsedControl"] {
+                display: flex !important;
+                visibility: visible !important;
+            }
+        }
+        </style>
+        """, unsafe_allow_html=True)
     with st.sidebar:
         st.markdown(
             """
