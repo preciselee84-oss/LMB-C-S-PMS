@@ -73,6 +73,11 @@ def _get_github_token():
 # ── DART 전자공시 API ─────────────────────────────────────────────
 
 def _get_dart_api_key():
+    # 1) 설정 메뉴에서 입력한 값 우선
+    session_key = st.session_state.get("dart_api_key", "")
+    if session_key:
+        return session_key
+    # 2) Streamlit secrets → 환경변수
     try:
         return st.secrets.get("DART_API_KEY", "")
     except Exception:
@@ -572,6 +577,7 @@ def init_state():
         "url_sync": DEFAULT_URL_SYNC,
         "url_hana": DEFAULT_URL_HANA,
         "url_hana_billing": DEFAULT_URL_HANA_BILLING,
+        "dart_api_key": "",
         "hana_sheet_df": None,
         "hana_billing_df": None,
         "analysis_lookup_df": None,
@@ -4927,9 +4933,8 @@ def render_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name=Non
             key=f"{key_prefix}_dart",
             value=False,
         )
-    elif st.session_state.get(f"{key_prefix}_dart_hint", True):
-        st.caption("💡 DART 전자공시 연동을 활성화하려면 Streamlit Cloud Secrets에 `DART_API_KEY`를 추가하세요.")
-        st.session_state[f"{key_prefix}_dart_hint"] = False
+    else:
+        st.caption("💡 DART 전자공시 연동을 활성화하려면 [설정 → 구글 스프레드시트 연동] 메뉴에서 DART API 키를 입력하세요.")
 
     rec_df = build_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name, use_dart=use_dart)
     if rec_df.empty:
@@ -7500,6 +7505,19 @@ def show_google_sync():
     st.session_state.url_analysis = st.text_input("하나지사 활동이력 구글 시트 CSV URL", value=st.session_state.url_analysis)
     st.session_state.url_hana = st.text_input("하나은행 구글 시트 CSV URL", value=st.session_state.url_hana)
     st.session_state.url_hana_billing = st.text_input("하나은행 청구 시트 CSV URL", value=st.session_state.url_hana_billing)
+
+    st.divider()
+    st.markdown("##### DART 전자공시 API 키")
+    st.caption("opendart.fss.or.kr 에서 무료 발급 — 유통활동 추천 보정에 사용됩니다.")
+    dart_input = st.text_input(
+        "DART API 키",
+        value=st.session_state.get("dart_api_key", ""),
+        type="password",
+        placeholder="발급받은 40자리 API 키를 입력하세요",
+        key="dart_api_key_input",
+    )
+    if dart_input != st.session_state.get("dart_api_key", ""):
+        st.session_state.dart_api_key = dart_input
 
     if st.button("데이터 저장", type="primary"):
         errors = []
