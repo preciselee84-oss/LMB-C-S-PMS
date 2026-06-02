@@ -8430,53 +8430,80 @@ def inject_theme_toggle():
     st.markdown("""
     <style>
     @media (max-width: 768px) {
-        /* 메인 컨텐츠 패딩 축소 */
+        /* ① 사이드바: 모바일에서 전체 폭 오버레이 */
+        [data-testid="stSidebar"] {
+            width: 100vw !important;
+            min-width: 100vw !important;
+            max-width: 100vw !important;
+        }
+        section[data-testid="stSidebar"] > div:first-child {
+            width: 100vw !important;
+        }
+
+        /* ② 메인 컨텐츠: 전체 폭, 패딩 최소화 */
         .block-container {
-            padding-left: 0.8rem !important;
-            padding-right: 0.8rem !important;
-            padding-top: 0.5rem !important;
+            padding: 0.5rem 0.75rem 2rem !important;
+            max-width: 100% !important;
         }
-        /* 테마 토글 버튼 크기 축소 */
-        .pms-sw-outer { top: 8px; right: 8px; }
-        .pms-btn { padding: 0 7px; height: 24px; font-size: 11px; }
-        /* 표 가로 스크롤 */
-        .pms-report-table { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
-        table { font-size: 11px !important; }
-        table th, table td { padding: 4px 6px !important; white-space: nowrap; }
-        /* 버튼 터치 영역 확보 */
-        .stButton > button {
-            min-height: 44px !important;
-            font-size: 14px !important;
+        [data-testid="stAppViewContainer"] > section.main {
+            width: 100% !important;
         }
-        /* 입력 폼 폰트 */
-        input, textarea, select {
-            font-size: 16px !important;
+
+        /* ③ 테마 토글 위치·크기 축소 */
+        .pms-sw-outer { top: 6px; right: 6px; }
+        .pms-btn { padding: 0 6px; height: 22px; font-size: 10px; }
+
+        /* ④ 표: 가로 스크롤 */
+        .pms-report-table {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            max-width: 100vw !important;
         }
-        /* 메트릭 카드 폰트 */
-        [data-testid="stMetricValue"] { font-size: 1.2rem !important; }
-        [data-testid="stMetricLabel"] { font-size: 0.75rem !important; }
-        /* 컬럼 레이아웃 — 좁은 화면에서 최소 너비 확보 */
-        [data-testid="stHorizontalBlock"] {
-            flex-wrap: wrap !important;
-        }
-        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
-            min-width: 140px !important;
-        }
-        /* 사이드바 토글 버튼 크게 */
-        [data-testid="stSidebarCollapsedControl"] button {
-            width: 44px !important;
-            height: 44px !important;
-        }
-        /* data_editor 가로 스크롤 */
+        table { font-size: 11px !important; min-width: max-content; }
+        table th, table td { padding: 4px 6px !important; white-space: nowrap !important; }
+
+        /* ⑤ data_editor 가로 스크롤 */
         [data-testid="stDataEditor"] {
             overflow-x: auto !important;
-            -webkit-overflow-scrolling: touch;
+            -webkit-overflow-scrolling: touch !important;
         }
-        /* 제목 폰트 크기 조정 */
-        h1 { font-size: 1.4rem !important; }
-        h2 { font-size: 1.2rem !important; }
-        h3 { font-size: 1.1rem !important; }
-        h4 { font-size: 1.0rem !important; }
+
+        /* ⑥ 컬럼 레이아웃: 2개 이상이면 가로 스크롤 */
+        [data-testid="stHorizontalBlock"] {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            flex-wrap: nowrap !important;
+            gap: 4px !important;
+        }
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+            min-width: 120px !important;
+            flex-shrink: 0 !important;
+        }
+
+        /* ⑦ 버튼 터치 영역 */
+        .stButton > button { min-height: 44px !important; font-size: 14px !important; }
+
+        /* ⑧ 입력 필드 — iOS 자동 확대 방지 */
+        input, textarea, select { font-size: 16px !important; }
+
+        /* ⑨ 메트릭 */
+        [data-testid="stMetricValue"] { font-size: 1.1rem !important; }
+        [data-testid="stMetricLabel"] { font-size: 0.7rem !important; }
+        [data-testid="metric-container"] { padding: 8px !important; }
+
+        /* ⑩ 제목 */
+        h1 { font-size: 1.3rem !important; }
+        h2 { font-size: 1.15rem !important; }
+        h3 { font-size: 1.05rem !important; }
+        h4 { font-size: 0.95rem !important; }
+
+        /* ⑪ 탭 */
+        [data-baseweb="tab"] { padding: 6px 8px !important; font-size: 12px !important; }
+
+        /* ⑫ 사이드바 햄버거 버튼 */
+        [data-testid="stSidebarCollapsedControl"] button {
+            width: 44px !important; height: 44px !important;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
