@@ -70,6 +70,97 @@ def _get_github_token():
         return os.environ.get("GITHUB_TOKEN", "")
 
 
+# ── DART 전자공시 API ─────────────────────────────────────────────
+
+def _get_dart_api_key():
+    try:
+        return st.secrets.get("DART_API_KEY", "")
+    except Exception:
+        return os.environ.get("DART_API_KEY", "")
+
+
+@st.cache_data(ttl=86400)
+def _load_dart_corp_map(api_key):
+    """DART 기업코드 목록 로드 ({정규화기업명: corp_code}). 24시간 캐시."""
+    if not api_key:
+        return {}
+    try:
+        import zipfile, io
+        import xml.etree.ElementTree as ET
+        resp = _requests.get(
+            f"https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key={api_key}",
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            return {}
+        with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+            xml_bytes = zf.read("CORPCODE.xml")
+        root = ET.fromstring(xml_bytes.decode("utf-8"))
+        return {
+            item.findtext("corp_name", "").strip().replace(" ", "").lower(): item.findtext("corp_code", "").strip()
+            for item in root.findall("list")
+            if item.findtext("corp_name", "").strip() and item.findtext("corp_code", "").strip()
+        }
+    except Exception:
+        return {}
+
+
+@st.cache_data(ttl=3600)
+def _dart_get_filings(api_key, corp_code, months=6):
+    """DART 최근 N개월 공시 목록. 1시간 캐시."""
+    if not api_key or not corp_code:
+        return []
+    try:
+        today = datetime.utcnow() + timedelta(hours=9)
+        bgn = (today - timedelta(days=months * 31)).strftime("%Y%m%d")
+        end = today.strftime("%Y%m%d")
+        resp = _requests.get(
+            "https://opendart.fss.or.kr/api/list.json",
+            params={
+                "crtfc_key": api_key, "corp_code": corp_code,
+                "bgn_de": bgn, "end_de": end, "page_count": 10,
+            },
+            timeout=10,
+        )
+        d = resp.json()
+        return d.get("list", []) if d.get("status") == "000" else []
+    except Exception:
+        return []
+
+
+# 유통활동 관련 공시 키워드 → (가산점수, 사유 설명)
+_DART_KW_SCORE = [
+    ("유상증자",  30, "유상증자 공시 → 자금 유입, 이체 활성화 기대"),
+    ("무상증자",  15, "무상증자 공시 → 재무구조 개선"),
+    ("합병",      25, "합병 공시 → 계좌 통합 니즈 발생"),
+    ("분할",      20, "기업분할 공시 → 신규 계좌 가능성"),
+    ("수주",      20, "수주 공시 → 매출 증가·자금 흐름 활성화"),
+    ("신규사업",  15, "신규사업 공시 → 향후 거래 확대 가능"),
+    ("투자",      10, "투자 공시 → 자금 유출입 예상"),
+]
+
+
+def _dart_enrich(api_key, corp_map, company_name):
+    """기업명으로 DART 공시 조회 후 (가산점수, 사유 목록) 반환."""
+    key = str(company_name).strip().replace(" ", "").lower()
+    corp_code = corp_map.get(key)
+    if not corp_code:
+        return 0, []
+    filings = _dart_get_filings(api_key, corp_code)
+    if not filings:
+        return 0, []
+    bonus, reasons, seen = 0, [], set()
+    for f in filings:
+        nm = f.get("report_nm", "")
+        dt = str(f.get("rcept_dt", ""))[:8]
+        for kw, pts, desc in _DART_KW_SCORE:
+            if kw in nm and kw not in seen:
+                bonus = max(bonus, pts)
+                reasons.append(f"[DART공시] {desc} ({dt[:4]}.{dt[4:6]}.{dt[6:]})")
+                seen.add(kw)
+    return bonus, reasons
+
+
 def _github_save(file_path, data):
     token = _get_github_token()
     if not token:
@@ -4620,7 +4711,7 @@ def _kpi_number(value):
     return int(parsed) if pd.notna(parsed) else 0
 
 
-def build_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name=None):
+def build_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name=None, use_dart=False):
     if hana_sheet is None or billing_sheet is None or hana_sheet.empty or billing_sheet.empty:
         return pd.DataFrame()
 
@@ -4694,6 +4785,11 @@ def build_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name=None
         return pd.DataFrame()
 
     today = pd.Timestamp(datetime.utcnow() + timedelta(hours=9)).normalize()
+
+    # DART 공시 기업코드 맵 로드 (use_dart=True 이고 API 키 있을 때만)
+    dart_key = _get_dart_api_key() if use_dart else ""
+    dart_corp_map = _load_dart_corp_map(dart_key) if dart_key else {}
+
     rows = []
     for _, row in merged.iterrows():
         score = 0
@@ -4767,6 +4863,17 @@ def build_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name=None
             reasons.append(f"사용량 높음(로그인 {login_count}, 메뉴 {menu_count})")
             guide.append("대시보드/IHB/We-Hub/이음택스 중 재무업무 니즈 확인")
 
+        # DART 공시 기반 유통활동 가산점
+        if dart_corp_map:
+            company_name = str(row.get("고객명", "") or row.get("청구고객명", "")).strip()
+            dart_bonus, dart_reasons = _dart_enrich(dart_key, dart_corp_map, company_name)
+            if dart_bonus > 0:
+                score += dart_bonus
+                if "유통" not in areas:
+                    areas.append("유통")
+                reasons.extend(dart_reasons)
+                guide.append("DART 공시 내용 확인 후 재무 니즈에 맞춰 서비스 제안")
+
         if score < 35:
             continue
 
@@ -4810,7 +4917,21 @@ def render_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name=Non
     c4.metric("유통 활동 잔여 목표", f"{KPI_MONTHLY_TARGETS['유통 활동'] * remaining_months:,}건", "월 40건")
 
     st.caption("2026년 KPI 계획 기준: 개설 20건/월, 연계 12건/월, 운영 순증 13개/월, 유통 활동 40건/월. 잔여 목표는 남은 6개월 기준입니다.")
-    rec_df = build_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name)
+
+    # DART 공시 연동 토글 (DART_API_KEY 설정된 경우에만 표시)
+    _dart_available = bool(_get_dart_api_key())
+    use_dart = False
+    if _dart_available:
+        use_dart = st.checkbox(
+            "📰 DART 전자공시 기반 유통활동 추천 보정 (공시 있는 고객 점수 상향)",
+            key=f"{key_prefix}_dart",
+            value=False,
+        )
+    elif st.session_state.get(f"{key_prefix}_dart_hint", True):
+        st.caption("💡 DART 전자공시 연동을 활성화하려면 Streamlit Cloud Secrets에 `DART_API_KEY`를 추가하세요.")
+        st.session_state[f"{key_prefix}_dart_hint"] = False
+
+    rec_df = build_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name, use_dart=use_dart)
     if rec_df.empty:
         st.info("청구 시트와 하나은행 시트 기준으로 추천 가능한 KPI 활동 고객이 없습니다.")
         return
