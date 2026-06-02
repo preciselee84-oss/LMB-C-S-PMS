@@ -5350,20 +5350,47 @@ def show_visit_history():
     db = load_db(VISIT_HISTORY_FILE, {})
     my_entries = db.get(user_name, [])
 
+    # 고객명 자동검색용 목록 — 하나은행 구글시트에서 추출
+    customer_options = []
+    hana_df = st.session_state.get("hana_sheet_df")
+    if hana_df is not None and not hana_df.empty:
+        comp_col = find_col(hana_df, ["고객명", "업체명", "상호"])
+        owner_col = find_col(hana_df, ["담당자"])
+        if comp_col:
+            filtered_hana = hana_df
+            if owner_col:
+                filtered_hana = hana_df[
+                    hana_df[owner_col].astype(str).str.strip() == str(user_name).strip()
+                ]
+            customer_options = sorted(
+                filtered_hana[comp_col].dropna().astype(str).str.strip()
+                .replace("", pd.NA).dropna().unique().tolist()
+            )
+
     # ── 등록 폼 ──
     with st.expander("방문이력 등록", expanded=True):
+        # 고객명 자동검색 (폼 바깥 — 실시간 필터링)
+        if customer_options:
+            v_customer_sel = st.selectbox(
+                "고객명 검색",
+                ["직접 입력"] + customer_options,
+                key="visit_customer_sel",
+            )
+        else:
+            v_customer_sel = "직접 입력"
+
         with st.form("visit_form"):
             vc1, vc2 = st.columns(2)
             with vc1:
-                v_date     = st.date_input("방문일자")
-                v_customer = st.text_input("고객명")
-                v_biz_no   = st.text_input("사업자번호")
+                v_date = st.date_input("방문일자")
             with vc2:
-                v_type     = st.selectbox("방문유형", ["방문", "원격지원", "전화", "이메일", "기타"])
-                v_purpose  = st.text_input("방문목적")
-                v_result   = st.selectbox("처리결과", ["완료", "진행중", "재방문필요", "보류"])
-            v_content  = st.text_area("상담내용", height=100)
-            v_note     = st.text_area("특이사항", height=60)
+                v_purpose = st.selectbox("방문목적", ["개설", "운영", "연계"])
+            # 고객명: 자동검색 선택값 또는 직접 입력
+            if v_customer_sel and v_customer_sel != "직접 입력":
+                v_customer = st.text_input("고객명", value=v_customer_sel)
+            else:
+                v_customer = st.text_input("고객명", placeholder="고객명을 입력하세요")
+            v_content = st.text_area("내용", height=120)
             v_submitted = st.form_submit_button("등록", use_container_width=True, type="primary")
 
         if v_submitted:
@@ -5375,12 +5402,8 @@ def show_visit_history():
                     "id": hashlib.md5(f"{user_name}-{now_text}-{v_customer}".encode()).hexdigest(),
                     "방문일자": str(v_date),
                     "고객명": v_customer.strip(),
-                    "사업자번호": v_biz_no.strip(),
-                    "방문유형": v_type,
-                    "방문목적": v_purpose.strip(),
-                    "처리결과": v_result,
-                    "상담내용": v_content.strip(),
-                    "특이사항": v_note.strip(),
+                    "방문목적": v_purpose,
+                    "내용": v_content.strip(),
                     "담당자": user_name,
                     "작성시각": now_text,
                 }
@@ -5396,7 +5419,7 @@ def show_visit_history():
         return
 
     sorted_entries = sorted(my_entries, key=lambda x: x.get("방문일자", ""), reverse=True)
-    show_cols = ["방문일자", "고객명", "사업자번호", "방문유형", "방문목적", "처리결과", "상담내용", "특이사항", "작성시각"]
+    show_cols = ["방문일자", "고객명", "방문목적", "내용", "작성시각"]
     display_df = pd.DataFrame(sorted_entries)
     display_df = display_df[[c for c in show_cols if c in display_df.columns]].copy()
     display_df.insert(0, "선택", False)
@@ -5411,15 +5434,14 @@ def show_visit_history():
     )
 
     selected_ids = [sorted_entries[i].get("id") for i, v in enumerate(edited_df["선택"]) if v]
-    btn1, btn2, _ = st.columns([15, 15, 70])
-    with btn2:
+    _, del_col, _ = st.columns([15, 15, 70])
+    with del_col:
         if st.button("삭제", use_container_width=True, disabled=not selected_ids, key="visit_del_btn"):
             db[user_name] = [r for r in my_entries if r.get("id") not in selected_ids]
             save_db(VISIT_HISTORY_FILE, db)
             st.success(f"{len(selected_ids)}건 삭제했습니다.")
             st.rerun()
 
-    # CSV 다운로드
     today_str = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m%d")
     dl_df = pd.DataFrame(sorted_entries)[[c for c in show_cols if c in pd.DataFrame(sorted_entries).columns]]
     st.download_button(
