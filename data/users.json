@@ -21,10 +21,76 @@
         "outsource": "아니오",
         "outsource_period": "해당없음"
     },
+    "iminjee": {
+        "pw": "1111",
+        "name": "임인지",
+        "email": "",
+        "access": "허용",
+        "role": "사용자",
+        "dept_type": "사업부",
+        "staff_type": "정규직",
+        "outsource": "아니오",
+        "outsource_period": "해당없음"
+    },
+    "kangkt": {
+        "pw": "1111",
+        "name": "강경태",
+        "email": "",
+        "access": "허용",
+        "role": "사용자",
+        "dept_type": "사업부",
+        "staff_type": "정규직",
+        "outsource": "아니오",
+        "outsource_period": "해당없음"
+    },
+    "leesh": {
+        "pw": "1111",
+        "name": "이수현",
+        "email": "",
+        "access": "허용",
+        "role": "사용자",
+        "dept_type": "사업부",
+        "staff_type": "정규직",
+        "outsource": "아니오",
+        "outsource_period": "해당없음"
+    },
+    "gilmj": {
+        "pw": "1111",
+        "name": "길민종",
+        "email": "",
+        "access": "허용",
+        "role": "사용자",
+        "dept_type": "사업부",
+        "staff_type": "정규직",
+        "outsource": "아니오",
+        "outsource_period": "해당없음"
+    },
+    "maengks": {
+        "pw": "1111",
+        "name": "맹국성",
+        "email": "",
+        "access": "허용",
+        "role": "사용자",
+        "dept_type": "사업부",
+        "staff_type": "정규직",
+        "outsource": "아니오",
+        "outsource_period": "해당없음"
+    },
     "liminji": {
         "pw": "@liminji7",
         "name": "임인지",
         "email": "liminji@webcash.co.kr",
+        "access": "불가",
+        "role": "사용자",
+        "dept_type": "사업부",
+        "staff_type": "정규직",
+        "outsource": "아니오",
+        "outsource_period": "해당없음"
+    },
+    "kkang": {
+        "pw": "kkang",
+        "name": "강경태",
+        "email": "kkang@webcash.co.kr",
         "access": "불가",
         "role": "사용자",
         "dept_type": "사업부",
