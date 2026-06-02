@@ -2047,6 +2047,25 @@ def show_auth_page():
 
 
 def show_sidebar():
+    # 모바일: 메뉴 클릭 후 사이드바 자동 닫기
+    if st.session_state.pop("_close_sidebar_mobile", False):
+        st.markdown(
+            """<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+            onload="(function(){
+                if(window.innerWidth > 768) return;
+                var sel = [
+                    '[data-testid=\\'stSidebarCollapseButton\\'] button',
+                    'button[data-testid=\\'stSidebarCollapseButton\\']',
+                    '[data-testid=\\'collapsedControl\\'] button',
+                    'button.st-emotion-cache-usj992'
+                ];
+                for(var i=0;i<sel.length;i++){
+                    var btn = document.querySelector(sel[i]);
+                    if(btn){ btn.click(); break; }
+                }
+            })()" style="display:none" alt="">""",
+            unsafe_allow_html=True,
+        )
     with st.sidebar:
         st.markdown(
             """
@@ -2263,6 +2282,7 @@ def show_sidebar():
                 persist_current_menu()
                 if menu_name == "업로드 및 실적 확인":
                     st.session_state["show_add_history_form"] = False
+                st.session_state["_close_sidebar_mobile"] = True
                 st.rerun()
 
         _lt = st.session_state.get("login_time", "")
