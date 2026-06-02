@@ -2136,18 +2136,18 @@ def show_sidebar():
                 line-height: 1.35;
             }
             [data-testid="stSidebar"] .gpt-section {
-                margin: 8px 8px 2px;
+                margin: 4px 8px 1px;
                 font-size: 12px;
                 color: #8e8e8e !important;
                 font-weight: 700;
                 letter-spacing: 0;
             }
             [data-testid="stSidebar"] .gpt-section:first-of-type {
-                margin-top: 4px;
+                margin-top: 2px;
             }
             [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-                margin-bottom: 0 !important;
-                padding-bottom: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
             }
             [data-testid="stSidebar"] .gpt-sidebar-spacer {
                 height: 10px;
@@ -2158,12 +2158,12 @@ def show_sidebar():
                 background: #2f2f2f;
             }
             [data-testid="stSidebar"] div.stButton {
-                margin: 1px 0 !important;
-                padding-bottom: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
             }
             [data-testid="stSidebar"] div.stButton > button {
                 margin-bottom: 0 !important;
-                min-height: 38px !important;
+                min-height: 34px !important;
                 height: auto !important;
             }
             [data-testid="stSidebar"] hr {
