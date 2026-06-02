@@ -6365,78 +6365,9 @@ OPERATION_PLAN_FILE = "operation_plan.json"
 
 def show_operation_plan():
     st.markdown("### 운영계획")
-    tab_plan, tab_kpi_rec, tab_no_login = st.tabs(["운영계획 관리", "KPI 집중 추천", "미로그인 고객 현황"])
+    tab_kpi_rec, tab_no_login = st.tabs(["KPI 집중 추천", "미로그인 고객 현황"])
 
-    # ── 탭1: 운영계획 관리 ──
-    with tab_plan:
-        db = load_db(OPERATION_PLAN_FILE, {"plans": []})
-        plans = db.get("plans", [])
-
-        with st.expander("운영계획 등록", expanded=not plans):
-            with st.form("op_plan_form"):
-                fc1, fc2 = st.columns(2)
-                with fc1:
-                    op_title    = st.text_input("제목")
-                    op_category = st.text_input("구분 (예: 구축, 연계, 운영 등)")
-                    op_start    = st.date_input("시작일")
-                with fc2:
-                    op_owner    = st.text_input("담당자")
-                    op_status   = st.selectbox("상태", ["예정", "진행중", "완료", "보류"])
-                    op_end      = st.date_input("종료일")
-                op_content = st.text_area("내용", height=100)
-                op_note    = st.text_area("비고", height=60)
-                submitted  = st.form_submit_button("등록", use_container_width=True, type="primary")
-
-            if submitted:
-                if not op_title.strip():
-                    st.error("제목을 입력해주세요.")
-                else:
-                    now_text = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
-                    plans.append({
-                        "id": hashlib.md5(f"{op_title}-{now_text}".encode()).hexdigest(),
-                        "제목": op_title.strip(),
-                        "구분": op_category.strip(),
-                        "담당자": op_owner.strip(),
-                        "시작일": str(op_start),
-                        "종료일": str(op_end),
-                        "상태": op_status,
-                        "내용": op_content.strip(),
-                        "비고": op_note.strip(),
-                        "등록시각": now_text,
-                    })
-                    db["plans"] = plans
-                    save_db(OPERATION_PLAN_FILE, db)
-                    st.success("운영계획을 등록했습니다.")
-                    st.rerun()
-
-        if not plans:
-            st.info("등록된 운영계획이 없습니다.")
-        else:
-            all_statuses = ["전체"] + list(dict.fromkeys(p.get("상태", "") for p in plans))
-            f1, _ = st.columns([2, 8])
-            with f1:
-                filter_status = st.selectbox("상태 필터", all_statuses, key="op_plan_status_filter")
-            filtered = plans if filter_status == "전체" else [p for p in plans if p.get("상태") == filter_status]
-            if filtered:
-                show_cols = ["제목", "구분", "담당자", "시작일", "종료일", "상태", "내용", "비고", "등록시각"]
-                render_plain_html_table(
-                    pd.DataFrame(filtered)[[c for c in show_cols if c in pd.DataFrame(filtered).columns]],
-                    center_align=False
-                )
-            st.markdown("---")
-            delete_opts = ["선택안함"] + [f"{p.get('시작일','')} | {p.get('제목','')} | {p.get('담당자','')}" for p in filtered]
-            d1, _ = st.columns([4, 6])
-            with d1:
-                sel_del = st.selectbox("삭제할 계획 선택", delete_opts, key="op_plan_del_sel")
-            if st.button("선택 삭제", disabled=(sel_del == "선택안함"), key="op_plan_del_btn"):
-                del_idx = delete_opts.index(sel_del) - 1
-                del_id = filtered[del_idx].get("id")
-                db["plans"] = [p for p in plans if p.get("id") != del_id]
-                save_db(OPERATION_PLAN_FILE, db)
-                st.success("삭제했습니다.")
-                st.rerun()
-
-    # ── 탭2: KPI 집중 추천 ──
+    # ── 탭1: KPI 집중 추천 ──
     with tab_kpi_rec:
         _force_kpi = st.session_state.pop("_op_kpi_refresh", False)
         refresh_col, _ = st.columns([1, 5])
