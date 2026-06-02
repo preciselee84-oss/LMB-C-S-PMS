@@ -5907,8 +5907,10 @@ def weekly_customer_status_tables(hana_df, year=2026, snapshot_end_date=None, sa
         f"{year - 1}년 신규접수 + 기준일 현재 구축대기",
     )
 
+    # 구축 접수: 신규접수일 기준 직접 카운트 (개설상태 패턴 불일치로 인한 누락 방지)
+    open_receipt_count_values = month_count_values(open_received_by_asof, open_receipt_dates)
     open_month_rows = [
-        ["구축", "접수"] + fmt_values(summed_values(open_wait_values, open_progress_values, open_done_values, open_cancel_values)),
+        ["구축", "접수"] + fmt_values(open_receipt_count_values),
         ["", "대기"] + fmt_values(open_wait_values),
         ["", "진행"] + fmt_values(open_progress_values),
         ["", "완료"] + fmt_values(open_done_values),
