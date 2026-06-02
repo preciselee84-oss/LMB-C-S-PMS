@@ -4933,6 +4933,14 @@ def render_kpi_activity_recommendations(hana_sheet, billing_sheet, user_name=Non
             key=f"{key_prefix}_dart",
             value=False,
         )
+        if use_dart:
+            st.caption(
+                "체크 시 고객명으로 DART 전자공시 시스템을 조회해 최근 6개월 내 "
+                "**유상증자·합병·수주·신규사업** 등 공시가 있는 고객의 유통활동 추천 점수를 자동으로 높입니다. "
+                "공시 내용은 활동사유 컬럼에 \`[DART공시]\` 형태로 표시됩니다."
+            )
+        else:
+            st.caption("체크하면 DART 전자공시(유상증자·합병·수주 등) 기반으로 유통활동 대상 고객의 추천 점수를 자동 보정합니다.")
     else:
         st.caption("💡 DART 전자공시 연동을 활성화하려면 [설정 → 구글 스프레드시트 연동] 메뉴에서 DART API 키를 입력하세요.")
 
