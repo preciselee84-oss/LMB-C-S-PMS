@@ -3400,6 +3400,8 @@ def show_all_staff_summary(staff_names):
             st.session_state.hana_sheet_df = None
             st.session_state.admin_uploaded_excel = None
             st.session_state.admin_uploaded_excel_display = None
+            st.session_state.admin_history_upload_key = None
+            st.session_state.admin_office_upload_key = None
             st.toast("데이터를 새로고침합니다.")
             st.rerun()
 
@@ -3459,6 +3461,10 @@ def show_all_staff_summary(staff_names):
                     if unmatched:
                         st.caption(f"고객번호 매핑 실패 {unmatched}건은 사업자번호가 공란으로 저장됩니다.")
                     st.success("✅ 업로드한 파일이 실적 계산에 반영됩니다.")
+                    history_file_key = f"{history_file.name}_{history_file.size}"
+                    if st.session_state.get("admin_history_upload_key") != history_file_key:
+                        st.session_state.admin_history_upload_key = history_file_key
+                        st.rerun()
             except ImportError:
                 st.button("변환파일 다운로드", use_container_width=True, disabled=True)
                 st.error("xls 파일 변환을 위해 xlrd 패키지가 필요합니다.")
@@ -3479,6 +3485,10 @@ def show_all_staff_summary(staff_names):
                 # session_state에 저장하여 운영 카운트에 사용
                 st.session_state.admin_uploaded_excel = office_df
                 st.success("✅ 본사이력 파일이 실적 계산에 반영됩니다.")
+                office_file_key = f"{u_file.name}_{u_file.size}"
+                if st.session_state.get("admin_office_upload_key") != office_file_key:
+                    st.session_state.admin_office_upload_key = office_file_key
+                    st.rerun()
             except Exception as e:
                 st.error(f"본사이력 업로드 실패: {e}")
 
