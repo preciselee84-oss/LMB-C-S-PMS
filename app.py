@@ -3496,6 +3496,16 @@ def show_all_staff_summary(staff_names):
             st.button("샘플파일 다운로드", use_container_width=True, disabled=True)
 
 
+    if (
+        isinstance(st.session_state.get("admin_uploaded_excel"), pd.DataFrame)
+        and not st.session_state.admin_uploaded_excel.empty
+    ):
+        admin_uploaded_df = st.session_state.admin_uploaded_excel.copy()
+        st.markdown("#### 본사이력 업로드 데이터")
+        st.caption(f"업로드 데이터 건수: {len(admin_uploaded_df):,}건")
+        st.dataframe(admin_uploaded_df, use_container_width=True, hide_index=True)
+
+
 def show_user_history(is_admin_mode=False):
     # 관리자 모드: 담당자 선택
     selected_user = st.session_state.user_name  # 기본값: 본인
