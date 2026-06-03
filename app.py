@@ -3225,16 +3225,24 @@ def show_all_staff_summary(staff_names):
             analysis_clean = clean_header_logic(analysis_df.copy())
             u_col = find_col(analysis_clean, ["등록자", "담당자", "성명"])
             d_col = find_col(analysis_clean, ["활동상세", "활동내용"])
+            category_col = find_col(analysis_clean, ["활동구분", "접수유형"])
 
             if u_col and u_col in analysis_clean.columns:
                 staff_activity = analysis_clean[analysis_clean[u_col] == staff_name].copy()
 
                 if d_col and d_col in staff_activity.columns:
-                    # 운영 활동 카운트
-                    operation_count = len(staff_activity[
-                        staff_activity[d_col].astype(str).str.contains("운영", na=False)
-                    ])
-                    operation_points = operation_count * 30  # 운영 1건당 30포인트
+                    # 운영 활동은 활동상세로 구분하고, 포인트는 활동구분(방문/원격)을 반영한다.
+                    operation_activity = staff_activity[
+                        staff_activity[d_col].astype(str).str.contains("운영|방문|점검", na=False)
+                    ].copy()
+                    operation_count = len(operation_activity)
+                    if category_col and category_col in operation_activity.columns:
+                        category_text = operation_activity[category_col].astype(str)
+                        visit_points = int(category_text.str.contains("방문", na=False).sum()) * 30
+                        remote_points = int(category_text.str.contains("원격", na=False).sum()) * 10
+                        operation_points = visit_points + remote_points
+                    else:
+                        operation_points = operation_count * 30  # 활동구분이 없으면 기존 방식 유지
 
         # 포인트 계산
         open_points = open_count * 90  # 개설 1건당 90포인트
