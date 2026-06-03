@@ -3079,17 +3079,8 @@ def show_all_staff_summary(staff_names):
             st.rerun()
         return
 
-    # 운영 실적용 데이터: 업로드한 엑셀 파일 우선 사용
-    if st.session_state.get("admin_uploaded_excel") is not None:
-        analysis_df = st.session_state.get("admin_uploaded_excel")
-    else:
-        # 업로드한 파일이 없으면 하나은행 활동 이력 시트 로드
-        if st.session_state.get("analysis_lookup_df") is None:
-            try:
-                load_csv_to_state("url_analysis", "analysis_lookup_df")
-            except:
-                pass
-        analysis_df = st.session_state.get("analysis_lookup_df")
+    # 운영 실적용 데이터: 업로드한 엑셀 파일만 사용 (없으면 None)
+    analysis_df = st.session_state.get("admin_uploaded_excel")
 
     # 은행 구글시트 로드 (하나은행 시트)
     hana_df = None
