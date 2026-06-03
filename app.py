@@ -3223,50 +3223,6 @@ def show_all_staff_summary(staff_names):
             ]
             erp_count = len(may_erp_data)
 
-            # 디버그: 전준수 직원의 연계 데이터 확인
-            if staff_name == "전준수":
-                with st.expander(f"🔍 {staff_name} 2026-05 연계 데이터"):
-                    st.write(f"연계건수: {erp_count}")
-                    if not may_erp_data.empty:
-                        display_cols = [company_col, biz_num_col, erp_date_col]
-                        display_cols = [col for col in display_cols if col and col in may_erp_data.columns]
-                        st.dataframe(may_erp_data[display_cols])
-
-                    # 전준수 직원의 전체 데이터 (애장경향교회 확인용)
-                    st.write("---")
-                    st.write(f"**{staff_name} 전체 데이터 건수:** {len(staff_cloud_df)}")
-
-                    # 본사 시트 컬럼명 확인
-                    st.write("**본사 시트 컬럼 정보:**")
-                    st.write(f"찾은 ERP연계일자 컬럼명: {erp_date_col}")
-                    erp_related_cols = [col for col in cloud_df.columns if 'ERP' in str(col).upper() or '연계' in str(col)]
-                    st.write(f"ERP/연계 관련 컬럼들: {erp_related_cols}")
-
-                    # 사업자번호로 검색 (전체 본사 시트에서)
-                    st.write("**사업자번호 1098209003 검색 (전체 본사 시트):**")
-                    if biz_num_col and biz_num_col in cloud_df.columns:
-                        biz_search = cloud_df[
-                            cloud_df[biz_num_col].astype(str).str.contains("1098209003", na=False, regex=False)
-                        ]
-                        if not biz_search.empty:
-                            st.write(f"해당 데이터의 모든 컬럼:")
-                            st.dataframe(biz_search)
-                        else:
-                            st.write("사업자번호 1098209003 데이터가 본사 시트에 없습니다.")
-
-                    # 고객명으로 검색
-                    if company_col and company_col in staff_cloud_df.columns:
-                        church_data = staff_cloud_df[
-                            staff_cloud_df[company_col].astype(str).str.contains("애장경향", na=False)
-                        ]
-                        if not church_data.empty:
-                            st.write("**애장경향 데이터 (전준수 담당):**")
-                            display_cols2 = [company_col, biz_num_col, erp_date_col, owner_col]
-                            display_cols2 = [col for col in display_cols2 if col and col in church_data.columns]
-                            st.dataframe(church_data[display_cols2])
-                        else:
-                            st.write("전준수 담당 데이터 중 애장경향 데이터가 없습니다.")
-
         # 운영 실적: 현재는 카운트하지 않음
         operation_count = 0
         operation_points = 0
