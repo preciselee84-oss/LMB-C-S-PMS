@@ -849,7 +849,15 @@ def attach_cloud_dates(user_df):
     cloud_map = cloud[["_biz_key"] + [c for c in cloud_cols if c != biz_col_cloud]].rename(columns=rename_map)
     cloud_map = cloud_map.drop_duplicates("_biz_key")
 
-    df = pd.merge(df, cloud_map, on="_biz_key", how="left")
+    df = pd.merge(df, cloud_map, on="_biz_key", how="left", suffixes=("", "_cloud"))
+    for col in ["본사 개설완료일자", "본사 ERP연계일자", "본사 신규이행구분", "본사 이행추가연계"]:
+        cloud_col = f"{col}_cloud"
+        if cloud_col in df.columns:
+            if col in df.columns:
+                df[col] = df[col].where(df[col].notna() & (df[col].astype(str).str.strip() != ""), df[cloud_col])
+            else:
+                df[col] = df[cloud_col]
+            df = df.drop(columns=[cloud_col], errors="ignore")
     return df.drop(columns=["_biz_key"], errors="ignore")
 
 
@@ -1290,6 +1298,119 @@ def apply_rs_allowance_formula(perf_df, user_db):
         result.at[idx, "지급포인트"] = int(amount / 1000)
 
     return result
+
+
+def may_2026_business_dates():
+    holidays = {"2026-05-01", "2026-05-05", "2026-05-24", "2026-05-25"}
+    days = pd.date_range("2026-05-01", "2026-05-31", freq="D")
+    return [d.strftime("%Y-%m-%d") for d in days if d.weekday() < 5 and d.strftime("%Y-%m-%d") not in holidays]
+
+
+def build_random_admin_extra_history(source_df, existing_df, target_count):
+    if source_df is None or not isinstance(source_df, pd.DataFrame) or source_df.empty:
+        return pd.DataFrame(), "하나지사 활동이력 데이터가 없습니다."
+
+    source = clean_header_logic(source_df.copy())
+    existing = clean_header_logic(existing_df.copy()) if isinstance(existing_df, pd.DataFrame) else pd.DataFrame()
+
+    detail_col = find_col(source, ["활동상세", "활동내용"])
+    if not detail_col or detail_col not in source.columns:
+        return pd.DataFrame(), "하나지사 활동이력에서 활동상세 컬럼을 찾을 수 없습니다."
+
+    source = source[source[detail_col].astype(str).str.contains("운영", na=False)].copy()
+    if source.empty:
+        return pd.DataFrame(), "활동상세가 운영인 데이터가 없습니다."
+
+    company_col = find_col(source, ["업체명", "상호", "고객명"])
+    biz_col = find_col(source, ["사업자번호"])
+    user_col = find_col(source, ["등록자", "담당자", "성명"])
+    place_col = find_col(source, ["방문장소", "주소", "지역"])
+    category_col = find_col(source, ["활동구분", "접수유형"])
+    work_col = find_col(source, ["업무번호"])
+    note_col = find_col(source, ["활동내역", "활동내용", "비고", "제목"])
+
+    if not user_col or user_col not in source.columns:
+        return pd.DataFrame(), "하나지사 활동이력에서 담당자 컬럼을 찾을 수 없습니다."
+
+    business_dates = may_2026_business_dates()
+    if not business_dates:
+        return pd.DataFrame(), "2026년 5월 영업일을 만들 수 없습니다."
+
+    existing_visit_counts = {}
+    existing_keys = set()
+    if not existing.empty:
+        e_user_col = find_col(existing, ["등록자", "담당자", "성명"])
+        e_biz_col = find_col(existing, ["사업자번호"])
+        e_date_col = find_col(existing, ["활동일자", "활동일", "일자"])
+        e_detail_col = find_col(existing, ["활동상세", "활동내용"])
+        e_category_col = find_col(existing, ["활동구분", "접수유형"])
+        if e_user_col and e_date_col and e_user_col in existing.columns and e_date_col in existing.columns:
+            for _, row in existing.iterrows():
+                user = str(row.get(e_user_col, "")).strip()
+                date = str(row.get(e_date_col, "")).strip()
+                category = str(row.get(e_category_col, "")) if e_category_col else ""
+                if user and date and "방문" in category:
+                    existing_visit_counts[(user, date)] = existing_visit_counts.get((user, date), 0) + 1
+                biz = normalize_biz(row.get(e_biz_col, "")) if e_biz_col else ""
+                detail = str(row.get(e_detail_col, "")).strip() if e_detail_col else ""
+                if biz and user and date and detail:
+                    existing_keys.add((biz, user, date, detail))
+
+    rng_state = int((datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m%d%H%M%S"))
+    source = source.sample(frac=1, random_state=rng_state).reset_index(drop=True)
+    target_count = max(1, int(target_count or 1))
+    rows = []
+
+    for _, row in source.iterrows():
+        if len(rows) >= target_count:
+            break
+
+        user = str(row.get(user_col, "")).strip()
+        if not user:
+            continue
+
+        raw_category = str(row.get(category_col, "")).strip() if category_col else ""
+        activity_category = "원격" if "원격" in raw_category else "방문"
+        biz = normalize_biz(row.get(biz_col, "")) if biz_col else ""
+
+        assigned_date = ""
+        for date in np.random.default_rng().permutation(business_dates):
+            date = str(date)
+            if activity_category == "방문" and existing_visit_counts.get((user, date), 0) >= 5:
+                continue
+            if biz and (biz, user, date, "운영") in existing_keys:
+                continue
+            assigned_date = date
+            break
+
+        if not assigned_date:
+            continue
+
+        if activity_category == "방문":
+            existing_visit_counts[(user, assigned_date)] = existing_visit_counts.get((user, assigned_date), 0) + 1
+        if biz:
+            existing_keys.add((biz, user, assigned_date, "운영"))
+
+        rows.append({
+            "업체명": row.get(company_col, "") if company_col else "",
+            "사업자번호": row.get(biz_col, "") if biz_col else "",
+            "등록자": user,
+            "활동일": assigned_date,
+            "방문장소 (시, 군, 구까지)": row.get(place_col, "") if place_col else "",
+            "활동구분": activity_category,
+            "활동상세": "운영",
+            "업무번호": row.get(work_col, "") if work_col else "",
+            "제목": "운영방문" if activity_category == "방문" else "운영원격",
+            "활동내역": row.get(note_col, "") if note_col else "",
+            "본사 개설완료일자": assigned_date,
+            "본사 ERP연계일자": assigned_date,
+            "_is_manual": False,
+        })
+
+    if not rows:
+        return pd.DataFrame(), "중복/초과방문 조건을 피해서 추가할 수 있는 데이터가 없습니다."
+
+    return pd.DataFrame(rows), ""
 
 
 def save_manual_perf_override_for_current_user():
@@ -3630,7 +3751,34 @@ def show_all_staff_summary(staff_names):
             :,
             admin_uploaded_df.apply(lambda col: col.astype(str).str.strip().replace("nan", "").ne("").any(), axis=0)
         ]
-        st.markdown("#### 본사이력 업로드 데이터")
+        title_col, add_history_col = st.columns([0.82, 0.18])
+        with title_col:
+            st.markdown("#### 본사이력 업로드 데이터")
+        with add_history_col:
+            if st.button("추가 이력 가져오기", use_container_width=True, key="admin_add_random_history"):
+                try:
+                    source_df = read_google_csv(
+                        st.session_state.get("url_analysis", DEFAULT_URL_ANALYSIS),
+                        force_refresh=True,
+                    )
+                    current_display_df = st.session_state.get("admin_uploaded_excel_display")
+                    if not isinstance(current_display_df, pd.DataFrame) or current_display_df.empty:
+                        current_display_df = st.session_state.admin_uploaded_excel
+                    target_count = max(20, len(current_display_df))
+                    extra_df, extra_error = build_random_admin_extra_history(source_df, current_display_df, target_count)
+                    if extra_error:
+                        st.warning(extra_error)
+                    else:
+                        combined_display_df = pd.concat(
+                            [clean_header_logic(current_display_df.copy()), extra_df],
+                            ignore_index=True,
+                        )
+                        st.session_state.admin_uploaded_excel_display = combined_display_df
+                        st.session_state.admin_uploaded_excel = normalize_converted_history_df(combined_display_df)
+                        st.toast(f"추가 이력 {len(extra_df):,}건을 가져왔습니다.")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"추가 이력 가져오기 실패: {e}")
         st.caption(f"업로드 데이터 건수: {len(admin_uploaded_df):,}건")
         st.dataframe(admin_uploaded_df, use_container_width=True, hide_index=True)
 
