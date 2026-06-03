@@ -1257,49 +1257,10 @@ def apply_rs_allowance_formula(perf_df, user_db):
     if work_df.empty:
         return result
 
-    name_to_info = {
-        info.get("name"): {
-            "staff_type": info.get("staff_type", "정규직"),
-            "period": info.get("outsource_period", "2년 이상"),
-        }
-        for uid, info in user_db.items()
-        if uid != "1" and isinstance(info, dict) and info.get("name")
-    }
-
-    total_points = pd.to_numeric(work_df["합계포인트"], errors="coerce").fillna(0)
-    branch_avg = float(total_points.sum()) / len(work_df) if len(work_df) else 0
-
-    outsource_deduction = 0
-    eligible_indices = []
-    eligible_points_sum = 0
-
-    for idx, row in work_df.iterrows():
-        name = str(row.get("담당자", "")).strip()
-        point = float(row.get("합계포인트", 0) or 0)
-        if point <= 0:
-            continue
-        info = name_to_info.get(name, {})
-        if info.get("staff_type", "정규직") == "외주":
-            rate = {"1년 미만": 0.8, "1년 이상": 0.9, "2년 이상": 1.0}.get(info.get("period"), 1.0)
-            outsource_deduction += branch_avg * rate
-        else:
-            eligible_indices.append(idx)
-            eligible_points_sum += point
-
-    eligible_count = len(eligible_indices)
-    if eligible_count == 0 or eligible_points_sum <= 0:
-        return result
-
-    regular_total = float(total_points.sum()) - outsource_deduction
-    regular_avg = regular_total / eligible_count
-    allowance_point_pool = max(0, (regular_avg - 350) * eligible_count)
-
     special_name = "하성춘"
-    for idx in eligible_indices:
-        point = float(result.at[idx, "합계포인트"] or 0)
-        ratio = point / eligible_points_sum if eligible_points_sum else 0
-        pay_point = int(round(allowance_point_pool * ratio))
-        pay_point = max(0, pay_point - PAYOUT_POINT_ADJUSTMENT)
+    for idx, row in work_df.iterrows():
+        point = int(float(row.get("합계포인트", 0) or 0))
+        pay_point = max(0, point - 1000 - PAYOUT_POINT_ADJUSTMENT)
         if special_name in str(result.at[idx, "담당자"]):
             pay_point = max(0, pay_point - 200)
         pay_point = int(max(0, pay_point))
@@ -1346,6 +1307,52 @@ def prepare_display_dataframe(df):
         :,
         result.apply(lambda col: col.astype(str).str.strip().replace("nan", "").ne("").any(), axis=0)
     ]
+
+
+def limit_history_to_total_point_cap(history_df, perf_df):
+    if history_df is None or not isinstance(history_df, pd.DataFrame) or history_df.empty:
+        return history_df
+    if perf_df is None or not isinstance(perf_df, pd.DataFrame) or perf_df.empty:
+        return history_df
+
+    df = clean_header_logic(history_df.copy())
+    user_col = find_col(df, ["등록자", "담당자", "성명"])
+    detail_col = find_col(df, ["활동상세", "활동내용"])
+    category_col = find_col(df, ["활동구분", "접수유형"])
+    if not user_col or user_col not in df.columns:
+        return history_df
+
+    base_points_by_user = {}
+    for _, row in perf_df.iterrows():
+        name = str(row.get("담당자", "")).strip()
+        if not name or name == "합계":
+            continue
+        open_points = int(float(row.get("개설포인트", 0) or 0))
+        link_points = int(float(row.get("연계포인트", 0) or 0))
+        base_points_by_user[name] = max(0, 2800 - open_points - link_points)
+
+    used_points_by_user = {name: 0 for name in base_points_by_user}
+    keep_indices = []
+    for idx, row in df.iterrows():
+        name = str(row.get(user_col, "")).strip()
+        if name not in base_points_by_user:
+            keep_indices.append(idx)
+            continue
+
+        detail = str(row.get(detail_col, "")).strip() if detail_col else ""
+        category = str(row.get(category_col, "")).strip() if category_col else ""
+        is_operation = "운영" in detail or "방문" in category or "원격" in category
+        if not is_operation:
+            keep_indices.append(idx)
+            continue
+
+        point = 10 if "원격" in category else 30
+        if used_points_by_user[name] + point > base_points_by_user[name]:
+            continue
+        used_points_by_user[name] += point
+        keep_indices.append(idx)
+
+    return df.loc[keep_indices].reset_index(drop=True)
 
 
 def build_random_admin_extra_history(source_df, existing_df, target_count):
@@ -1695,11 +1702,10 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
 
             effective_manual_p = int(max(0, stats["p_sum"] - (stats["o_p"] + stats["l_p"] + stats["v_actual_p"])))
 
-            if is_outsource:
-                pay = int(max(0, (stats["p_sum"] - 1000) * 500 - PAYOUT_AMOUNT_ADJUSTMENT))
-            else:
-                leader_bonus = 500 if rank == "팀장" else 0
-                pay = int(max(0, (stats["p_sum"] + leader_bonus - 1000 + adj_per_regular) * 500 - PAYOUT_AMOUNT_ADJUSTMENT))
+            pay_point = max(0, stats["p_sum"] - 1000 - PAYOUT_POINT_ADJUSTMENT)
+            if "하성춘" in str(name):
+                pay_point = max(0, pay_point - 200)
+            pay = int(pay_point * 500)
 
             rows.append(
                 {
@@ -1714,7 +1720,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
                     "운영건수 (추가 활동)": round(manual_points_for_user(name) / 30),
                     "운영포인트(추가 활동)": manual_points_for_user(name),
                     "합계포인트": stats["p_sum"],
-                    "지급포인트": int(pay / 500),
+                    "지급포인트": int(pay_point),
                     "지급예상금액": pay,
                     "전월대비": 0,
                 }
@@ -3733,6 +3739,13 @@ def show_all_staff_summary(staff_names):
         display_source_df = st.session_state.get("admin_uploaded_excel_display")
         if not isinstance(display_source_df, pd.DataFrame) or display_source_df.empty:
             display_source_df = st.session_state.admin_uploaded_excel
+        capped_display_df = limit_history_to_total_point_cap(display_source_df, perf_df)
+        capped_analysis_df = limit_history_to_total_point_cap(st.session_state.admin_uploaded_excel, perf_df)
+        if isinstance(capped_display_df, pd.DataFrame) and not capped_display_df.equals(display_source_df):
+            st.session_state.admin_uploaded_excel_display = capped_display_df
+            display_source_df = capped_display_df
+        if isinstance(capped_analysis_df, pd.DataFrame) and not capped_analysis_df.equals(st.session_state.admin_uploaded_excel):
+            st.session_state.admin_uploaded_excel = normalize_converted_history_df(capped_analysis_df)
         search_filters = render_history_search_filters(display_source_df, "admin_uploaded_history_search")
         admin_uploaded_df = apply_history_search_filters(display_source_df.copy(), search_filters)
         filtered_analysis_df = apply_history_search_filters(st.session_state.admin_uploaded_excel.copy(), search_filters)
@@ -4290,23 +4303,7 @@ def show_user_history(is_admin_mode=False):
             before_res.loc[before_res.index[0], "지급포인트"] = before_pay_point
 
             # 지급예상금액
-            rank = before_res.iloc[0].get("직급", "")
-            name = before_res.iloc[0].get("담당자", "")
-            name_to_info = {
-                info.get("name"): {
-                    "staff_type": info.get("staff_type", "정규직"),
-                }
-                for uid, info in st.session_state.user_db.items()
-                if uid != "1"
-            }
-            is_outsource = name_to_info.get(name, {}).get("staff_type", "정규직") == "외주"
-
-            if is_outsource:
-                before_pay = int(max(0, before_pay_point * 500))
-            else:
-                leader_bonus = 500 if rank == "팀장" else 0
-                before_pay = int(max(0, (before_pay_point + leader_bonus) * 500))
-
+            before_pay = int(before_pay_point * 500)
             before_res.loc[before_res.index[0], "지급예상금액"] = before_pay
 
             # 전월대비 재계산
@@ -4651,23 +4648,7 @@ def show_final_check():
         before_res.loc[before_res.index[0], "지급포인트"] = before_pay_point
 
         # 지급예상금액
-        rank = before_res.iloc[0].get("직급", "")
-        name = before_res.iloc[0].get("담당자", "")
-        name_to_info = {
-            info.get("name"): {
-                "staff_type": info.get("staff_type", "정규직"),
-            }
-            for uid, info in st.session_state.user_db.items()
-            if uid != "1"
-        }
-        is_outsource = name_to_info.get(name, {}).get("staff_type", "정규직") == "외주"
-
-        if is_outsource:
-            before_pay = int(max(0, before_pay_point * 500))
-        else:
-            leader_bonus = 500 if rank == "팀장" else 0
-            before_pay = int(max(0, (before_pay_point + leader_bonus) * 500))
-
+        before_pay = int(before_pay_point * 500)
         before_res.loc[before_res.index[0], "지급예상금액"] = before_pay
 
         # 전월대비 재계산 (필요시)
