@@ -3053,25 +3053,25 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
 
 def show_all_staff_summary(staff_names):
     """전체 직원 실적 요약 표시"""
-    # 구글 시트 데이터 로드
-    if st.session_state.get("analysis_lookup_df") is None:
+    # 본사 구글시트 로드
+    if st.session_state.get("cloud_sheet_df") is None:
         try:
-            with st.spinner("실적 데이터를 불러오는 중..."):
-                load_csv_to_state("url_analysis", "analysis_lookup_df")
+            with st.spinner("본사 구글시트를 불러오는 중..."):
+                load_csv_to_state("url_sync", "cloud_sheet_df")
         except Exception as e:
-            st.error("⚠️ 하나은행 활동 이력 시트를 불러오지 못했습니다.")
+            st.error("⚠️ 본사 구글시트를 불러오지 못했습니다.")
             with st.expander("📋 오류 상세 정보"):
                 st.code(str(e))
-            st.info("💡 [구글 스트레드시트 연동] 메뉴에서 '하나은행 구글 시트 CSV URL'을 확인해주세요.")
+            st.info("💡 [구글 스트레드시트 연동] 메뉴에서 '본사 구글 시트 CSV URL'을 확인해주세요.")
 
             if st.button("🔗 구글 스트레드시트 연동 메뉴로 이동", use_container_width=True):
                 st.session_state.current_menu = "구글 스트레드시트 연동"
                 st.rerun()
             return
 
-    analysis_df = st.session_state.get("analysis_lookup_df")
-    if analysis_df is None or analysis_df.empty:
-        st.warning("📂 실적 데이터가 없습니다.")
+    cloud_df = st.session_state.get("cloud_sheet_df")
+    if cloud_df is None or cloud_df.empty:
+        st.warning("📂 본사 구글시트 데이터가 없습니다.")
         st.info("💡 [구글 스트레드시트 연동] 메뉴에서 URL 설정 및 데이터 새로고침을 해주세요.")
 
         if st.button("🔗 구글 스트레드시트 연동 메뉴로 이동", use_container_width=True):
@@ -3079,35 +3079,101 @@ def show_all_staff_summary(staff_names):
             st.rerun()
         return
 
-    # 데이터 정리
-    analysis_df = clean_header_logic(analysis_df.copy())
+    # 하나은행 활동 이력 시트 로드 (운영 실적용)
+    if st.session_state.get("analysis_lookup_df") is None:
+        try:
+            load_csv_to_state("url_analysis", "analysis_lookup_df")
+        except:
+            pass
 
-    # 담당자별 실적 집계
-    u_col = find_col(analysis_df, ["등록자", "담당자", "성명"])
-    if not u_col or u_col not in analysis_df.columns:
-        st.warning("담당자 컬럼을 찾을 수 없습니다.")
+    analysis_df = st.session_state.get("analysis_lookup_df")
+
+    # 데이터 정리
+    cloud_df = clean_header_logic(cloud_df.copy())
+
+    # 본사 시트 컬럼 찾기
+    owner_col = find_col(cloud_df, ["담당자", "등록자", "성명"])
+    open_date_col = find_col(cloud_df, ["개설완료일자", "개설일"])
+    erp_date_col = find_col(cloud_df, ["ERP연계일자", "연계일자"])
+
+    if not owner_col or owner_col not in cloud_df.columns:
+        st.warning("본사 시트에서 담당자 컬럼을 찾을 수 없습니다.")
         return
+
+    # 날짜 컬럼 변환
+    if open_date_col and open_date_col in cloud_df.columns:
+        cloud_df[open_date_col] = pd.to_datetime(cloud_df[open_date_col], errors="coerce")
+    if erp_date_col and erp_date_col in cloud_df.columns:
+        cloud_df[erp_date_col] = pd.to_datetime(cloud_df[erp_date_col], errors="coerce")
+
+    # 대상 년월 (2026-05)
+    target_year_month = "2026-05"
 
     # 실적 데이터 계산
     performance_data = []
 
     for staff_name in staff_names:
-        staff_df = analysis_df[analysis_df[u_col] == staff_name].copy()
-        if staff_df.empty:
-            continue
+        # 본사 시트에서 담당자 데이터 필터링
+        staff_cloud_df = cloud_df[cloud_df[owner_col] == staff_name].copy()
 
-        staff_df = attach_cloud_dates(staff_df)
+        # 개설건수: 2026년 5월 개설완료일자 카운트
+        open_count = 0
+        if open_date_col and open_date_col in staff_cloud_df.columns:
+            open_count = len(staff_cloud_df[
+                staff_cloud_df[open_date_col].dt.strftime("%Y-%m") == target_year_month
+            ])
 
-        # 실적 계산
-        result, errors, duplicates = process_performance_analysis(staff_df)
+        # 연계건수: 2026년 5월 ERP연계일자 카운트
+        erp_count = 0
+        if erp_date_col and erp_date_col in staff_cloud_df.columns:
+            erp_count = len(staff_cloud_df[
+                staff_cloud_df[erp_date_col].dt.strftime("%Y-%m") == target_year_month
+            ])
 
-        if isinstance(result, pd.DataFrame) and not result.empty:
-            staff_result = result[result["담당자"] == staff_name]
-            if not staff_result.empty:
-                row_data = staff_result.iloc[0].to_dict()
-                row_data["오류건수"] = len(errors) if isinstance(errors, pd.DataFrame) else 0
-                row_data["중복건수"] = len(duplicates) if isinstance(duplicates, pd.DataFrame) else 0
-                performance_data.append(row_data)
+        # 운영 실적: 하나은행 활동 이력에서 계산
+        operation_count = 0
+        operation_points = 0
+
+        if analysis_df is not None and not analysis_df.empty:
+            analysis_clean = clean_header_logic(analysis_df.copy())
+            u_col = find_col(analysis_clean, ["등록자", "담당자", "성명"])
+            d_col = find_col(analysis_clean, ["활동상세", "활동내용"])
+
+            if u_col and u_col in analysis_clean.columns:
+                staff_activity = analysis_clean[analysis_clean[u_col] == staff_name].copy()
+
+                if d_col and d_col in staff_activity.columns:
+                    # 운영 활동 카운트
+                    operation_count = len(staff_activity[
+                        staff_activity[d_col].astype(str).str.contains("운영", na=False)
+                    ])
+                    operation_points = operation_count * 30  # 운영 1건당 30포인트
+
+        # 포인트 계산
+        open_points = open_count * 100  # 개설 1건당 100포인트
+        erp_points = erp_count * 100  # 연계 1건당 100포인트
+
+        # 합계 계산
+        total_points = min(2800, min(1000, open_points + erp_points) + min(1800, operation_points))
+        pay_points = max(0, total_points - 1000)
+
+        # 지급예상금액 계산 (임시로 500원/포인트 적용, 실제로는 직급/외주 여부 확인 필요)
+        pay_amount = pay_points * 500
+
+        row_data = {
+            "담당자": staff_name,
+            "개설건수": open_count,
+            "개설포인트": open_points,
+            "연계건수": erp_count,
+            "연계포인트": erp_points,
+            "운영건수 (실제 활동)": operation_count,
+            "운영포인트 (실제 활동)": operation_points,
+            "합계포인트": total_points,
+            "지급포인트": pay_points,
+            "지급예상금액": pay_amount,
+        }
+
+        performance_data.append(row_data)
 
     if not performance_data:
         st.info("집계된 실적이 없습니다.")
