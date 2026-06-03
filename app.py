@@ -3051,7 +3051,43 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
     return analysis_df
 
 
-def show_user_history():
+def show_user_history(is_admin_mode=False):
+    # 관리자 모드: 담당자 선택
+    selected_user = st.session_state.user_name  # 기본값: 본인
+
+    if is_admin_mode:
+        st.markdown("### 관리자용 실적 확인")
+
+        # 모든 직원 목록 가져오기
+        user_db = load_db(DB_FILE, {})
+        staff_names = []
+        for uid, user_info in user_db.items():
+            if uid != "1" and user_info.get("name"):
+                staff_names.append(user_info.get("name"))
+
+        staff_names = sorted(staff_names)
+
+        if not staff_names:
+            st.warning("등록된 직원이 없습니다. [직원 및 권한설정] 메뉴에서 직원을 등록해주세요.")
+            return
+
+        # 담당자 선택 드롭다운
+        col_select1, col_select2 = st.columns([1, 3])
+        with col_select1:
+            selected_user = st.selectbox(
+                "👤 담당자 선택",
+                options=staff_names,
+                index=0
+            )
+
+        st.markdown(f"**{selected_user}**님의 실적을 확인/수정합니다.")
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
+    # 선택된 담당자로 작업 진행
+    original_user_name = st.session_state.user_name
+    if is_admin_mode:
+        st.session_state.user_name = selected_user
+
     converted_preview_df = None
     analysis_df = None
     converted_ym = ""
@@ -3639,6 +3675,10 @@ def show_user_history():
     st.divider()
     st.markdown("### 최종 실적 확인")
     show_final_check()
+
+    # 관리자 모드: user_name 복원
+    if is_admin_mode:
+        st.session_state.user_name = original_user_name
 
 
 def show_final_check():
@@ -4472,164 +4512,8 @@ def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_m
 
 
 def show_admin_performance():
-    st.markdown("### 관리자용 실적 확인")
-
-    # 구글 시트 데이터 로드
-    if st.session_state.get("analysis_lookup_df") is None:
-        try:
-            load_csv_to_state("url_analysis", "analysis_lookup_df")
-        except Exception as e:
-            st.error(f"⚠️ 하나은행 활동 이력 시트를 불러오지 못했습니다.")
-            st.error(f"오류 내용: {str(e)}")
-            st.info("💡 [구글 스트레드시트 연동] 메뉴에서 '하나은행 구글 시트 CSV URL'을 확인해주세요.")
-
-            # URL 설정 페이지로 이동 버튼
-            if st.button("구글 스트레드시트 연동 메뉴로 이동"):
-                st.session_state.current_menu = "구글 스트레드시트 연동"
-                st.rerun()
-            return
-
-    analysis_df = st.session_state.get("analysis_lookup_df")
-    if analysis_df is None or analysis_df.empty:
-        st.warning("📂 실적 데이터가 없습니다.")
-        st.info("💡 [구글 스트레드시트 연동] 메뉴에서 URL 설정 및 데이터 새로고침을 해주세요.")
-
-        if st.button("구글 스트레드시트 연동 메뉴로 이동"):
-            st.session_state.current_menu = "구글 스트레드시트 연동"
-            st.rerun()
-        return
-
-    # 데이터 정리
-    analysis_df = clean_header_logic(analysis_df.copy())
-
-    # 담당자별 실적 집계
-    u_col = find_col(analysis_df, ["등록자", "담당자", "성명"])
-    d_col = find_col(analysis_df, ["활동상세", "활동내용"])
-
-    if not u_col or u_col not in analysis_df.columns:
-        st.warning("담당자 컬럼을 찾을 수 없습니다.")
-        return
-
-    # 담당자별 그룹화
-    staff_list = analysis_df[u_col].dropna().unique()
-
-    # 실적 데이터 계산
-    performance_data = []
-
-    for staff_name in staff_list:
-        staff_df = analysis_df[analysis_df[u_col] == staff_name].copy()
-        staff_df = attach_cloud_dates(staff_df)
-
-        # 실적 계산
-        result, errors, duplicates = process_performance_analysis(staff_df)
-
-        if isinstance(result, pd.DataFrame) and not result.empty:
-            staff_result = result[result["담당자"] == staff_name]
-            if not staff_result.empty:
-                row_data = staff_result.iloc[0].to_dict()
-                row_data["오류건수"] = len(errors) if isinstance(errors, pd.DataFrame) else 0
-                row_data["중복건수"] = len(duplicates) if isinstance(duplicates, pd.DataFrame) else 0
-                performance_data.append(row_data)
-
-    if not performance_data:
-        st.info("집계된 실적이 없습니다.")
-        return
-
-    # DataFrame 생성
-    perf_df = pd.DataFrame(performance_data)
-
-    # 필터 및 검색
-    col1, col2, col3 = st.columns([2, 2, 1])
-
-    with col1:
-        search_name = st.text_input("🔍 담당자 검색", placeholder="이름 입력")
-
-    with col2:
-        sort_by = st.selectbox(
-            "정렬 기준",
-            ["합계포인트", "지급예상금액", "개설건수", "연계건수", "운영건수 (실제 활동)", "담당자"],
-            index=0
-        )
-
-    with col3:
-        sort_order = st.radio("정렬 순서", ["내림차순 ⬇", "오름차순 ⬆"], horizontal=True)
-
-    # 검색 필터 적용
-    if search_name:
-        perf_df = perf_df[perf_df["담당자"].astype(str).str.contains(search_name, na=False)]
-
-    if perf_df.empty:
-        st.warning("검색 결과가 없습니다.")
-        return
-
-    # 정렬 적용
-    ascending = sort_order == "오름차순 ⬆"
-    perf_df = perf_df.sort_values(by=sort_by, ascending=ascending)
-
-    # 통계 요약
-    st.markdown("#### 📊 전체 실적 요약")
-    summary_cols = st.columns(5)
-
-    with summary_cols[0]:
-        st.metric("총 인원", f"{len(perf_df)}명")
-
-    with summary_cols[1]:
-        total_open = int(perf_df["개설건수"].sum()) if "개설건수" in perf_df.columns else 0
-        st.metric("총 개설", f"{total_open}건")
-
-    with summary_cols[2]:
-        total_link = int(perf_df["연계건수"].sum()) if "연계건수" in perf_df.columns else 0
-        st.metric("총 연계", f"{total_link}건")
-
-    with summary_cols[3]:
-        total_points = int(perf_df["합계포인트"].sum()) if "합계포인트" in perf_df.columns else 0
-        st.metric("총 포인트", f"{total_points:,}pt")
-
-    with summary_cols[4]:
-        total_amount = int(perf_df["지급예상금액"].sum()) if "지급예상금액" in perf_df.columns else 0
-        st.metric("총 지급예상", f"{total_amount:,}원")
-
-    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-
-    # 상세 실적 테이블
-    st.markdown("#### 📋 담당자별 상세 실적")
-
-    # 표시할 컬럼 선택
-    display_cols = [
-        "담당자", "직급", "개설건수", "개설포인트", "연계건수", "연계포인트",
-        "운영건수 (실제 활동)", "운영포인트 (실제 활동)",
-        "합계포인트", "지급포인트", "지급예상금액", "오류건수", "중복건수"
-    ]
-
-    # 존재하는 컬럼만 선택
-    display_cols = [col for col in display_cols if col in perf_df.columns]
-
-    # 테이블 표시
-    st.dataframe(
-        perf_df[display_cols].reset_index(drop=True),
-        use_container_width=True,
-        hide_index=True
-    )
-
-    # Excel 다운로드
-    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-
-    col_dl1, col_dl2, col_dl3 = st.columns([1, 1, 2])
-
-    with col_dl1:
-        from datetime import datetime
-        download_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-        excel_bytes = BytesIO()
-        perf_df[display_cols].to_excel(excel_bytes, index=False, engine="openpyxl")
-        excel_bytes.seek(0)
-
-        st.download_button(
-            "📥 Excel 다운로드",
-            data=excel_bytes.getvalue(),
-            file_name=f"전체실적_{download_time}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
+    # 관리자 모드로 사용자 실적 확인 페이지 호출
+    show_user_history(is_admin_mode=True)
 
 
 def show_admin_analysis():
