@@ -3337,9 +3337,6 @@ def show_all_staff_summary(staff_names):
 
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
-    # 상세 실적 테이블
-    st.markdown("#### 📋 담당자별 상세 실적")
-
     # 표시할 컬럼 선택
     display_cols = [
         "담당자", "직급", "개설건수", "개설포인트", "연계건수", "연계포인트",
@@ -3366,13 +3363,6 @@ def show_all_staff_summary(staff_names):
             total_row[col] = ""
 
     perf_df_with_total = pd.concat([perf_df[display_cols], pd.DataFrame([total_row])], ignore_index=True)
-
-    # 테이블 표시
-    st.dataframe(
-        perf_df_with_total,
-        use_container_width=True,
-        hide_index=True
-    )
 
     # Excel 다운로드 및 새로고침
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
@@ -3501,9 +3491,19 @@ def show_all_staff_summary(staff_names):
         and not st.session_state.admin_uploaded_excel.empty
     ):
         admin_uploaded_df = st.session_state.admin_uploaded_excel.copy()
+        admin_uploaded_df = admin_uploaded_df[
+            [col for col in admin_uploaded_df.columns if not str(col).strip().lower().startswith("unnamed")]
+        ]
         st.markdown("#### 본사이력 업로드 데이터")
         st.caption(f"업로드 데이터 건수: {len(admin_uploaded_df):,}건")
         st.dataframe(admin_uploaded_df, use_container_width=True, hide_index=True)
+
+    st.markdown("#### 담당자별 상세 실적")
+    st.dataframe(
+        perf_df_with_total,
+        use_container_width=True,
+        hide_index=True
+    )
 
 
 def show_user_history(is_admin_mode=False):
