@@ -4059,6 +4059,9 @@ def show_all_staff_summary(staff_names):
 
                                 # C&S 직원 목록
                                 staff_list = staff_names.copy()
+                                st.write(f"🔍 디버그: C&S 직원 수 = {len(staff_list)}")
+                                st.write(f"🔍 디버그: 직원 목록 = {staff_list}")
+                                st.write(f"🔍 디버그: 운영 데이터 건수 = {len(operation_df)}")
 
                                 # 담당자별로 최대 60건씩, 총 360건 생성
                                 target_total = 360
@@ -4093,8 +4096,12 @@ def show_all_staff_summary(staff_names):
                                     generated_rows.append(random_row)
                                     staff_count[staff] = staff_count.get(staff, 0) + 1
 
+                                st.write(f"🔍 디버그: 생성된 행 수 = {len(generated_rows)}")
+                                st.write(f"🔍 디버그: 담당자별 건수 = {staff_count}")
+
                                 if generated_rows:
                                     random_df = pd.DataFrame(generated_rows)
+                                    st.write(f"🔍 디버그: DataFrame 생성 완료, 행 수 = {len(random_df)}")
 
                                     # 중복 제거 (담당자 + 일자 기준)
                                     if hana_date_col and hana_date_col in random_df.columns:
