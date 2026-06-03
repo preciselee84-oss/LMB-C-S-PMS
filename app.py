@@ -3514,7 +3514,56 @@ def show_all_staff_summary(staff_names):
         display_source_df = st.session_state.get("admin_uploaded_excel_display")
         if not isinstance(display_source_df, pd.DataFrame) or display_source_df.empty:
             display_source_df = st.session_state.admin_uploaded_excel
-        admin_uploaded_df = display_source_df.copy()
+        search_filters = render_history_search_filters(display_source_df, "admin_uploaded_history_search")
+        admin_uploaded_df = apply_history_search_filters(display_source_df.copy(), search_filters)
+        filtered_analysis_df = apply_history_search_filters(st.session_state.admin_uploaded_excel.copy(), search_filters)
+
+        analysis_clean = clean_header_logic(filtered_analysis_df.copy())
+        u_col = find_col(analysis_clean, ["등록자", "담당자", "성명"])
+        d_col = find_col(analysis_clean, ["활동상세", "활동내용"])
+        category_col = find_col(analysis_clean, ["활동구분", "접수유형"])
+        if u_col and u_col in analysis_clean.columns:
+            for idx, row in perf_df.iterrows():
+                staff_activity = analysis_clean[analysis_clean[u_col] == row["담당자"]].copy()
+                operation_count = 0
+                operation_points = 0
+                if category_col and category_col in staff_activity.columns:
+                    category_text = staff_activity[category_col].astype(str)
+                    visit_count = int(category_text.str.contains("방문", na=False).sum())
+                    remote_count = int(category_text.str.contains("원격", na=False).sum())
+                    operation_count = visit_count + remote_count
+                    operation_points = (visit_count * 30) + (remote_count * 10)
+                elif d_col and d_col in staff_activity.columns:
+                    operation_count = int(
+                        staff_activity[d_col].astype(str).str.contains("운영|방문|점검", na=False).sum()
+                    )
+                    operation_points = operation_count * 30
+
+                open_points = int(perf_df.at[idx, "개설포인트"]) if "개설포인트" in perf_df.columns else 0
+                link_points = int(perf_df.at[idx, "연계포인트"]) if "연계포인트" in perf_df.columns else 0
+                total_points = min(2800, min(1000, open_points + link_points) + min(1800, operation_points))
+                pay_points = max(0, total_points - 1000)
+                perf_df.at[idx, "운영건수 (실제 활동)"] = operation_count
+                perf_df.at[idx, "운영포인트 (실제 활동)"] = operation_points
+                perf_df.at[idx, "합계포인트"] = total_points
+                perf_df.at[idx, "지급포인트"] = pay_points
+                perf_df.at[idx, "지급예상금액"] = pay_points * 500
+
+            total_row = {}
+            for col in display_cols:
+                if col in ["담당자"]:
+                    total_row[col] = "합계"
+                elif col in ["직급"]:
+                    total_row[col] = ""
+                elif col in perf_df.columns:
+                    if perf_df[col].dtype in ['int64', 'float64']:
+                        total_row[col] = perf_df[col].sum()
+                    else:
+                        total_row[col] = ""
+                else:
+                    total_row[col] = ""
+            perf_df_with_total = pd.concat([perf_df[display_cols], pd.DataFrame([total_row])], ignore_index=True)
+
         admin_uploaded_df = admin_uploaded_df[
             [
                 col for col in admin_uploaded_df.columns
