@@ -3109,6 +3109,9 @@ def show_all_staff_summary(staff_names):
     # 대상 년월 (2026-05)
     target_year_month = "2026-05"
 
+    # 직원 정보 로드 (직급 정보 가져오기)
+    user_db = load_db(DB_FILE, {})
+
     # 실적 데이터 계산
     performance_data = []
 
@@ -3160,8 +3163,16 @@ def show_all_staff_summary(staff_names):
         # 지급예상금액 계산 (임시로 500원/포인트 적용, 실제로는 직급/외주 여부 확인 필요)
         pay_amount = pay_points * 500
 
+        # 직급 정보 가져오기
+        staff_rank = "직원"  # 기본값
+        for uid, user_info in user_db.items():
+            if isinstance(user_info, dict) and user_info.get("name") == staff_name:
+                staff_rank = user_info.get("rank", "직원")
+                break
+
         row_data = {
             "담당자": staff_name,
+            "직급": staff_rank,
             "개설건수": open_count,
             "개설포인트": open_points,
             "연계건수": erp_count,
@@ -3182,6 +3193,10 @@ def show_all_staff_summary(staff_names):
     # DataFrame 생성
     perf_df = pd.DataFrame(performance_data)
 
+    # 직급 순서 정의 및 정렬용 컬럼 추가
+    rank_order = {"부서장": 0, "팀장": 1, "과장": 2, "대리": 3, "주임": 4, "직원": 5}
+    perf_df["_rank_order"] = perf_df["직급"].map(lambda x: rank_order.get(x, 99))
+
     # 필터 및 검색
     col1, col2, col3 = st.columns([2, 2, 1])
 
@@ -3191,12 +3206,12 @@ def show_all_staff_summary(staff_names):
     with col2:
         sort_by = st.selectbox(
             "정렬 기준",
-            ["합계포인트", "지급예상금액", "개설건수", "연계건수", "운영건수 (실제 활동)", "담당자"],
+            ["직급", "합계포인트", "지급예상금액", "개설건수", "연계건수", "운영건수 (실제 활동)", "담당자"],
             index=0
         )
 
     with col3:
-        sort_order = st.radio("정렬 순서", ["내림차순 ⬇", "오름차순 ⬆"], horizontal=True)
+        sort_order = st.radio("정렬 순서", ["오름차순 ⬆", "내림차순 ⬇"], horizontal=True)
 
     # 검색 필터 적용
     if search_name:
@@ -3208,7 +3223,10 @@ def show_all_staff_summary(staff_names):
 
     # 정렬 적용
     ascending = sort_order == "오름차순 ⬆"
-    perf_df = perf_df.sort_values(by=sort_by, ascending=ascending)
+    if sort_by == "직급":
+        perf_df = perf_df.sort_values(by="_rank_order", ascending=ascending)
+    else:
+        perf_df = perf_df.sort_values(by=sort_by, ascending=ascending)
 
     # 통계 요약
     st.markdown("#### 📊 전체 실적 요약")
