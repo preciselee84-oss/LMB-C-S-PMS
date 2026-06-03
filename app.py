@@ -3291,11 +3291,11 @@ def show_user_history(is_admin_mode=False):
     if is_admin_mode:
         st.markdown("### 관리자용 실적 확인")
 
-        # 모든 직원 목록 가져오기
+        # C&S 부서 직원 목록만 가져오기
         user_db = load_db(DB_FILE, {})
         staff_names = []
         for uid, user_info in user_db.items():
-            if uid != "1" and isinstance(user_info, dict) and user_info.get("name"):
+            if uid != "1" and isinstance(user_info, dict) and user_info.get("name") and user_info.get("dept_type") == "C&S":
                 staff_names.append(user_info.get("name"))
 
         staff_names = sorted(staff_names)
