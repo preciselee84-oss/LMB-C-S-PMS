@@ -3088,17 +3088,14 @@ def show_all_staff_summary(staff_names):
 
     analysis_df = st.session_state.get("analysis_lookup_df")
 
-    # 디버그: 사용 중인 URL 및 데이터 확인
-    with st.expander("🔍 데이터 소스 확인"):
-        url_sync = st.session_state.get("url_sync", DEFAULT_URL_SYNC)
-        url_analysis = st.session_state.get("url_analysis", DEFAULT_URL_ANALYSIS)
-        st.write("**본사 구글시트 URL (url_sync):**")
-        st.code(url_sync)
-        st.write("**하나은행 활동 이력 URL (url_analysis):**")
-        st.code(url_analysis)
-        st.write("**본사 구글시트 컬럼 목록:**")
-        st.write(list(cloud_df.columns))
-        st.write(f"**본사 구글시트 데이터 건수:** {len(cloud_df)}")
+    # 은행 구글시트 로드 (하나은행 시트)
+    hana_df = None
+    if st.session_state.get("hana_sheet_df") is None:
+        try:
+            load_csv_to_state("url_hana", "hana_sheet_df")
+        except:
+            pass
+    hana_df = st.session_state.get("hana_sheet_df")
 
     # 데이터 정리
     cloud_df = clean_header_logic(cloud_df.copy())
@@ -3114,19 +3111,66 @@ def show_all_staff_summary(staff_names):
         st.warning("본사 시트에서 담당자 컬럼을 찾을 수 없습니다.")
         return
 
-    # 디버그: 특정 사업자번호 검색
-    search_biz_nums = ["2298603470", "8898704171"]
-    if biz_num_col and biz_num_col in cloud_df.columns:
-        with st.expander("🔍 특정 사업자번호 검색 결과"):
-            for search_num in search_biz_nums:
-                matched = cloud_df[cloud_df[biz_num_col].astype(str).str.contains(search_num, na=False)]
-                if not matched.empty:
-                    st.write(f"**사업자번호: {search_num}**")
-                    display_cols = [biz_num_col, owner_col, open_date_col, company_col]
-                    display_cols = [col for col in display_cols if col and col in matched.columns]
-                    st.dataframe(matched[display_cols])
-                else:
-                    st.write(f"**사업자번호: {search_num}** - 데이터 없음")
+    # 은행 시트와 본사 시트 비교 - 누락 데이터 확인
+    if hana_df is not None and not hana_df.empty:
+        hana_clean = clean_header_logic(hana_df.copy())
+        hana_biz_col = find_col(hana_clean, ["사업자번호", "사업자등록번호"])
+        hana_company_col = find_col(hana_clean, ["고객명", "업체명", "상호"])
+        hana_open_col = find_col(hana_clean, ["개설완료일자", "개설일", "개설/이행일"])
+        hana_erp_col = find_col(hana_clean, ["연계완료일자", "연계청구일자", "ERP연계일자"])
+        hana_owner_col = find_col(hana_clean, ["담당자", "등록자"])
+
+        missing_open = []
+        missing_erp = []
+
+        if hana_biz_col and biz_num_col:
+            # 개설완료일자 누락 확인
+            if hana_open_col:
+                hana_with_open = hana_clean[hana_clean[hana_open_col].notna()].copy()
+                for _, row in hana_with_open.iterrows():
+                    biz_num = str(row.get(hana_biz_col, "")).strip()
+                    if not biz_num:
+                        continue
+                    # 본사 시트에서 해당 사업자번호 찾기
+                    cloud_match = cloud_df[cloud_df[biz_num_col].astype(str).str.contains(biz_num, na=False, regex=False)]
+                    if cloud_match.empty or cloud_match[open_date_col].isna().all():
+                        missing_open.append({
+                            "사업자번호": biz_num,
+                            "고객명": row.get(hana_company_col, ""),
+                            "담당자": row.get(hana_owner_col, ""),
+                            "은행시트_개설일": row.get(hana_open_col, "")
+                        })
+
+            # ERP연계일자 누락 확인
+            if hana_erp_col:
+                hana_with_erp = hana_clean[hana_clean[hana_erp_col].notna()].copy()
+                for _, row in hana_with_erp.iterrows():
+                    biz_num = str(row.get(hana_biz_col, "")).strip()
+                    if not biz_num:
+                        continue
+                    # 본사 시트에서 해당 사업자번호 찾기
+                    cloud_match = cloud_df[cloud_df[biz_num_col].astype(str).str.contains(biz_num, na=False, regex=False)]
+                    if cloud_match.empty or cloud_match[erp_date_col].isna().all():
+                        missing_erp.append({
+                            "사업자번호": biz_num,
+                            "고객명": row.get(hana_company_col, ""),
+                            "담당자": row.get(hana_owner_col, ""),
+                            "은행시트_연계일": row.get(hana_erp_col, "")
+                        })
+
+        # 누락 데이터 표시
+        if missing_open or missing_erp:
+            with st.expander("⚠️ 본사 시트 누락 데이터", expanded=False):
+                if missing_open:
+                    st.markdown("#### 개설완료일자 누락")
+                    st.write(f"은행 시트에는 개설완료일자가 있으나 본사 시트에 없는 고객사: **{len(missing_open)}건**")
+                    st.dataframe(pd.DataFrame(missing_open), use_container_width=True)
+                    st.markdown("---")
+
+                if missing_erp:
+                    st.markdown("#### ERP연계일자 누락")
+                    st.write(f"은행 시트에는 연계일자가 있으나 본사 시트에 없는 고객사: **{len(missing_erp)}건**")
+                    st.dataframe(pd.DataFrame(missing_erp), use_container_width=True)
 
     # 날짜 컬럼 변환
     if open_date_col and open_date_col in cloud_df.columns:
@@ -3147,20 +3191,6 @@ def show_all_staff_summary(staff_names):
         # 본사 시트에서 담당자 데이터 필터링
         staff_cloud_df = cloud_df[cloud_df[owner_col] == staff_name].copy()
 
-        # 디버그: 이성환 직원의 데이터 확인
-        if staff_name == "이성환":
-            with st.expander(f"🔍 {staff_name} 디버그 정보"):
-                st.write(f"담당자 컬럼: {owner_col}")
-                st.write(f"개설완료일자 컬럼: {open_date_col}")
-                st.write(f"ERP연계일자 컬럼: {erp_date_col}")
-                st.write(f"총 데이터 건수: {len(staff_cloud_df)}")
-                if not staff_cloud_df.empty:
-                    st.write("데이터 샘플:")
-                    if open_date_col in staff_cloud_df.columns:
-                        st.dataframe(staff_cloud_df[[owner_col, open_date_col]].head(10))
-                    else:
-                        st.dataframe(staff_cloud_df.head(10))
-
         # 개설건수: 2026년 5월 개설완료일자 카운트
         open_count = 0
         if open_date_col and open_date_col in staff_cloud_df.columns:
@@ -3168,12 +3198,6 @@ def show_all_staff_summary(staff_names):
                 staff_cloud_df[open_date_col].dt.strftime("%Y-%m") == target_year_month
             ]
             open_count = len(may_2026_data)
-
-            # 디버그: 이성환 직원의 5월 데이터 확인
-            if staff_name == "이성환" and not may_2026_data.empty:
-                with st.expander(f"🔍 {staff_name} 2026-05 개설 데이터"):
-                    st.write(f"개설건수: {open_count}")
-                    st.dataframe(may_2026_data)
 
         # 연계건수: 2026년 5월 ERP연계일자 카운트
         erp_count = 0
