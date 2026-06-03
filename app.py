@@ -4007,6 +4007,11 @@ def show_all_staff_summary(staff_names):
             if st.button("추가 이력 가져오기", use_container_width=True, key="admin_add_random_history"):
                 # 업로드한 데이터에서 담당자별 운영 활동을 60회 이하로 제한하여 가져오기
                 uploaded_excel = st.session_state.get("admin_uploaded_excel")
+
+                st.write(f"🔍 디버그: uploaded_excel 타입 = {type(uploaded_excel)}")
+                if uploaded_excel is not None:
+                    st.write(f"🔍 디버그: 데이터 건수 = {len(uploaded_excel) if isinstance(uploaded_excel, pd.DataFrame) else 'N/A'}")
+
                 if uploaded_excel is not None and isinstance(uploaded_excel, pd.DataFrame):
                     uploaded_data = st.session_state.get("admin_uploaded_excel")
                     uploaded_clean = clean_header_logic(uploaded_data.copy())
@@ -4014,18 +4019,23 @@ def show_all_staff_summary(staff_names):
                     d_col = find_col(uploaded_clean, ["활동상세", "활동내용"])
                     category_col = find_col(uploaded_clean, ["활동구분", "접수유형"])
 
+                    st.write(f"🔍 디버그: u_col={u_col}, d_col={d_col}, category_col={category_col}")
+
                     # 운영 활동만 필터링
                     if u_col and u_col in uploaded_clean.columns:
                         if category_col and category_col in uploaded_clean.columns:
                             operation_all = uploaded_clean[
                                 uploaded_clean[category_col].astype(str).str.contains("방문|원격", na=False)
                             ].copy()
+                            st.write(f"🔍 디버그: category_col 사용, 운영 활동 {len(operation_all)}건")
                         elif d_col and d_col in uploaded_clean.columns:
                             operation_all = uploaded_clean[
                                 uploaded_clean[d_col].astype(str).str.contains("운영|방문|점검", na=False)
                             ].copy()
+                            st.write(f"🔍 디버그: d_col 사용, 운영 활동 {len(operation_all)}건")
                         else:
                             operation_all = pd.DataFrame()
+                            st.warning("활동구분 또는 활동상세 컬럼을 찾을 수 없습니다.")
 
                         if not operation_all.empty:
                             # 담당자별로 60회 제한하면서 데이터 수집
@@ -4048,11 +4058,11 @@ def show_all_staff_summary(staff_names):
                             time.sleep(10)
                             st.rerun()
                         else:
-                            st.warning("운영 활동 데이터가 없습니다.")
+                            st.warning("⚠️ 운영 활동 데이터가 없습니다.")
                     else:
-                        st.error("담당자 컬럼을 찾을 수 없습니다.")
+                        st.error("❌ 담당자 컬럼을 찾을 수 없습니다.")
                 else:
-                    st.warning("먼저 파일을 업로드해주세요.")
+                    st.warning("⚠️ admin_uploaded_excel이 비어있습니다. 먼저 파일을 업로드해주세요.")
             st.caption("💡 담당자별 운영 활동을 60회로 제한하여 가져옵니다.")
         st.caption(f"업로드 데이터 건수: {len(admin_uploaded_df):,}건")
         st.dataframe(admin_uploaded_df, use_container_width=True, hide_index=True)
