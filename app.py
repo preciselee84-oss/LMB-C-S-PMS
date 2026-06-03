@@ -3058,17 +3058,27 @@ def show_all_staff_summary(staff_names):
     # 구글 시트 데이터 로드
     if st.session_state.get("analysis_lookup_df") is None:
         try:
-            load_csv_to_state("url_analysis", "analysis_lookup_df")
+            with st.spinner("실적 데이터를 불러오는 중..."):
+                load_csv_to_state("url_analysis", "analysis_lookup_df")
         except Exception as e:
-            st.error(f"⚠️ 하나은행 활동 이력 시트를 불러오지 못했습니다.")
-            st.error(f"오류 내용: {str(e)}")
+            st.error("⚠️ 하나은행 활동 이력 시트를 불러오지 못했습니다.")
+            with st.expander("📋 오류 상세 정보"):
+                st.code(str(e))
             st.info("💡 [구글 스트레드시트 연동] 메뉴에서 '하나은행 구글 시트 CSV URL'을 확인해주세요.")
+
+            if st.button("🔗 구글 스트레드시트 연동 메뉴로 이동", use_container_width=True):
+                st.session_state.current_menu = "구글 스트레드시트 연동"
+                st.rerun()
             return
 
     analysis_df = st.session_state.get("analysis_lookup_df")
     if analysis_df is None or analysis_df.empty:
         st.warning("📂 실적 데이터가 없습니다.")
         st.info("💡 [구글 스트레드시트 연동] 메뉴에서 URL 설정 및 데이터 새로고침을 해주세요.")
+
+        if st.button("🔗 구글 스트레드시트 연동 메뉴로 이동", use_container_width=True):
+            st.session_state.current_menu = "구글 스트레드시트 연동"
+            st.rerun()
         return
 
     # 데이터 정리
