@@ -3079,14 +3079,17 @@ def show_all_staff_summary(staff_names):
             st.rerun()
         return
 
-    # 하나은행 활동 이력 시트 로드 (운영 실적용)
-    if st.session_state.get("analysis_lookup_df") is None:
-        try:
-            load_csv_to_state("url_analysis", "analysis_lookup_df")
-        except:
-            pass
-
-    analysis_df = st.session_state.get("analysis_lookup_df")
+    # 운영 실적용 데이터: 업로드한 엑셀 파일 우선 사용
+    if st.session_state.get("admin_uploaded_excel") is not None:
+        analysis_df = st.session_state.get("admin_uploaded_excel")
+    else:
+        # 업로드한 파일이 없으면 하나은행 활동 이력 시트 로드
+        if st.session_state.get("analysis_lookup_df") is None:
+            try:
+                load_csv_to_state("url_analysis", "analysis_lookup_df")
+            except:
+                pass
+        analysis_df = st.session_state.get("analysis_lookup_df")
 
     # 은행 구글시트 로드 (하나은행 시트)
     hana_df = None
@@ -3406,6 +3409,7 @@ def show_all_staff_summary(staff_names):
             st.session_state.cloud_sheet_df = None
             st.session_state.analysis_lookup_df = None
             st.session_state.hana_sheet_df = None
+            st.session_state.admin_uploaded_excel = None
             st.toast("데이터를 새로고침합니다.")
             st.rerun()
 
@@ -3432,6 +3436,8 @@ def show_all_staff_summary(staff_names):
                     st.warning(convert_info.get("error", "변환할 데이터가 없습니다."))
                 else:
                     converted_df = normalize_converted_history_df(converted_df)
+                    # session_state에 저장하여 운영 카운트에 사용
+                    st.session_state.admin_uploaded_excel = converted_df
                     converted_bytes = sample_format_excel_bytes(converted_df)
                     converted_ym = get_uploaded_month(converted_df).replace("-", "") or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
                     st.download_button(
@@ -3444,6 +3450,7 @@ def show_all_staff_summary(staff_names):
                     unmatched = int(convert_info.get("unmatched", 0))
                     if unmatched:
                         st.caption(f"고객번호 매핑 실패 {unmatched}건은 사업자번호가 공란으로 저장됩니다.")
+                    st.success("✅ 업로드한 파일이 실적 계산에 반영됩니다.")
             except ImportError:
                 st.button("변환파일 다운로드", use_container_width=True, disabled=True)
                 st.error("xls 파일 변환을 위해 xlrd 패키지가 필요합니다.")
