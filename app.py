@@ -1255,16 +1255,16 @@ def apply_rs_allowance_formula(perf_df, user_db):
     if work_df.empty:
         return result
 
-    base_amount = 850000
+    base_pay_point = 1700
     special_name = "하성춘"
     for idx, row in work_df.iterrows():
         point = float(row.get("합계포인트", 0) or 0)
         if point <= 0:
             continue
         name = str(row.get("담당자", "")).strip()
-        amount = base_amount - 100000 if special_name in name else base_amount
-        result.at[idx, "지급예상금액"] = amount
-        result.at[idx, "지급포인트"] = int(amount / 1000)
+        pay_point = base_pay_point - 200 if special_name in name else base_pay_point
+        result.at[idx, "지급포인트"] = pay_point
+        result.at[idx, "지급예상금액"] = pay_point * 500
 
     return result
 
