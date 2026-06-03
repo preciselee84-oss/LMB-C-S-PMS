@@ -44,6 +44,8 @@ DEFAULT_URL_ANALYSIS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9XPHqr
 DEFAULT_URL_SYNC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9F7R7oLA2B02H-I25kVv2JeYHFgWQq0CT7TeW61hrNpJLdHWJFhFR_iDQGCFAW044o8rRwBDeovKG/pub?gid=1533424484&single=true&output=csv"
 DEFAULT_URL_HANA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgRHnTZD4eDW2UeODQuGxmxFrflKpbQda3sBsVjj1s3qAFWMKcpke2U58UuT6VEDlkbXveZlaroTCr/pub?gid=0&single=true&output=csv"
 DEFAULT_URL_HANA_BILLING = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgRHnTZD4eDW2UeODQuGxmxFrflKpbQda3sBsVjj1s3qAFWMKcpke2U58UuT6VEDlkbXveZlaroTCr/pub?gid=1172734914&single=true&output=csv"
+PAYOUT_AMOUNT_ADJUSTMENT = 350000
+PAYOUT_POINT_ADJUSTMENT = PAYOUT_AMOUNT_ADJUSTMENT // 500
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -1297,6 +1299,7 @@ def apply_rs_allowance_formula(perf_df, user_db):
         point = float(result.at[idx, "합계포인트"] or 0)
         ratio = point / eligible_points_sum if eligible_points_sum else 0
         pay_point = int(round(allowance_point_pool * ratio))
+        pay_point = max(0, pay_point - PAYOUT_POINT_ADJUSTMENT)
         if special_name in str(result.at[idx, "담당자"]):
             pay_point = max(0, pay_point - 200)
         pay_point = int(max(0, pay_point))
@@ -1693,10 +1696,10 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
             effective_manual_p = int(max(0, stats["p_sum"] - (stats["o_p"] + stats["l_p"] + stats["v_actual_p"])))
 
             if is_outsource:
-                pay = int(max(0, (stats["p_sum"] - 1000) * 500))
+                pay = int(max(0, (stats["p_sum"] - 1000) * 500 - PAYOUT_AMOUNT_ADJUSTMENT))
             else:
                 leader_bonus = 500 if rank == "팀장" else 0
-                pay = int(max(0, (stats["p_sum"] + leader_bonus - 1000 + adj_per_regular) * 500))
+                pay = int(max(0, (stats["p_sum"] + leader_bonus - 1000 + adj_per_regular) * 500 - PAYOUT_AMOUNT_ADJUSTMENT))
 
             rows.append(
                 {
@@ -1711,7 +1714,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
                     "운영건수 (추가 활동)": round(manual_points_for_user(name) / 30),
                     "운영포인트(추가 활동)": manual_points_for_user(name),
                     "합계포인트": stats["p_sum"],
-                    "지급포인트": max(0, stats["p_sum"] - 1000),
+                    "지급포인트": int(pay / 500),
                     "지급예상금액": pay,
                     "전월대비": 0,
                 }
@@ -3784,32 +3787,8 @@ def show_all_staff_summary(staff_names):
         with title_col:
             st.markdown("#### 본사이력 업로드 데이터")
         with add_history_col:
-            if st.button("추가 이력 가져오기", use_container_width=True, key="admin_add_random_history"):
-                try:
-                    source_df = read_google_csv(
-                        st.session_state.get("url_analysis", DEFAULT_URL_ANALYSIS),
-                        force_refresh=True,
-                    )
-                    source_df = prepare_random_history_source_df(source_df)
-                    current_display_df = st.session_state.get("admin_uploaded_excel_display")
-                    if not isinstance(current_display_df, pd.DataFrame) or current_display_df.empty:
-                        current_display_df = st.session_state.admin_uploaded_excel
-                    current_display_df = prepare_random_history_source_df(current_display_df)
-                    target_count = max(20, len(current_display_df))
-                    extra_df, extra_error = build_random_admin_extra_history(source_df, current_display_df, target_count)
-                    if extra_error:
-                        st.warning(extra_error)
-                    else:
-                        combined_display_df = pd.concat(
-                            [clean_header_logic(current_display_df.copy()), extra_df],
-                            ignore_index=True,
-                        )
-                        st.session_state.admin_uploaded_excel_display = combined_display_df
-                        st.session_state.admin_uploaded_excel = normalize_converted_history_df(combined_display_df)
-                        st.toast(f"추가 이력 {len(extra_df):,}건을 가져왔습니다.")
-                        st.rerun()
-                except Exception as e:
-                    st.error(f"추가 이력 가져오기 실패: {e}")
+            st.button("추가 이력 가져오기", use_container_width=True, key="admin_add_random_history", disabled=True)
+            st.caption("추가 이력 자동 반영은 중지되었습니다.")
         st.caption(f"업로드 데이터 건수: {len(admin_uploaded_df):,}건")
         st.dataframe(admin_uploaded_df, use_container_width=True, hide_index=True)
 
@@ -4307,7 +4286,7 @@ def show_user_history(is_admin_mode=False):
             before_res.loc[before_res.index[0], "합계포인트"] = before_total
 
             # 지급포인트
-            before_pay_point = max(0, before_total - 1000)
+            before_pay_point = max(0, before_total - 1000 - PAYOUT_POINT_ADJUSTMENT)
             before_res.loc[before_res.index[0], "지급포인트"] = before_pay_point
 
             # 지급예상금액
@@ -4668,7 +4647,7 @@ def show_final_check():
         before_res.loc[before_res.index[0], "합계포인트"] = before_total
 
         # 지급포인트
-        before_pay_point = max(0, before_total - 1000)
+        before_pay_point = max(0, before_total - 1000 - PAYOUT_POINT_ADJUSTMENT)
         before_res.loc[before_res.index[0], "지급포인트"] = before_pay_point
 
         # 지급예상금액
