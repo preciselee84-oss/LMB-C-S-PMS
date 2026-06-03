@@ -3053,8 +3053,6 @@ def render_converted_preview_editor(converted_preview_df, filters=None):
 
 def show_all_staff_summary(staff_names):
     """전체 직원 실적 요약 표시"""
-    st.markdown("### 📊 전체 직원 실적 요약")
-
     # 구글 시트 데이터 로드
     if st.session_state.get("analysis_lookup_df") is None:
         try:
