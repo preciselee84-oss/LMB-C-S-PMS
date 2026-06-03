@@ -21,17 +21,6 @@
         "outsource": "아니오",
         "outsource_period": "해당없음"
     },
-    "iminjee": {
-        "pw": "1111",
-        "name": "임인지",
-        "email": "",
-        "access": "허용",
-        "role": "사용자",
-        "dept_type": "사업부",
-        "staff_type": "정규직",
-        "outsource": "아니오",
-        "outsource_period": "해당없음"
-    },
     "leesh": {
         "pw": "1111",
         "name": "이수현",
@@ -114,6 +103,7 @@
         "rank": "대리"
     },
     "_deleted": [
-        "kangkt"
+        "kangkt",
+        "iminjee"
     ]
 }
