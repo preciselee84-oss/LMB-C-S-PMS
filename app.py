@@ -4029,12 +4029,14 @@ def show_all_staff_summary(staff_names):
                         # 컬럼 찾기
                         hana_detail_col = find_col(activity_clean, ["활동상세", "활동내용"])
                         hana_owner_col = find_col(activity_clean, ["담당자", "등록자", "성명"])
-                        hana_date_col = find_col(activity_clean, ["활동일자", "일자", "날짜"])
+                        hana_date_col = find_col(activity_clean, ["활동일", "활동일자", "일자", "날짜"])
 
                         st.write(f"🔍 찾은 컬럼: detail={hana_detail_col}, owner={hana_owner_col}, date={hana_date_col}")
 
                         if not hana_detail_col or not hana_owner_col:
                             st.error("❌ 하나지사 활동이력 시트에서 필수 컬럼(활동상세, 담당자)을 찾을 수 없습니다.")
+                        elif not hana_date_col:
+                            st.error("❌ 하나지사 활동이력 시트에서 날짜 컬럼(활동일)을 찾을 수 없습니다.")
                         else:
                             # 활동상세가 "운영"인 데이터만 필터링
                             operation_df = activity_clean[
