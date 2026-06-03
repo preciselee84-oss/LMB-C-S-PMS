@@ -3649,6 +3649,60 @@ def show_all_staff_summary(staff_names):
                 st.write("**데이터 샘플:**")
                 st.dataframe(prepare_display_dataframe(uploaded_data).head(10))
 
+        # 중복 이력 및 초과 방문 체크
+        with st.expander("⚠️ 중복 이력 및 초과 방문 체크", expanded=False):
+            uploaded_clean = clean_header_logic(uploaded_data.copy())
+            biz_col = find_col(uploaded_clean, ["사업자번호", "사업자등록번호"])
+            u_col = find_col(uploaded_clean, ["등록자", "담당자", "성명"])
+            date_col = find_col(uploaded_clean, ["활동일자", "방문일자"])
+            d_col = find_col(uploaded_clean, ["활동상세", "활동내용"])
+            company_col = find_col(uploaded_clean, ["고객명", "업체명", "상호"])
+
+            # 중복 이력 체크
+            dup_df = pd.DataFrame()
+            if biz_col and u_col and date_col and d_col:
+                _dup_df = uploaded_clean.copy()
+                _dup_df["_dup_biz"] = _dup_df[biz_col].astype(str).str.strip()
+                _dup_df["_dup_user"] = _dup_df[u_col].astype(str).str.strip()
+                _dup_df["_dup_date"] = pd.to_datetime(_dup_df[date_col], errors="coerce").dt.strftime("%Y-%m-%d")
+                _dup_df["_dup_detail"] = _dup_df[d_col].astype(str).str.strip()
+                _dup_keys = ["_dup_biz", "_dup_user", "_dup_date", "_dup_detail"]
+                _dup_df = _dup_df[(_dup_df[_dup_keys] != "").all(axis=1)]
+                dup_df = _dup_df[_dup_df.duplicated(subset=_dup_keys, keep=False)].copy()
+                if not dup_df.empty:
+                    dup_df = dup_df.drop(columns=_dup_keys, errors="ignore")
+                    dup_df = dup_df.sort_values(by=[date_col, biz_col, u_col, d_col]) if all(c in dup_df.columns for c in [date_col, biz_col, u_col, d_col]) else dup_df
+
+            # 초과 방문 체크 (하루 5회 이상 방문)
+            over_visit_df = pd.DataFrame()
+            if biz_col and u_col and date_col and company_col:
+                visit_count = uploaded_clean.groupby([biz_col, u_col, date_col]).size().reset_index(name="일방문")
+                over_visit = visit_count[visit_count["일방문"] >= 5]
+                if not over_visit.empty:
+                    # 월 총 방문 횟수 계산
+                    month_count = uploaded_clean.groupby([biz_col, u_col]).size().reset_index(name="월총방문")
+                    over_visit = over_visit.merge(month_count, on=[biz_col, u_col], how="left")
+                    # 업체명 추가
+                    company_map = uploaded_clean.groupby(biz_col)[company_col].first().to_dict()
+                    over_visit[company_col] = over_visit[biz_col].map(company_map)
+                    over_visit_df = over_visit[[company_col, biz_col, u_col, date_col, "일방문", "월총방문"]].rename(columns={date_col: "초과일자"})
+
+            # 결과 표시
+            tabs = st.tabs(["중복 이력", "초과 방문"])
+            with tabs[0]:
+                if not dup_df.empty:
+                    st.warning(f"⚠️ 중복 이력 {len(dup_df)}건 발견")
+                    st.dataframe(dup_df, use_container_width=True, hide_index=True)
+                else:
+                    st.success("✅ 중복 이력이 없습니다.")
+
+            with tabs[1]:
+                if not over_visit_df.empty:
+                    st.warning(f"⚠️ 초과 방문 {len(over_visit_df)}건 발견 (하루 5회 이상)")
+                    st.dataframe(over_visit_df, use_container_width=True, hide_index=True)
+                else:
+                    st.success("✅ 초과 방문이 없습니다.")
+
     col1, col_convert, col_upload, col_sample, _ = st.columns([1, 1, 1, 1, 2])
     with col1:
         st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>은행 이력 업로드</div>", unsafe_allow_html=True)
