@@ -3925,6 +3925,8 @@ def show_all_staff_summary(staff_names):
                             st.session_state.admin_uploaded_excel = limited_df
                             st.success(f"✅ 운영 활동을 담당자별 60회로 제한하여 가져왔습니다.")
                             st.info(f"📊 총 {total_count}건 (담당자별 최대 60회)")
+                            st.info("⏰ 10초 후 페이지가 자동으로 새로고침됩니다...")
+                            time.sleep(10)
                             st.rerun()
                         else:
                             st.warning("운영 활동 데이터가 없습니다.")
