@@ -4042,12 +4042,9 @@ def show_all_staff_summary(staff_names):
                             ].copy()
 
                             if operation_df.empty:
-                                st.warning("⚠️ 하나은행 시트에 '운영' 활동 데이터가 없습니다.")
+                                st.warning("⚠️ 하나지사 활동이력 시트에 '운영' 활동 데이터가 없습니다.")
                             else:
                                 # 2026년 5월 영업일 생성 (휴일/공휴일 제외)
-                                import numpy as np
-                                from datetime import datetime, timedelta
-
                                 may_2026_days = []
                                 for day in range(1, 32):
                                     try:
