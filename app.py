@@ -1658,7 +1658,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
             l_p = int(row["l"]) * 120
             v_actual_p = int(row["v"]) * 30
             manual_p = manual_points_for_user(name) + added_pts_by_name.get(name, 0)
-            p_sum = o_p + l_p + v_actual_p + manual_p
+            p_sum = min(2800, o_p + l_p + v_actual_p + manual_p)
 
             member_stats[name] = {
                 "o_p": o_p,
@@ -3467,8 +3467,8 @@ def show_all_staff_summary(staff_names):
         open_points = open_count * 90  # 개설 1건당 90포인트
         erp_points = erp_count * 120  # 연계 1건당 120포인트
 
-        # 합계포인트는 개설포인트 + 연계포인트 + 운영포인트의 단순 합계다.
-        total_points = open_points + erp_points + operation_points
+        # 합계포인트는 개설포인트 + 연계포인트 + 운영포인트 합계이며 최대 2800점이다.
+        total_points = min(2800, open_points + erp_points + operation_points)
 
         # 직급 정보 가져오기
         staff_rank = "직원"  # 기본값
@@ -3757,7 +3757,7 @@ def show_all_staff_summary(staff_names):
 
                 open_points = int(perf_df.at[idx, "개설포인트"]) if "개설포인트" in perf_df.columns else 0
                 link_points = int(perf_df.at[idx, "연계포인트"]) if "연계포인트" in perf_df.columns else 0
-                total_points = open_points + link_points + operation_points
+                total_points = min(2800, open_points + link_points + operation_points)
                 perf_df.at[idx, "운영건수 (실제 활동)"] = operation_count
                 perf_df.at[idx, "운영포인트 (실제 활동)"] = operation_points
                 perf_df.at[idx, "합계포인트"] = total_points
@@ -4303,7 +4303,7 @@ def show_user_history(is_admin_mode=False):
             v_p = int(float(before_res.iloc[0].get("운영포인트 (실제 활동)", 0)))
 
             # 합계포인트: 개설 + 연계 + 운영(실제)만
-            before_total = o_p + l_p + v_p
+            before_total = min(2800, o_p + l_p + v_p)
             before_res.loc[before_res.index[0], "합계포인트"] = before_total
 
             # 지급포인트
@@ -4664,7 +4664,7 @@ def show_final_check():
         v_p = int(float(before_res.iloc[0].get("운영포인트 (실제 활동)", 0)))
 
         # 합계포인트: 개설 + 연계 + 운영(실제)만
-        before_total = o_p + l_p + v_p
+        before_total = min(2800, o_p + l_p + v_p)
         before_res.loc[before_res.index[0], "합계포인트"] = before_total
 
         # 지급포인트
@@ -7801,7 +7801,7 @@ def show_dashboard():
         l   = len(ldf)
         v = int((gdf[gubun_col].astype(str).str.strip() == "이행").sum()) if gubun_col in gdf.columns else 0
         o_p, l_p, v_p = o * 90, l * 120, v * 30
-        total = o_p + l_p + v_p
+        total = min(2800, o_p + l_p + v_p)
         return {"개설건수": o, "연계건수": l, "운영건수": v, "개설포인트": o_p, "연계포인트": l_p, "운영포인트": v_p, "합계포인트": total}
 
     def calc_act_for(uname, ym):
@@ -7817,7 +7817,7 @@ def show_dashboard():
             l = int(df_m[act_d_col].astype(str).str.contains("연계", na=False).sum())
             v = int(df_m[act_d_col].astype(str).str.contains("운영|방문|점검", na=False).sum())
             o_p, l_p, v_p = o * 90, l * 120, v * 30
-            total = o_p + l_p + v_p
+            total = min(2800, o_p + l_p + v_p)
             return {"개설건수": o, "연계건수": l, "운영건수": v, "합계포인트": total}
         except Exception:
             return empty
@@ -7845,7 +7845,7 @@ def show_dashboard():
             l = int(df_m[act_d_col].astype(str).str.contains("연계", na=False).sum())
             v = int(df_m[act_d_col].astype(str).str.contains("운영|방문|점검", na=False).sum())
             o_p, l_p, v_p = o * 90, l * 120, v * 30
-            total = o_p + l_p + v_p
+            total = min(2800, o_p + l_p + v_p)
             return {"개설건수": o, "연계건수": l, "운영건수": v, "개설포인트": o_p, "연계포인트": l_p, "운영포인트": v_p, "합계포인트": total}
         except Exception:
             return empty
