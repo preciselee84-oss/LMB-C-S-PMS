@@ -4005,29 +4005,40 @@ def show_all_staff_summary(staff_names):
             st.markdown("#### 본사이력 업로드 데이터")
         with add_history_col:
             if st.button("추가 이력 가져오기", use_container_width=True, key="admin_add_random_history"):
-                # 하나은행 구글 시트에서 랜덤 운영 이력 생성 (360건, 담당자별 최대 60건)
-                if hana_df is None or hana_df.empty:
-                    st.error("❌ 하나은행 활동이력 구글 시트를 먼저 불러와주세요.")
-                else:
-                    with st.spinner("하나은행 시트에서 운영 이력을 랜덤으로 생성 중..."):
-                        hana_clean = clean_header_logic(hana_df.copy())
+                # 하나지사 활동이력 구글 시트에서 랜덤 운영 이력 생성 (360건, 담당자별 최대 60건)
+                # url_analysis 시트 로드
+                activity_df = st.session_state.get("analysis_lookup_df")
+                if activity_df is None:
+                    try:
+                        with st.spinner("하나지사 활동이력 시트를 불러오는 중..."):
+                            load_csv_to_state("url_analysis", "analysis_lookup_df")
+                            activity_df = st.session_state.get("analysis_lookup_df")
+                    except Exception as e:
+                        st.error(f"❌ 하나지사 활동이력 구글 시트를 불러오지 못했습니다: {e}")
+                        activity_df = None
 
-                        # 디버깅: 하나은행 시트 컬럼명 출력
-                        st.write("🔍 하나은행 시트 컬럼명:", list(hana_clean.columns))
+                if activity_df is None or activity_df.empty:
+                    st.error("❌ 하나지사 활동이력 구글 시트를 먼저 불러와주세요.")
+                else:
+                    with st.spinner("하나지사 활동이력 시트에서 운영 이력을 랜덤으로 생성 중..."):
+                        activity_clean = clean_header_logic(activity_df.copy())
+
+                        # 디버깅: 하나지사 활동이력 시트 컬럼명 출력
+                        st.write("🔍 하나지사 활동이력 시트 컬럼명:", list(activity_clean.columns))
 
                         # 컬럼 찾기
-                        hana_detail_col = find_col(hana_clean, ["활동상세", "활동내용"])
-                        hana_owner_col = find_col(hana_clean, ["담당자", "등록자", "성명"])
-                        hana_date_col = find_col(hana_clean, ["활동일자", "일자", "날짜"])
+                        hana_detail_col = find_col(activity_clean, ["활동상세", "활동내용"])
+                        hana_owner_col = find_col(activity_clean, ["담당자", "등록자", "성명"])
+                        hana_date_col = find_col(activity_clean, ["활동일자", "일자", "날짜"])
 
                         st.write(f"🔍 찾은 컬럼: detail={hana_detail_col}, owner={hana_owner_col}, date={hana_date_col}")
 
                         if not hana_detail_col or not hana_owner_col:
-                            st.error("❌ 하나은행 시트에서 필수 컬럼(활동상세, 담당자)을 찾을 수 없습니다.")
+                            st.error("❌ 하나지사 활동이력 시트에서 필수 컬럼(활동상세, 담당자)을 찾을 수 없습니다.")
                         else:
                             # 활동상세가 "운영"인 데이터만 필터링
-                            operation_df = hana_clean[
-                                hana_clean[hana_detail_col].astype(str).str.contains("운영", na=False)
+                            operation_df = activity_clean[
+                                activity_clean[hana_detail_col].astype(str).str.contains("운영", na=False)
                             ].copy()
 
                             if operation_df.empty:
