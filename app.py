@@ -3683,6 +3683,46 @@ def show_all_staff_summary(staff_names):
         hide_index=True
     )
 
+    st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
+    dl_excel_col, dl_ppt_col, _ = st.columns([1, 1, 2])
+
+    admin_ym = ""
+    if isinstance(st.session_state.get("admin_uploaded_excel"), pd.DataFrame):
+        admin_ym = get_uploaded_month(st.session_state.admin_uploaded_excel)
+    year_month = admin_ym.replace("-", "") if admin_ym else (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
+    curr_month_label = f"{int(year_month[-2:])}월" if year_month[-2:].isdigit() else "당월"
+    adm_sel = st.session_state.get("adm_prev_month", "선택안함")
+    prev_month_label = str(int(adm_sel.split("-")[1])) + "월" if adm_sel and adm_sel != "선택안함" else "전월"
+    download_time = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m%d_%H%M%S")
+
+    with dl_excel_col:
+        if isinstance(st.session_state.get("admin_uploaded_excel"), pd.DataFrame) and not st.session_state.admin_uploaded_excel.empty:
+            excel_bytes = sample_format_excel_bytes(st.session_state.admin_uploaded_excel)
+            st.download_button(
+                "실적파일 엑셀 다운로드",
+                data=excel_bytes,
+                file_name=f"LMB월간 활동실적__{year_month}_{download_time}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+        else:
+            st.button("실적파일 엑셀 다운로드", use_container_width=True, disabled=True)
+
+    with dl_ppt_col:
+        try:
+            report_df_for_ppt = perf_df[display_cols].copy()
+            ppt_bytes = build_report_ppt_bytes(report_df_for_ppt, pd.DataFrame(), curr_month_label, prev_month_label)
+            st.download_button(
+                "실적보고서 PPT 다운로드",
+                data=ppt_bytes,
+                file_name=f"LMB활동실적보고서_{year_month}_하나지사.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                use_container_width=True,
+            )
+        except Exception as e:
+            st.button("실적보고서 PPT 다운로드", use_container_width=True, disabled=True)
+            st.caption(f"PPT 생성 준비 중 오류: {e}")
+
 
 def show_user_history(is_admin_mode=False):
     # 관리자 모드: 담당자 선택
