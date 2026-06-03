@@ -4946,7 +4946,18 @@ def show_staff_admin():
                     "outsource": "아니오",
                     "outsource_period": "해당없음",
                 }
-                save_db(DB_FILE, st.session_state.user_db)
+                # _deleted 목록 유지
+                _cur_file = {}
+                if os.path.exists(DB_FILE):
+                    try:
+                        with open(DB_FILE, "r", encoding="utf-8") as _f:
+                            _cur_file = json.load(_f)
+                    except Exception:
+                        pass
+                save_data = dict(st.session_state.user_db)
+                if "_deleted" in _cur_file:
+                    save_data["_deleted"] = _cur_file["_deleted"]
+                save_db(DB_FILE, save_data)
                 st.success(f"직원 '{name_str}({uid_str})'을(를) 추가했습니다.")
                 st.rerun()
 
