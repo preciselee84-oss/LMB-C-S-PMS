@@ -3885,10 +3885,8 @@ def show_all_staff_summary(staff_names):
             st.markdown("#### 본사이력 업로드 데이터")
         with add_history_col:
             if st.button("추가 이력 가져오기", use_container_width=True, key="admin_add_random_history"):
-                st.info("버튼 클릭됨 - 처리 시작...")
                 # 업로드한 데이터에서 담당자별 운영 활동을 60회 이하로 제한하여 가져오기
                 uploaded_excel = st.session_state.get("admin_uploaded_excel")
-                st.write(f"디버그: uploaded_excel type: {type(uploaded_excel)}")
                 if uploaded_excel is not None and isinstance(uploaded_excel, pd.DataFrame):
                     uploaded_data = st.session_state.get("admin_uploaded_excel")
                     uploaded_clean = clean_header_logic(uploaded_data.copy())
