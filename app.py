@@ -3396,6 +3396,7 @@ def show_all_staff_summary(staff_names):
             # 본사 구글시트와 하나은행 시트 데이터 새로고침
             st.session_state.cloud_sheet_df = None
             st.session_state.analysis_lookup_df = None
+            st.session_state.hana_sheet_df = None
             st.toast("데이터를 새로고침합니다.")
             st.rerun()
 
