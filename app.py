@@ -4105,10 +4105,12 @@ def show_all_staff_summary(staff_names):
 
                                     # 중복 제거 (담당자 + 일자 기준)
                                     if hana_date_col and hana_date_col in random_df.columns:
+                                        before_dedup = len(random_df)
                                         random_df = random_df.drop_duplicates(
                                             subset=[hana_owner_col, hana_date_col],
                                             keep='first'
                                         )
+                                        st.write(f"🔍 디버그: 중복 제거 전 {before_dedup}건 → 후 {len(random_df)}건")
 
                                     # 초과방문 체크 및 제거 (일자별 5회 이상)
                                     if hana_date_col and hana_date_col in random_df.columns:
@@ -4118,13 +4120,18 @@ def show_all_staff_summary(staff_names):
                                             count = daily_counts.get((row[hana_owner_col], row[hana_date_col]), 0)
                                             if count < 5:
                                                 valid_rows.append(row)
+                                        before_filter = len(random_df)
                                         random_df = pd.DataFrame(valid_rows)
+                                        st.write(f"🔍 디버그: 초과방문 제거 전 {before_filter}건 → 후 {len(random_df)}건")
 
                                     # 세션 스테이트에 저장
                                     st.session_state.admin_uploaded_excel = random_df
                                     st.session_state.admin_uploaded_excel_display = random_df
 
-                                    st.success(f"✅ 하나은행 시트에서 운영 이력 {len(random_df)}건을 랜덤으로 생성했습니다.")
+                                    st.write(f"🔍 디버그: 세션 스테이트 저장 완료")
+                                    st.write(f"🔍 디버그: admin_uploaded_excel 건수 = {len(st.session_state.admin_uploaded_excel)}")
+
+                                    st.success(f"✅ 하나지사 활동이력 시트에서 운영 이력 {len(random_df)}건을 랜덤으로 생성했습니다.")
                                     st.info(f"📊 담당자별 최대 60건, 일자는 2026년 5월 영업일")
                                     st.info("⏰ 10초 후 페이지가 자동으로 새로고침됩니다...")
                                     time.sleep(10)
