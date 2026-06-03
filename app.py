@@ -4113,17 +4113,16 @@ def show_all_staff_summary(staff_names):
                                         )
                                         st.write(f"🔍 디버그: 중복 제거 (담당자+일자+사업자번호) 전 {before_dedup}건 → 후 {len(random_df)}건")
 
-                                    # 초과방문 체크 및 제거 (일자별 5회 이상)
+                                    # 초과방문 제거 (일자별 최대 5회)
                                     if hana_date_col and hana_date_col in random_df.columns:
-                                        daily_counts = random_df.groupby([hana_owner_col, hana_date_col]).size()
-                                        valid_rows = []
-                                        for idx, row in random_df.iterrows():
-                                            count = daily_counts.get((row[hana_owner_col], row[hana_date_col]), 0)
-                                            if count < 5:
-                                                valid_rows.append(row)
                                         before_filter = len(random_df)
-                                        random_df = pd.DataFrame(valid_rows)
-                                        st.write(f"🔍 디버그: 초과방문 제거 전 {before_filter}건 → 후 {len(random_df)}건")
+                                        # 담당자 + 일자별로 그룹화하여 최대 5개씩만 유지
+                                        limited_rows = []
+                                        for (staff, date), group in random_df.groupby([hana_owner_col, hana_date_col]):
+                                            # 각 그룹에서 최대 5개까지만
+                                            limited_rows.append(group.head(5))
+                                        random_df = pd.concat(limited_rows, ignore_index=True) if limited_rows else pd.DataFrame()
+                                        st.write(f"🔍 디버그: 초과방문 제한 (일별 최대 5회) 전 {before_filter}건 → 후 {len(random_df)}건")
 
                                     # 세션 스테이트에 저장
                                     st.session_state.admin_uploaded_excel = random_df
