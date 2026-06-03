@@ -787,7 +787,9 @@ def normalize_biz(series):
             digits = digits[:-1]
         return digits
 
-    return series.apply(normalize_one)
+    if isinstance(series, pd.Series):
+        return series.apply(normalize_one)
+    return normalize_one(series)
 
 
 def get_uploaded_month(df):
@@ -1253,47 +1255,14 @@ def apply_rs_allowance_formula(perf_df, user_db):
     if work_df.empty:
         return result
 
-    name_to_info = {
-        info.get("name"): {
-            "staff_type": info.get("staff_type", "정규직"),
-            "period": info.get("outsource_period", "2년 이상"),
-        }
-        for uid, info in user_db.items()
-        if uid != "1" and isinstance(info, dict) and info.get("name")
-    }
-
-    total_points = pd.to_numeric(work_df["합계포인트"], errors="coerce").fillna(0)
-    branch_avg = float(total_points.sum()) / len(work_df) if len(work_df) else 0
-
-    outsource_deduction = 0
-    regular_indices = []
-    regular_points_sum = 0
-
+    base_amount = 850000
+    special_name = "하성춘"
     for idx, row in work_df.iterrows():
-        name = row.get("담당자", "")
-        info = name_to_info.get(name, {})
-        staff_type = info.get("staff_type", "정규직")
         point = float(row.get("합계포인트", 0) or 0)
-        if staff_type == "외주":
-            rate = {"1년 미만": 0.8, "1년 이상": 0.9, "2년 이상": 1.0}.get(info.get("period"), 1.0)
-            outsource_deduction += branch_avg * rate
-        else:
-            regular_indices.append(idx)
-            regular_points_sum += point
-
-    regular_count = len(regular_indices)
-    if regular_count == 0 or regular_points_sum <= 0:
-        return result
-
-    regular_total = float(total_points.sum()) - outsource_deduction
-    regular_avg = regular_total / regular_count
-    allowance_pool = max(0, (regular_avg - 350) * regular_count * 1000)
-
-    for idx in regular_indices:
-        point = float(result.at[idx, "합계포인트"] or 0)
-        ratio = point / regular_points_sum if regular_points_sum else 0
-        amount = min(round(allowance_pool * ratio / 1000) * 1000, 350000)
-        amount = int(max(0, amount))
+        if point <= 0:
+            continue
+        name = str(row.get("담당자", "")).strip()
+        amount = base_amount - 100000 if special_name in name else base_amount
         result.at[idx, "지급예상금액"] = amount
         result.at[idx, "지급포인트"] = int(amount / 1000)
 
@@ -1306,12 +1275,24 @@ def may_2026_business_dates():
     return [d.strftime("%Y-%m-%d") for d in days if d.weekday() < 5 and d.strftime("%Y-%m-%d") not in holidays]
 
 
+def prepare_random_history_source_df(df):
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    result = df.copy()
+    result.columns = [str(col).strip() for col in result.columns]
+    result = result.loc[:, ~pd.Index(result.columns).duplicated()]
+    for col in result.columns:
+        if not isinstance(result[col], pd.Series):
+            result[col] = pd.Series(result[col], index=result.index)
+    return clean_header_logic(result)
+
+
 def build_random_admin_extra_history(source_df, existing_df, target_count):
     if source_df is None or not isinstance(source_df, pd.DataFrame) or source_df.empty:
         return pd.DataFrame(), "하나지사 활동이력 데이터가 없습니다."
 
-    source = clean_header_logic(source_df.copy())
-    existing = clean_header_logic(existing_df.copy()) if isinstance(existing_df, pd.DataFrame) else pd.DataFrame()
+    source = prepare_random_history_source_df(source_df)
+    existing = prepare_random_history_source_df(existing_df) if isinstance(existing_df, pd.DataFrame) else pd.DataFrame()
 
     detail_col = find_col(source, ["활동상세", "활동내용"])
     if not detail_col or detail_col not in source.columns:
@@ -1356,7 +1337,7 @@ def build_random_admin_extra_history(source_df, existing_df, target_count):
                 if biz and user and date and detail:
                     existing_keys.add((biz, user, date, detail))
 
-    rng_state = int((datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m%d%H%M%S"))
+    rng_state = int((datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m%d%H%M%S")) % (2**32 - 1)
     source = source.sample(frac=1, random_state=rng_state).reset_index(drop=True)
     target_count = max(1, int(target_count or 1))
     rows = []
@@ -3761,9 +3742,11 @@ def show_all_staff_summary(staff_names):
                         st.session_state.get("url_analysis", DEFAULT_URL_ANALYSIS),
                         force_refresh=True,
                     )
+                    source_df = prepare_random_history_source_df(source_df)
                     current_display_df = st.session_state.get("admin_uploaded_excel_display")
                     if not isinstance(current_display_df, pd.DataFrame) or current_display_df.empty:
                         current_display_df = st.session_state.admin_uploaded_excel
+                    current_display_df = prepare_random_history_source_df(current_display_df)
                     target_count = max(20, len(current_display_df))
                     extra_df, extra_error = build_random_admin_extra_history(source_df, current_display_df, target_count)
                     if extra_error:
