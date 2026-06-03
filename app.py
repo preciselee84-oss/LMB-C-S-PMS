@@ -4274,7 +4274,31 @@ def show_all_staff_summary(staff_names):
             if not isinstance(excel_download_df, pd.DataFrame) or excel_download_df.empty:
                 excel_download_df = st.session_state.admin_uploaded_excel
             excel_download_df = prepare_display_dataframe(excel_download_df)
-            excel_bytes = dataframe_to_excel_bytes({"실적파일": excel_download_df})
+
+            # 개설고객사 데이터 (2026년 5월 개설 완료)
+            open_companies_df = pd.DataFrame()
+            if open_date_col and open_date_col in cloud_df.columns:
+                open_companies_df = cloud_df[
+                    cloud_df[open_date_col].notna() &
+                    (cloud_df[open_date_col].dt.strftime("%Y-%m") == target_year_month)
+                ].copy()
+
+            # 연계고객사 데이터 (2026년 5월 ERP 연계)
+            erp_companies_df = pd.DataFrame()
+            if erp_date_col and erp_date_col in cloud_df.columns:
+                erp_companies_df = cloud_df[
+                    cloud_df[erp_date_col].notna() &
+                    (cloud_df[erp_date_col].dt.strftime("%Y-%m") == target_year_month)
+                ].copy()
+
+            # 여러 시트로 엑셀 생성
+            excel_sheets = {"실적파일": excel_download_df}
+            if not open_companies_df.empty:
+                excel_sheets["개설고객사"] = open_companies_df
+            if not erp_companies_df.empty:
+                excel_sheets["연계고객사"] = erp_companies_df
+
+            excel_bytes = dataframe_to_excel_bytes(excel_sheets)
             st.download_button(
                 "실적파일 엑셀 다운로드",
                 data=excel_bytes,
