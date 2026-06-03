@@ -1243,9 +1243,9 @@ def calculate_manual_perf_total(edited_df):
     return int(total)
 
 
-def apply_rs_allowance_formula(perf_df, user_db):
+def apply_rs_allowance_formula(perf_df, user_db, return_debug=False):
     if perf_df is None or perf_df.empty or "합계포인트" not in perf_df.columns:
-        return perf_df
+        return (perf_df, {}) if return_debug else perf_df
 
     result = perf_df.copy()
     result["지급포인트"] = 0
@@ -1253,7 +1253,7 @@ def apply_rs_allowance_formula(perf_df, user_db):
 
     work_df = result[result["담당자"].astype(str) != "합계"].copy() if "담당자" in result.columns else result.copy()
     if work_df.empty:
-        return result
+        return (result, {}) if return_debug else result
 
     # 직원 정보 매핑 (이름 -> 정보)
     name_to_info = {}
@@ -1283,7 +1283,7 @@ def apply_rs_allowance_formula(perf_df, user_db):
                     regular_staff.append((idx, row, staff_info))
 
     if not cs_staff:
-        return result
+        return (result, {}) if return_debug else result
 
     # BU 평균 계산 (C&S 전체 합산포인트 / C&S 인원)
     total_bu_points = sum(int(float(row.get("합계포인트", 0) or 0)) for _, row, _ in cs_staff)
@@ -1312,8 +1312,20 @@ def apply_rs_allowance_formula(perf_df, user_db):
     regular_count = len(regular_staff)
     outsource_point_per_regular = outsource_total_points / regular_count if regular_count > 0 else 0
 
-    # 팀장수당 (팀장은 200포인트 추가)
-    team_leader_bonus = 200
+    # 팀장수당 (팀장은 213포인트 추가)
+    team_leader_bonus = 213
+
+    # 디버깅 정보
+    debug_info = {
+        "BU합산": total_bu_points,
+        "BU인원": bu_count,
+        "BU평균": bu_average,
+        "외주직원수": len(outsource_staff),
+        "일반직원수": regular_count,
+        "외주가감총합": outsource_total_points,
+        "일반직원1인당분배": outsource_point_per_regular,
+        "팀장수당": team_leader_bonus
+    }
 
     # 최종 지급액 계산
     for idx, row, staff_info in cs_staff:
@@ -1343,6 +1355,8 @@ def apply_rs_allowance_formula(perf_df, user_db):
         result.at[idx, "지급포인트"] = final_pay_point
         result.at[idx, "지급예상금액"] = int(final_pay_point * 500)
 
+    if return_debug:
+        return result, debug_info
     return result
 
 
@@ -3589,7 +3603,34 @@ def show_all_staff_summary(staff_names):
 
     # DataFrame 생성
     perf_df = pd.DataFrame(performance_data)
-    perf_df = apply_rs_allowance_formula(perf_df, user_db)
+    perf_df, debug_info = apply_rs_allowance_formula(perf_df, user_db, return_debug=True)
+
+    # 디버깅 정보 표시
+    st.markdown("---")
+    st.markdown("### 🔍 계산 디버깅 정보")
+
+    if debug_info:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("BU 합산포인트", f"{debug_info['BU합산']:,}")
+            st.metric("BU 평균", f"{debug_info['BU평균']:.2f}")
+        with col2:
+            st.metric("BU 인원", f"{debug_info['BU인원']}명")
+            st.metric("외주직원 수", f"{debug_info['외주직원수']}명")
+        with col3:
+            st.metric("일반직원 수", f"{debug_info['일반직원수']}명")
+            st.metric("팀장수당", f"{debug_info['팀장수당']}pt")
+
+        st.divider()
+        col4, col5 = st.columns(2)
+        with col4:
+            st.metric("외주가감 총합", f"{debug_info['외주가감총합']:.2f}pt")
+        with col5:
+            st.metric("일반직원 1인당 분배", f"{debug_info['일반직원1인당분배']:.2f}pt")
+    else:
+        st.warning("디버깅 정보가 없습니다.")
+
+    st.markdown("---")
 
     # 직급 순서 정의 및 정렬용 컬럼 추가
     rank_order = {"부서장": 0, "팀장": 1, "과장": 2, "대리": 3, "주임": 4, "직원": 5}
