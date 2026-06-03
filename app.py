@@ -3409,6 +3409,68 @@ def show_all_staff_summary(staff_names):
             st.toast("데이터를 새로고침합니다.")
             st.rerun()
 
+    # 엑셀 파일 업로드 기능
+    st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
+    st.markdown("#### 📤 엑셀 파일 업로드")
+
+    col1, col_convert, col_upload, col_sample, _ = st.columns([1, 1, 1, 1, 2])
+    with col1:
+        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>은행 이력 업로드</div>", unsafe_allow_html=True)
+        history_file = st.file_uploader("은행 이력 업로드", type=["xls", "xlsx"], key="admin_history_upload", label_visibility="collapsed")
+        st.caption("은행에서 반출해준 이력파일 그대로 업로드 해주세요.")
+
+    with col_convert:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        if history_file is not None:
+            try:
+                with st.spinner("은행 이력을 샘플 양식으로 변환 중입니다."):
+                    history_df = read_excel_history_file(history_file)
+                    # 관리자 모드에서는 담당자명이 없으므로 빈 문자열 사용
+                    converted_df, convert_info = convert_history_to_sample_df(history_df, "")
+                if converted_df.empty:
+                    st.button("변환파일 다운로드", use_container_width=True, disabled=True)
+                    st.warning(convert_info.get("error", "변환할 데이터가 없습니다."))
+                else:
+                    converted_df = normalize_converted_history_df(converted_df)
+                    converted_bytes = sample_format_excel_bytes(converted_df)
+                    converted_ym = get_uploaded_month(converted_df).replace("-", "") or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
+                    st.download_button(
+                        "변환파일 다운로드",
+                        data=converted_bytes,
+                        file_name=f"LMB월간 활동실적_{converted_ym}_관리자.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                    )
+                    unmatched = int(convert_info.get("unmatched", 0))
+                    if unmatched:
+                        st.caption(f"고객번호 매핑 실패 {unmatched}건은 사업자번호가 공란으로 저장됩니다.")
+            except ImportError:
+                st.button("변환파일 다운로드", use_container_width=True, disabled=True)
+                st.error("xls 파일 변환을 위해 xlrd 패키지가 필요합니다.")
+            except Exception as e:
+                st.button("변환파일 다운로드", use_container_width=True, disabled=True)
+                st.error(f"은행 이력 업로드 실패: {e}")
+        else:
+            st.button("변환파일 다운로드", use_container_width=True, disabled=True)
+
+    with col_upload:
+        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>본사이력 업로드 (선택)</div>", unsafe_allow_html=True)
+        u_file = st.file_uploader("본사이력 업로드 (선택)", type=["xlsx"], key="admin_office_upload", label_visibility="collapsed")
+
+    with col_sample:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        if os.path.exists(EXCEL_SAMPLE_FILE):
+            with open(EXCEL_SAMPLE_FILE, "rb") as sample_file:
+                st.download_button(
+                    "샘플파일 다운로드",
+                    data=sample_file.read(),
+                    file_name="LMB월간 활동실적_000000(샘플).xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+        else:
+            st.button("샘플파일 다운로드", use_container_width=True, disabled=True)
+
 
 def show_user_history(is_admin_mode=False):
     # 관리자 모드: 담당자 선택
