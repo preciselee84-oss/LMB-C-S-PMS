@@ -3062,7 +3062,7 @@ def show_user_history(is_admin_mode=False):
         user_db = load_db(DB_FILE, {})
         staff_names = []
         for uid, user_info in user_db.items():
-            if uid != "1" and user_info.get("name"):
+            if uid != "1" and isinstance(user_info, dict) and user_info.get("name"):
                 staff_names.append(user_info.get("name"))
 
         staff_names = sorted(staff_names)
