@@ -3095,10 +3095,26 @@ def show_all_staff_summary(staff_names):
     owner_col = find_col(cloud_df, ["담당자", "등록자", "성명"])
     open_date_col = find_col(cloud_df, ["개설완료일자", "개설일"])
     erp_date_col = find_col(cloud_df, ["ERP연계일자", "연계일자"])
+    biz_num_col = find_col(cloud_df, ["사업자번호", "사업자등록번호"])
+    company_col = find_col(cloud_df, ["고객명", "업체명", "상호"])
 
     if not owner_col or owner_col not in cloud_df.columns:
         st.warning("본사 시트에서 담당자 컬럼을 찾을 수 없습니다.")
         return
+
+    # 디버그: 특정 사업자번호 검색
+    search_biz_nums = ["2298603470", "8898704171"]
+    if biz_num_col and biz_num_col in cloud_df.columns:
+        with st.expander("🔍 특정 사업자번호 검색 결과"):
+            for search_num in search_biz_nums:
+                matched = cloud_df[cloud_df[biz_num_col].astype(str).str.contains(search_num, na=False)]
+                if not matched.empty:
+                    st.write(f"**사업자번호: {search_num}**")
+                    display_cols = [biz_num_col, owner_col, open_date_col, company_col]
+                    display_cols = [col for col in display_cols if col and col in matched.columns]
+                    st.dataframe(matched[display_cols])
+                else:
+                    st.write(f"**사업자번호: {search_num}** - 데이터 없음")
 
     # 날짜 컬럼 변환
     if open_date_col and open_date_col in cloud_df.columns:
