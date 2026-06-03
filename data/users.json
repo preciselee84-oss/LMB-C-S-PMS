@@ -34,17 +34,6 @@
         "outsource_period": "해당없음",
         "rank": "대리"
     },
-    "gilmj": {
-        "pw": "1111",
-        "name": "길민종",
-        "email": "",
-        "access": "허용",
-        "role": "사용자",
-        "dept_type": "사업부",
-        "staff_type": "정규직",
-        "outsource": "아니오",
-        "outsource_period": "해당없음"
-    },
     "maengks": {
         "pw": "1111",
         "name": "맹국성",
@@ -118,6 +107,7 @@
     },
     "_deleted": [
         "kangkt",
+        "gilmj",
         "iminjee"
     ]
 }
