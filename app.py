@@ -3088,6 +3088,18 @@ def show_all_staff_summary(staff_names):
 
     analysis_df = st.session_state.get("analysis_lookup_df")
 
+    # 디버그: 사용 중인 URL 및 데이터 확인
+    with st.expander("🔍 데이터 소스 확인"):
+        url_sync = st.session_state.get("url_sync", DEFAULT_URL_SYNC)
+        url_analysis = st.session_state.get("url_analysis", DEFAULT_URL_ANALYSIS)
+        st.write("**본사 구글시트 URL (url_sync):**")
+        st.code(url_sync)
+        st.write("**하나은행 활동 이력 URL (url_analysis):**")
+        st.code(url_analysis)
+        st.write("**본사 구글시트 컬럼 목록:**")
+        st.write(list(cloud_df.columns))
+        st.write(f"**본사 구글시트 데이터 건수:** {len(cloud_df)}")
+
     # 데이터 정리
     cloud_df = clean_header_logic(cloud_df.copy())
 
