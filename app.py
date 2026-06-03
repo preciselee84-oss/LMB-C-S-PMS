@@ -3182,24 +3182,24 @@ def show_all_staff_summary(staff_names):
                 staff_cloud_df[erp_date_col].dt.strftime("%Y-%m") == target_year_month
             ])
 
-        # 운영 실적: 하나은행 활동 이력에서 계산
+        # 운영 실적: 현재는 카운트하지 않음
         operation_count = 0
         operation_points = 0
 
-        if analysis_df is not None and not analysis_df.empty:
-            analysis_clean = clean_header_logic(analysis_df.copy())
-            u_col = find_col(analysis_clean, ["등록자", "담당자", "성명"])
-            d_col = find_col(analysis_clean, ["활동상세", "활동내용"])
-
-            if u_col and u_col in analysis_clean.columns:
-                staff_activity = analysis_clean[analysis_clean[u_col] == staff_name].copy()
-
-                if d_col and d_col in staff_activity.columns:
-                    # 운영 활동 카운트
-                    operation_count = len(staff_activity[
-                        staff_activity[d_col].astype(str).str.contains("운영", na=False)
-                    ])
-                    operation_points = operation_count * 30  # 운영 1건당 30포인트
+        # if analysis_df is not None and not analysis_df.empty:
+        #     analysis_clean = clean_header_logic(analysis_df.copy())
+        #     u_col = find_col(analysis_clean, ["등록자", "담당자", "성명"])
+        #     d_col = find_col(analysis_clean, ["활동상세", "활동내용"])
+        #
+        #     if u_col and u_col in analysis_clean.columns:
+        #         staff_activity = analysis_clean[analysis_clean[u_col] == staff_name].copy()
+        #
+        #         if d_col and d_col in staff_activity.columns:
+        #             # 운영 활동 카운트
+        #             operation_count = len(staff_activity[
+        #                 staff_activity[d_col].astype(str).str.contains("운영", na=False)
+        #             ])
+        #             operation_points = operation_count * 30  # 운영 1건당 30포인트
 
         # 포인트 계산
         open_points = open_count * 100  # 개설 1건당 100포인트
