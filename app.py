@@ -3226,18 +3226,6 @@ def show_all_staff_summary(staff_names):
             u_col = find_col(analysis_clean, ["등록자", "담당자", "성명"])
             d_col = find_col(analysis_clean, ["활동상세", "활동내용"])
 
-            # 디버그: 첫 번째 직원에 대해 업로드 데이터 확인
-            if staff_name == staff_names[0] if staff_names else None:
-                with st.expander(f"🔍 업로드 데이터 확인 ({staff_name})"):
-                    st.write(f"업로드 데이터 건수: {len(analysis_clean)}")
-                    st.write(f"담당자 컬럼명: {u_col}")
-                    st.write(f"활동상세 컬럼명: {d_col}")
-                    if u_col and u_col in analysis_clean.columns:
-                        unique_users = analysis_clean[u_col].unique()
-                        st.write(f"업로드 데이터의 담당자 목록: {list(unique_users)}")
-                    st.write("데이터 샘플:")
-                    st.dataframe(analysis_clean.head(5))
-
             if u_col and u_col in analysis_clean.columns:
                 staff_activity = analysis_clean[analysis_clean[u_col] == staff_name].copy()
 
@@ -3419,6 +3407,23 @@ def show_all_staff_summary(staff_names):
     # 엑셀 파일 업로드 기능
     st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
     st.markdown("#### 📤 엑셀 파일 업로드")
+
+    # 업로드된 데이터 확인
+    if st.session_state.get("admin_uploaded_excel") is not None:
+        uploaded_data = st.session_state.get("admin_uploaded_excel")
+        with st.expander("🔍 업로드된 데이터 확인", expanded=False):
+            st.write(f"**업로드 데이터 건수:** {len(uploaded_data)}")
+            if not uploaded_data.empty:
+                analysis_clean = clean_header_logic(uploaded_data.copy())
+                u_col = find_col(analysis_clean, ["등록자", "담당자", "성명"])
+                d_col = find_col(analysis_clean, ["활동상세", "활동내용"])
+                st.write(f"**담당자 컬럼명:** {u_col}")
+                st.write(f"**활동상세 컬럼명:** {d_col}")
+                if u_col and u_col in analysis_clean.columns:
+                    unique_users = analysis_clean[u_col].unique()
+                    st.write(f"**담당자 목록:** {list(unique_users)}")
+                st.write("**데이터 샘플:**")
+                st.dataframe(uploaded_data.head(10))
 
     col1, col_convert, col_upload, col_sample, _ = st.columns([1, 1, 1, 1, 2])
     with col1:
