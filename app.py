@@ -3116,60 +3116,74 @@ def show_all_staff_summary(staff_names):
         hana_clean = clean_header_logic(hana_df.copy())
         hana_biz_col = find_col(hana_clean, ["사업자번호", "사업자등록번호"])
         hana_company_col = find_col(hana_clean, ["고객명", "업체명", "상호"])
-        hana_open_col = find_col(hana_clean, ["개설완료일자", "개설일", "개설/이행일"])
-        hana_erp_col = find_col(hana_clean, ["연계완료일자", "연계청구일자", "ERP연계일자"])
+        hana_open_status_col = find_col(hana_clean, ["개설상태"])
+        hana_erp_status_col = find_col(hana_clean, ["연계상태", "ERP연계상태"])
         hana_owner_col = find_col(hana_clean, ["담당자", "등록자"])
+
+        cloud_status_col = find_col(cloud_df, ["상태"])
 
         missing_open = []
         missing_erp = []
 
         if hana_biz_col and biz_num_col:
-            # 개설완료일자 누락 확인
-            if hana_open_col:
-                hana_with_open = hana_clean[hana_clean[hana_open_col].notna()].copy()
-                for _, row in hana_with_open.iterrows():
+            # 개설상태가 "개설완료"인데 본사 시트 상태가 "완료"가 아닌 경우
+            if hana_open_status_col:
+                hana_open_completed = hana_clean[
+                    hana_clean[hana_open_status_col].astype(str).str.contains("개설완료", na=False)
+                ].copy()
+                for _, row in hana_open_completed.iterrows():
                     biz_num = str(row.get(hana_biz_col, "")).strip()
                     if not biz_num:
                         continue
                     # 본사 시트에서 해당 사업자번호 찾기
                     cloud_match = cloud_df[cloud_df[biz_num_col].astype(str).str.contains(biz_num, na=False, regex=False)]
-                    if cloud_match.empty or cloud_match[open_date_col].isna().all():
-                        missing_open.append({
-                            "사업자번호": biz_num,
-                            "고객명": row.get(hana_company_col, ""),
-                            "담당자": row.get(hana_owner_col, ""),
-                            "은행시트_개설일": row.get(hana_open_col, "")
-                        })
+                    if not cloud_match.empty:
+                        # 상태가 "완료"가 아닌 경우
+                        if cloud_status_col and cloud_status_col in cloud_match.columns:
+                            cloud_status = cloud_match[cloud_status_col].astype(str).str.strip()
+                            if not cloud_status.str.contains("완료", na=False).any():
+                                missing_open.append({
+                                    "사업자번호": biz_num,
+                                    "고객명": row.get(hana_company_col, ""),
+                                    "담당자": row.get(hana_owner_col, ""),
+                                    "은행시트_개설상태": row.get(hana_open_status_col, ""),
+                                    "본사시트_상태": cloud_match[cloud_status_col].iloc[0] if not cloud_match.empty else ""
+                                })
 
-            # ERP연계일자 누락 확인
-            if hana_erp_col:
-                hana_with_erp = hana_clean[hana_clean[hana_erp_col].notna()].copy()
-                for _, row in hana_with_erp.iterrows():
+            # 연계상태가 "연계완료" 또는 "청구완료"인데 본사 시트 ERP연계일자가 없는 경우
+            if hana_erp_status_col:
+                hana_erp_completed = hana_clean[
+                    hana_clean[hana_erp_status_col].astype(str).str.contains("연계완료|청구완료", na=False, regex=True)
+                ].copy()
+                for _, row in hana_erp_completed.iterrows():
                     biz_num = str(row.get(hana_biz_col, "")).strip()
                     if not biz_num:
                         continue
                     # 본사 시트에서 해당 사업자번호 찾기
                     cloud_match = cloud_df[cloud_df[biz_num_col].astype(str).str.contains(biz_num, na=False, regex=False)]
-                    if cloud_match.empty or cloud_match[erp_date_col].isna().all():
-                        missing_erp.append({
-                            "사업자번호": biz_num,
-                            "고객명": row.get(hana_company_col, ""),
-                            "담당자": row.get(hana_owner_col, ""),
-                            "은행시트_연계일": row.get(hana_erp_col, "")
-                        })
+                    if not cloud_match.empty:
+                        # ERP연계일자가 없는 경우
+                        if erp_date_col and erp_date_col in cloud_match.columns:
+                            if cloud_match[erp_date_col].isna().all():
+                                missing_erp.append({
+                                    "사업자번호": biz_num,
+                                    "고객명": row.get(hana_company_col, ""),
+                                    "담당자": row.get(hana_owner_col, ""),
+                                    "은행시트_연계상태": row.get(hana_erp_status_col, "")
+                                })
 
         # 누락 데이터 표시
         if missing_open or missing_erp:
             with st.expander("⚠️ 본사 시트 누락 데이터", expanded=False):
                 if missing_open:
-                    st.markdown("#### 개설완료일자 누락")
-                    st.write(f"은행 시트에는 개설완료일자가 있으나 본사 시트에 없는 고객사: **{len(missing_open)}건**")
+                    st.markdown("#### 개설 상태 불일치")
+                    st.write(f"은행 시트는 개설완료이나 본사 시트 상태가 완료가 아닌 고객사: **{len(missing_open)}건**")
                     st.dataframe(pd.DataFrame(missing_open), use_container_width=True)
                     st.markdown("---")
 
                 if missing_erp:
                     st.markdown("#### ERP연계일자 누락")
-                    st.write(f"은행 시트에는 연계일자가 있으나 본사 시트에 없는 고객사: **{len(missing_erp)}건**")
+                    st.write(f"은행 시트는 연계완료/청구완료이나 본사 시트에 ERP연계일자가 없는 고객사: **{len(missing_erp)}건**")
                     st.dataframe(pd.DataFrame(missing_erp), use_container_width=True)
 
     # 날짜 컬럼 변환
