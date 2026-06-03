@@ -3216,9 +3216,18 @@ def show_all_staff_summary(staff_names):
         # 연계건수: 2026년 5월 ERP연계일자 카운트
         erp_count = 0
         if erp_date_col and erp_date_col in staff_cloud_df.columns:
-            erp_count = len(staff_cloud_df[
+            may_erp_data = staff_cloud_df[
                 staff_cloud_df[erp_date_col].dt.strftime("%Y-%m") == target_year_month
-            ])
+            ]
+            erp_count = len(may_erp_data)
+
+            # 디버그: 전준수 직원의 연계 데이터 확인
+            if staff_name == "전준수" and not may_erp_data.empty:
+                with st.expander(f"🔍 {staff_name} 2026-05 연계 데이터"):
+                    st.write(f"연계건수: {erp_count}")
+                    display_cols = [company_col, biz_num_col, erp_date_col]
+                    display_cols = [col for col in display_cols if col and col in may_erp_data.columns]
+                    st.dataframe(may_erp_data[display_cols])
 
         # 운영 실적: 현재는 카운트하지 않음
         operation_count = 0
