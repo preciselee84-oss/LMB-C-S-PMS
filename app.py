@@ -4005,64 +4005,110 @@ def show_all_staff_summary(staff_names):
             st.markdown("#### 본사이력 업로드 데이터")
         with add_history_col:
             if st.button("추가 이력 가져오기", use_container_width=True, key="admin_add_random_history"):
-                # 업로드한 데이터에서 담당자별 운영 활동을 60회 이하로 제한하여 가져오기
-                uploaded_excel = st.session_state.get("admin_uploaded_excel")
-
-                st.write(f"🔍 디버그: uploaded_excel 타입 = {type(uploaded_excel)}")
-                if uploaded_excel is not None:
-                    st.write(f"🔍 디버그: 데이터 건수 = {len(uploaded_excel) if isinstance(uploaded_excel, pd.DataFrame) else 'N/A'}")
-
-                if uploaded_excel is not None and isinstance(uploaded_excel, pd.DataFrame):
-                    uploaded_data = st.session_state.get("admin_uploaded_excel")
-                    uploaded_clean = clean_header_logic(uploaded_data.copy())
-                    u_col = find_col(uploaded_clean, ["등록자", "담당자", "성명"])
-                    d_col = find_col(uploaded_clean, ["활동상세", "활동내용"])
-                    category_col = find_col(uploaded_clean, ["활동구분", "접수유형"])
-
-                    st.write(f"🔍 디버그: u_col={u_col}, d_col={d_col}, category_col={category_col}")
-
-                    # 운영 활동만 필터링
-                    if u_col and u_col in uploaded_clean.columns:
-                        if category_col and category_col in uploaded_clean.columns:
-                            operation_all = uploaded_clean[
-                                uploaded_clean[category_col].astype(str).str.contains("방문|원격", na=False)
-                            ].copy()
-                            st.write(f"🔍 디버그: category_col 사용, 운영 활동 {len(operation_all)}건")
-                        elif d_col and d_col in uploaded_clean.columns:
-                            operation_all = uploaded_clean[
-                                uploaded_clean[d_col].astype(str).str.contains("운영|방문|점검", na=False)
-                            ].copy()
-                            st.write(f"🔍 디버그: d_col 사용, 운영 활동 {len(operation_all)}건")
-                        else:
-                            operation_all = pd.DataFrame()
-                            st.warning("활동구분 또는 활동상세 컬럼을 찾을 수 없습니다.")
-
-                        if not operation_all.empty:
-                            # 담당자별로 60회 제한하면서 데이터 수집
-                            filtered_rows = []
-                            for staff_name in operation_all[u_col].unique():
-                                staff_data = operation_all[operation_all[u_col] == staff_name].copy()
-                                # 60회로 제한
-                                limited_data = staff_data.head(60)
-                                filtered_rows.append(limited_data)
-
-                            limited_df = pd.concat(filtered_rows, ignore_index=True)
-
-                            # 실적 계산에서 사용할 데이터 건수 표시
-                            total_count = len(limited_df)
-                            st.session_state.admin_uploaded_excel = limited_df
-                            st.session_state.admin_uploaded_excel_display = limited_df
-                            st.success(f"✅ 운영 활동을 담당자별 60회로 제한하여 가져왔습니다.")
-                            st.info(f"📊 총 {total_count}건 (담당자별 최대 60회)")
-                            st.info("⏰ 10초 후 페이지가 자동으로 새로고침됩니다...")
-                            time.sleep(10)
-                            st.rerun()
-                        else:
-                            st.warning("⚠️ 운영 활동 데이터가 없습니다.")
-                    else:
-                        st.error("❌ 담당자 컬럼을 찾을 수 없습니다.")
+                # 하나은행 구글 시트에서 랜덤 운영 이력 생성 (360건, 담당자별 최대 60건)
+                if hana_df is None or hana_df.empty:
+                    st.error("❌ 하나은행 활동이력 구글 시트를 먼저 불러와주세요.")
                 else:
-                    st.warning("⚠️ admin_uploaded_excel이 비어있습니다. 먼저 파일을 업로드해주세요.")
+                    with st.spinner("하나은행 시트에서 운영 이력을 랜덤으로 생성 중..."):
+                        hana_clean = clean_header_logic(hana_df.copy())
+
+                        # 컬럼 찾기
+                        hana_detail_col = find_col(hana_clean, ["활동상세", "활동내용"])
+                        hana_owner_col = find_col(hana_clean, ["담당자", "등록자", "성명"])
+                        hana_date_col = find_col(hana_clean, ["활동일자", "일자", "날짜"])
+
+                        if not hana_detail_col or not hana_owner_col:
+                            st.error("❌ 하나은행 시트에서 필수 컬럼(활동상세, 담당자)을 찾을 수 없습니다.")
+                        else:
+                            # 활동상세가 "운영"인 데이터만 필터링
+                            operation_df = hana_clean[
+                                hana_clean[hana_detail_col].astype(str).str.contains("운영", na=False)
+                            ].copy()
+
+                            if operation_df.empty:
+                                st.warning("⚠️ 하나은행 시트에 '운영' 활동 데이터가 없습니다.")
+                            else:
+                                # 2026년 5월 영업일 생성 (휴일/공휴일 제외)
+                                import numpy as np
+                                from datetime import datetime, timedelta
+
+                                may_2026_days = []
+                                for day in range(1, 32):
+                                    try:
+                                        date_obj = datetime(2026, 5, day)
+                                        # 토요일(5), 일요일(6) 제외
+                                        if date_obj.weekday() < 5:
+                                            may_2026_days.append(date_obj.strftime("%Y-%m-%d"))
+                                    except:
+                                        pass
+
+                                # C&S 직원 목록
+                                staff_list = staff_names.copy()
+
+                                # 담당자별로 최대 60건씩, 총 360건 생성
+                                target_total = 360
+                                target_per_staff = 60
+
+                                generated_rows = []
+                                staff_count = {}
+
+                                # 랜덤하게 데이터 생성
+                                for _ in range(target_total * 2):  # 여유있게 생성
+                                    if len(generated_rows) >= target_total:
+                                        break
+
+                                    # 랜덤 담당자 선택
+                                    staff = np.random.choice(staff_list)
+
+                                    # 담당자별 60건 제한 체크
+                                    if staff_count.get(staff, 0) >= target_per_staff:
+                                        continue
+
+                                    # 랜덤 데이터 선택
+                                    random_row = operation_df.sample(n=1).iloc[0].copy()
+
+                                    # 담당자 변경
+                                    random_row[hana_owner_col] = staff
+
+                                    # 랜덤 일자 할당 (2026년 5월 영업일)
+                                    random_date = np.random.choice(may_2026_days)
+                                    if hana_date_col and hana_date_col in random_row.index:
+                                        random_row[hana_date_col] = random_date
+
+                                    generated_rows.append(random_row)
+                                    staff_count[staff] = staff_count.get(staff, 0) + 1
+
+                                if generated_rows:
+                                    random_df = pd.DataFrame(generated_rows)
+
+                                    # 중복 제거 (담당자 + 일자 기준)
+                                    if hana_date_col and hana_date_col in random_df.columns:
+                                        random_df = random_df.drop_duplicates(
+                                            subset=[hana_owner_col, hana_date_col],
+                                            keep='first'
+                                        )
+
+                                    # 초과방문 체크 및 제거 (일자별 5회 이상)
+                                    if hana_date_col and hana_date_col in random_df.columns:
+                                        daily_counts = random_df.groupby([hana_owner_col, hana_date_col]).size()
+                                        valid_rows = []
+                                        for idx, row in random_df.iterrows():
+                                            count = daily_counts.get((row[hana_owner_col], row[hana_date_col]), 0)
+                                            if count < 5:
+                                                valid_rows.append(row)
+                                        random_df = pd.DataFrame(valid_rows)
+
+                                    # 세션 스테이트에 저장
+                                    st.session_state.admin_uploaded_excel = random_df
+                                    st.session_state.admin_uploaded_excel_display = random_df
+
+                                    st.success(f"✅ 하나은행 시트에서 운영 이력 {len(random_df)}건을 랜덤으로 생성했습니다.")
+                                    st.info(f"📊 담당자별 최대 60건, 일자는 2026년 5월 영업일")
+                                    st.info("⏰ 10초 후 페이지가 자동으로 새로고침됩니다...")
+                                    time.sleep(10)
+                                    st.rerun()
+                                else:
+                                    st.warning("⚠️ 생성된 데이터가 없습니다.")
             st.caption("💡 담당자별 운영 활동을 60회로 제한하여 가져옵니다.")
         st.caption(f"업로드 데이터 건수: {len(admin_uploaded_df):,}건")
         st.dataframe(admin_uploaded_df, use_container_width=True, hide_index=True)
