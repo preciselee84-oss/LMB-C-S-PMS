@@ -3461,13 +3461,17 @@ def show_all_staff_summary(staff_names):
                     category_text = staff_activity[category_col].astype(str)
                     visit_count = int(category_text.str.contains("방문", na=False).sum())
                     remote_count = int(category_text.str.contains("원격", na=False).sum())
-                    operation_count = visit_count + remote_count
-                    operation_points = (visit_count * 30) + (remote_count * 10)
+                    operation_count_raw = visit_count + remote_count
+                    # 운영건수는 최대 60회까지만 카운트
+                    operation_count = min(60, operation_count_raw)
+                    operation_points = (min(60, visit_count) * 30) + (min(60 - min(60, visit_count), remote_count) * 10)
                 elif d_col and d_col in staff_activity.columns:
                     # 활동구분이 없으면 기존처럼 활동상세 기준으로 운영 실적을 계산한다.
-                    operation_count = int(
+                    operation_count_raw = int(
                         staff_activity[d_col].astype(str).str.contains("운영|방문|점검", na=False).sum()
                     )
+                    # 운영건수는 최대 60회까지만 카운트
+                    operation_count = min(60, operation_count_raw)
                     operation_points = operation_count * 30
 
         # 포인트 계산
@@ -3687,8 +3691,28 @@ def show_all_staff_summary(staff_names):
                     over_visit[company_col] = over_visit[biz_col].map(company_map)
                     over_visit_df = over_visit[[company_col, biz_col, u_col, date_col, "일방문", "월총방문"]].rename(columns={date_col: "초과일자"})
 
+            # 운영 60회 초과 체크
+            over_operation_df = pd.DataFrame()
+            if u_col:
+                category_col = find_col(uploaded_clean, ["활동구분", "접수유형"])
+                if category_col and category_col in uploaded_clean.columns:
+                    # 활동구분 기준
+                    operation_count_by_user = uploaded_clean.groupby(u_col).apply(
+                        lambda x: int(x[category_col].astype(str).str.contains("방문|원격", na=False).sum())
+                    ).reset_index(name="운영건수")
+                elif d_col and d_col in uploaded_clean.columns:
+                    # 활동상세 기준
+                    operation_count_by_user = uploaded_clean.groupby(u_col).apply(
+                        lambda x: int(x[d_col].astype(str).str.contains("운영|방문|점검", na=False).sum())
+                    ).reset_index(name="운영건수")
+                else:
+                    operation_count_by_user = pd.DataFrame()
+
+                if not operation_count_by_user.empty:
+                    over_operation_df = operation_count_by_user[operation_count_by_user["운영건수"] > 60]
+
             # 결과 표시
-            tabs = st.tabs(["중복 이력", "초과 방문"])
+            tabs = st.tabs(["중복 이력", "초과 방문", "운영 60회 초과"])
             with tabs[0]:
                 if not dup_df.empty:
                     st.warning(f"⚠️ 중복 이력 {len(dup_df)}건 발견")
@@ -3702,6 +3726,14 @@ def show_all_staff_summary(staff_names):
                     st.dataframe(over_visit_df, use_container_width=True, hide_index=True)
                 else:
                     st.success("✅ 초과 방문이 없습니다.")
+
+            with tabs[2]:
+                if not over_operation_df.empty:
+                    st.warning(f"⚠️ 운영 60회 초과 {len(over_operation_df)}명 발견")
+                    st.info("💡 운영건수는 최대 60회까지만 실적에 반영됩니다.")
+                    st.dataframe(over_operation_df, use_container_width=True, hide_index=True)
+                else:
+                    st.success("✅ 운영 60회 초과 담당자가 없습니다.")
 
     col1, col_convert, col_upload, col_sample, _ = st.columns([1, 1, 1, 1, 2])
     with col1:
