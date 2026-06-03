@@ -3119,12 +3119,33 @@ def show_all_staff_summary(staff_names):
         # 본사 시트에서 담당자 데이터 필터링
         staff_cloud_df = cloud_df[cloud_df[owner_col] == staff_name].copy()
 
+        # 디버그: 이성환 직원의 데이터 확인
+        if staff_name == "이성환":
+            with st.expander(f"🔍 {staff_name} 디버그 정보"):
+                st.write(f"담당자 컬럼: {owner_col}")
+                st.write(f"개설완료일자 컬럼: {open_date_col}")
+                st.write(f"ERP연계일자 컬럼: {erp_date_col}")
+                st.write(f"총 데이터 건수: {len(staff_cloud_df)}")
+                if not staff_cloud_df.empty:
+                    st.write("데이터 샘플:")
+                    if open_date_col in staff_cloud_df.columns:
+                        st.dataframe(staff_cloud_df[[owner_col, open_date_col]].head(10))
+                    else:
+                        st.dataframe(staff_cloud_df.head(10))
+
         # 개설건수: 2026년 5월 개설완료일자 카운트
         open_count = 0
         if open_date_col and open_date_col in staff_cloud_df.columns:
-            open_count = len(staff_cloud_df[
+            may_2026_data = staff_cloud_df[
                 staff_cloud_df[open_date_col].dt.strftime("%Y-%m") == target_year_month
-            ])
+            ]
+            open_count = len(may_2026_data)
+
+            # 디버그: 이성환 직원의 5월 데이터 확인
+            if staff_name == "이성환" and not may_2026_data.empty:
+                with st.expander(f"🔍 {staff_name} 2026-05 개설 데이터"):
+                    st.write(f"개설건수: {open_count}")
+                    st.dataframe(may_2026_data)
 
         # 연계건수: 2026년 5월 ERP연계일자 카운트
         erp_count = 0
