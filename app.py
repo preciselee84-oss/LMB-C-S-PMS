@@ -3209,7 +3209,8 @@ def show_all_staff_summary(staff_names):
         open_count = 0
         if open_date_col and open_date_col in staff_cloud_df.columns:
             may_2026_data = staff_cloud_df[
-                staff_cloud_df[open_date_col].dt.strftime("%Y-%m") == target_year_month
+                staff_cloud_df[open_date_col].notna() &
+                (staff_cloud_df[open_date_col].dt.strftime("%Y-%m") == target_year_month)
             ]
             open_count = len(may_2026_data)
 
@@ -3217,7 +3218,8 @@ def show_all_staff_summary(staff_names):
         erp_count = 0
         if erp_date_col and erp_date_col in staff_cloud_df.columns:
             may_erp_data = staff_cloud_df[
-                staff_cloud_df[erp_date_col].dt.strftime("%Y-%m") == target_year_month
+                staff_cloud_df[erp_date_col].notna() &
+                (staff_cloud_df[erp_date_col].dt.strftime("%Y-%m") == target_year_month)
             ]
             erp_count = len(may_erp_data)
 
