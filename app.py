@@ -3579,6 +3579,103 @@ def show_all_staff_summary(staff_names):
         st.caption(f"업로드 데이터 건수: {len(admin_uploaded_df):,}건")
         st.dataframe(admin_uploaded_df, use_container_width=True, hide_index=True)
 
+        admin_check_df = attach_cloud_dates(filter_visit_rows(clean_header_logic(filtered_analysis_df.copy())))
+        _, admin_err, admin_dup = process_performance_analysis(admin_check_df, st.session_state.get("auto_prev_df"))
+
+        admin_dup_df = pd.DataFrame()
+        if admin_dup is not None and not admin_dup.empty:
+            admin_dup_df = apply_history_search_filters(admin_dup.copy(), search_filters)
+
+        admin_err_df = pd.DataFrame()
+        if admin_err is not None and not admin_err.empty:
+            admin_err_df = admin_err[admin_err["일방문"] >= 6].copy() if "일방문" in admin_err.columns else admin_err.copy()
+            admin_err_df = apply_history_search_filters(admin_err_df, search_filters)
+
+        admin_missing_open = pd.DataFrame()
+        if "본사 개설완료일자" in admin_check_df.columns:
+            admin_missing_open = admin_check_df[
+                pd.isna(admin_check_df["본사 개설완료일자"]) |
+                (admin_check_df["본사 개설완료일자"].astype(str).str.strip() == "")
+            ].copy()
+            if "본사 신규이행구분" in admin_missing_open.columns:
+                admin_missing_open = admin_missing_open[
+                    admin_missing_open["본사 신규이행구분"].astype(str).str.strip() != "이행"
+                ]
+            admin_missing_open = apply_history_search_filters(admin_missing_open, search_filters)
+
+        admin_missing_erp = pd.DataFrame()
+        if "본사 ERP연계일자" in admin_check_df.columns:
+            if d_col and d_col in admin_check_df.columns:
+                admin_erp_target = admin_check_df[admin_check_df[d_col].astype(str).str.contains("연계", na=False)]
+            else:
+                admin_erp_target = admin_check_df
+            admin_missing_erp = admin_erp_target[
+                pd.isna(admin_erp_target["본사 ERP연계일자"]) |
+                (admin_erp_target["본사 ERP연계일자"].astype(str).str.strip() == "")
+            ].copy()
+            if "본사 신규이행구분" in admin_missing_erp.columns and "본사 이행추가연계" in admin_missing_erp.columns:
+                _is_ihang = admin_missing_erp["본사 신규이행구분"].astype(str).str.strip() == "이행"
+                _add_empty = (
+                    pd.isna(admin_missing_erp["본사 이행추가연계"]) |
+                    (admin_missing_erp["본사 이행추가연계"].astype(str).str.strip() == "")
+                )
+                admin_missing_erp = admin_missing_erp[~(_is_ihang & _add_empty)]
+            admin_missing_erp = apply_history_search_filters(admin_missing_erp, search_filters)
+
+        admin_other_errors = apply_history_search_filters(build_other_validation_errors(admin_check_df), search_filters)
+
+        admin_error_tabs = []
+        if not admin_dup_df.empty:
+            admin_error_tabs.append("중복 이력")
+        if not admin_err_df.empty:
+            admin_error_tabs.append("초과 방문")
+        if not admin_missing_open.empty:
+            admin_error_tabs.append("본사 개설완료일자 누락")
+        if not admin_missing_erp.empty:
+            admin_error_tabs.append("본사 ERP연계일자 누락")
+        if not admin_other_errors.empty:
+            admin_error_tabs.append("기타 오류")
+
+        t1, t2, t3, t4, t5 = validation_tabs_with_refresh("refresh_admin_history_validation")
+        with t1:
+            if not admin_dup_df.empty:
+                style_report_logic(admin_dup_df.drop(columns=[c for c in admin_dup_df.columns if c.startswith("_")], errors="ignore"))
+            else:
+                st.info("중복 이력이 없습니다.")
+        with t2:
+            if not admin_err_df.empty:
+                style_report_logic(admin_err_df.drop(columns=["월총방문"], errors="ignore"))
+            else:
+                st.info("초과 방문 데이터가 없습니다.")
+        with t3:
+            if not admin_missing_open.empty:
+                style_report_logic(admin_missing_open.drop(columns=["본사 ERP연계일자"], errors="ignore"))
+            elif "본사 개설완료일자" not in admin_check_df.columns:
+                st.info("본사 구글시트에 개설완료일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
+        with t4:
+            if not admin_missing_erp.empty:
+                style_report_logic(admin_missing_erp.drop(columns=["본사 개설완료일자"], errors="ignore"))
+            elif "본사 ERP연계일자" not in admin_check_df.columns:
+                st.info("본사 구글시트에 ERP연계일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
+        with t5:
+            style_report_logic(admin_other_errors, align_overrides={"오류 사유": "left"}, default_align="center")
+
+        if admin_error_tabs:
+            error_list = ", ".join(admin_error_tabs)
+            st.markdown(
+                f"<div style='margin-top:12px;margin-bottom:12px;padding:12px 16px;background:#FFF3CD;border-left:4px solid #FFC107;border-radius:4px;'>"
+                f"<div style='font-size:14px;color:#856404;'><b>⚠️ 다음 항목을 확인해주세요:</b> {error_list}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f"<div style='margin-top:12px;margin-bottom:12px;padding:12px 16px;background:#D4EDDA;border-left:4px solid #28A745;border-radius:4px;'>"
+                f"<div style='font-size:14px;color:#155724;'><b>✓ 잘못된 데이터가 없습니다.</b></div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
     st.markdown("#### 담당자별 상세 실적")
     st.dataframe(
         perf_df_with_total,
