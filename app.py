@@ -4030,8 +4030,9 @@ def show_all_staff_summary(staff_names):
                         hana_detail_col = find_col(activity_clean, ["활동상세", "활동내용"])
                         hana_owner_col = find_col(activity_clean, ["담당자", "등록자", "성명"])
                         hana_date_col = find_col(activity_clean, ["활동일", "활동일자", "일자", "날짜"])
+                        hana_biz_col = find_col(activity_clean, ["사업자번호", "사업자등록번호"])
 
-                        st.write(f"🔍 찾은 컬럼: detail={hana_detail_col}, owner={hana_owner_col}, date={hana_date_col}")
+                        st.write(f"🔍 찾은 컬럼: detail={hana_detail_col}, owner={hana_owner_col}, date={hana_date_col}, biz={hana_biz_col}")
 
                         if not hana_detail_col or not hana_owner_col:
                             st.error("❌ 하나지사 활동이력 시트에서 필수 컬럼(활동상세, 담당자)을 찾을 수 없습니다.")
@@ -4103,14 +4104,14 @@ def show_all_staff_summary(staff_names):
                                     random_df = pd.DataFrame(generated_rows)
                                     st.write(f"🔍 디버그: DataFrame 생성 완료, 행 수 = {len(random_df)}")
 
-                                    # 중복 제거 (담당자 + 일자 기준)
-                                    if hana_date_col and hana_date_col in random_df.columns:
+                                    # 중복 제거 (담당자 + 일자 + 사업자번호 기준)
+                                    if hana_date_col and hana_date_col in random_df.columns and hana_biz_col and hana_biz_col in random_df.columns:
                                         before_dedup = len(random_df)
                                         random_df = random_df.drop_duplicates(
-                                            subset=[hana_owner_col, hana_date_col],
+                                            subset=[hana_owner_col, hana_date_col, hana_biz_col],
                                             keep='first'
                                         )
-                                        st.write(f"🔍 디버그: 중복 제거 전 {before_dedup}건 → 후 {len(random_df)}건")
+                                        st.write(f"🔍 디버그: 중복 제거 (담당자+일자+사업자번호) 전 {before_dedup}건 → 후 {len(random_df)}건")
 
                                     # 초과방문 체크 및 제거 (일자별 5회 이상)
                                     if hana_date_col and hana_date_col in random_df.columns:
