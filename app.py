@@ -3789,6 +3789,17 @@ def show_user_history(is_admin_mode=False):
                     st.session_state.user_excel_data = None
                     st.session_state.user_excel_source = None
 
+    if (
+        st.session_state.get("user_excel_source") == "hq"
+        and isinstance(st.session_state.get("user_excel_data"), pd.DataFrame)
+        and not st.session_state.user_excel_data.empty
+    ):
+        hq_uploaded_df = st.session_state.user_excel_data.copy()
+        st.markdown("#### 본사이력 업로드 데이터")
+        st.caption(f"업로드 데이터 건수: {len(hq_uploaded_df):,}건")
+        st.dataframe(hq_uploaded_df, use_container_width=True, hide_index=True)
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
     current_df = current_history_analysis_df()
     if not current_df.empty:
         analysis_df = current_df
