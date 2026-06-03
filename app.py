@@ -3519,21 +3519,29 @@ def show_all_staff_summary(staff_names):
 
         # 개설건수: 2026년 5월 개설완료일자 카운트
         open_count = 0
+        open_companies = []
         if open_date_col and open_date_col in staff_cloud_df.columns:
             may_2026_data = staff_cloud_df[
                 staff_cloud_df[open_date_col].notna() &
                 (staff_cloud_df[open_date_col].dt.strftime("%Y-%m") == target_year_month)
             ]
             open_count = len(may_2026_data)
+            # 개설고객사 목록
+            if company_col and company_col in may_2026_data.columns:
+                open_companies = may_2026_data[company_col].astype(str).tolist()
 
         # 연계건수: 2026년 5월 ERP연계일자 카운트
         erp_count = 0
+        erp_companies = []
         if erp_date_col and erp_date_col in staff_cloud_df.columns:
             may_erp_data = staff_cloud_df[
                 staff_cloud_df[erp_date_col].notna() &
                 (staff_cloud_df[erp_date_col].dt.strftime("%Y-%m") == target_year_month)
             ]
             erp_count = len(may_erp_data)
+            # 연계고객사 목록
+            if company_col and company_col in may_erp_data.columns:
+                erp_companies = may_erp_data[company_col].astype(str).tolist()
 
         # 운영 실적: 업로드한 엑셀 파일에서 계산
         operation_count = 0
@@ -3584,8 +3592,10 @@ def show_all_staff_summary(staff_names):
             "담당자": staff_name,
             "직급": staff_rank,
             "개설건수": open_count,
+            "개설고객사": ", ".join(open_companies) if open_companies else "",
             "개설포인트": open_points,
             "연계건수": erp_count,
+            "연계고객사": ", ".join(erp_companies) if erp_companies else "",
             "연계포인트": erp_points,
             "운영건수 (실제 활동)": operation_count,
             "운영포인트 (실제 활동)": operation_points,
