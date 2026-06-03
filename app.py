@@ -44,8 +44,6 @@ DEFAULT_URL_ANALYSIS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9XPHqr
 DEFAULT_URL_SYNC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9F7R7oLA2B02H-I25kVv2JeYHFgWQq0CT7TeW61hrNpJLdHWJFhFR_iDQGCFAW044o8rRwBDeovKG/pub?gid=1533424484&single=true&output=csv"
 DEFAULT_URL_HANA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgRHnTZD4eDW2UeODQuGxmxFrflKpbQda3sBsVjj1s3qAFWMKcpke2U58UuT6VEDlkbXveZlaroTCr/pub?gid=0&single=true&output=csv"
 DEFAULT_URL_HANA_BILLING = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgRHnTZD4eDW2UeODQuGxmxFrflKpbQda3sBsVjj1s3qAFWMKcpke2U58UuT6VEDlkbXveZlaroTCr/pub?gid=1172734914&single=true&output=csv"
-PAYOUT_AMOUNT_ADJUSTMENT = 350000
-PAYOUT_POINT_ADJUSTMENT = PAYOUT_AMOUNT_ADJUSTMENT // 500
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -1260,7 +1258,7 @@ def apply_rs_allowance_formula(perf_df, user_db):
     special_name = "하성춘"
     for idx, row in work_df.iterrows():
         point = int(float(row.get("합계포인트", 0) or 0))
-        pay_point = max(0, point - 1000 - PAYOUT_POINT_ADJUSTMENT)
+        pay_point = max(0, point - 1000)
         if special_name in str(result.at[idx, "담당자"]):
             pay_point = max(0, pay_point - 200)
         pay_point = int(max(0, pay_point))
@@ -1702,7 +1700,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
 
             effective_manual_p = int(max(0, stats["p_sum"] - (stats["o_p"] + stats["l_p"] + stats["v_actual_p"])))
 
-            pay_point = max(0, stats["p_sum"] - 1000 - PAYOUT_POINT_ADJUSTMENT)
+            pay_point = max(0, stats["p_sum"] - 1000)
             if "하성춘" in str(name):
                 pay_point = max(0, pay_point - 200)
             pay = int(pay_point * 500)
@@ -4299,7 +4297,7 @@ def show_user_history(is_admin_mode=False):
             before_res.loc[before_res.index[0], "합계포인트"] = before_total
 
             # 지급포인트
-            before_pay_point = max(0, before_total - 1000 - PAYOUT_POINT_ADJUSTMENT)
+            before_pay_point = max(0, before_total - 1000)
             before_res.loc[before_res.index[0], "지급포인트"] = before_pay_point
 
             # 지급예상금액
@@ -4644,7 +4642,7 @@ def show_final_check():
         before_res.loc[before_res.index[0], "합계포인트"] = before_total
 
         # 지급포인트
-        before_pay_point = max(0, before_total - 1000 - PAYOUT_POINT_ADJUSTMENT)
+        before_pay_point = max(0, before_total - 1000)
         before_res.loc[before_res.index[0], "지급포인트"] = before_pay_point
 
         # 지급예상금액
