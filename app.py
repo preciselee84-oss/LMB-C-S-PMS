@@ -1286,14 +1286,14 @@ def apply_rs_allowance_formula(perf_df, user_db, return_debug=False):
         return (result, {}) if return_debug else result
 
     # BU 평균 계산 (C&S 전체 합산포인트 / C&S 인원)
-    total_bu_points = sum(int(float(row.get("합계포인트", 0) or 0)) for _, row, _ in cs_staff)
+    total_bu_points = sum(int(float(row["합계포인트"]) if pd.notna(row["합계포인트"]) else 0) for _, row, _ in cs_staff)
     bu_count = len(cs_staff)
     bu_average = total_bu_points / bu_count if bu_count > 0 else 0
 
     # 외주직원 가감포인트 계산
     outsource_total_points = 0
     for idx, row, staff_info in outsource_staff:
-        staff_points = int(float(row.get("합계포인트", 0) or 0))
+        staff_points = int(float(row["합계포인트"]) if pd.notna(row["합계포인트"]) else 0)
 
         # 근무기간 계수
         period = staff_info["period"]
@@ -1329,7 +1329,7 @@ def apply_rs_allowance_formula(perf_df, user_db, return_debug=False):
 
     # 최종 지급액 계산
     for idx, row, staff_info in cs_staff:
-        total_points = int(float(row.get("합계포인트", 0) or 0))
+        total_points = int(float(row["합계포인트"]) if pd.notna(row["합계포인트"]) else 0)
 
         # 기본 지급포인트
         base_pay_point = max(0, total_points - 1000)
