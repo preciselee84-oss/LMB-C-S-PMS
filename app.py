@@ -3236,6 +3236,12 @@ def show_all_staff_summary(staff_names):
                     st.write("---")
                     st.write(f"**{staff_name} 전체 데이터 건수:** {len(staff_cloud_df)}")
 
+                    # 본사 시트 컬럼명 확인
+                    st.write("**본사 시트 컬럼 정보:**")
+                    st.write(f"찾은 ERP연계일자 컬럼명: {erp_date_col}")
+                    erp_related_cols = [col for col in cloud_df.columns if 'ERP' in str(col).upper() or '연계' in str(col)]
+                    st.write(f"ERP/연계 관련 컬럼들: {erp_related_cols}")
+
                     # 사업자번호로 검색 (전체 본사 시트에서)
                     st.write("**사업자번호 1098209003 검색 (전체 본사 시트):**")
                     if biz_num_col and biz_num_col in cloud_df.columns:
@@ -3243,9 +3249,8 @@ def show_all_staff_summary(staff_names):
                             cloud_df[biz_num_col].astype(str).str.contains("1098209003", na=False, regex=False)
                         ]
                         if not biz_search.empty:
-                            display_cols3 = [company_col, biz_num_col, owner_col, erp_date_col]
-                            display_cols3 = [col for col in display_cols3 if col and col in biz_search.columns]
-                            st.dataframe(biz_search[display_cols3])
+                            st.write(f"해당 데이터의 모든 컬럼:")
+                            st.dataframe(biz_search)
                         else:
                             st.write("사업자번호 1098209003 데이터가 본사 시트에 없습니다.")
 
