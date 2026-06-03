@@ -74,9 +74,9 @@
         "access": "허용",
         "role": "사용자",
         "dept_type": "C&S",
-        "staff_type": "정규직",
-        "outsource": "아니오",
-        "outsource_period": "해당없음",
+        "staff_type": "외주",
+        "outsource": "예",
+        "outsource_period": "1년 이상",
         "rank": "직원"
     },
     "xxabideby": {
@@ -90,11 +90,5 @@
         "outsource": "아니오",
         "outsource_period": "해당없음",
         "rank": "대리"
-    },
-    "_deleted": [
-        "kangkt",
-        "sy",
-        "gilmj",
-        "iminjee"
-    ]
+    }
 }
