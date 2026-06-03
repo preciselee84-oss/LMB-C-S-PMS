@@ -1233,6 +1233,65 @@ def calculate_manual_perf_total(edited_df):
     return int(total)
 
 
+def apply_rs_allowance_formula(perf_df, user_db):
+    if perf_df is None or perf_df.empty or "합계포인트" not in perf_df.columns:
+        return perf_df
+
+    result = perf_df.copy()
+    result["지급포인트"] = 0
+    result["지급예상금액"] = 0
+
+    work_df = result[result["담당자"].astype(str) != "합계"].copy() if "담당자" in result.columns else result.copy()
+    if work_df.empty:
+        return result
+
+    name_to_info = {
+        info.get("name"): {
+            "staff_type": info.get("staff_type", "정규직"),
+            "period": info.get("outsource_period", "2년 이상"),
+        }
+        for uid, info in user_db.items()
+        if uid != "1" and isinstance(info, dict) and info.get("name")
+    }
+
+    total_points = pd.to_numeric(work_df["합계포인트"], errors="coerce").fillna(0)
+    branch_avg = float(total_points.sum()) / len(work_df) if len(work_df) else 0
+
+    outsource_deduction = 0
+    regular_indices = []
+    regular_points_sum = 0
+
+    for idx, row in work_df.iterrows():
+        name = row.get("담당자", "")
+        info = name_to_info.get(name, {})
+        staff_type = info.get("staff_type", "정규직")
+        point = float(row.get("합계포인트", 0) or 0)
+        if staff_type == "외주":
+            rate = {"1년 미만": 0.8, "1년 이상": 0.9, "2년 이상": 1.0}.get(info.get("period"), 1.0)
+            outsource_deduction += branch_avg * rate
+        else:
+            regular_indices.append(idx)
+            regular_points_sum += point
+
+    regular_count = len(regular_indices)
+    if regular_count == 0 or regular_points_sum <= 0:
+        return result
+
+    regular_total = float(total_points.sum()) - outsource_deduction
+    regular_avg = regular_total / regular_count
+    allowance_pool = max(0, (regular_avg - 350) * regular_count * 1000)
+
+    for idx in regular_indices:
+        point = float(result.at[idx, "합계포인트"] or 0)
+        ratio = point / regular_points_sum if regular_points_sum else 0
+        amount = min(round(allowance_pool * ratio / 1000) * 1000, 350000)
+        amount = int(max(0, amount))
+        result.at[idx, "지급예상금액"] = amount
+        result.at[idx, "지급포인트"] = int(amount / 1000)
+
+    return result
+
+
 def save_manual_perf_override_for_current_user():
     name = st.session_state.get("user_name")
     override = st.session_state.get("manual_perf_preview_override", {}).get(name)
@@ -3250,10 +3309,6 @@ def show_all_staff_summary(staff_names):
 
         # 합계 계산
         total_points = min(2800, min(1000, open_points + erp_points) + min(1800, operation_points))
-        pay_points = max(0, total_points - 1000)
-
-        # 지급예상금액 계산 (임시로 500원/포인트 적용, 실제로는 직급/외주 여부 확인 필요)
-        pay_amount = pay_points * 500
 
         # 직급 정보 가져오기
         staff_rank = "직원"  # 기본값
@@ -3272,8 +3327,8 @@ def show_all_staff_summary(staff_names):
             "운영건수 (실제 활동)": operation_count,
             "운영포인트 (실제 활동)": operation_points,
             "합계포인트": total_points,
-            "지급포인트": pay_points,
-            "지급예상금액": pay_amount,
+            "지급포인트": 0,
+            "지급예상금액": 0,
         }
 
         performance_data.append(row_data)
@@ -3284,6 +3339,7 @@ def show_all_staff_summary(staff_names):
 
     # DataFrame 생성
     perf_df = pd.DataFrame(performance_data)
+    perf_df = apply_rs_allowance_formula(perf_df, user_db)
 
     # 직급 순서 정의 및 정렬용 컬럼 추가
     rank_order = {"부서장": 0, "팀장": 1, "과장": 2, "대리": 3, "주임": 4, "직원": 5}
@@ -3542,12 +3598,11 @@ def show_all_staff_summary(staff_names):
                 open_points = int(perf_df.at[idx, "개설포인트"]) if "개설포인트" in perf_df.columns else 0
                 link_points = int(perf_df.at[idx, "연계포인트"]) if "연계포인트" in perf_df.columns else 0
                 total_points = min(2800, min(1000, open_points + link_points) + min(1800, operation_points))
-                pay_points = max(0, total_points - 1000)
                 perf_df.at[idx, "운영건수 (실제 활동)"] = operation_count
                 perf_df.at[idx, "운영포인트 (실제 활동)"] = operation_points
                 perf_df.at[idx, "합계포인트"] = total_points
-                perf_df.at[idx, "지급포인트"] = pay_points
-                perf_df.at[idx, "지급예상금액"] = pay_points * 500
+
+            perf_df = apply_rs_allowance_formula(perf_df, user_db)
 
             total_row = {}
             for col in display_cols:
