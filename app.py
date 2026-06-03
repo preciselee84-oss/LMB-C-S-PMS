@@ -1255,15 +1255,93 @@ def apply_rs_allowance_formula(perf_df, user_db):
     if work_df.empty:
         return result
 
-    special_name = "하성춘"
+    # 직원 정보 매핑 (이름 -> 정보)
+    name_to_info = {}
+    for uid, info in user_db.items():
+        if isinstance(info, dict) and info.get("name"):
+            name_to_info[info["name"]] = {
+                "rank": info.get("rank", "직원"),
+                "outsource": info.get("outsource", "아니오"),
+                "period": info.get("outsource_period", "해당없음"),
+                "dept_type": info.get("dept_type", "사업부")
+            }
+
+    # C&S 부서만 대상
+    cs_staff = []
+    outsource_staff = []
+    regular_staff = []
+
     for idx, row in work_df.iterrows():
-        point = int(float(row.get("합계포인트", 0) or 0))
-        pay_point = max(0, point - 1000)
-        if special_name in str(result.at[idx, "담당자"]):
-            pay_point = max(0, pay_point - 200)
-        pay_point = int(max(0, pay_point))
-        result.at[idx, "지급포인트"] = pay_point
-        result.at[idx, "지급예상금액"] = pay_point * 500
+        staff_name = str(row.get("담당자", ""))
+        if staff_name in name_to_info:
+            staff_info = name_to_info[staff_name]
+            if staff_info["dept_type"] == "C&S":
+                cs_staff.append((idx, row, staff_info))
+                if staff_info["outsource"] == "예":
+                    outsource_staff.append((idx, row, staff_info))
+                else:
+                    regular_staff.append((idx, row, staff_info))
+
+    if not cs_staff:
+        return result
+
+    # BU 평균 계산 (C&S 전체 합산포인트 / C&S 인원)
+    total_bu_points = sum(int(float(row.get("합계포인트", 0) or 0)) for _, row, _ in cs_staff)
+    bu_count = len(cs_staff)
+    bu_average = total_bu_points / bu_count if bu_count > 0 else 0
+
+    # 외주직원 가감포인트 계산
+    outsource_total_points = 0
+    for idx, row, staff_info in outsource_staff:
+        staff_points = int(float(row.get("합계포인트", 0) or 0))
+
+        # 근무기간 계수
+        period = staff_info["period"]
+        if period == "1년 미만":
+            period_factor = 0.8
+        elif period == "1년 이상":
+            period_factor = 0.9
+        else:  # 2년 이상
+            period_factor = 1.0
+
+        # 외주직원 가감포인트 = 외주직원포인트 - (BU평균 × 근무기간)
+        adjustment = staff_points - (bu_average * period_factor)
+        outsource_total_points += adjustment
+
+    # 일반직원 수
+    regular_count = len(regular_staff)
+    outsource_point_per_regular = outsource_total_points / regular_count if regular_count > 0 else 0
+
+    # 팀장수당 (팀장은 200포인트 추가)
+    team_leader_bonus = 200
+
+    # 최종 지급액 계산
+    for idx, row, staff_info in cs_staff:
+        total_points = int(float(row.get("합계포인트", 0) or 0))
+
+        # 기본 지급포인트
+        base_pay_point = max(0, total_points - 1000)
+
+        # 팀장 여부 확인
+        is_team_leader = staff_info["rank"] == "팀장"
+
+        # 외주직원 여부 확인
+        is_outsource = staff_info["outsource"] == "예"
+
+        if is_outsource:
+            # 외주직원: 지급포인트만 (외주 가감포인트 분배 없음)
+            final_pay_point = base_pay_point
+        else:
+            # 일반직원: 기본포인트 + (외주가감포인트/일반직원수)
+            final_pay_point = base_pay_point + outsource_point_per_regular
+
+            # 팀장: 팀장수당 추가
+            if is_team_leader:
+                final_pay_point += team_leader_bonus
+
+        final_pay_point = int(max(0, final_pay_point))
+        result.at[idx, "지급포인트"] = final_pay_point
+        result.at[idx, "지급예상금액"] = int(final_pay_point * 500)
 
     return result
 
