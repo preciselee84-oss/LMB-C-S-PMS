@@ -4291,14 +4291,45 @@ def show_all_staff_summary(staff_names):
                     (cloud_df[erp_date_col].dt.strftime("%Y-%m") == target_year_month)
                 ].copy()
 
-            # 여러 시트로 엑셀 생성
-            excel_sheets = {"실적파일": excel_download_df}
-            if not open_companies_df.empty:
-                excel_sheets["개설고객사"] = open_companies_df
-            if not erp_companies_df.empty:
-                excel_sheets["연계고객사"] = erp_companies_df
+            # 하나의 시트에 모든 데이터 합치기
+            combined_parts = [excel_download_df]
 
-            excel_bytes = dataframe_to_excel_bytes(excel_sheets)
+            # 개설고객사 추가
+            if not open_companies_df.empty:
+                # 빈 행 추가
+                empty_row = pd.DataFrame([[""] * len(excel_download_df.columns)], columns=excel_download_df.columns)
+                combined_parts.append(empty_row)
+                combined_parts.append(empty_row)
+
+                # 제목 행 추가
+                title_row = pd.DataFrame([["개설고객사"] + [""] * (len(excel_download_df.columns) - 1)], columns=excel_download_df.columns)
+                combined_parts.append(title_row)
+
+                # 개설고객사 데이터 추가 (컬럼 맞추기)
+                open_companies_aligned = pd.DataFrame(columns=excel_download_df.columns)
+                for col in open_companies_df.columns:
+                    if col in open_companies_aligned.columns:
+                        open_companies_aligned[col] = open_companies_df[col]
+                combined_parts.append(open_companies_df)
+
+            # 연계고객사 추가
+            if not erp_companies_df.empty:
+                # 빈 행 추가
+                empty_row = pd.DataFrame([[""] * len(excel_download_df.columns)], columns=excel_download_df.columns)
+                combined_parts.append(empty_row)
+                combined_parts.append(empty_row)
+
+                # 제목 행 추가
+                title_row = pd.DataFrame([["연계고객사"] + [""] * (len(excel_download_df.columns) - 1)], columns=excel_download_df.columns)
+                combined_parts.append(title_row)
+
+                # 연계고객사 데이터 추가
+                combined_parts.append(erp_companies_df)
+
+            # 모든 데이터 합치기
+            final_df = pd.concat(combined_parts, ignore_index=True, sort=False)
+
+            excel_bytes = dataframe_to_excel_bytes({"실적파일": final_df})
             st.download_button(
                 "실적파일 엑셀 다운로드",
                 data=excel_bytes,
