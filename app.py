@@ -4479,12 +4479,24 @@ def show_admin_performance():
         try:
             load_csv_to_state("url_analysis", "analysis_lookup_df")
         except Exception as e:
-            st.error(f"실적 데이터를 불러오지 못했습니다: {e}")
+            st.error(f"⚠️ 하나은행 활동 이력 시트를 불러오지 못했습니다.")
+            st.error(f"오류 내용: {str(e)}")
+            st.info("💡 [구글 스트레드시트 연동] 메뉴에서 '하나은행 구글 시트 CSV URL'을 확인해주세요.")
+
+            # URL 설정 페이지로 이동 버튼
+            if st.button("구글 스트레드시트 연동 메뉴로 이동"):
+                st.session_state.current_menu = "구글 스트레드시트 연동"
+                st.rerun()
             return
 
     analysis_df = st.session_state.get("analysis_lookup_df")
     if analysis_df is None or analysis_df.empty:
-        st.info("실적 데이터가 없습니다. 구글 스프레드시트 연동을 확인해주세요.")
+        st.warning("📂 실적 데이터가 없습니다.")
+        st.info("💡 [구글 스트레드시트 연동] 메뉴에서 URL 설정 및 데이터 새로고침을 해주세요.")
+
+        if st.button("구글 스트레드시트 연동 메뉴로 이동"):
+            st.session_state.current_menu = "구글 스트레드시트 연동"
+            st.rerun()
         return
 
     # 데이터 정리
