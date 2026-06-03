@@ -1287,6 +1287,27 @@ def prepare_random_history_source_df(df):
     return clean_header_logic(result)
 
 
+def prepare_display_dataframe(df):
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    result = df.copy()
+    result.columns = [str(col).strip() for col in result.columns]
+    result = result.loc[:, ~pd.Index(result.columns).duplicated()]
+    result = result[
+        [
+            col for col in result.columns
+            if not str(col).strip().lower().startswith("unnamed")
+            and not str(col).strip().startswith("_")
+        ]
+    ]
+    if result.empty:
+        return result
+    return result.loc[
+        :,
+        result.apply(lambda col: col.astype(str).str.strip().replace("nan", "").ne("").any(), axis=0)
+    ]
+
+
 def build_random_admin_extra_history(source_df, existing_df, target_count):
     if source_df is None or not isinstance(source_df, pd.DataFrame) or source_df.empty:
         return pd.DataFrame(), "하나지사 활동이력 데이터가 없습니다."
@@ -3582,7 +3603,7 @@ def show_all_staff_summary(staff_names):
                     unique_users = analysis_clean[u_col].unique()
                     st.write(f"**담당자 목록:** {list(unique_users)}")
                 st.write("**데이터 샘플:**")
-                st.dataframe(uploaded_data.head(10))
+                st.dataframe(prepare_display_dataframe(uploaded_data).head(10))
 
     col1, col_convert, col_upload, col_sample, _ = st.columns([1, 1, 1, 1, 2])
     with col1:
@@ -3721,17 +3742,7 @@ def show_all_staff_summary(staff_names):
                     total_row[col] = ""
             perf_df_with_total = pd.concat([perf_df[display_cols], pd.DataFrame([total_row])], ignore_index=True)
 
-        admin_uploaded_df = admin_uploaded_df[
-            [
-                col for col in admin_uploaded_df.columns
-                if not str(col).strip().lower().startswith("unnamed")
-                and not str(col).strip().startswith("_")
-            ]
-        ]
-        admin_uploaded_df = admin_uploaded_df.loc[
-            :,
-            admin_uploaded_df.apply(lambda col: col.astype(str).str.strip().replace("nan", "").ne("").any(), axis=0)
-        ]
+        admin_uploaded_df = prepare_display_dataframe(admin_uploaded_df)
         title_col, add_history_col = st.columns([0.82, 0.18])
         with title_col:
             st.markdown("#### 본사이력 업로드 데이터")
@@ -3886,18 +3897,7 @@ def show_all_staff_summary(staff_names):
             excel_download_df = st.session_state.get("admin_uploaded_excel_display")
             if not isinstance(excel_download_df, pd.DataFrame) or excel_download_df.empty:
                 excel_download_df = st.session_state.admin_uploaded_excel
-            excel_download_df = excel_download_df.copy()
-            excel_download_df = excel_download_df[
-                [
-                    col for col in excel_download_df.columns
-                    if not str(col).strip().lower().startswith("unnamed")
-                    and not str(col).strip().startswith("_")
-                ]
-            ]
-            excel_download_df = excel_download_df.loc[
-                :,
-                excel_download_df.apply(lambda col: col.astype(str).str.strip().replace("nan", "").ne("").any(), axis=0)
-            ]
+            excel_download_df = prepare_display_dataframe(excel_download_df)
             excel_bytes = dataframe_to_excel_bytes({"실적파일": excel_download_df})
             st.download_button(
                 "실적파일 엑셀 다운로드",
@@ -4223,18 +4223,7 @@ def show_user_history(is_admin_mode=False):
         and isinstance(st.session_state.get("user_excel_data"), pd.DataFrame)
         and not st.session_state.user_excel_data.empty
     ):
-        hq_uploaded_df = st.session_state.user_excel_data.copy()
-        hq_uploaded_df = hq_uploaded_df[
-            [
-                col for col in hq_uploaded_df.columns
-                if not str(col).strip().lower().startswith("unnamed")
-                and not str(col).strip().startswith("_")
-            ]
-        ]
-        hq_uploaded_df = hq_uploaded_df.loc[
-            :,
-            hq_uploaded_df.apply(lambda col: col.astype(str).str.strip().replace("nan", "").ne("").any(), axis=0)
-        ]
+        hq_uploaded_df = prepare_display_dataframe(st.session_state.user_excel_data)
         st.markdown("#### 본사이력 업로드 데이터")
         st.caption(f"업로드 데이터 건수: {len(hq_uploaded_df):,}건")
         st.dataframe(hq_uploaded_df, use_container_width=True, hide_index=True)
