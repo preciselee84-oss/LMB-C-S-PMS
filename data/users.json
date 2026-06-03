@@ -21,17 +21,6 @@
         "outsource": "아니오",
         "outsource_period": "해당없음"
     },
-    "kangkt": {
-        "pw": "1111",
-        "name": "강경태",
-        "email": "",
-        "access": "허용",
-        "role": "사용자",
-        "dept_type": "사업부",
-        "staff_type": "정규직",
-        "outsource": "아니오",
-        "outsource_period": "해당없음"
-    },
     "leesh": {
         "pw": "1111",
         "name": "이수현",
@@ -125,6 +114,7 @@
         "outsource_period": "해당없음"
     },
     "_deleted": [
+        "kangkt",
         "iminjee"
     ]
 }
