@@ -3391,6 +3391,7 @@ def show_all_staff_summary(staff_names):
             st.session_state.analysis_lookup_df = None
             st.session_state.hana_sheet_df = None
             st.session_state.admin_uploaded_excel = None
+            st.session_state.admin_uploaded_excel_display = None
             st.toast("데이터를 새로고침합니다.")
             st.rerun()
 
@@ -3436,6 +3437,7 @@ def show_all_staff_summary(staff_names):
                     converted_df = normalize_converted_history_df(converted_df)
                     # session_state에 저장하여 운영 카운트에 사용
                     st.session_state.admin_uploaded_excel = converted_df
+                    st.session_state.admin_uploaded_excel_display = converted_df.copy()
                     converted_bytes = sample_format_excel_bytes(converted_df)
                     converted_ym = get_uploaded_month(converted_df).replace("-", "") or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
                     st.download_button(
@@ -3464,6 +3466,7 @@ def show_all_staff_summary(staff_names):
         if u_file is not None:
             try:
                 office_df = pd.read_excel(u_file)
+                st.session_state.admin_uploaded_excel_display = clean_header_logic(office_df.copy())
                 office_df = normalize_converted_history_df(office_df)
                 # session_state에 저장하여 운영 카운트에 사용
                 st.session_state.admin_uploaded_excel = office_df
@@ -3490,9 +3493,20 @@ def show_all_staff_summary(staff_names):
         isinstance(st.session_state.get("admin_uploaded_excel"), pd.DataFrame)
         and not st.session_state.admin_uploaded_excel.empty
     ):
-        admin_uploaded_df = st.session_state.admin_uploaded_excel.copy()
+        display_source_df = st.session_state.get("admin_uploaded_excel_display")
+        if not isinstance(display_source_df, pd.DataFrame) or display_source_df.empty:
+            display_source_df = st.session_state.admin_uploaded_excel
+        admin_uploaded_df = display_source_df.copy()
         admin_uploaded_df = admin_uploaded_df[
-            [col for col in admin_uploaded_df.columns if not str(col).strip().lower().startswith("unnamed")]
+            [
+                col for col in admin_uploaded_df.columns
+                if not str(col).strip().lower().startswith("unnamed")
+                and not str(col).strip().startswith("_")
+            ]
+        ]
+        admin_uploaded_df = admin_uploaded_df.loc[
+            :,
+            admin_uploaded_df.apply(lambda col: col.astype(str).str.strip().replace("nan", "").ne("").any(), axis=0)
         ]
         st.markdown("#### 본사이력 업로드 데이터")
         st.caption(f"업로드 데이터 건수: {len(admin_uploaded_df):,}건")
@@ -3805,6 +3819,17 @@ def show_user_history(is_admin_mode=False):
         and not st.session_state.user_excel_data.empty
     ):
         hq_uploaded_df = st.session_state.user_excel_data.copy()
+        hq_uploaded_df = hq_uploaded_df[
+            [
+                col for col in hq_uploaded_df.columns
+                if not str(col).strip().lower().startswith("unnamed")
+                and not str(col).strip().startswith("_")
+            ]
+        ]
+        hq_uploaded_df = hq_uploaded_df.loc[
+            :,
+            hq_uploaded_df.apply(lambda col: col.astype(str).str.strip().replace("nan", "").ne("").any(), axis=0)
+        ]
         st.markdown("#### 본사이력 업로드 데이터")
         st.caption(f"업로드 데이터 건수: {len(hq_uploaded_df):,}건")
         st.dataframe(hq_uploaded_df, use_container_width=True, hide_index=True)
