@@ -3217,7 +3217,7 @@ def show_all_staff_summary(staff_names):
             ]
             erp_count = len(may_erp_data)
 
-        # 운영 실적: 하나은행 활동 이력에서 계산
+        # 운영 실적: 업로드한 엑셀 파일에서 계산
         operation_count = 0
         operation_points = 0
 
@@ -3225,6 +3225,18 @@ def show_all_staff_summary(staff_names):
             analysis_clean = clean_header_logic(analysis_df.copy())
             u_col = find_col(analysis_clean, ["등록자", "담당자", "성명"])
             d_col = find_col(analysis_clean, ["활동상세", "활동내용"])
+
+            # 디버그: 첫 번째 직원에 대해 업로드 데이터 확인
+            if staff_name == staff_names[0] if staff_names else None:
+                with st.expander(f"🔍 업로드 데이터 확인 ({staff_name})"):
+                    st.write(f"업로드 데이터 건수: {len(analysis_clean)}")
+                    st.write(f"담당자 컬럼명: {u_col}")
+                    st.write(f"활동상세 컬럼명: {d_col}")
+                    if u_col and u_col in analysis_clean.columns:
+                        unique_users = analysis_clean[u_col].unique()
+                        st.write(f"업로드 데이터의 담당자 목록: {list(unique_users)}")
+                    st.write("데이터 샘플:")
+                    st.dataframe(analysis_clean.head(5))
 
             if u_col and u_col in analysis_clean.columns:
                 staff_activity = analysis_clean[analysis_clean[u_col] == staff_name].copy()
@@ -3454,6 +3466,15 @@ def show_all_staff_summary(staff_names):
     with col_upload:
         st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>본사이력 업로드 (선택)</div>", unsafe_allow_html=True)
         u_file = st.file_uploader("본사이력 업로드 (선택)", type=["xlsx"], key="admin_office_upload", label_visibility="collapsed")
+        if u_file is not None:
+            try:
+                office_df = pd.read_excel(u_file)
+                office_df = normalize_converted_history_df(office_df)
+                # session_state에 저장하여 운영 카운트에 사용
+                st.session_state.admin_uploaded_excel = office_df
+                st.success("✅ 본사이력 파일이 실적 계산에 반영됩니다.")
+            except Exception as e:
+                st.error(f"본사이력 업로드 실패: {e}")
 
     with col_sample:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
