@@ -3697,7 +3697,22 @@ def show_all_staff_summary(staff_names):
 
     with dl_excel_col:
         if isinstance(st.session_state.get("admin_uploaded_excel"), pd.DataFrame) and not st.session_state.admin_uploaded_excel.empty:
-            excel_bytes = sample_format_excel_bytes(st.session_state.admin_uploaded_excel)
+            excel_download_df = st.session_state.get("admin_uploaded_excel_display")
+            if not isinstance(excel_download_df, pd.DataFrame) or excel_download_df.empty:
+                excel_download_df = st.session_state.admin_uploaded_excel
+            excel_download_df = excel_download_df.copy()
+            excel_download_df = excel_download_df[
+                [
+                    col for col in excel_download_df.columns
+                    if not str(col).strip().lower().startswith("unnamed")
+                    and not str(col).strip().startswith("_")
+                ]
+            ]
+            excel_download_df = excel_download_df.loc[
+                :,
+                excel_download_df.apply(lambda col: col.astype(str).str.strip().replace("nan", "").ne("").any(), axis=0)
+            ]
+            excel_bytes = dataframe_to_excel_bytes({"실적파일": excel_download_df})
             st.download_button(
                 "실적파일 엑셀 다운로드",
                 data=excel_bytes,
