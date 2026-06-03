@@ -3893,33 +3893,35 @@ def show_all_staff_summary(staff_names):
                     d_col = find_col(uploaded_clean, ["활동상세", "활동내용"])
                     category_col = find_col(uploaded_clean, ["활동구분", "접수유형"])
 
-                    # 담당자별로 운영 활동만 필터링하고 60회로 제한
-                    filtered_rows = []
+                    # 운영 활동만 필터링
                     if u_col and u_col in uploaded_clean.columns:
-                        for staff_name in uploaded_clean[u_col].unique():
-                            staff_data = uploaded_clean[uploaded_clean[u_col] == staff_name].copy()
+                        if category_col and category_col in uploaded_clean.columns:
+                            operation_all = uploaded_clean[
+                                uploaded_clean[category_col].astype(str).str.contains("방문|원격", na=False)
+                            ].copy()
+                        elif d_col and d_col in uploaded_clean.columns:
+                            operation_all = uploaded_clean[
+                                uploaded_clean[d_col].astype(str).str.contains("운영|방문|점검", na=False)
+                            ].copy()
+                        else:
+                            operation_all = pd.DataFrame()
 
-                            # 운영 활동 필터링
-                            if category_col and category_col in staff_data.columns:
-                                operation_data = staff_data[
-                                    staff_data[category_col].astype(str).str.contains("방문|원격", na=False)
-                                ]
-                            elif d_col and d_col in staff_data.columns:
-                                operation_data = staff_data[
-                                    staff_data[d_col].astype(str).str.contains("운영|방문|점검", na=False)
-                                ]
-                            else:
-                                operation_data = pd.DataFrame()
-
-                            # 60회로 제한
-                            if not operation_data.empty:
-                                limited_data = operation_data.head(60)
+                        if not operation_all.empty:
+                            # 담당자별로 60회 제한하면서 데이터 수집
+                            filtered_rows = []
+                            for staff_name in operation_all[u_col].unique():
+                                staff_data = operation_all[operation_all[u_col] == staff_name].copy()
+                                # 60회로 제한
+                                limited_data = staff_data.head(60)
                                 filtered_rows.append(limited_data)
 
-                        if filtered_rows:
                             limited_df = pd.concat(filtered_rows, ignore_index=True)
+
+                            # 실적 계산에서 사용할 데이터 건수 표시
+                            total_count = len(limited_df)
                             st.session_state.admin_uploaded_excel = limited_df
-                            st.success(f"✅ 담당자별 운영 활동을 60회로 제한하여 가져왔습니다. (총 {len(limited_df)}건)")
+                            st.success(f"✅ 운영 활동을 담당자별 60회로 제한하여 가져왔습니다.")
+                            st.info(f"📊 총 {total_count}건 (담당자별 최대 60회)")
                             st.rerun()
                         else:
                             st.warning("운영 활동 데이터가 없습니다.")
