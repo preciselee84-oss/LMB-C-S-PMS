@@ -4982,6 +4982,10 @@ def show_staff_admin():
         st.info("등록된 직원이 없습니다.")
         return
 
+    # 직급 순서로 정렬
+    rank_order = {"부서장": 0, "팀장": 1, "과장": 2, "대리": 3, "주임": 4, "직원": 5}
+    staff_rows.sort(key=lambda x: rank_order.get(x["직급"], 99))
+
     # ── 직원 목록 HTML 테이블 표시 (다크모드 호환, 가운데 정렬) ──
     render_plain_html_table(pd.DataFrame(staff_rows), center_align=True)
 
