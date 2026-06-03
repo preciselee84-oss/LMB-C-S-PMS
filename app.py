@@ -1290,18 +1290,18 @@ def apply_rs_allowance_formula(perf_df, user_db):
 
     regular_total = float(total_points.sum()) - outsource_deduction
     regular_avg = regular_total / eligible_count
-    allowance_pool = max(0, (regular_avg - 350) * eligible_count * 1000)
+    allowance_point_pool = max(0, (regular_avg - 350) * eligible_count)
 
     special_name = "하성춘"
     for idx in eligible_indices:
         point = float(result.at[idx, "합계포인트"] or 0)
         ratio = point / eligible_points_sum if eligible_points_sum else 0
-        amount = min(round(allowance_pool * ratio / 1000) * 1000, 350000)
+        pay_point = int(round(allowance_point_pool * ratio))
         if special_name in str(result.at[idx, "담당자"]):
-            amount = max(0, amount - 100000)
-        amount = int(max(0, amount))
-        result.at[idx, "지급예상금액"] = amount
-        result.at[idx, "지급포인트"] = int(amount / 500)
+            pay_point = max(0, pay_point - 200)
+        pay_point = int(max(0, pay_point))
+        result.at[idx, "지급포인트"] = pay_point
+        result.at[idx, "지급예상금액"] = pay_point * 500
 
     return result
 
