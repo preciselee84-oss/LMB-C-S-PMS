@@ -3921,6 +3921,7 @@ def show_all_staff_summary(staff_names):
                             # 실적 계산에서 사용할 데이터 건수 표시
                             total_count = len(limited_df)
                             st.session_state.admin_uploaded_excel = limited_df
+                            st.session_state.admin_uploaded_excel_display = limited_df
                             st.success(f"✅ 운영 활동을 담당자별 60회로 제한하여 가져왔습니다.")
                             st.info(f"📊 총 {total_count}건 (담당자별 최대 60회)")
                             st.info("⏰ 10초 후 페이지가 자동으로 새로고침됩니다...")
