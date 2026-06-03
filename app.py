@@ -3202,8 +3202,8 @@ def show_all_staff_summary(staff_names):
         #             operation_points = operation_count * 30  # 운영 1건당 30포인트
 
         # 포인트 계산
-        open_points = open_count * 100  # 개설 1건당 100포인트
-        erp_points = erp_count * 100  # 연계 1건당 100포인트
+        open_points = open_count * 90  # 개설 1건당 90포인트
+        erp_points = erp_count * 120  # 연계 1건당 120포인트
 
         # 합계 계산
         total_points = min(2800, min(1000, open_points + erp_points) + min(1800, operation_points))
