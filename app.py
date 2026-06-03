@@ -4012,10 +4012,15 @@ def show_all_staff_summary(staff_names):
                     with st.spinner("하나은행 시트에서 운영 이력을 랜덤으로 생성 중..."):
                         hana_clean = clean_header_logic(hana_df.copy())
 
+                        # 디버깅: 하나은행 시트 컬럼명 출력
+                        st.write("🔍 하나은행 시트 컬럼명:", list(hana_clean.columns))
+
                         # 컬럼 찾기
                         hana_detail_col = find_col(hana_clean, ["활동상세", "활동내용"])
                         hana_owner_col = find_col(hana_clean, ["담당자", "등록자", "성명"])
                         hana_date_col = find_col(hana_clean, ["활동일자", "일자", "날짜"])
+
+                        st.write(f"🔍 찾은 컬럼: detail={hana_detail_col}, owner={hana_owner_col}, date={hana_date_col}")
 
                         if not hana_detail_col or not hana_owner_col:
                             st.error("❌ 하나은행 시트에서 필수 컬럼(활동상세, 담당자)을 찾을 수 없습니다.")
