@@ -3884,8 +3884,50 @@ def show_all_staff_summary(staff_names):
         with title_col:
             st.markdown("#### 본사이력 업로드 데이터")
         with add_history_col:
-            st.button("추가 이력 가져오기", use_container_width=True, key="admin_add_random_history", disabled=True)
-            st.caption("추가 이력 자동 반영은 중지되었습니다.")
+            if st.button("추가 이력 가져오기", use_container_width=True, key="admin_add_random_history"):
+                # 업로드한 데이터에서 담당자별 운영 활동을 60회 이하로 제한하여 가져오기
+                if st.session_state.get("admin_uploaded_excel") is not None:
+                    uploaded_data = st.session_state.get("admin_uploaded_excel")
+                    uploaded_clean = clean_header_logic(uploaded_data.copy())
+                    u_col = find_col(uploaded_clean, ["등록자", "담당자", "성명"])
+                    d_col = find_col(uploaded_clean, ["활동상세", "활동내용"])
+                    category_col = find_col(uploaded_clean, ["활동구분", "접수유형"])
+
+                    # 담당자별로 운영 활동만 필터링하고 60회로 제한
+                    filtered_rows = []
+                    if u_col and u_col in uploaded_clean.columns:
+                        for staff_name in uploaded_clean[u_col].unique():
+                            staff_data = uploaded_clean[uploaded_clean[u_col] == staff_name].copy()
+
+                            # 운영 활동 필터링
+                            if category_col and category_col in staff_data.columns:
+                                operation_data = staff_data[
+                                    staff_data[category_col].astype(str).str.contains("방문|원격", na=False)
+                                ]
+                            elif d_col and d_col in staff_data.columns:
+                                operation_data = staff_data[
+                                    staff_data[d_col].astype(str).str.contains("운영|방문|점검", na=False)
+                                ]
+                            else:
+                                operation_data = pd.DataFrame()
+
+                            # 60회로 제한
+                            if not operation_data.empty:
+                                limited_data = operation_data.head(60)
+                                filtered_rows.append(limited_data)
+
+                        if filtered_rows:
+                            limited_df = pd.concat(filtered_rows, ignore_index=True)
+                            st.session_state.admin_uploaded_excel = limited_df
+                            st.success(f"✅ 담당자별 운영 활동을 60회로 제한하여 가져왔습니다. (총 {len(limited_df)}건)")
+                            st.rerun()
+                        else:
+                            st.warning("운영 활동 데이터가 없습니다.")
+                    else:
+                        st.error("담당자 컬럼을 찾을 수 없습니다.")
+                else:
+                    st.warning("먼저 파일을 업로드해주세요.")
+            st.caption("💡 담당자별 운영 활동을 60회로 제한하여 가져옵니다.")
         st.caption(f"업로드 데이터 건수: {len(admin_uploaded_df):,}건")
         st.dataframe(admin_uploaded_df, use_container_width=True, hide_index=True)
 
