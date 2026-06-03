@@ -3400,9 +3400,26 @@ def show_all_staff_summary(staff_names):
     # 존재하는 컬럼만 선택
     display_cols = [col for col in display_cols if col in perf_df.columns]
 
+    # 합계 행 추가
+    total_row = {}
+    for col in display_cols:
+        if col in ["담당자"]:
+            total_row[col] = "합계"
+        elif col in ["직급"]:
+            total_row[col] = ""
+        elif col in perf_df.columns:
+            if perf_df[col].dtype in ['int64', 'float64']:
+                total_row[col] = perf_df[col].sum()
+            else:
+                total_row[col] = ""
+        else:
+            total_row[col] = ""
+
+    perf_df_with_total = pd.concat([perf_df[display_cols], pd.DataFrame([total_row])], ignore_index=True)
+
     # 테이블 표시
     st.dataframe(
-        perf_df[display_cols].reset_index(drop=True),
+        perf_df_with_total,
         use_container_width=True,
         hide_index=True
     )
