@@ -3230,19 +3230,19 @@ def show_all_staff_summary(staff_names):
             if u_col and u_col in analysis_clean.columns:
                 staff_activity = analysis_clean[analysis_clean[u_col] == staff_name].copy()
 
-                if d_col and d_col in staff_activity.columns:
-                    # 운영 활동은 활동상세로 구분하고, 포인트는 활동구분(방문/원격)을 반영한다.
-                    operation_activity = staff_activity[
-                        staff_activity[d_col].astype(str).str.contains("운영|방문|점검", na=False)
-                    ].copy()
-                    operation_count = len(operation_activity)
-                    if category_col and category_col in operation_activity.columns:
-                        category_text = operation_activity[category_col].astype(str)
-                        visit_points = int(category_text.str.contains("방문", na=False).sum()) * 30
-                        remote_points = int(category_text.str.contains("원격", na=False).sum()) * 10
-                        operation_points = visit_points + remote_points
-                    else:
-                        operation_points = operation_count * 30  # 활동구분이 없으면 기존 방식 유지
+                if category_col and category_col in staff_activity.columns:
+                    # 본사이력 업로드는 활동구분(방문/원격)을 우선 기준으로 운영 실적을 반영한다.
+                    category_text = staff_activity[category_col].astype(str)
+                    visit_count = int(category_text.str.contains("방문", na=False).sum())
+                    remote_count = int(category_text.str.contains("원격", na=False).sum())
+                    operation_count = visit_count + remote_count
+                    operation_points = (visit_count * 30) + (remote_count * 10)
+                elif d_col and d_col in staff_activity.columns:
+                    # 활동구분이 없으면 기존처럼 활동상세 기준으로 운영 실적을 계산한다.
+                    operation_count = int(
+                        staff_activity[d_col].astype(str).str.contains("운영|방문|점검", na=False).sum()
+                    )
+                    operation_points = operation_count * 30
 
         # 포인트 계산
         open_points = open_count * 90  # 개설 1건당 90포인트
