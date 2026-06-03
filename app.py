@@ -3255,7 +3255,7 @@ def show_all_staff_summary(staff_names):
         hide_index=True
     )
 
-    # Excel 다운로드
+    # Excel 다운로드 및 새로고침
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
     col_dl1, col_dl2, col_dl3 = st.columns([1, 1, 2])
@@ -3274,6 +3274,14 @@ def show_all_staff_summary(staff_names):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+
+    with col_dl2:
+        if st.button("🔄 새로고침", use_container_width=True):
+            # 본사 구글시트와 하나은행 시트 데이터 새로고침
+            st.session_state.cloud_sheet_df = None
+            st.session_state.analysis_lookup_df = None
+            st.toast("데이터를 새로고침합니다.")
+            st.rerun()
 
 
 def show_user_history(is_admin_mode=False):
