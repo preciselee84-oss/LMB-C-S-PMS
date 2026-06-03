@@ -69,11 +69,15 @@
         "outsource_period": "해당없음",
         "rank": "대리"
     },
-    "_deleted": [
-        "maengks",
-        "iminjee",
-        "gilmj",
-        "leesh",
-        "kangkt"
-    ]
+    "sy": {
+        "pw": "1",
+        "name": "이수현",
+        "email": "",
+        "access": "허용",
+        "role": "사용자",
+        "dept_type": "사업부",
+        "staff_type": "정규직",
+        "outsource": "아니오",
+        "outsource_period": "해당없음"
+    }
 }
