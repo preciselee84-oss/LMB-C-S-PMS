@@ -127,18 +127,6 @@
         "outsource_period": "해당없음",
         "rank": "대리"
     },
-    "hh": {
-        "pw": "22",
-        "name": "하성춘",
-        "email": "",
-        "access": "허용",
-        "role": "사용자",
-        "dept_type": "C&S",
-        "staff_type": "정규직",
-        "outsource": "아니오",
-        "outsource_period": "해당없음",
-        "rank": "과장"
-    },
     "mkmk87541": {
         "pw": "WEBCASH1!",
         "name": "하성춘",
@@ -150,5 +138,8 @@
         "outsource": "아니오",
         "outsource_period": "해당없음",
         "rank": "대리"
-    }
+    },
+    "_deleted": [
+        "hh"
+    ]
 }
