@@ -3516,17 +3516,28 @@ def show_all_staff_summary(staff_names):
     # 복합 헤더(다중 행)이므로 header=None으로 원본 로딩 후 직접 파싱
     def _load_perf_sheet():
         url = st.session_state.get("url_hana_performance", DEFAULT_URL_HANA_PERFORMANCE)
+        raw = None
+        _err = ""
+        # 방법1: read_csv_cached (캐시 활용)
         try:
-            import io
-            resp = _requests.get(url, timeout=15)
-            raw = pd.read_csv(io.StringIO(resp.text), header=None, dtype=str)
-        except Exception:
+            raw = read_csv_cached(url, header=None).copy()
+            raw = raw.astype(str)
+        except Exception as e1:
+            _err += f"cached: {e1} | "
+        # 방법2: pandas 직접 로드
+        if raw is None:
+            try:
+                raw = pd.read_csv(url, header=None, dtype=str)
+            except Exception as e2:
+                _err += f"direct: {e2}"
+        if raw is None:
+            st.session_state["_perf_debug_err"] = _err
             return None, None, None
 
         # "방문A" 가 들어있는 행을 헤더 행으로 탐색
         header_row_idx = None
         visit_a_col_idx = None
-        for i in range(min(10, len(raw))):
+        for i in range(min(15, len(raw))):
             for j, val in enumerate(raw.iloc[i]):
                 if str(val).strip() == "방문A":
                     header_row_idx = i
@@ -3535,12 +3546,13 @@ def show_all_staff_summary(staff_names):
             if header_row_idx is not None:
                 break
 
+        st.session_state["_perf_debug_raw"] = raw.head(5).to_dict()
+        st.session_state["_perf_debug_hdr"] = (header_row_idx, visit_a_col_idx)
+
         if header_row_idx is None or visit_a_col_idx is None:
             return None, None, None
 
-        # 데이터는 헤더 행 다음 줄부터
         data = raw.iloc[header_row_idx + 1:].reset_index(drop=True)
-        # 담당자는 첫 번째 컬럼(0번)
         result = pd.DataFrame({
             "_owner":   data.iloc[:, 0].astype(str).str.strip(),
             "_visit_a": data.iloc[:, visit_a_col_idx].astype(str).str.strip(),
@@ -3572,8 +3584,14 @@ def show_all_staff_summary(staff_names):
     # ── 디버그: 실적관리 시트 상태 확인 ──
     with st.expander("🔍 실적관리 시트 디버그 (확인 후 제거 예정)", expanded=False):
         st.write(f"_perf_df: {'로드됨' if _perf_df is not None else 'None'}")
+        if st.session_state.get("_perf_debug_err"):
+            st.error(f"로드 오류: {st.session_state['_perf_debug_err']}")
+        if st.session_state.get("_perf_debug_hdr"):
+            st.write(f"헤더행/방문A열 인덱스: {st.session_state['_perf_debug_hdr']}")
+        if st.session_state.get("_perf_debug_raw"):
+            st.write("원본 상위 5행:")
+            st.write(st.session_state["_perf_debug_raw"])
         if _perf_df is not None:
-            st.write(f"파싱 결과 행 수: {len(_perf_df)}")
             st.write(f"담당자 목록: {_perf_df['_owner'].tolist()}")
             st.write(f"count_visit_a('이성환') = {count_visit_a('이성환')}")
             st.dataframe(_perf_df.head(10))
