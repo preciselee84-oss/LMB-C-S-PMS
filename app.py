@@ -4421,7 +4421,7 @@ def show_all_staff_summary(staff_names):
                         "활동구분": "상담",
                         "활동상세": activity_detail,
                         "업무번호": "",
-                        "제목": template_title or title_from_activity_detail(activity_detail),
+                        "제목": "신규구축" if activity_detail == "개설" else "ERP연계 방문",
                         "활동내역": template_content or f"본사 구글시트 {activity_detail} 실적 반영",
                     })
 
