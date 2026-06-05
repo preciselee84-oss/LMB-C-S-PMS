@@ -3513,19 +3513,28 @@ def show_all_staff_summary(staff_names):
     user_db = load_db(DB_FILE, {})
 
     # 하나지사 실적관리 시트 로드 (방문A 카운트용)
+    # 복합 헤더 구조이므로 header 행을 자동 탐색
+    def _load_perf_sheet():
+        url = st.session_state.get("url_hana_performance", DEFAULT_URL_HANA_PERFORMANCE)
+        for hdr in range(0, 5):
+            try:
+                df = read_google_csv(url, header=hdr).dropna(how="all").reset_index(drop=True)
+                df.columns = [str(c).strip() for c in df.columns]
+                if find_col(df, ["담당자", "성명", "등록자"]) and find_col(df, ["방문A"]):
+                    return df
+            except Exception:
+                continue
+        return None
+
     perf_sheet_df = st.session_state.get("hana_performance_df")
-    if perf_sheet_df is None:
-        try:
-            perf_sheet_df = read_google_csv(
-                st.session_state.get("url_hana_performance", DEFAULT_URL_HANA_PERFORMANCE)
-            ).dropna(how="all").reset_index(drop=True)
+    if perf_sheet_df is None or not find_col(perf_sheet_df, ["방문A"]):
+        perf_sheet_df = _load_perf_sheet()
+        if perf_sheet_df is not None:
             st.session_state.hana_performance_df = perf_sheet_df
-        except Exception:
-            perf_sheet_df = None
 
     # 실적관리 시트에서 방문A 컬럼·담당자 컬럼 탐색
-    perf_owner_col   = find_col(perf_sheet_df, ["담당자", "성명", "등록자"]) if perf_sheet_df is not None else None
-    perf_visit_col   = find_col(perf_sheet_df, ["방문A", "방문", "활동구분", "구분"]) if perf_sheet_df is not None else None
+    perf_owner_col = find_col(perf_sheet_df, ["담당자", "성명", "등록자"]) if perf_sheet_df is not None else None
+    perf_visit_col = find_col(perf_sheet_df, ["방문A"]) if perf_sheet_df is not None else None
 
     def count_visit_a(staff):
         """담당자의 방문A 카운트 (실적관리 시트 기준)"""
