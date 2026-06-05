@@ -3999,20 +3999,26 @@ def show_all_staff_summary(staff_names):
         category_col = find_col(analysis_clean, ["활동구분", "접수유형"])
         if u_col and u_col in analysis_clean.columns:
             for idx, row in perf_df.iterrows():
-                staff_activity = analysis_clean[analysis_clean[u_col] == row["담당자"]].copy()
-                operation_count = 0
-                operation_points = 0
-                if category_col and category_col in staff_activity.columns:
-                    category_text = staff_activity[category_col].astype(str)
-                    visit_count = int(category_text.str.contains("방문", na=False).sum())
-                    remote_count = int(category_text.str.contains("원격", na=False).sum())
-                    operation_count = visit_count + remote_count
-                    operation_points = (visit_count * 30) + (remote_count * 10)
-                elif d_col and d_col in staff_activity.columns:
-                    operation_count = int(
-                        staff_activity[d_col].astype(str).str.contains("운영|방문|점검", na=False).sum()
-                    )
-                    operation_points = operation_count * 30
+                # 실적관리 시트 방문A 우선 (엑셀 업로드보다 우선)
+                va = count_visit_a(row["담당자"])
+                if va is not None:
+                    operation_count  = va
+                    operation_points = va * 30
+                else:
+                    staff_activity = analysis_clean[analysis_clean[u_col] == row["담당자"]].copy()
+                    operation_count = 0
+                    operation_points = 0
+                    if category_col and category_col in staff_activity.columns:
+                        category_text = staff_activity[category_col].astype(str)
+                        visit_count = int(category_text.str.contains("방문", na=False).sum())
+                        remote_count = int(category_text.str.contains("원격", na=False).sum())
+                        operation_count = visit_count + remote_count
+                        operation_points = (visit_count * 30) + (remote_count * 10)
+                    elif d_col and d_col in staff_activity.columns:
+                        operation_count = int(
+                            staff_activity[d_col].astype(str).str.contains("운영|방문|점검", na=False).sum()
+                        )
+                        operation_points = operation_count * 30
 
                 open_points = int(perf_df.at[idx, "개설포인트"]) if "개설포인트" in perf_df.columns else 0
                 link_points = int(perf_df.at[idx, "연계포인트"]) if "연계포인트" in perf_df.columns else 0
