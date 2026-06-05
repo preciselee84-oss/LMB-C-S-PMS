@@ -4303,7 +4303,7 @@ def show_all_staff_summary(staff_names):
                 latest_clean["_staff_target"] = latest_clean[latest_owner_col].map(target_counts).fillna(0).astype(int)
                 latest_clean = latest_clean[latest_clean["_staff_seq"] < latest_clean["_staff_target"]].copy()
 
-                final_check_df = attach_cloud_dates(filter_visit_rows(clean_header_logic(latest_clean.copy())))
+                final_check_df = attach_cloud_dates(clean_header_logic(latest_clean.copy()))
                 final_other_errors = build_other_validation_errors(final_check_df)
                 if isinstance(final_other_errors, pd.DataFrame) and not final_other_errors.empty and "사업자번호" in final_other_errors.columns:
                     invalid_biz = set(normalize_biz(final_other_errors["사업자번호"]).astype(str))
@@ -4324,10 +4324,87 @@ def show_all_staff_summary(staff_names):
                     ).reset_index(drop=True)
                 )
 
+            cloud_history_rows = []
+            cloud_source = st.session_state.get("cloud_sheet_df")
+            if isinstance(cloud_source, pd.DataFrame) and not cloud_source.empty:
+                cloud_source = clean_header_logic(cloud_source.copy())
+                cloud_owner_col = find_col(cloud_source, ["담당자", "등록자", "성명"])
+                cloud_open_col = find_col(cloud_source, ["개설완료일자", "개설일"])
+                cloud_erp_col = find_col(cloud_source, ["ERP연계일자", "연계일자"])
+                cloud_biz_col = find_col(cloud_source, ["사업자번호", "사업자등록번호"])
+                cloud_company_col = find_col(cloud_source, ["고객명", "업체명", "상호"])
+
+                def add_cloud_history_row(src_row, activity_detail, activity_date):
+                    parsed_date = parse_sheet_date(activity_date)
+                    if pd.isna(parsed_date) or parsed_date.strftime("%Y-%m") != target_year_month:
+                        return
+                    staff = str(src_row.get(cloud_owner_col, "")).strip() if cloud_owner_col else ""
+                    if staff not in staff_names:
+                        return
+                    company = src_row.get(cloud_company_col, "") if cloud_company_col else ""
+                    biz_no = normalize_biz(src_row.get(cloud_biz_col, "")) if cloud_biz_col else ""
+                    cloud_history_rows.append({
+                        "지사": "HANA지사",
+                        "상품": "통합CMS",
+                        "업체명": company,
+                        "사업자번호": biz_no,
+                        "등록자": staff,
+                        "활동일자": parsed_date.strftime("%Y-%m-%d"),
+                        "방문장소 (시, 군, 구까지)": "",
+                        "활동구분": "상담",
+                        "활동상세": activity_detail,
+                        "업무번호": "",
+                        "제목": title_from_activity_detail(activity_detail),
+                        "활동내역": f"본사 구글시트 {activity_detail} 실적 반영",
+                    })
+
+                if cloud_owner_col and cloud_biz_col:
+                    for _, cloud_row in cloud_source.iterrows():
+                        if cloud_open_col:
+                            add_cloud_history_row(cloud_row, "개설", cloud_row.get(cloud_open_col, ""))
+                        if cloud_erp_col:
+                            add_cloud_history_row(cloud_row, "연계", cloud_row.get(cloud_erp_col, ""))
+
+            if cloud_history_rows:
+                latest_df = pd.concat(
+                    [latest_df, normalize_converted_history_df(pd.DataFrame(cloud_history_rows))],
+                    ignore_index=True,
+                    sort=False,
+                )
+                latest_all = clean_header_logic(latest_df.copy())
+                all_owner_col = find_col(latest_all, ["등록자", "담당자", "성명"])
+                all_date_col = find_col(latest_all, ["활동일자", "활동일", "일자"])
+                all_detail_col = find_col(latest_all, ["활동상세", "활동내용"])
+                all_biz_col = find_col(latest_all, ["사업자번호"], "사업자번호")
+                if all_owner_col and all_date_col and all_detail_col and all_biz_col:
+                    latest_all["_all_biz"] = normalize_biz(latest_all[all_biz_col])
+                    latest_all["_all_date"] = pd.to_datetime(latest_all[all_date_col], errors="coerce").dt.strftime("%Y-%m-%d")
+                    latest_all["_all_detail"] = latest_all[all_detail_col].astype(str).str.strip()
+                    latest_all[all_owner_col] = latest_all[all_owner_col].astype(str).str.strip()
+                    latest_all = latest_all.drop_duplicates(
+                        subset=["_all_biz", all_owner_col, "_all_date", "_all_detail"],
+                        keep="first",
+                    )
+                    final_all_check = attach_cloud_dates(clean_header_logic(latest_all.copy()))
+                    final_all_errors = build_other_validation_errors(final_all_check)
+                    if isinstance(final_all_errors, pd.DataFrame) and not final_all_errors.empty and "사업자번호" in final_all_errors.columns:
+                        invalid_biz = set(normalize_biz(final_all_errors["사업자번호"]).astype(str))
+                        latest_all = latest_all[~latest_all["_all_biz"].astype(str).isin(invalid_biz)].copy()
+                    latest_df = normalize_converted_history_df(
+                        latest_all.drop(columns=["_all_biz", "_all_date", "_all_detail"], errors="ignore").reset_index(drop=True)
+                    )
+
             st.session_state.admin_uploaded_excel = latest_df
             st.session_state.admin_uploaded_excel_display = latest_df.copy()
             st.session_state.admin_office_upload_key = f"latest_history_{len(latest_df)}_{int(time.time())}"
-            st.success(f"최신 이력 {len(latest_df):,}건을 가져왔습니다. (목표 {target_total:,}건)")
+            detail_summary = {}
+            detail_summary_col = find_col(latest_df, ["활동상세", "활동내용"])
+            if detail_summary_col and detail_summary_col in latest_df.columns:
+                detail_summary = latest_df[detail_summary_col].astype(str).value_counts().to_dict()
+            st.success(
+                f"최신 이력 {len(latest_df):,}건을 가져왔습니다. "
+                f"(운영 목표 {target_total:,}건 / 개설 {int(detail_summary.get('개설', 0)):,}건 / 연계 {int(detail_summary.get('연계', 0)):,}건)"
+            )
             if shortages:
                 shortage_text = ", ".join([f"{staff} {count}건" for staff, count in shortages.items()])
                 st.warning(f"목표 건수보다 부족한 담당자: {shortage_text}")
