@@ -4449,7 +4449,17 @@ def show_all_staff_summary(staff_names):
                 unsafe_allow_html=True,
             )
 
-    st.markdown("#### 담당자별 상세 실적")
+    detail_title_col, detail_refresh_col = st.columns([0.86, 0.14])
+    with detail_title_col:
+        st.markdown("#### 담당자별 상세 실적")
+    with detail_refresh_col:
+        if st.button("🔄 새로고침", key="refresh_staff_detail_perf", use_container_width=True, help="실적관리 시트의 방문A/배분금액을 다시 조회합니다."):
+            for key in ["_perf_parsed", "_perf_parsed_url", "_perf_parsed_version", "_perf_debug_err", "_perf_debug_hdr", "_perf_debug_raw"]:
+                st.session_state.pop(key, None)
+            read_csv_cached.clear()
+            st.toast("담당자별 상세 실적을 새로고침합니다.")
+            st.rerun()
+
     st.dataframe(
         perf_df_with_total,
         use_container_width=True,
