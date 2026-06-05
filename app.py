@@ -4899,7 +4899,8 @@ def show_all_staff_summary(staff_names):
     with dl_ppt_col:
         try:
             report_df_for_ppt = perf_df[display_cols].copy()
-            ppt_bytes = build_report_ppt_bytes(report_df_for_ppt, pd.DataFrame(), curr_month_label, prev_month_label)
+            upload_df_for_ppt = st.session_state.get("admin_uploaded_excel")
+            ppt_bytes = build_report_ppt_bytes(report_df_for_ppt, pd.DataFrame(), curr_month_label, prev_month_label, upload_df_for_ppt)
             st.download_button(
                 "실적보고서 PPT 다운로드",
                 data=ppt_bytes,
@@ -5998,7 +5999,31 @@ def cloud_customer_counts(name=None):
     }
 
 
-def sent_activity_counts(report_df, name=None):
+def sent_activity_counts(report_df, name=None, upload_df=None):
+    if isinstance(upload_df, pd.DataFrame) and not upload_df.empty:
+        upload = clean_header_logic(upload_df.copy())
+        u_col = find_col(upload, ["등록자", "담당자", "성명"])
+        d_col = find_col(upload, ["활동상세", "활동내용"])
+        biz_col = find_col(upload, ["사업자번호"])
+        if name and u_col and u_col in upload.columns:
+            upload = upload[upload[u_col].astype(str).str.strip() == str(name).strip()].copy()
+        if d_col and d_col in upload.columns:
+            detail = upload[d_col].astype(str)
+            open_count = int(detail.str.contains("개설", na=False).sum())
+            link_count = int(detail.str.contains("연계", na=False).sum())
+            operation_count = int(detail.str.contains("개설|연계|운영|방문|점검", na=False).sum())
+            total_count = operation_count
+            unique_customers = 0
+            if biz_col and biz_col in upload.columns:
+                unique_customers = len({v for v in normalize_biz(upload[biz_col]).tolist() if v})
+            return {
+                "open": open_count,
+                "link": link_count,
+                "operation": operation_count,
+                "total": total_count,
+                "unique_customers": unique_customers or total_count,
+            }
+
     df = report_df.copy()
     if name and "담당자" in df.columns:
         df = df[df["담당자"].astype(str).str.strip() == str(name).strip()]
@@ -6092,9 +6117,12 @@ def is_major_note_col(table, col_idx):
         return False
 
 
-def uploaded_major_rows(name, keyword, row_type):
-    payload = load_db(SENT_UPLOADS_FILE, {}).get(name)
-    df = upload_payload_to_dataframe(payload)
+def uploaded_major_rows(name, keyword, row_type, upload_df=None):
+    if isinstance(upload_df, pd.DataFrame) and not upload_df.empty:
+        df = clean_header_logic(upload_df.copy())
+    else:
+        payload = load_db(SENT_UPLOADS_FILE, {}).get(name)
+        df = upload_payload_to_dataframe(payload)
     if df.empty:
         return []
 
@@ -6124,7 +6152,7 @@ def uploaded_major_rows(name, keyword, row_type):
     return rows
 
 
-def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_label):
+def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_label, upload_df=None):
     from pptx import Presentation
     from pptx.enum.text import PP_ALIGN
     from pptx.util import Pt
@@ -6249,7 +6277,7 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
     # 전체 브랜치 서비스(BS성과)_운영: 4페이지
     try:
         if len(prs.slides) > 3:
-            fill_stats_slide(prs.slides[3], sent_activity_counts(report_df), cloud_customer_counts())
+            fill_stats_slide(prs.slides[3], sent_activity_counts(report_df, upload_df=upload_df), cloud_customer_counts())
     except Exception as e:
         raise Exception(f"전체 브랜치 슬라이드(4페이지) 처리 중 오류: {e}")
 
@@ -6271,11 +6299,11 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
         link_idx = idxs[3] if len(idxs) > 3 else None
         try:
             if stats_idx < len(prs.slides):
-                fill_stats_slide(prs.slides[stats_idx], sent_activity_counts(report_df, name), cloud_customer_counts(name))
+                fill_stats_slide(prs.slides[stats_idx], sent_activity_counts(report_df, name, upload_df), cloud_customer_counts(name))
             if open_idx is not None and open_idx < len(prs.slides):
-                fill_major_slide(prs.slides[open_idx], uploaded_major_rows(name, "개설", "일반 개설"))
+                fill_major_slide(prs.slides[open_idx], uploaded_major_rows(name, "개설", "일반 개설", upload_df))
             if link_idx is not None and link_idx < len(prs.slides):
-                fill_major_slide(prs.slides[link_idx], uploaded_major_rows(name, "연계", "추가 연계"))
+                fill_major_slide(prs.slides[link_idx], uploaded_major_rows(name, "연계", "추가 연계", upload_df))
         except Exception as e:
             raise Exception(f"{name} 슬라이드 처리 중 오류: {e}")
 
@@ -6345,7 +6373,10 @@ def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_m
         _is_admin = st.session_state.get("user_role") == "관리자"
         if is_closed or _is_admin:
             try:
-                ppt_bytes = build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_label)
+                upload_df_for_ppt = None
+                if isinstance(st.session_state.get("admin_uploaded_excel"), pd.DataFrame):
+                    upload_df_for_ppt = st.session_state.admin_uploaded_excel
+                ppt_bytes = build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_label, upload_df_for_ppt)
                 st.download_button(
                     "실적보고서 PPT 다운로드",
                     data=ppt_bytes,
