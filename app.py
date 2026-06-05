@@ -3534,6 +3534,17 @@ def show_all_staff_summary(staff_names):
         df = perf_sheet_df[perf_sheet_df[perf_owner_col].astype(str).str.strip() == str(staff).strip()]
         return int(df[perf_visit_col].astype(str).str.strip().eq("방문A").sum())
 
+    # ── 디버그: 실적관리 시트 상태 확인 ──
+    with st.expander("🔍 실적관리 시트 디버그 (확인 후 제거 예정)", expanded=False):
+        st.write(f"perf_sheet_df: {'로드됨' if perf_sheet_df is not None else 'None'}")
+        if perf_sheet_df is not None:
+            st.write(f"컬럼 목록: {list(perf_sheet_df.columns)}")
+            st.write(f"perf_owner_col: {perf_owner_col}")
+            st.write(f"perf_visit_col: {perf_visit_col}")
+            st.write(f"count_visit_a('이성환') = {count_visit_a('이성환')}")
+            if perf_visit_col:
+                st.write(f"방문A 컬럼 고유값: {perf_sheet_df[perf_visit_col].astype(str).str.strip().unique().tolist()[:20]}")
+
     # 실적 데이터 계산
     performance_data = []
 
