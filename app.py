@@ -3573,10 +3573,10 @@ def show_all_staff_summary(staff_names):
 
         visit_a_count = count_visit_a(staff_name)
         if visit_a_count is not None:
-            operation_count = min(60, visit_a_count)
+            operation_count = visit_a_count
             operation_points = operation_count * 30
 
-        elif analysis_df is not None and not analysis_df.empty:
+        if False and analysis_df is not None and not analysis_df.empty:
             analysis_clean = clean_header_logic(analysis_df.copy())
             u_col = find_col(analysis_clean, ["등록자", "담당자", "성명"])
             d_col = find_col(analysis_clean, ["활동상세", "활동내용"])
