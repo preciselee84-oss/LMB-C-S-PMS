@@ -4208,6 +4208,24 @@ def show_all_staff_summary(staff_names):
                 st.warning("하나지사 활동이력 시트에 운영 활동 데이터가 없습니다.")
                 return
 
+            if st.session_state.get("cloud_sheet_df") is None:
+                try:
+                    load_csv_to_state("url_sync", "cloud_sheet_df")
+                except Exception:
+                    pass
+
+            if biz_col and biz_col in operation_df.columns:
+                op_check_df = attach_cloud_dates(filter_visit_rows(clean_header_logic(operation_df.copy())))
+                op_other_errors = build_other_validation_errors(op_check_df)
+                if isinstance(op_other_errors, pd.DataFrame) and not op_other_errors.empty and "사업자번호" in op_other_errors.columns:
+                    invalid_biz = set(normalize_biz(op_other_errors["사업자번호"]).astype(str))
+                    operation_df = operation_df[
+                        ~normalize_biz(operation_df[biz_col]).astype(str).isin(invalid_biz)
+                    ].copy()
+                    if operation_df.empty:
+                        st.warning("기타 오류 대상 고객사를 제외한 운영 활동 데이터가 없습니다.")
+                        return
+
             operation_df["_parsed_date"] = pd.to_datetime(operation_df[date_col].map(parse_sheet_date), errors="coerce")
             operation_df = operation_df.sort_values("_parsed_date", ascending=False, na_position="last")
             business_dates = may_2026_business_dates()
@@ -4284,6 +4302,14 @@ def show_all_staff_summary(staff_names):
                 latest_clean["_staff_seq"] = latest_clean.groupby(latest_owner_col).cumcount()
                 latest_clean["_staff_target"] = latest_clean[latest_owner_col].map(target_counts).fillna(0).astype(int)
                 latest_clean = latest_clean[latest_clean["_staff_seq"] < latest_clean["_staff_target"]].copy()
+
+                final_check_df = attach_cloud_dates(filter_visit_rows(clean_header_logic(latest_clean.copy())))
+                final_other_errors = build_other_validation_errors(final_check_df)
+                if isinstance(final_other_errors, pd.DataFrame) and not final_other_errors.empty and "사업자번호" in final_other_errors.columns:
+                    invalid_biz = set(normalize_biz(final_other_errors["사업자번호"]).astype(str))
+                    latest_clean = latest_clean[
+                        ~latest_clean["_latest_biz"].astype(str).isin(invalid_biz)
+                    ].copy()
 
                 actual_counts = latest_clean.groupby(latest_owner_col).size().to_dict()
                 shortages = {
