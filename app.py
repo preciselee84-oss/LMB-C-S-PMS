@@ -1000,7 +1000,14 @@ def normalize_converted_history_df(df):
         result["활동상세"] = result["활동상세"].astype(str).map(
             lambda v: "연계" if "연계" in v else ("개설" if "개설" in v else "운영")
         )
-        result["제목"] = result["활동상세"].map(title_from_activity_detail)
+        default_titles = result["활동상세"].map(title_from_activity_detail)
+        if "제목" in result.columns:
+            result["제목"] = result["제목"].where(
+                result["제목"].notna() & result["제목"].astype(str).str.strip().ne(""),
+                default_titles,
+            )
+        else:
+            result["제목"] = default_titles
     if "활동일" in result.columns and "활동일자" not in result.columns:
         result = result.rename(columns={"활동일": "활동일자"})
     if "활동내용" in result.columns and "활동내역" not in result.columns:
@@ -4193,6 +4200,10 @@ def show_all_staff_summary(staff_names):
             owner_col = find_col(activity_clean, ["담당자", "등록자", "성명"])
             date_col = find_col(activity_clean, ["활동일", "활동일자", "일자", "날짜"])
             biz_col = find_col(activity_clean, ["사업자번호", "사업자등록번호"])
+            activity_company_col = find_col(activity_clean, ["업체명", "고객명", "상호"])
+            activity_title_col = find_col(activity_clean, ["제목"])
+            activity_content_col = find_col(activity_clean, ["활동내용", "활동내역"])
+            activity_location_col = find_col(activity_clean, ["방문장소", "주소", "지역"])
 
             if not detail_col or not owner_col:
                 st.error("하나지사 활동이력 시트에서 필수 컬럼(활동상세, 담당자)을 찾을 수 없습니다.")
@@ -4231,6 +4242,32 @@ def show_all_staff_summary(staff_names):
             business_dates = may_2026_business_dates()
             generated = []
             shortages = {}
+
+            def template_from_activity_history(activity_detail, company_name):
+                keyword = "개설|구축|신규" if activity_detail == "개설" else "연계|ERP"
+                text_cols = [
+                    col for col in [detail_col, activity_title_col, activity_content_col, activity_company_col]
+                    if col and col in activity_clean.columns
+                ]
+                if not text_cols:
+                    return "", "", ""
+                template_source = activity_clean.copy()
+                template_text = template_source[text_cols].fillna("").astype(str).agg(" ".join, axis=1)
+                candidates = template_source[template_text.str.contains(keyword, regex=True, na=False)].copy()
+                if candidates.empty:
+                    return "", "", ""
+                company_text = str(company_name or "")
+                if "교회" in company_text and activity_company_col and activity_company_col in candidates.columns:
+                    church_candidates = candidates[candidates[activity_company_col].astype(str).str.contains("교회", na=False)].copy()
+                    if not church_candidates.empty:
+                        candidates = church_candidates
+                candidates["_template_date"] = pd.to_datetime(candidates[date_col].map(parse_sheet_date), errors="coerce")
+                candidates = candidates.sort_values("_template_date", ascending=False, na_position="last")
+                template = candidates.iloc[0]
+                title = template.get(activity_title_col, "") if activity_title_col else ""
+                content = template.get(activity_content_col, "") if activity_content_col else ""
+                location = template.get(activity_location_col, "") if activity_location_col else ""
+                return title, content, location
 
             for staff, target_count in target_counts.items():
                 source = operation_df[operation_df[owner_col].astype(str).str.strip() == staff].copy()
@@ -4343,6 +4380,7 @@ def show_all_staff_summary(staff_names):
                         return
                     company = src_row.get(cloud_company_col, "") if cloud_company_col else ""
                     biz_no = normalize_biz(src_row.get(cloud_biz_col, "")) if cloud_biz_col else ""
+                    template_title, template_content, template_location = template_from_activity_history(activity_detail, company)
                     cloud_history_rows.append({
                         "지사": "HANA지사",
                         "상품": "통합CMS",
@@ -4350,12 +4388,12 @@ def show_all_staff_summary(staff_names):
                         "사업자번호": biz_no,
                         "등록자": staff,
                         "활동일자": parsed_date.strftime("%Y-%m-%d"),
-                        "방문장소 (시, 군, 구까지)": "",
+                        "방문장소 (시, 군, 구까지)": template_location,
                         "활동구분": "상담",
                         "활동상세": activity_detail,
                         "업무번호": "",
-                        "제목": title_from_activity_detail(activity_detail),
-                        "활동내역": f"본사 구글시트 {activity_detail} 실적 반영",
+                        "제목": template_title or title_from_activity_detail(activity_detail),
+                        "활동내역": template_content or f"본사 구글시트 {activity_detail} 실적 반영",
                     })
 
                 if cloud_owner_col and cloud_biz_col:
