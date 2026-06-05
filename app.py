@@ -44,6 +44,7 @@ DEFAULT_URL_ANALYSIS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9XPHqr
 DEFAULT_URL_SYNC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9F7R7oLA2B02H-I25kVv2JeYHFgWQq0CT7TeW61hrNpJLdHWJFhFR_iDQGCFAW044o8rRwBDeovKG/pub?gid=1533424484&single=true&output=csv"
 DEFAULT_URL_HANA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgRHnTZD4eDW2UeODQuGxmxFrflKpbQda3sBsVjj1s3qAFWMKcpke2U58UuT6VEDlkbXveZlaroTCr/pub?gid=0&single=true&output=csv"
 DEFAULT_URL_HANA_BILLING = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgRHnTZD4eDW2UeODQuGxmxFrflKpbQda3sBsVjj1s3qAFWMKcpke2U58UuT6VEDlkbXveZlaroTCr/pub?gid=1172734914&single=true&output=csv"
+DEFAULT_URL_HANA_PERFORMANCE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS2CUE3No1cptBOTehN8r1xoTQyUni07sjbut-f1Teo9mpB-rcJgpE5xfI6dTy0M4IUxSg8Mv5_uT4l/pub?gid=1749034066&single=true&output=csv"
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -577,6 +578,7 @@ def init_state():
         "url_sync": DEFAULT_URL_SYNC,
         "url_hana": DEFAULT_URL_HANA,
         "url_hana_billing": DEFAULT_URL_HANA_BILLING,
+        "url_hana_performance": DEFAULT_URL_HANA_PERFORMANCE,
         "dart_api_key": "",
         "hana_sheet_df": None,
         "hana_billing_df": None,
@@ -8995,6 +8997,7 @@ def show_google_sync():
     st.session_state.url_analysis = st.text_input("하나지사 활동이력 구글 시트 CSV URL", value=st.session_state.url_analysis)
     st.session_state.url_hana = st.text_input("하나은행 구글 시트 CSV URL", value=st.session_state.url_hana)
     st.session_state.url_hana_billing = st.text_input("하나은행 청구 시트 CSV URL", value=st.session_state.url_hana_billing)
+    st.session_state.url_hana_performance = st.text_input("하나지사 실적관리 CSV URL", value=st.session_state.get("url_hana_performance", DEFAULT_URL_HANA_PERFORMANCE))
 
     st.divider()
     st.markdown("##### DART 전자공시 API 키")
@@ -9032,6 +9035,12 @@ def show_google_sync():
             st.session_state.hana_billing_df = billing_raw
         except Exception:
             errors.append("하나은행 청구 시트")
+        try:
+            perf_raw = read_google_csv(st.session_state.get("url_hana_performance", DEFAULT_URL_HANA_PERFORMANCE), force_refresh=True)
+            perf_raw = perf_raw.dropna(how="all").reset_index(drop=True)
+            st.session_state.hana_performance_df = perf_raw
+        except Exception:
+            errors.append("하나지사 실적관리 시트")
         if errors:
             st.error(f"불러오기 실패: {', '.join(errors)} — URL을 확인해주세요.")
         else:
@@ -9052,6 +9061,10 @@ def show_google_sync():
     if st.session_state.hana_billing_df is not None:
         st.markdown("**하나은행 청구 시트 데이터** (상위 20행)")
         render_plain_html_table(strip_activity_time_columns(st.session_state.hana_billing_df), max_rows=20)
+
+    if st.session_state.get("hana_performance_df") is not None:
+        st.markdown("**하나지사 실적관리 데이터** (상위 20행)")
+        render_plain_html_table(st.session_state.hana_performance_df, max_rows=20)
 
 
 def inject_theme_toggle():
