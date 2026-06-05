@@ -4138,6 +4138,124 @@ def show_all_staff_summary(staff_names):
         else:
             st.button("샘플파일 다운로드", use_container_width=True, disabled=True)
 
+    def load_latest_operation_history(target_perf_df):
+        target_counts = {}
+        if isinstance(target_perf_df, pd.DataFrame) and not target_perf_df.empty:
+            for _, row in target_perf_df.iterrows():
+                staff = str(row.get("담당자", "")).strip()
+                if not staff or staff == "합계":
+                    continue
+                try:
+                    target_counts[staff] = max(0, int(float(row.get("운영건수 (실제 활동)", 0) or 0)))
+                except Exception:
+                    target_counts[staff] = 0
+        target_counts = {staff: count for staff, count in target_counts.items() if count > 0}
+        if not target_counts:
+            st.warning("가져올 운영건수 대상이 없습니다.")
+            return
+
+        activity_df = st.session_state.get("analysis_lookup_df")
+        if activity_df is None:
+            try:
+                with st.spinner("하나지사 활동이력 시트를 불러오는 중..."):
+                    load_csv_to_state("url_analysis", "analysis_lookup_df")
+                    activity_df = st.session_state.get("analysis_lookup_df")
+            except Exception as e:
+                st.error(f"하나지사 활동이력 구글 시트를 불러오지 못했습니다: {e}")
+                return
+
+        if activity_df is None or activity_df.empty:
+            st.error("하나지사 활동이력 시트 데이터가 없습니다.")
+            return
+
+        with st.spinner("담당자별 운영건수에 맞춰 최신 이력을 가져오는 중..."):
+            activity_clean = clean_header_logic(activity_df.copy())
+            detail_col = find_col(activity_clean, ["활동상세", "활동내용"])
+            owner_col = find_col(activity_clean, ["담당자", "등록자", "성명"])
+            date_col = find_col(activity_clean, ["활동일", "활동일자", "일자", "날짜"])
+            biz_col = find_col(activity_clean, ["사업자번호", "사업자등록번호"])
+
+            if not detail_col or not owner_col:
+                st.error("하나지사 활동이력 시트에서 필수 컬럼(활동상세, 담당자)을 찾을 수 없습니다.")
+                return
+            if not date_col:
+                st.error("하나지사 활동이력 시트에서 날짜 컬럼(활동일)을 찾을 수 없습니다.")
+                return
+
+            operation_df = activity_clean[
+                activity_clean[detail_col].astype(str).str.contains("운영|방문|점검", na=False)
+            ].copy()
+            if operation_df.empty:
+                st.warning("하나지사 활동이력 시트에 운영 활동 데이터가 없습니다.")
+                return
+
+            operation_df["_parsed_date"] = pd.to_datetime(operation_df[date_col].map(parse_sheet_date), errors="coerce")
+            operation_df = operation_df.sort_values("_parsed_date", ascending=False, na_position="last")
+            business_dates = may_2026_business_dates()
+            generated = []
+            shortages = {}
+
+            for staff, target_count in target_counts.items():
+                source = operation_df[operation_df[owner_col].astype(str).str.strip() == staff].copy()
+                if source.empty:
+                    source = operation_df.copy()
+
+                source = source.drop(columns=["_parsed_date"], errors="ignore").reset_index(drop=True)
+                selected_rows = []
+                used_keys = set()
+                daily_counts = {}
+                source_idx = 0
+                attempts = 0
+                max_attempts = max(target_count * 20, len(source) * 3, 100)
+
+                while len(selected_rows) < target_count and attempts < max_attempts and not source.empty:
+                    base = source.iloc[source_idx % len(source)].copy()
+                    source_idx += 1
+                    attempts += 1
+
+                    date = business_dates[len(selected_rows) % len(business_dates)]
+                    if daily_counts.get(date, 0) >= 5:
+                        available_dates = [d for d in business_dates if daily_counts.get(d, 0) < 5]
+                        if not available_dates:
+                            break
+                        date = available_dates[0]
+
+                    biz_value = str(base.get(biz_col, "")).strip() if biz_col else str(source_idx)
+                    key = (staff, date, biz_value, str(base.get(detail_col, "")).strip())
+                    if key in used_keys:
+                        continue
+
+                    base[owner_col] = staff
+                    base[date_col] = date
+                    selected_rows.append(base)
+                    used_keys.add(key)
+                    daily_counts[date] = daily_counts.get(date, 0) + 1
+
+                if len(selected_rows) < target_count:
+                    shortages[staff] = target_count - len(selected_rows)
+                generated.extend(selected_rows)
+
+            if not generated:
+                st.warning("가져온 이력이 없습니다.")
+                return
+
+            latest_df = normalize_converted_history_df(pd.DataFrame(generated))
+            st.session_state.admin_uploaded_excel = latest_df
+            st.session_state.admin_uploaded_excel_display = latest_df.copy()
+            st.session_state.admin_office_upload_key = f"latest_history_{len(latest_df)}_{int(time.time())}"
+            st.success(f"최신 이력 {len(latest_df):,}건을 가져왔습니다.")
+            if shortages:
+                shortage_text = ", ".join([f"{staff} {count}건" for staff, count in shortages.items()])
+                st.warning(f"목표 건수보다 부족한 담당자: {shortage_text}")
+            st.rerun()
+
+    latest_col, latest_spacer = st.columns([0.18, 0.82])
+    with latest_col:
+        if st.button("최신 이력가져오기", use_container_width=True, key="admin_load_latest_history"):
+            load_latest_operation_history(perf_df)
+    with latest_spacer:
+        st.caption("실적관리 시트의 운영건수(실제 활동)에 맞춰 하나지사 활동이력에서 최신 운영 이력을 가져옵니다.")
+
 
     if (
         isinstance(st.session_state.get("admin_uploaded_excel"), pd.DataFrame)
@@ -4214,7 +4332,7 @@ def show_all_staff_summary(staff_names):
         with title_col:
             st.markdown("#### 본사이력 업로드 데이터")
         with add_history_col:
-            if st.button("추가 이력 가져오기", use_container_width=True, key="admin_add_random_history"):
+            if False and st.button("추가 이력 가져오기", use_container_width=True, key="admin_add_random_history"):
                 # 하나지사 활동이력 구글 시트에서 랜덤 운영 이력 생성 (360건, 담당자별 최대 60건)
                 # url_analysis 시트 로드
                 activity_df = st.session_state.get("analysis_lookup_df")
@@ -4348,7 +4466,7 @@ def show_all_staff_summary(staff_names):
                                     st.rerun()
                                 else:
                                     st.warning("⚠️ 생성된 데이터가 없습니다.")
-            st.caption("💡 담당자별 운영 활동을 60회로 제한하여 가져옵니다.")
+            pass
         st.caption(f"업로드 데이터 건수: {len(admin_uploaded_df):,}건")
         st.dataframe(admin_uploaded_df, use_container_width=True, hide_index=True)
 
