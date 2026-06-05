@@ -3553,6 +3553,7 @@ def show_all_staff_summary(staff_names):
         # "방문A" 가 들어있는 행을 헤더 행으로 탐색
         header_row_idx = None
         visit_a_col_idx = None
+        owner_col_idx = None
         for i in range(min(15, len(raw))):
             for j, val in enumerate(raw.iloc[i]):
                 if str(val).strip() == "방문A":
@@ -3563,27 +3564,42 @@ def show_all_staff_summary(staff_names):
                 break
 
         st.session_state["_perf_debug_raw"] = raw.head(5).to_dict()
-        st.session_state["_perf_debug_hdr"] = (header_row_idx, visit_a_col_idx)
+        if header_row_idx is not None:
+            for i in range(max(0, header_row_idx - 3), min(len(raw), header_row_idx + 2)):
+                for j, val in enumerate(raw.iloc[i]):
+                    if str(val).strip() in ["이름", "담당자", "성명"]:
+                        owner_col_idx = j
+                        break
+                if owner_col_idx is not None:
+                    break
+        st.session_state["_perf_debug_hdr"] = (header_row_idx, owner_col_idx, visit_a_col_idx)
 
-        if header_row_idx is None or visit_a_col_idx is None:
+        if header_row_idx is None or owner_col_idx is None or visit_a_col_idx is None:
             return None, None, None
 
         data = raw.iloc[header_row_idx + 1:].reset_index(drop=True)
         result = pd.DataFrame({
-            "_owner":   data.iloc[:, 0].astype(str).str.strip(),
+            "_owner":   data.iloc[:, owner_col_idx].astype(str).str.strip(),
             "_visit_a": data.iloc[:, visit_a_col_idx].astype(str).str.strip(),
         })
-        result = result[result["_owner"].ne("") & result["_owner"].ne("nan")].reset_index(drop=True)
+        result = result[
+            result["_owner"].ne("")
+            & result["_owner"].ne("nan")
+            & result["_owner"].ne("합계")
+        ].reset_index(drop=True)
         return result, "_owner", "_visit_a"
 
     _perf_url = normalize_google_sheet_csv_url(st.session_state.get("url_hana_performance", DEFAULT_URL_HANA_PERFORMANCE))
+    _perf_parser_version = 2
     _perf_cache = st.session_state.get("_perf_parsed")
     _perf_cache_url = st.session_state.get("_perf_parsed_url")
-    if _perf_cache is None or _perf_cache_url != _perf_url:
+    _perf_cache_version = st.session_state.get("_perf_parsed_version")
+    if _perf_cache is None or _perf_cache_url != _perf_url or _perf_cache_version != _perf_parser_version:
         _perf_df, _perf_owner, _perf_visit = _load_perf_sheet()
         if _perf_df is not None:
             st.session_state["_perf_parsed"] = (_perf_df, _perf_owner, _perf_visit)
             st.session_state["_perf_parsed_url"] = _perf_url
+            st.session_state["_perf_parsed_version"] = _perf_parser_version
         _perf_cache = (_perf_df, _perf_owner, _perf_visit)
     else:
         _perf_df, _perf_owner, _perf_visit = _perf_cache
