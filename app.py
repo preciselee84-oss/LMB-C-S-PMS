@@ -3553,12 +3553,13 @@ def show_all_staff_summary(staff_names):
                 _err += f"direct: {e2}"
         if raw is None:
             st.session_state["_perf_debug_err"] = _err
-            return None, None, None
+            return None, None, None, None
 
         # "방문A" 가 들어있는 행을 헤더 행으로 탐색
         header_row_idx = None
         visit_a_col_idx = None
         owner_col_idx = None
+        payout_col_idx = None
         for i in range(min(15, len(raw))):
             for j, val in enumerate(raw.iloc[i]):
                 if str(val).strip() == "방문A":
@@ -3574,40 +3575,49 @@ def show_all_staff_summary(staff_names):
                 for j, val in enumerate(raw.iloc[i]):
                     if str(val).strip() in ["이름", "담당자", "성명"]:
                         owner_col_idx = j
-                        break
-                if owner_col_idx is not None:
+                    if str(val).strip() in ["배분금액", "지급예상금액", "금액"]:
+                        payout_col_idx = j
+                if owner_col_idx is not None and payout_col_idx is not None:
                     break
-        st.session_state["_perf_debug_hdr"] = (header_row_idx, owner_col_idx, visit_a_col_idx)
+        st.session_state["_perf_debug_hdr"] = (header_row_idx, owner_col_idx, visit_a_col_idx, payout_col_idx)
 
         if header_row_idx is None or owner_col_idx is None or visit_a_col_idx is None:
-            return None, None, None
+            return None, None, None, None
 
         data = raw.iloc[header_row_idx + 1:].reset_index(drop=True)
         result = pd.DataFrame({
             "_owner":   data.iloc[:, owner_col_idx].astype(str).str.strip(),
             "_visit_a": data.iloc[:, visit_a_col_idx].astype(str).str.strip(),
         })
+        if payout_col_idx is not None:
+            result["_payout"] = data.iloc[:, payout_col_idx].astype(str).str.strip()
+        else:
+            result["_payout"] = ""
         result = result[
             result["_owner"].ne("")
             & result["_owner"].ne("nan")
             & result["_owner"].ne("합계")
         ].reset_index(drop=True)
-        return result, "_owner", "_visit_a"
+        return result, "_owner", "_visit_a", "_payout"
 
     _perf_url = normalize_google_sheet_csv_url(st.session_state.get("url_hana_performance", DEFAULT_URL_HANA_PERFORMANCE))
-    _perf_parser_version = 2
+    _perf_parser_version = 3
     _perf_cache = st.session_state.get("_perf_parsed")
     _perf_cache_url = st.session_state.get("_perf_parsed_url")
     _perf_cache_version = st.session_state.get("_perf_parsed_version")
     if _perf_cache is None or _perf_cache_url != _perf_url or _perf_cache_version != _perf_parser_version:
-        _perf_df, _perf_owner, _perf_visit = _load_perf_sheet()
+        _perf_df, _perf_owner, _perf_visit, _perf_payout = _load_perf_sheet()
         if _perf_df is not None:
-            st.session_state["_perf_parsed"] = (_perf_df, _perf_owner, _perf_visit)
+            st.session_state["_perf_parsed"] = (_perf_df, _perf_owner, _perf_visit, _perf_payout)
             st.session_state["_perf_parsed_url"] = _perf_url
             st.session_state["_perf_parsed_version"] = _perf_parser_version
-        _perf_cache = (_perf_df, _perf_owner, _perf_visit)
+        _perf_cache = (_perf_df, _perf_owner, _perf_visit, _perf_payout)
     else:
-        _perf_df, _perf_owner, _perf_visit = _perf_cache
+        if len(_perf_cache) == 3:
+            _perf_df, _perf_owner, _perf_visit = _perf_cache
+            _perf_payout = None
+        else:
+            _perf_df, _perf_owner, _perf_visit, _perf_payout = _perf_cache
 
     def count_visit_a(staff):
         """담당자의 방문A 값 (실적관리 시트 요약표 기준)"""
@@ -3626,11 +3636,50 @@ def show_all_staff_summary(staff_names):
             if not match:
                 return 0
             try:
-                return int(float(match.group()))
+                return int(round(float(match.group())))
             except Exception:
                 return 0
 
         return int(rows[_perf_visit].map(parse_visit_count).sum())
+
+    def perf_sheet_payout_amount(staff):
+        """담당자의 배분금액 값 (실적관리 시트 계산 결과 기준)"""
+        if _perf_df is None or _perf_owner is None or not _perf_payout:
+            return None
+        staff_key = str(staff).strip()
+        rows = _perf_df[_perf_df[_perf_owner].astype(str).str.strip() == staff_key]
+        if rows.empty:
+            return None
+
+        def parse_amount(value):
+            text = str(value).strip().replace(",", "")
+            if not text or text.lower() == "nan" or text == "-":
+                return None
+            match = re.search(r"-?\d+(?:\.\d+)?", text)
+            if not match:
+                return None
+            try:
+                return int(round(float(match.group())))
+            except Exception:
+                return None
+
+        amounts = [amount for amount in rows[_perf_payout].map(parse_amount).tolist() if amount is not None]
+        return amounts[0] if amounts else None
+
+    def apply_perf_sheet_payouts(df):
+        if df is None or not isinstance(df, pd.DataFrame) or df.empty or "담당자" not in df.columns:
+            return df
+        result_df = df.copy()
+        for idx, row in result_df.iterrows():
+            staff = row.get("담당자", "")
+            if str(staff).strip() == "합계":
+                continue
+            amount = perf_sheet_payout_amount(staff)
+            if amount is None:
+                continue
+            result_df.at[idx, "지급예상금액"] = amount
+            result_df.at[idx, "지급포인트"] = int(round(amount / 500))
+        return result_df
 
     # ── 디버그: 실적관리 시트 상태 확인 ──
     with st.expander("🔍 실적관리 시트 디버그 (확인 후 제거 예정)", expanded=False):
@@ -3645,6 +3694,7 @@ def show_all_staff_summary(staff_names):
         if _perf_df is not None:
             st.write(f"담당자 목록: {_perf_df['_owner'].tolist()}")
             st.write(f"count_visit_a('이성환') = {count_visit_a('이성환')}")
+            st.write(f"perf_sheet_payout_amount('이성환') = {perf_sheet_payout_amount('이성환')}")
             st.dataframe(_perf_df.head(10))
 
     # 실적 데이터 계산
@@ -3756,6 +3806,7 @@ def show_all_staff_summary(staff_names):
     # DataFrame 생성
     perf_df = pd.DataFrame(performance_data)
     perf_df, debug_info = apply_rs_allowance_formula(perf_df, user_db, return_debug=True)
+    perf_df = apply_perf_sheet_payouts(perf_df)
 
     # 디버깅 정보 표시
     st.markdown("---")
@@ -4141,6 +4192,7 @@ def show_all_staff_summary(staff_names):
                 perf_df.at[idx, "합계포인트"] = total_points
 
             perf_df = apply_rs_allowance_formula(perf_df, user_db)
+            perf_df = apply_perf_sheet_payouts(perf_df)
 
             total_row = {}
             for col in display_cols:
