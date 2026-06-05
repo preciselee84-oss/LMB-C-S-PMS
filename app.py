@@ -3513,46 +3513,70 @@ def show_all_staff_summary(staff_names):
     user_db = load_db(DB_FILE, {})
 
     # 하나지사 실적관리 시트 로드 (방문A 카운트용)
-    # 복합 헤더 구조이므로 header 행을 자동 탐색
+    # 복합 헤더(다중 행)이므로 header=None으로 원본 로딩 후 직접 파싱
     def _load_perf_sheet():
         url = st.session_state.get("url_hana_performance", DEFAULT_URL_HANA_PERFORMANCE)
-        for hdr in range(0, 5):
-            try:
-                df = read_google_csv(url, header=hdr).dropna(how="all").reset_index(drop=True)
-                df.columns = [str(c).strip() for c in df.columns]
-                if find_col(df, ["담당자", "성명", "등록자"]) and find_col(df, ["방문A"]):
-                    return df
-            except Exception:
-                continue
-        return None
+        try:
+            import io
+            resp = _requests.get(url, timeout=15)
+            raw = pd.read_csv(io.StringIO(resp.text), header=None, dtype=str)
+        except Exception:
+            return None, None, None
 
-    perf_sheet_df = st.session_state.get("hana_performance_df")
-    if perf_sheet_df is None or not find_col(perf_sheet_df, ["방문A"]):
-        perf_sheet_df = _load_perf_sheet()
-        if perf_sheet_df is not None:
-            st.session_state.hana_performance_df = perf_sheet_df
+        # "방문A" 가 들어있는 행을 헤더 행으로 탐색
+        header_row_idx = None
+        visit_a_col_idx = None
+        for i in range(min(10, len(raw))):
+            for j, val in enumerate(raw.iloc[i]):
+                if str(val).strip() == "방문A":
+                    header_row_idx = i
+                    visit_a_col_idx = j
+                    break
+            if header_row_idx is not None:
+                break
 
-    # 실적관리 시트에서 방문A 컬럼·담당자 컬럼 탐색
-    perf_owner_col = find_col(perf_sheet_df, ["담당자", "성명", "등록자"]) if perf_sheet_df is not None else None
-    perf_visit_col = find_col(perf_sheet_df, ["방문A"]) if perf_sheet_df is not None else None
+        if header_row_idx is None or visit_a_col_idx is None:
+            return None, None, None
+
+        # 데이터는 헤더 행 다음 줄부터
+        data = raw.iloc[header_row_idx + 1:].reset_index(drop=True)
+        # 담당자는 첫 번째 컬럼(0번)
+        result = pd.DataFrame({
+            "_owner":   data.iloc[:, 0].astype(str).str.strip(),
+            "_visit_a": data.iloc[:, visit_a_col_idx].astype(str).str.strip(),
+        })
+        result = result[result["_owner"].ne("") & result["_owner"].ne("nan")].reset_index(drop=True)
+        return result, "_owner", "_visit_a"
+
+    _perf_cache = st.session_state.get("_perf_parsed")
+    if _perf_cache is None:
+        _perf_df, _perf_owner, _perf_visit = _load_perf_sheet()
+        if _perf_df is not None:
+            st.session_state["_perf_parsed"] = (_perf_df, _perf_owner, _perf_visit)
+        _perf_cache = (_perf_df, _perf_owner, _perf_visit)
+    else:
+        _perf_df, _perf_owner, _perf_visit = _perf_cache
 
     def count_visit_a(staff):
-        """담당자의 방문A 카운트 (실적관리 시트 기준)"""
-        if perf_sheet_df is None or not perf_owner_col or not perf_visit_col:
+        """담당자의 방문A 값 (실적관리 시트 요약표 기준)"""
+        if _perf_df is None or _perf_owner is None or _perf_visit is None:
             return None
-        df = perf_sheet_df[perf_sheet_df[perf_owner_col].astype(str).str.strip() == str(staff).strip()]
-        return int(df[perf_visit_col].astype(str).str.strip().eq("방문A").sum())
+        row = _perf_df[_perf_df[_perf_owner] == str(staff).strip()]
+        if row.empty:
+            return None
+        try:
+            return int(float(row.iloc[0][_perf_visit].replace(",", "") or 0))
+        except Exception:
+            return 0
 
     # ── 디버그: 실적관리 시트 상태 확인 ──
     with st.expander("🔍 실적관리 시트 디버그 (확인 후 제거 예정)", expanded=False):
-        st.write(f"perf_sheet_df: {'로드됨' if perf_sheet_df is not None else 'None'}")
-        if perf_sheet_df is not None:
-            st.write(f"컬럼 목록: {list(perf_sheet_df.columns)}")
-            st.write(f"perf_owner_col: {perf_owner_col}")
-            st.write(f"perf_visit_col: {perf_visit_col}")
+        st.write(f"_perf_df: {'로드됨' if _perf_df is not None else 'None'}")
+        if _perf_df is not None:
+            st.write(f"파싱 결과 행 수: {len(_perf_df)}")
+            st.write(f"담당자 목록: {_perf_df['_owner'].tolist()}")
             st.write(f"count_visit_a('이성환') = {count_visit_a('이성환')}")
-            if perf_visit_col:
-                st.write(f"방문A 컬럼 고유값: {perf_sheet_df[perf_visit_col].astype(str).str.strip().unique().tolist()[:20]}")
+            st.dataframe(_perf_df.head(10))
 
     # 실적 데이터 계산
     performance_data = []
