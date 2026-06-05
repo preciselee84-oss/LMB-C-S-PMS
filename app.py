@@ -4259,6 +4259,45 @@ def show_all_staff_summary(staff_names):
                 return
 
             latest_df = normalize_converted_history_df(pd.DataFrame(generated))
+            latest_clean = clean_header_logic(latest_df.copy())
+            latest_owner_col = find_col(latest_clean, ["등록자", "담당자", "성명"])
+            latest_date_col = find_col(latest_clean, ["활동일자", "활동일", "일자"])
+            latest_detail_col = find_col(latest_clean, ["활동상세", "활동내용"])
+            latest_biz_col = find_col(latest_clean, ["사업자번호"], "사업자번호")
+
+            if latest_owner_col and latest_date_col and latest_detail_col:
+                latest_clean[latest_owner_col] = latest_clean[latest_owner_col].astype(str).str.strip()
+                latest_clean["_latest_date"] = pd.to_datetime(latest_clean[latest_date_col], errors="coerce").dt.strftime("%Y-%m-%d")
+                latest_clean["_latest_detail"] = latest_clean[latest_detail_col].astype(str).str.strip()
+                if latest_biz_col and latest_biz_col in latest_clean.columns:
+                    latest_clean["_latest_biz"] = normalize_biz(latest_clean[latest_biz_col])
+                else:
+                    latest_clean["_latest_biz"] = ""
+
+                latest_clean = latest_clean[latest_clean[latest_owner_col].isin(target_counts.keys())].copy()
+                latest_clean = latest_clean.drop_duplicates(
+                    subset=["_latest_biz", latest_owner_col, "_latest_date", "_latest_detail"],
+                    keep="first",
+                )
+                latest_clean["_daily_seq"] = latest_clean.groupby([latest_owner_col, "_latest_date"]).cumcount()
+                latest_clean = latest_clean[latest_clean["_daily_seq"] < 5].copy()
+                latest_clean["_staff_seq"] = latest_clean.groupby(latest_owner_col).cumcount()
+                latest_clean["_staff_target"] = latest_clean[latest_owner_col].map(target_counts).fillna(0).astype(int)
+                latest_clean = latest_clean[latest_clean["_staff_seq"] < latest_clean["_staff_target"]].copy()
+
+                actual_counts = latest_clean.groupby(latest_owner_col).size().to_dict()
+                shortages = {
+                    staff: target - int(actual_counts.get(staff, 0))
+                    for staff, target in target_counts.items()
+                    if int(actual_counts.get(staff, 0)) < target
+                }
+                latest_df = normalize_converted_history_df(
+                    latest_clean.drop(
+                        columns=["_latest_date", "_latest_detail", "_latest_biz", "_daily_seq", "_staff_seq", "_staff_target"],
+                        errors="ignore",
+                    ).reset_index(drop=True)
+                )
+
             st.session_state.admin_uploaded_excel = latest_df
             st.session_state.admin_uploaded_excel_display = latest_df.copy()
             st.session_state.admin_office_upload_key = f"latest_history_{len(latest_df)}_{int(time.time())}"
