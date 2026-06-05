@@ -3512,6 +3512,28 @@ def show_all_staff_summary(staff_names):
     # 직원 정보 로드 (직급 정보 가져오기)
     user_db = load_db(DB_FILE, {})
 
+    # 하나지사 실적관리 시트 로드 (방문A 카운트용)
+    perf_sheet_df = st.session_state.get("hana_performance_df")
+    if perf_sheet_df is None:
+        try:
+            perf_sheet_df = read_google_csv(
+                st.session_state.get("url_hana_performance", DEFAULT_URL_HANA_PERFORMANCE)
+            ).dropna(how="all").reset_index(drop=True)
+            st.session_state.hana_performance_df = perf_sheet_df
+        except Exception:
+            perf_sheet_df = None
+
+    # 실적관리 시트에서 방문A 컬럼·담당자 컬럼 탐색
+    perf_owner_col   = find_col(perf_sheet_df, ["담당자", "성명", "등록자"]) if perf_sheet_df is not None else None
+    perf_visit_col   = find_col(perf_sheet_df, ["방문A", "방문", "활동구분", "구분"]) if perf_sheet_df is not None else None
+
+    def count_visit_a(staff):
+        """담당자의 방문A 카운트 (실적관리 시트 기준)"""
+        if perf_sheet_df is None or not perf_owner_col or not perf_visit_col:
+            return None
+        df = perf_sheet_df[perf_sheet_df[perf_owner_col].astype(str).str.strip() == str(staff).strip()]
+        return int(df[perf_visit_col].astype(str).str.strip().eq("방문A").sum())
+
     # 실적 데이터 계산
     performance_data = []
 
@@ -3545,11 +3567,16 @@ def show_all_staff_summary(staff_names):
             if company_col and company_col in may_erp_data.columns:
                 erp_companies = may_erp_data[company_col].astype(str).tolist()
 
-        # 운영 실적: 업로드한 엑셀 파일에서 계산
+        # 운영 실적: 하나지사 실적관리 시트 방문A 카운트 우선, 없으면 업로드 파일 기준
         operation_count = 0
         operation_points = 0
 
-        if analysis_df is not None and not analysis_df.empty:
+        visit_a_count = count_visit_a(staff_name)
+        if visit_a_count is not None:
+            operation_count = min(60, visit_a_count)
+            operation_points = operation_count * 30
+
+        elif analysis_df is not None and not analysis_df.empty:
             analysis_clean = clean_header_logic(analysis_df.copy())
             u_col = find_col(analysis_clean, ["등록자", "담당자", "성명"])
             d_col = find_col(analysis_clean, ["활동상세", "활동내용"])
