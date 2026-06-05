@@ -49,12 +49,28 @@ DEFAULT_URL_HANA_PERFORMANCE = "https://docs.google.com/spreadsheets/d/e/2PACX-1
 
 @st.cache_data(ttl=300, show_spinner=False)
 def read_csv_cached(url, header=0, cache_buster=0):
+    url = normalize_google_sheet_csv_url(url)
     return pd.read_csv(url, header=header)
 
 
 def read_google_csv(url, header=0, force_refresh=False):
     cache_buster = int(datetime.utcnow().timestamp()) if force_refresh else 0
     return read_csv_cached(url, header=header, cache_buster=cache_buster).copy()
+
+
+def normalize_google_sheet_csv_url(url):
+    """Google Sheets pubhtml/pub links are normalized to direct CSV export."""
+    if not isinstance(url, str):
+        return url
+    normalized = url.strip()
+    if "docs.google.com/spreadsheets" not in normalized:
+        return normalized
+    normalized = normalized.replace("/pubhtml?", "/pub?")
+    normalized = normalized.replace("/pubhtml", "/pub")
+    if "/pub?" in normalized and "output=csv" not in normalized:
+        separator = "&" if "?" in normalized else "?"
+        normalized = f"{normalized}{separator}output=csv"
+    return normalized
 
 
 GITHUB_REPO = "preciselee84-oss/LMB-C-S-PMS"
@@ -3515,7 +3531,7 @@ def show_all_staff_summary(staff_names):
     # 하나지사 실적관리 시트 로드 (방문A 카운트용)
     # 복합 헤더(다중 행)이므로 header=None으로 원본 로딩 후 직접 파싱
     def _load_perf_sheet():
-        url = st.session_state.get("url_hana_performance", DEFAULT_URL_HANA_PERFORMANCE)
+        url = normalize_google_sheet_csv_url(st.session_state.get("url_hana_performance", DEFAULT_URL_HANA_PERFORMANCE))
         raw = None
         _err = ""
         # 방법1: read_csv_cached (캐시 활용)
@@ -3560,11 +3576,14 @@ def show_all_staff_summary(staff_names):
         result = result[result["_owner"].ne("") & result["_owner"].ne("nan")].reset_index(drop=True)
         return result, "_owner", "_visit_a"
 
+    _perf_url = normalize_google_sheet_csv_url(st.session_state.get("url_hana_performance", DEFAULT_URL_HANA_PERFORMANCE))
     _perf_cache = st.session_state.get("_perf_parsed")
-    if _perf_cache is None:
+    _perf_cache_url = st.session_state.get("_perf_parsed_url")
+    if _perf_cache is None or _perf_cache_url != _perf_url:
         _perf_df, _perf_owner, _perf_visit = _load_perf_sheet()
         if _perf_df is not None:
             st.session_state["_perf_parsed"] = (_perf_df, _perf_owner, _perf_visit)
+            st.session_state["_perf_parsed_url"] = _perf_url
         _perf_cache = (_perf_df, _perf_owner, _perf_visit)
     else:
         _perf_df, _perf_owner, _perf_visit = _perf_cache
@@ -3573,13 +3592,24 @@ def show_all_staff_summary(staff_names):
         """담당자의 방문A 값 (실적관리 시트 요약표 기준)"""
         if _perf_df is None or _perf_owner is None or _perf_visit is None:
             return None
-        row = _perf_df[_perf_df[_perf_owner] == str(staff).strip()]
-        if row.empty:
+        staff_key = str(staff).strip()
+        rows = _perf_df[_perf_df[_perf_owner].astype(str).str.strip() == staff_key]
+        if rows.empty:
             return None
-        try:
-            return int(float(row.iloc[0][_perf_visit].replace(",", "") or 0))
-        except Exception:
-            return 0
+
+        def parse_visit_count(value):
+            text = str(value).strip().replace(",", "")
+            if not text or text.lower() == "nan":
+                return 0
+            match = re.search(r"-?\d+(?:\.\d+)?", text)
+            if not match:
+                return 0
+            try:
+                return int(float(match.group()))
+            except Exception:
+                return 0
+
+        return int(rows[_perf_visit].map(parse_visit_count).sum())
 
     # ── 디버그: 실적관리 시트 상태 확인 ──
     with st.expander("🔍 실적관리 시트 디버그 (확인 후 제거 예정)", expanded=False):
