@@ -4243,7 +4243,7 @@ def show_all_staff_summary(staff_names):
             generated = []
             shortages = {}
 
-            def template_from_activity_history(activity_detail, company_name):
+            def template_from_activity_history(activity_detail, company_name, staff_name="", biz_no=""):
                 keyword = "개설|구축|신규" if activity_detail == "개설" else "연계|ERP"
                 text_cols = [
                     col for col in [detail_col, activity_title_col, activity_content_col, activity_company_col]
@@ -4263,10 +4263,39 @@ def show_all_staff_summary(staff_names):
                         candidates = church_candidates
                 candidates["_template_date"] = pd.to_datetime(candidates[date_col].map(parse_sheet_date), errors="coerce")
                 candidates = candidates.sort_values("_template_date", ascending=False, na_position="last")
-                template = candidates.iloc[0]
-                title = template.get(activity_title_col, "") if activity_title_col else ""
-                content = template.get(activity_content_col, "") if activity_content_col else ""
+                seed = f"{activity_detail}|{company_name}|{staff_name}|{biz_no}"
+                template_idx = int(hashlib.md5(seed.encode("utf-8")).hexdigest(), 16) % len(candidates)
+                template = candidates.iloc[template_idx]
+                template_company = str(template.get(activity_company_col, "")).strip() if activity_company_col else ""
+                title = str(template.get(activity_title_col, "") or "").strip() if activity_title_col else ""
+                content = str(template.get(activity_content_col, "") or "").strip() if activity_content_col else ""
                 location = template.get(activity_location_col, "") if activity_location_col else ""
+
+                if template_company and company_text:
+                    title = title.replace(template_company, company_text)
+                    content = content.replace(template_company, company_text)
+
+                variants = {
+                    "개설": [
+                        "서버 구축 및 사용자 교육 진행, 초기 사용 환경 점검 완료",
+                        "계좌 등록과 권한 설정 안내, 조회/이체 기본 업무 교육 진행",
+                        "신규 구축 후 담당자 사용 방법 안내 및 운영 전환 사항 확인",
+                        "클라이언트 설치와 기본 메뉴 교육 진행, 추가 요청사항 확인",
+                        "초기 세팅 상태 점검 및 개설 이후 사용 일정 협의 완료",
+                    ],
+                    "연계": [
+                        "ERP 연계 대상 업무 확인 및 데이터 내보내기 절차 안내",
+                        "연계 설정 상태 점검, 테스트 데이터 확인 후 후속 일정 협의",
+                        "ERP 담당자와 연계 범위 확인 및 반영 결과 점검 진행",
+                        "연계 오류 가능 항목 사전 확인, 사용자 검증 방법 안내",
+                        "연계 완료 후 조회/전송 데이터 확인 및 담당자 교육 진행",
+                    ],
+                }
+                variant_list = variants.get(activity_detail, [])
+                if variant_list:
+                    variant_idx = int(hashlib.md5(f"{seed}|variant".encode("utf-8")).hexdigest(), 16) % len(variant_list)
+                    company_prefix = f"{company_text} " if company_text else ""
+                    content = f"{content}\n- {company_prefix}{variant_list[variant_idx]}".strip()
                 return title, content, location
 
             for staff, target_count in target_counts.items():
@@ -4380,7 +4409,7 @@ def show_all_staff_summary(staff_names):
                         return
                     company = src_row.get(cloud_company_col, "") if cloud_company_col else ""
                     biz_no = normalize_biz(src_row.get(cloud_biz_col, "")) if cloud_biz_col else ""
-                    template_title, template_content, template_location = template_from_activity_history(activity_detail, company)
+                    template_title, template_content, template_location = template_from_activity_history(activity_detail, company, staff, biz_no)
                     cloud_history_rows.append({
                         "지사": "HANA지사",
                         "상품": "통합CMS",
