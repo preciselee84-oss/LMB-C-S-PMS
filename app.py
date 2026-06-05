@@ -1265,6 +1265,21 @@ def apply_rs_allowance_formula(perf_df, user_db, return_debug=False):
     if perf_df is None or perf_df.empty or "합계포인트" not in perf_df.columns:
         return (perf_df, {}) if return_debug else perf_df
 
+    def num(value):
+        try:
+            if pd.isna(value):
+                return 0
+            return int(float(str(value).replace(",", "").strip() or 0))
+        except Exception:
+            return 0
+
+    def payable_points(row):
+        open_link_points = num(row.get("개설포인트", 0)) + num(row.get("연계포인트", 0))
+        operation_points = num(row.get("운영포인트 (실제 활동)", 0))
+        operation_points += num(row.get("운영포인트 (추가 활동)", 0))
+        operation_points += num(row.get("운영포인트(추가 활동)", 0))
+        return min(open_link_points, 1000) + min(operation_points, 1800)
+
     result = perf_df.copy()
     result["지급포인트"] = 0
     result["지급예상금액"] = 0
@@ -1280,6 +1295,7 @@ def apply_rs_allowance_formula(perf_df, user_db, return_debug=False):
             name_to_info[info["name"]] = {
                 "rank": info.get("rank", "직원"),
                 "outsource": info.get("outsource", "아니오"),
+                "staff_type": info.get("staff_type", "정규직"),
                 "period": info.get("outsource_period", "해당없음"),
                 "dept_type": info.get("dept_type", "사업부")
             }
@@ -1295,7 +1311,7 @@ def apply_rs_allowance_formula(perf_df, user_db, return_debug=False):
             staff_info = name_to_info[staff_name]
             if staff_info["dept_type"] == "C&S":
                 cs_staff.append((idx, row, staff_info))
-                if staff_info["outsource"] == "예":
+                if staff_info["outsource"] == "예" or staff_info["staff_type"] == "외주":
                     outsource_staff.append((idx, row, staff_info))
                 else:
                     regular_staff.append((idx, row, staff_info))
@@ -1303,15 +1319,15 @@ def apply_rs_allowance_formula(perf_df, user_db, return_debug=False):
     if not cs_staff:
         return (result, {}) if return_debug else result
 
-    # BU 평균 계산 (C&S 전체 합산포인트 / C&S 인원)
-    total_bu_points = sum(int(float(row["합계포인트"]) if pd.notna(row["합계포인트"]) else 0) for _, row, _ in cs_staff)
+    # BU 평균 계산 (C&S 전체 지급 산정 포인트 / C&S 인원)
+    total_bu_points = sum(payable_points(row) for _, row, _ in cs_staff)
     bu_count = len(cs_staff)
     bu_average = total_bu_points / bu_count if bu_count > 0 else 0
 
     # 외주직원 가감포인트 계산
     outsource_total_points = 0
     for idx, row, staff_info in outsource_staff:
-        staff_points = int(float(row["합계포인트"]) if pd.notna(row["합계포인트"]) else 0)
+        staff_points = payable_points(row)
 
         # 근무기간 계수
         period = staff_info["period"]
@@ -1330,8 +1346,8 @@ def apply_rs_allowance_formula(perf_df, user_db, return_debug=False):
     regular_count = len(regular_staff)
     outsource_point_per_regular = outsource_total_points / regular_count if regular_count > 0 else 0
 
-    # 팀장수당 (팀장은 213포인트 추가)
-    team_leader_bonus = 213
+    # 팀장수당
+    team_leader_bonus = 267
 
     # 디버깅 정보
     debug_info = {
@@ -1347,25 +1363,20 @@ def apply_rs_allowance_formula(perf_df, user_db, return_debug=False):
 
     # 최종 지급액 계산
     for idx, row, staff_info in cs_staff:
-        total_points = int(float(row["합계포인트"]) if pd.notna(row["합계포인트"]) else 0)
-
-        # 기본 지급포인트
-        base_pay_point = max(0, total_points - 1000)
+        total_points = payable_points(row)
 
         # 팀장 여부 확인
         is_team_leader = staff_info["rank"] == "팀장"
 
         # 외주직원 여부 확인
-        is_outsource = staff_info["outsource"] == "예"
+        is_outsource = staff_info["outsource"] == "예" or staff_info["staff_type"] == "외주"
 
         if is_outsource:
-            # 외주직원: 지급포인트만 (외주 가감포인트 분배 없음)
-            final_pay_point = base_pay_point
+            # 외주직원: 외주실적 가감포인트 분배 대상에서는 제외
+            final_pay_point = total_points - 1000
         else:
-            # 일반직원: 기본포인트 + (외주가감포인트/일반직원수)
-            final_pay_point = base_pay_point + outsource_point_per_regular
-
-            # 팀장: 팀장수당 추가
+            # 팀장/직원 공식: (개설+연계+운영(+팀장수당)-1000)+(외주실적가감포인트/일반직원수)
+            final_pay_point = total_points - 1000 + outsource_point_per_regular
             if is_team_leader:
                 final_pay_point += team_leader_bonus
 
@@ -1808,13 +1819,6 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
             rank = member_db.get(name, "직원")
             is_outsource = name_to_info.get(name, {}).get("staff_type", "정규직") == "외주"
 
-            effective_manual_p = int(max(0, stats["p_sum"] - (stats["o_p"] + stats["l_p"] + stats["v_actual_p"])))
-
-            pay_point = max(0, stats["p_sum"] - 1000)
-            if "하성춘" in str(name):
-                pay_point = max(0, pay_point - 200)
-            pay = int(pay_point * 500)
-
             rows.append(
                 {
                     "담당자": name,
@@ -1828,14 +1832,15 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
                     "운영건수 (추가 활동)": round(manual_points_for_user(name) / 30),
                     "운영포인트(추가 활동)": manual_points_for_user(name),
                     "합계포인트": stats["p_sum"],
-                    "지급포인트": int(pay_point),
-                    "지급예상금액": pay,
+                    "지급포인트": 0,
+                    "지급예상금액": 0,
                     "전월대비": 0,
                 }
             )
 
         res_df = pd.DataFrame(rows)
         res_df = apply_rank_from_user_db(res_df)
+        res_df = apply_rs_allowance_formula(res_df, st.session_state.user_db)
         res_df = hide_department_heads(res_df)
         res_df = sort_by_rank_name(res_df)
 
