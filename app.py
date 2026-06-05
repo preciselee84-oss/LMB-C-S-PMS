@@ -4140,18 +4140,37 @@ def show_all_staff_summary(staff_names):
 
     def load_latest_operation_history(target_perf_df):
         target_counts = {}
-        if isinstance(target_perf_df, pd.DataFrame) and not target_perf_df.empty:
+        for staff in staff_names:
+            visit_count = count_visit_a(staff)
+            if visit_count is not None and visit_count > 0:
+                target_counts[str(staff).strip()] = min(int(visit_count), 60)
+
+        if not target_counts and isinstance(target_perf_df, pd.DataFrame) and not target_perf_df.empty:
+            target_base = target_perf_df[target_perf_df["담당자"].astype(str).str.strip().ne("합계")].copy()
+            target_base["_target_count"] = pd.to_numeric(target_base.get("운영건수 (실제 활동)", 0), errors="coerce").fillna(0).astype(int)
+            target_base = target_base.groupby("담당자", as_index=False)["_target_count"].max()
+            target_counts = {
+                str(row["담당자"]).strip(): min(int(row["_target_count"]), 60)
+                for _, row in target_base.iterrows()
+                if str(row["담당자"]).strip() and int(row["_target_count"]) > 0
+            }
+
+        if not target_counts and isinstance(target_perf_df, pd.DataFrame) and not target_perf_df.empty:
             for _, row in target_perf_df.iterrows():
                 staff = str(row.get("담당자", "")).strip()
                 if not staff or staff == "합계":
                     continue
                 try:
-                    target_counts[staff] = max(0, int(float(row.get("운영건수 (실제 활동)", 0) or 0)))
+                    target_counts[staff] = min(max(0, int(float(row.get("운영건수 (실제 활동)", 0) or 0))), 60)
                 except Exception:
                     target_counts[staff] = 0
         target_counts = {staff: count for staff, count in target_counts.items() if count > 0}
         if not target_counts:
             st.warning("가져올 운영건수 대상이 없습니다.")
+            return
+        target_total = sum(target_counts.values())
+        if target_total > (len(target_counts) * 60):
+            st.error("목표 운영건수가 비정상적으로 큽니다. 실적관리 시트 새로고침 후 다시 시도해주세요.")
             return
 
         activity_df = st.session_state.get("analysis_lookup_df")
@@ -4243,7 +4262,7 @@ def show_all_staff_summary(staff_names):
             st.session_state.admin_uploaded_excel = latest_df
             st.session_state.admin_uploaded_excel_display = latest_df.copy()
             st.session_state.admin_office_upload_key = f"latest_history_{len(latest_df)}_{int(time.time())}"
-            st.success(f"최신 이력 {len(latest_df):,}건을 가져왔습니다.")
+            st.success(f"최신 이력 {len(latest_df):,}건을 가져왔습니다. (목표 {target_total:,}건)")
             if shortages:
                 shortage_text = ", ".join([f"{staff} {count}건" for staff, count in shortages.items()])
                 st.warning(f"목표 건수보다 부족한 담당자: {shortage_text}")
