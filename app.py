@@ -3794,6 +3794,7 @@ def _render_workplace_info_admin():
     workplaces = data.get("workplaces", [])
 
     if workplaces:
+        st.markdown("#### 등록된 사업장")
         site_df = pd.DataFrame(workplaces)
         if "business_number" not in site_df.columns:
             site_df["business_number"] = ""
