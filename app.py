@@ -2739,7 +2739,7 @@ def _mssql_config_ready(config):
 
 
 def _build_mssql_connection_string(config):
-    driver = config.get("driver_name") or "ODBC Driver 18 for SQL Server"
+    driver = _resolve_mssql_driver(config)
     server = str(config.get("server_host", "")).strip()
     port = int(config.get("server_port", 1433) or 1433)
     database = str(config.get("database_name", "")).strip()
@@ -2792,9 +2792,17 @@ def _preferred_mssql_driver(installed_drivers):
     return sql_like[0] if sql_like else "ODBC Driver 18 for SQL Server"
 
 
+def _resolve_mssql_driver(config):
+    installed = _get_installed_odbc_drivers()
+    configured = config.get("driver_name")
+    if configured and (not installed or configured in installed):
+        return configured
+    return _preferred_mssql_driver(installed)
+
+
 def _mssql_driver_error_message(config):
     installed = _get_installed_odbc_drivers()
-    selected = config.get("driver_name") or "ODBC Driver 18 for SQL Server"
+    selected = config.get("driver_name") or _preferred_mssql_driver(installed)
     installed_text = ", ".join(installed) if installed else "감지된 드라이버 없음"
     return (
         f"선택한 ODBC 드라이버 '{selected}'를 열 수 없습니다. "
@@ -10057,7 +10065,10 @@ def _load_server_connection():
         return default_data
     if not isinstance(data, dict):
         return default_data
-    return {**default_data, **data}
+    merged = {**default_data, **data}
+    if installed_drivers and merged.get("driver_name") not in installed_drivers:
+        merged["driver_name"] = _preferred_mssql_driver(installed_drivers)
+    return merged
 
 
 def _save_server_connection(data):
@@ -10079,7 +10090,7 @@ def show_server_connection_info():
     installed_drivers = _get_installed_odbc_drivers()
     driver_options = installed_drivers.copy()
     current_driver = config.get("driver_name", "")
-    if current_driver and current_driver not in driver_options:
+    if current_driver and current_driver not in driver_options and not installed_drivers:
         driver_options.insert(0, current_driver)
     if not driver_options:
         driver_options = ["ODBC Driver 18 for SQL Server", "ODBC Driver 17 for SQL Server", "FreeTDS"]
