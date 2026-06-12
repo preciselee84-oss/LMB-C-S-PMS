@@ -2755,7 +2755,8 @@ def show_sales_payment_automation():
             with st.form("sales_lead_form", clear_on_submit=True):
                 col_a, col_b = st.columns(2)
                 customer_name = col_a.text_input("거래처명", placeholder="예: OO기업")
-                owner_name = col_b.text_input(
+                business_number = col_b.text_input("사업자번호", placeholder="예: 123-45-67890")
+                owner_name = st.text_input(
                     "영업 담당자",
                     value=st.session_state.get("user_name", ""),
                     placeholder="예: 김영업",
@@ -2777,6 +2778,7 @@ def show_sales_payment_automation():
                         {
                             "id": int(time.time() * 1000),
                             "customer_name": customer_name.strip(),
+                            "business_number": business_number.strip(),
                             "owner_name": owner_name.strip(),
                             "owner_contact": owner_contact.strip(),
                             "meeting_note": meeting_note.strip(),
@@ -2820,6 +2822,7 @@ def show_sales_payment_automation():
                             "id": int(time.time() * 1000),
                             "sales_lead_id": matched_lead.get("id"),
                             "customer_name": matched_lead.get("customer_name"),
+                            "business_number": matched_lead.get("business_number", ""),
                             "owner_name": matched_lead.get("owner_name"),
                             "depositor_name": depositor_name.strip(),
                             "amount": int(amount),
@@ -2838,8 +2841,21 @@ def show_sales_payment_automation():
 
             if matches:
                 match_df = pd.DataFrame(matches)
-                display_cols = ["matched_at", "customer_name", "owner_name", "depositor_name", "amount", "matched_rule"]
-                st.dataframe(match_df[display_cols].sort_values("matched_at", ascending=False), use_container_width=True)
+                if "business_number" not in match_df.columns:
+                    match_df["business_number"] = ""
+                display_cols = ["matched_at", "customer_name", "business_number", "owner_name", "depositor_name", "amount", "matched_rule"]
+                match_view = match_df[display_cols].sort_values("matched_at", ascending=False).rename(
+                    columns={
+                        "matched_at": "매칭일시",
+                        "customer_name": "거래처명",
+                        "business_number": "사업자번호",
+                        "owner_name": "영업 담당자",
+                        "depositor_name": "입금자명",
+                        "amount": "입금액",
+                        "matched_rule": "매칭 방식",
+                    }
+                )
+                st.dataframe(match_view, use_container_width=True)
 
     with tab_pipeline:
         col_a, col_b = st.columns(2)
@@ -2848,9 +2864,22 @@ def show_sales_payment_automation():
 
         if leads:
             lead_df = pd.DataFrame(leads)
+            if "business_number" not in lead_df.columns:
+                lead_df["business_number"] = ""
             lead_df["expected_amount"] = lead_df["expected_amount"].apply(_format_won)
-            display_cols = ["claimed_at", "customer_name", "owner_name", "expected_amount", "status", "meeting_note"]
-            st.dataframe(lead_df[display_cols].sort_values("claimed_at", ascending=False), use_container_width=True)
+            display_cols = ["claimed_at", "customer_name", "business_number", "owner_name", "expected_amount", "status", "meeting_note"]
+            lead_view = lead_df[display_cols].sort_values("claimed_at", ascending=False).rename(
+                columns={
+                    "claimed_at": "등록일시",
+                    "customer_name": "거래처명",
+                    "business_number": "사업자번호",
+                    "owner_name": "영업 담당자",
+                    "expected_amount": "예상 계약 금액",
+                    "status": "상태",
+                    "meeting_note": "미팅 내용",
+                }
+            )
+            st.dataframe(lead_view, use_container_width=True)
         else:
             st.info("등록된 영업 정보가 없습니다.")
 
