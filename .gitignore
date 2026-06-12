@@ -1,9 +1,20 @@
-# Claude Code settings
-.claude/
+__pycache__/
+*.py[cod]
+.Python
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.log
+.DS_Store
+Thumbs.db
 
-# Streamlit secrets
-.streamlit/secrets.toml
-
-# Local JSON data files
-*.json
-*.json.bak

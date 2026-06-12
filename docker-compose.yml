@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16
+    container_name: lmb-performance-db
+    environment:
+      POSTGRES_DB: lmb_performance
+      POSTGRES_USER: lmb_admin
+      POSTGRES_PASSWORD: lmb_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lmb_admin -d lmb_performance"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+
