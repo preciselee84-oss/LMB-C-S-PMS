@@ -1,4 +1,18 @@
 {
-    "workplaces": [],
+    "workplaces": [
+        {
+            "id": 1781268705510,
+            "workplace_name": "웹케시 테스트",
+            "business_number": "1238812356",
+            "business_alias": "남부",
+            "bank_name": "",
+            "account_number": "",
+            "regular_payment_day": 0,
+            "manager_name": "",
+            "manager_contact": "",
+            "memo": "",
+            "created_at": "2026-06-12 21:51:45"
+        }
+    ],
     "requests": []
 }
