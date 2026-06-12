@@ -3424,6 +3424,53 @@ def _render_bank_account_management():
     workplaces = wp_data.get("workplaces", [])
     workplaces_by_id = {site.get("id"): site for site in workplaces}
 
+    # 등록된 계좌 표시 (맨 위로 이동)
+    if accounts:
+        st.markdown("#### 등록된 계좌")
+        account_df = pd.DataFrame(accounts)
+        account_df["balance_won"] = account_df["balance"].apply(_format_won)
+        for col in ["holder_name", "balance_updated_at", "memo"]:
+            if col not in account_df.columns:
+                account_df[col] = ""
+        account_df["회사"] = [_account_company_label(row, workplaces_by_id) for row in accounts]
+        account_view = account_df[
+            ["회사", "account_name", "bank_name", "account_number", "holder_name", "balance_won", "balance_updated_at", "memo"]
+        ].rename(
+            columns={
+                "account_name": "계좌명",
+                "bank_name": "은행명",
+                "account_number": "계좌번호",
+                "holder_name": "예금주",
+                "balance_won": "현재잔고",
+                "balance_updated_at": "최종업데이트",
+                "memo": "메모",
+            }
+        )
+        st.dataframe(account_view, use_container_width=True)
+
+        if st.session_state.get("_show_account_delete_select"):
+            delete_options = {f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row.get("id") for row in accounts}
+            target_label = st.selectbox("삭제 대상 계좌", list(delete_options.keys()), key="bank_account_delete_target")
+            target_id = delete_options[target_label]
+
+            col_confirm, col_cancel = st.columns(2)
+            if col_confirm.button("삭제 확인", type="primary", use_container_width=True):
+                data["accounts"] = [row for row in accounts if row.get("id") != target_id]
+                _save_bank_accounts(data)
+                st.session_state["_show_account_delete_select"] = False
+                st.success("계좌가 삭제되었습니다.")
+                st.rerun()
+            if col_cancel.button("취소", use_container_width=True):
+                st.session_state["_show_account_delete_select"] = False
+                st.rerun()
+        else:
+            if st.button("삭제", key="show_account_delete_btn", use_container_width=False):
+                st.session_state["_show_account_delete_select"] = True
+                st.rerun()
+    else:
+        st.info("등록된 계좌가 없습니다.")
+
+    # 계좌 등록 폼
     if not workplaces:
         st.warning("[사업장 정보 관리]에서 사업장을 먼저 등록해주세요.")
     else:
@@ -3492,51 +3539,6 @@ def _render_bank_account_management():
             _save_bank_accounts(data)
             st.success(f"{len(importable)}개 사업장 계좌를 가져왔습니다.")
             st.rerun()
-
-    if accounts:
-        st.markdown("#### 등록된 계좌")
-        account_df = pd.DataFrame(accounts)
-        account_df["balance_won"] = account_df["balance"].apply(_format_won)
-        for col in ["holder_name", "balance_updated_at", "memo"]:
-            if col not in account_df.columns:
-                account_df[col] = ""
-        account_df["회사"] = [_account_company_label(row, workplaces_by_id) for row in accounts]
-        account_view = account_df[
-            ["회사", "account_name", "bank_name", "account_number", "holder_name", "balance_won", "balance_updated_at", "memo"]
-        ].rename(
-            columns={
-                "account_name": "계좌명",
-                "bank_name": "은행명",
-                "account_number": "계좌번호",
-                "holder_name": "예금주",
-                "balance_won": "현재잔고",
-                "balance_updated_at": "최종업데이트",
-                "memo": "메모",
-            }
-        )
-        st.dataframe(account_view, use_container_width=True)
-
-        if st.session_state.get("_show_account_delete_select"):
-            delete_options = {f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row.get("id") for row in accounts}
-            target_label = st.selectbox("삭제 대상 계좌", list(delete_options.keys()), key="bank_account_delete_target")
-            target_id = delete_options[target_label]
-
-            col_confirm, col_cancel = st.columns(2)
-            if col_confirm.button("삭제 확인", type="primary", use_container_width=True):
-                data["accounts"] = [row for row in accounts if row.get("id") != target_id]
-                _save_bank_accounts(data)
-                st.session_state["_show_account_delete_select"] = False
-                st.success("계좌가 삭제되었습니다.")
-                st.rerun()
-            if col_cancel.button("취소", use_container_width=True):
-                st.session_state["_show_account_delete_select"] = False
-                st.rerun()
-        else:
-            if st.button("삭제", key="show_account_delete_btn", use_container_width=False):
-                st.session_state["_show_account_delete_select"] = True
-                st.rerun()
-    else:
-        st.info("등록된 계좌가 없습니다.")
 
 
 def show_transfer_file_generation():
