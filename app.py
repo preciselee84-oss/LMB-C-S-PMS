@@ -2759,6 +2759,13 @@ def _save_bank_accounts(data):
     save_db(BANK_ACCOUNT_FILE, data, allow_shrink=True)
 
 
+def _account_company_label(account, workplaces_by_id):
+    site = workplaces_by_id.get(account.get("linked_workplace_id"))
+    if site:
+        return site.get("workplace_name", "")
+    return account.get("account_type", "")
+
+
 def _load_company_profile():
     default_data = {
         "name": "",
@@ -3411,48 +3418,55 @@ def show_workplace_admin():
 
 
 def _render_bank_account_management():
-    st.caption("회사 및 위탁 사업장의 계좌 정보를 관리합니다.")
+    st.caption("위탁 사업장의 계좌 정보를 관리합니다.")
 
     data = _load_bank_accounts()
     accounts = data.get("accounts", [])
 
-    with st.form("bank_account_form", clear_on_submit=True):
-        col_a, col_b = st.columns(2)
-        account_type = col_a.selectbox("구분", ["회사", "위탁사업장"])
-        account_name = col_b.text_input("계좌명", placeholder="예: 본사 지급계좌")
-        col_c, col_d = st.columns(2)
-        bank_name = col_c.text_input("은행명", placeholder="예: 하나은행")
-        account_number = col_d.text_input("계좌번호", placeholder="예: 123-456789-01234")
-        holder_name = st.text_input("예금주", placeholder="예: (주)회사명")
-        memo = st.text_area("메모", placeholder="계좌 관련 특이사항")
-        submitted = st.form_submit_button("계좌 등록", type="primary")
-
-    if submitted:
-        if not account_name.strip() or not account_number.strip():
-            st.warning("계좌명과 계좌번호를 입력해주세요.")
-        else:
-            accounts.append(
-                {
-                    "id": int(time.time() * 1000),
-                    "account_type": account_type,
-                    "account_name": account_name.strip(),
-                    "bank_name": bank_name.strip(),
-                    "account_number": account_number.strip(),
-                    "holder_name": holder_name.strip(),
-                    "linked_workplace_id": None,
-                    "balance": 0,
-                    "balance_updated_at": "",
-                    "balance_history": [],
-                    "memo": memo.strip(),
-                    "created_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
-                }
-            )
-            _save_bank_accounts(data)
-            st.success("계좌가 등록되었습니다.")
-            st.rerun()
-
     wp_data = _load_delegated_workplaces()
     workplaces = wp_data.get("workplaces", [])
+    workplaces_by_id = {site.get("id"): site for site in workplaces}
+
+    if not workplaces:
+        st.warning("[사업장 정보 관리]에서 사업장을 먼저 등록해주세요.")
+    else:
+        company_options = {site.get("workplace_name", ""): site for site in workplaces}
+        with st.form("bank_account_form", clear_on_submit=True):
+            col_a, col_b = st.columns(2)
+            company_label = col_a.selectbox("회사 선택", list(company_options.keys()))
+            account_name = col_b.text_input("계좌명", placeholder="예: 본사 지급계좌")
+            col_c, col_d = st.columns(2)
+            bank_name = col_c.text_input("은행명", placeholder="예: 하나은행")
+            account_number = col_d.text_input("계좌번호", placeholder="예: 123-456789-01234")
+            holder_name = st.text_input("예금주", placeholder="예: (주)회사명")
+            memo = st.text_area("메모", placeholder="계좌 관련 특이사항")
+            submitted = st.form_submit_button("계좌 등록", type="primary")
+
+        if submitted:
+            if not account_name.strip() or not account_number.strip():
+                st.warning("계좌명과 계좌번호를 입력해주세요.")
+            else:
+                site = company_options[company_label]
+                accounts.append(
+                    {
+                        "id": int(time.time() * 1000),
+                        "account_type": "위탁사업장",
+                        "account_name": account_name.strip(),
+                        "bank_name": bank_name.strip(),
+                        "account_number": account_number.strip(),
+                        "holder_name": holder_name.strip(),
+                        "linked_workplace_id": site.get("id"),
+                        "balance": 0,
+                        "balance_updated_at": "",
+                        "balance_history": [],
+                        "memo": memo.strip(),
+                        "created_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                )
+                _save_bank_accounts(data)
+                st.success("계좌가 등록되었습니다.")
+                st.rerun()
+
     linked_ids = {row.get("linked_workplace_id") for row in accounts if row.get("linked_workplace_id")}
     importable = [
         site for site in workplaces
@@ -3489,11 +3503,11 @@ def _render_bank_account_management():
         for col in ["holder_name", "balance_updated_at", "memo"]:
             if col not in account_df.columns:
                 account_df[col] = ""
+        account_df["회사"] = [_account_company_label(row, workplaces_by_id) for row in accounts]
         account_view = account_df[
-            ["account_type", "account_name", "bank_name", "account_number", "holder_name", "balance_won", "balance_updated_at", "memo"]
+            ["회사", "account_name", "bank_name", "account_number", "holder_name", "balance_won", "balance_updated_at", "memo"]
         ].rename(
             columns={
-                "account_type": "구분",
                 "account_name": "계좌명",
                 "bank_name": "은행명",
                 "account_number": "계좌번호",
@@ -3529,19 +3543,18 @@ def show_transfer_file_generation():
 
     bank_data = _load_bank_accounts()
     accounts = bank_data.get("accounts", [])
-    company_accounts = [row for row in accounts if row.get("account_type") == "회사"]
 
     targets = [row for row in requests if row.get("status") == "품의 확정"]
     if not targets:
         st.info("이체 자료를 생성할 품의 확정 건이 없습니다.")
         return
 
-    if not company_accounts:
-        st.warning("[계좌 관리]에서 회사 계좌를 먼저 등록해주세요.")
+    if not accounts:
+        st.warning("[계좌 관리]에서 계좌를 먼저 등록해주세요.")
         return
 
-    source_options = {f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row for row in company_accounts}
-    source_label = st.selectbox("출금 계좌(회사)", list(source_options.keys()))
+    source_options = {f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row for row in accounts}
+    source_label = st.selectbox("출금 계좌", list(source_options.keys()))
 
     st.markdown("#### 이체 대상 선택")
     selected_ids = []
@@ -3645,7 +3658,7 @@ def show_transfer_result_confirmation():
 
 def show_account_balance_check():
     st.markdown("### 계좌 잔고 확인")
-    st.caption("위탁 사업장 및 회사 계좌의 잔고를 수동으로 관리하고 변동 추이를 확인합니다.")
+    st.caption("위탁 사업장 계좌의 잔고를 수동으로 관리하고 변동 추이를 확인합니다.")
 
     data = _load_bank_accounts()
     accounts = data.get("accounts", [])
@@ -3654,15 +3667,18 @@ def show_account_balance_check():
         st.info("등록된 계좌가 없습니다. [계좌 관리]에서 계좌를 먼저 등록해주세요.")
         return
 
+    wp_data = _load_delegated_workplaces()
+    workplaces_by_id = {site.get("id"): site for site in wp_data.get("workplaces", [])}
+
     account_df = pd.DataFrame(accounts)
     account_df["balance_won"] = account_df["balance"].apply(_format_won)
     if "balance_updated_at" not in account_df.columns:
         account_df["balance_updated_at"] = ""
+    account_df["회사"] = [_account_company_label(row, workplaces_by_id) for row in accounts]
     account_view = account_df[
-        ["account_type", "account_name", "bank_name", "account_number", "balance_won", "balance_updated_at"]
+        ["회사", "account_name", "bank_name", "account_number", "balance_won", "balance_updated_at"]
     ].rename(
         columns={
-            "account_type": "구분",
             "account_name": "계좌명",
             "bank_name": "은행명",
             "account_number": "계좌번호",
@@ -3833,15 +3849,16 @@ def show_reports():
     bank_data = _load_bank_accounts()
     accounts = bank_data.get("accounts", [])
     if accounts:
+        workplaces_by_id = {site.get("id"): site for site in workplaces}
         account_df = pd.DataFrame(accounts)
         account_df["balance_won"] = account_df["balance"].apply(_format_won)
         if "balance_updated_at" not in account_df.columns:
             account_df["balance_updated_at"] = ""
+        account_df["회사"] = [_account_company_label(row, workplaces_by_id) for row in accounts]
         account_view = account_df[
-            ["account_type", "account_name", "bank_name", "balance_won", "balance_updated_at"]
+            ["회사", "account_name", "bank_name", "balance_won", "balance_updated_at"]
         ].rename(
             columns={
-                "account_type": "구분",
                 "account_name": "계좌명",
                 "bank_name": "은행명",
                 "balance_won": "현재잔고",
@@ -4001,7 +4018,7 @@ MENU_GUIDES = {
     ],
     "사업장 관리": [
         "🏢 [사업장 정보 관리] 탭에서 사업장 정보와 정기 지급일을 등록합니다.",
-        "🏦 [계좌 관리] 탭에서 회사 및 위탁 사업장의 계좌 정보를 등록/관리합니다.",
+        "🏦 [계좌 관리] 탭에서 [사업장 정보 관리]에 등록된 사업장을 선택하여 계좌 정보를 등록/관리합니다.",
         "🔄 계좌 관리에서 '위탁 사업장 계좌 가져오기'로 사업장 계좌를 일괄 등록할 수 있습니다.",
         "👤 [담당자 관리] 탭에서 직원 계정의 접근 권한, 비밀번호, 역할을 관리합니다.",
     ],
@@ -4012,7 +4029,7 @@ MENU_GUIDES = {
     ],
     "이체 자료 생성": [
         "✅ 품의 확정된 전도금 요청을 선택해 이체 자료(엑셀)를 생성합니다.",
-        "🏦 출금 계좌는 [계좌 관리]에 등록된 회사 계좌 중에서 선택합니다.",
+        "🏦 출금 계좌는 [계좌 관리]에 등록된 계좌 중에서 선택합니다.",
         "➡️ 생성 후 해당 요청은 '이체 대상' 상태로 전환됩니다.",
     ],
     "지급 결과 확인": [
