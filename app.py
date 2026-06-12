@@ -2784,84 +2784,400 @@ def _workplace_forecast_rows(workplaces, requests):
     return rows
 
 
-def show_delegated_workplace_management():
-    st.markdown("### 위탁 사업장 관리")
-    st.caption("사업장 전도금 요청부터 품의 확정, 이체 완료까지 관리합니다.")
+def _workplace_dashboard_css():
+    st.markdown(
+        """
+        <style>
+        .sales-home-shell {
+            position: relative;
+            overflow: hidden;
+            border-radius: 22px;
+            padding: 14px 18px 22px;
+            background:
+                radial-gradient(circle at 48% 42%, rgba(16, 185, 173, 0.30) 0 32%, transparent 33%),
+                linear-gradient(135deg, #f7f8fb 0%, #ffffff 52%, #f4f6fa 100%);
+            box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
+            border: 1px solid rgba(226, 232, 240, 0.9);
+        }
+        .sales-topbar {
+            height: 46px;
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            border-radius: 24px;
+            padding: 0 18px;
+            background: rgba(255, 255, 255, 0.86);
+            box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.85);
+            margin-bottom: 18px;
+        }
+        .sales-cloud {
+            width: 34px;
+            height: 22px;
+            border-radius: 999px;
+            background: #1d9bd7;
+            position: relative;
+            flex: 0 0 auto;
+        }
+        .sales-cloud::before, .sales-cloud::after {
+            content: "";
+            position: absolute;
+            background: #1d9bd7;
+            border-radius: 999px;
+        }
+        .sales-cloud::before { width: 18px; height: 18px; left: 5px; top: -7px; }
+        .sales-cloud::after { width: 18px; height: 18px; right: 4px; top: -5px; }
+        .sales-nav-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 800;
+            color: #111827;
+            white-space: nowrap;
+        }
+        .sales-app-icon {
+            display: inline-grid;
+            place-items: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 5px;
+            background: #14b8a6;
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 900;
+        }
+        .sales-home-title {
+            font-size: 22px;
+            font-weight: 850;
+            color: #111827;
+            margin: 8px 0 14px;
+            letter-spacing: 0;
+        }
+        .work-card {
+            min-height: 170px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.90);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 16px 35px rgba(15, 23, 42, 0.10);
+            padding: 18px 18px 14px;
+        }
+        .work-card-title {
+            color: #111827;
+            font-size: 15px;
+            font-weight: 850;
+            margin-bottom: 12px;
+        }
+        .donut {
+            width: 118px;
+            height: 118px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            margin: 0 auto 10px;
+            background: conic-gradient(#8b5cf6 var(--p), #2f8eea var(--p) 72%, #7bb9f4 72% 100%);
+        }
+        .donut-inner {
+            width: 76px;
+            height: 76px;
+            border-radius: 50%;
+            background: #ffffff;
+            display: grid;
+            place-items: center;
+            text-align: center;
+            color: #111827;
+            line-height: 1.12;
+            font-size: 13px;
+            box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.9);
+        }
+        .donut-value {
+            display: block;
+            font-size: 20px;
+            font-weight: 900;
+            margin-bottom: 2px;
+        }
+        .card-dots {
+            display: flex;
+            gap: 6px;
+            justify-content: flex-end;
+            margin-top: 4px;
+        }
+        .card-dots span {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #2f8eea;
+            display: block;
+        }
+        .card-dots span:nth-child(3), .card-dots span:nth-child(4) { background: #8b5cf6; }
+        .suggestion-panel {
+            min-height: 386px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid rgba(226, 232, 240, 0.85);
+            box-shadow: 0 16px 35px rgba(15, 23, 42, 0.10);
+            padding: 18px;
+        }
+        .suggestion-title {
+            color: #6b7280;
+            font-size: 15px;
+            font-weight: 850;
+            margin-bottom: 10px;
+        }
+        .suggestion-row {
+            display: grid;
+            grid-template-columns: 28px 1fr;
+            gap: 12px;
+            padding: 13px 0;
+        }
+        .suggestion-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 5px;
+            background: #8b7cf6;
+            color: #fff;
+            display: grid;
+            place-items: center;
+            font-size: 13px;
+            font-weight: 900;
+        }
+        .skeleton {
+            height: 6px;
+            border-radius: 99px;
+            background: #d7d7d7;
+            margin: 8px 0;
+        }
+        .skeleton.short { width: 38%; }
+        .skeleton.mid { width: 62%; }
+        .skeleton.long { width: 96%; }
+        .workflow-card {
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(226, 232, 240, 0.85);
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.10);
+            padding: 16px;
+            margin-top: 14px;
+        }
+        .workflow-title {
+            font-size: 15px;
+            font-weight: 850;
+            color: #111827;
+            margin-bottom: 12px;
+        }
+        .request-card {
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+            padding: 13px 14px;
+            min-height: 122px;
+            margin-bottom: 12px;
+        }
+        .request-title {
+            color: #111827;
+            font-size: 15px;
+            font-weight: 850;
+            margin-bottom: 4px;
+        }
+        .request-meta {
+            color: #6b7280;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 4px 9px;
+            font-size: 12px;
+            font-weight: 800;
+            background: #eef2ff;
+            color: #4f46e5;
+            margin-top: 8px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
+
+def _donut_card(title, value, label, percent):
+    pct = max(0, min(100, int(percent)))
+    return f"""
+    <div class="work-card">
+        <div class="work-card-title">{html.escape(str(title))}</div>
+        <div class="donut" style="--p:{pct}%;">
+            <div class="donut-inner">
+                <div>
+                    <span class="donut-value">{html.escape(str(value))}</span>
+                    {html.escape(str(label))}
+                </div>
+            </div>
+        </div>
+        <div class="card-dots"><span></span><span></span><span></span><span></span></div>
+    </div>
+    """
+
+
+def _suggestion_html(workplaces, requests):
+    forecast_rows = _workplace_forecast_rows(workplaces, requests)
+    risky = [row for row in forecast_rows if row.get("리스크") != "정상"][:3]
+    if not risky:
+        risky = forecast_rows[:3]
+    if not risky:
+        risky = [{"사업장명": "사업장 등록 필요", "리스크": "관리자 메뉴에서 사업장 정보를 등록하세요."}]
+    rows = []
+    for row in risky:
+        rows.append(
+            f"""
+            <div class="suggestion-row">
+                <div class="suggestion-icon">i</div>
+                <div>
+                    <div class="skeleton short"></div>
+                    <div style="font-weight:800;color:#111827;margin:2px 0 6px;">{html.escape(str(row.get("사업장명", "")))}</div>
+                    <div style="color:#6b7280;font-size:12px;">{html.escape(str(row.get("리스크", "")))}</div>
+                    <div class="skeleton long"></div>
+                    <div class="skeleton mid"></div>
+                </div>
+            </div>
+            """
+        )
+    return f"""
+    <div class="suggestion-panel">
+        <div class="suggestion-title">Contact Suggestions</div>
+        {''.join(rows)}
+    </div>
+    """
+
+
+def show_delegated_workplace_management():
     data = _load_delegated_workplaces()
     workplaces = data.get("workplaces", [])
     requests = data.get("requests", [])
     metrics = _workplace_request_metrics(requests)
+    total_amount = sum(int(row.get("request_amount", 0) or 0) for row in requests)
+    paid_count = len([row for row in requests if row.get("status") == "이체 완료"])
+    total_count = max(len(requests), 1)
 
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("등록 사업장", f"{len(workplaces):,}곳")
-    m2.metric("요청 대기", f"{metrics['pending']:,}건")
-    m3.metric("품의 확정", f"{metrics['approved']:,}건")
-    m4.metric("당월 이체액", _format_won(metrics["paid_amount"]))
+    _workplace_dashboard_css()
+    st.markdown(
+        """
+        <div class="sales-home-shell">
+          <div class="sales-topbar">
+            <div class="sales-cloud"></div>
+            <div class="sales-nav-pill"><span class="sales-app-icon">F</span> Funds</div>
+            <div class="sales-nav-pill">Home</div>
+          </div>
+          <div class="sales-home-title">Workplace Home</div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    if not workplaces:
-        st.info("관리자 메뉴의 [사업장 정보 등록]에서 사업장을 먼저 등록해주세요.")
-    else:
-        workplace_options = {row.get("workplace_name", ""): row for row in workplaces}
-        with st.form("delegated_fund_request_form", clear_on_submit=True):
-            col_a, col_b = st.columns([2, 1])
-            selected_name = col_a.selectbox("사업장", list(workplace_options.keys()))
-            request_amount = col_b.number_input("요청 금액", min_value=0, step=100000, format="%d")
-            requested_by = st.text_input(
-                "요청자",
-                value=st.session_state.get("user_name", ""),
-                placeholder="요청자명",
-            )
-            request_reason = st.text_area("요청 사유", placeholder="전도금 사용 목적 및 필요 사유")
-            requested = st.form_submit_button("전도금 요청 등록", type="primary")
+    left_area, right_area = st.columns([3, 1.15])
+    with left_area:
+        c1, c2, c3, c4 = st.columns(4)
+        c1.markdown(_donut_card("Workplaces", f"{len(workplaces):,}", "Sites", min(len(workplaces) * 12, 100)), unsafe_allow_html=True)
+        c2.markdown(_donut_card("Requests", f"{metrics['pending']:,}", "Pending", min(metrics["pending"] * 18, 100)), unsafe_allow_html=True)
+        c3.markdown(_donut_card("Approvals", f"{metrics['approved']:,}", "Approved", min(metrics["approved"] * 18, 100)), unsafe_allow_html=True)
+        c4.markdown(_donut_card("Paid", f"{paid_count:,}", "Transfers", int((paid_count / total_count) * 100)), unsafe_allow_html=True)
 
-        if requested:
-            site = workplace_options[selected_name]
-            if request_amount <= 0:
-                st.warning("요청 금액을 입력해주세요.")
+        st.markdown('<div class="workflow-card"><div class="workflow-title">Workflow Automation</div>', unsafe_allow_html=True)
+        form_col, summary_col = st.columns([1.2, 1])
+
+        with form_col:
+            if not workplaces:
+                st.info("관리자 메뉴의 [사업장 정보 등록]에서 사업장을 먼저 등록해주세요.")
             else:
-                requests.append(
-                    {
-                        "id": int(time.time() * 1000),
-                        "workplace_id": site.get("id"),
-                        "workplace_name": site.get("workplace_name"),
-                        "request_amount": int(request_amount),
-                        "requested_by": requested_by.strip(),
-                        "request_reason": request_reason.strip(),
-                        "status": "요청",
-                        "requested_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
-                        "approved_at": "",
-                        "paid_at": "",
-                    }
-                )
-                _save_delegated_workplaces(data)
-                st.success("전도금 요청이 등록되었습니다.")
-                st.rerun()
+                workplace_options = {row.get("workplace_name", ""): row for row in workplaces}
+                with st.form("delegated_fund_request_form", clear_on_submit=True):
+                    selected_name = st.selectbox("사업장", list(workplace_options.keys()))
+                    request_amount = st.number_input("요청 금액", min_value=0, step=100000, format="%d")
+                    requested_by = st.text_input(
+                        "요청자",
+                        value=st.session_state.get("user_name", ""),
+                        placeholder="요청자명",
+                    )
+                    request_reason = st.text_area("요청 사유", placeholder="전도금 사용 목적 및 필요 사유")
+                    requested = st.form_submit_button("전도금 요청 등록", type="primary")
 
-    if requests:
-        st.markdown("#### 요청 처리")
-        for row in sorted(requests, key=lambda item: item.get("requested_at", ""), reverse=True):
-            cols = st.columns([2, 1, 1, 1, 2])
-            cols[0].markdown(f"**{row.get('workplace_name')}**  \n{row.get('request_reason') or '요청 사유 없음'}")
-            cols[1].write(_format_won(row.get("request_amount")))
-            cols[2].write(row.get("status"))
-            cols[3].caption(row.get("requested_at", ""))
-            with cols[4]:
-                if row.get("status") == "요청":
-                    if st.button("품의 확정", key=f"approve_{row.get('id')}", use_container_width=True):
-                        row["status"] = "품의 확정"
-                        row["approved_at"] = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
+                if requested:
+                    site = workplace_options[selected_name]
+                    if request_amount <= 0:
+                        st.warning("요청 금액을 입력해주세요.")
+                    else:
+                        requests.append(
+                            {
+                                "id": int(time.time() * 1000),
+                                "workplace_id": site.get("id"),
+                                "workplace_name": site.get("workplace_name"),
+                                "request_amount": int(request_amount),
+                                "requested_by": requested_by.strip(),
+                                "request_reason": request_reason.strip(),
+                                "status": "요청",
+                                "requested_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
+                                "approved_at": "",
+                                "paid_at": "",
+                            }
+                        )
                         _save_delegated_workplaces(data)
+                        st.success("전도금 요청이 등록되었습니다.")
                         st.rerun()
-                elif row.get("status") == "품의 확정":
-                    if st.button("이체 완료", key=f"pay_{row.get('id')}", use_container_width=True):
-                        row["status"] = "이체 완료"
-                        row["paid_at"] = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
-                        _save_delegated_workplaces(data)
-                        st.rerun()
-                else:
-                    st.success("처리 완료")
 
+        with summary_col:
+            request_percent = min(metrics['month_requests'] * 12, 100)
+            transfer_percent = int((paid_count / total_count) * 100)
+            st.markdown(
+                f"""
+                <div class="work-card" style="min-height:270px;">
+                    <div class="work-card-title">Monthly Goals</div>
+                    <div style="color:#111827;font-size:14px;">Requests Scheduled</div>
+                    <div class="skeleton long" style="background:linear-gradient(90deg,#0ea5e9 {request_percent}%,#dedede 0);height:10px;"></div>
+                    <div style="height:18px;"></div>
+                    <div style="color:#111827;font-size:14px;">Transfers Made</div>
+                    <div class="skeleton long" style="background:linear-gradient(90deg,#0ea5e9 {transfer_percent}%,#dedede 0);height:10px;"></div>
+                    <div style="height:18px;"></div>
+                    <div class="request-meta">당월 이체액</div>
+                    <div style="font-size:22px;font-weight:900;color:#111827;">{html.escape(_format_won(metrics['paid_amount']))}</div>
+                    <div class="request-meta">전체 요청액 {html.escape(_format_won(total_amount))}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        if requests:
+            st.markdown("#### 요청 처리")
+            request_cols = st.columns(3)
+            for index, row in enumerate(sorted(requests, key=lambda item: item.get("requested_at", ""), reverse=True)):
+                with request_cols[index % 3]:
+                    st.markdown(
+                        f"""
+                        <div class="request-card">
+                            <div class="request-title">{html.escape(str(row.get('workplace_name', '')))}</div>
+                            <div class="request-meta">{html.escape(str(row.get('request_reason') or '요청 사유 없음'))}</div>
+                            <div class="request-meta">{html.escape(_format_won(row.get('request_amount')))} · {html.escape(str(row.get('requested_at', '')))}</div>
+                            <span class="status-chip">{html.escape(str(row.get('status', '')))}</span>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    if row.get("status") == "요청":
+                        if st.button("품의 확정", key=f"approve_{row.get('id')}", use_container_width=True):
+                            row["status"] = "품의 확정"
+                            row["approved_at"] = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
+                            _save_delegated_workplaces(data)
+                            st.rerun()
+                    elif row.get("status") == "품의 확정":
+                        if st.button("이체 완료", key=f"pay_{row.get('id')}", use_container_width=True):
+                            row["status"] = "이체 완료"
+                            row["paid_at"] = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
+                            _save_delegated_workplaces(data)
+                            st.rerun()
+                    else:
+                        st.success("처리 완료")
+
+    with right_area:
+        st.markdown(_suggestion_html(workplaces, requests), unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 def show_workplace_info_admin():
     st.markdown("### 사업장 정보 등록")
