@@ -3646,72 +3646,73 @@ def show_account_balance_check():
 
 
 def _render_workplace_info_admin():
-    st.caption("위탁 사업장 기본 정보와 정기 지급일, 담당자 정보를 관리합니다.")
+    st.caption("위탁 사업장의 기본 정보를 관리합니다.")
 
     data = _load_delegated_workplaces()
     workplaces = data.get("workplaces", [])
-
-    with st.form("delegated_workplace_form", clear_on_submit=True):
-        col_a, col_b = st.columns(2)
-        workplace_name = col_a.text_input("사업장명", placeholder="예: 강남 위탁사업장")
-        business_number = col_b.text_input("사업자번호", placeholder="예: 123-45-67890")
-        manager_name = st.text_input("사업장 담당자", placeholder="예: 홍길동")
-        col_c, col_d = st.columns(2)
-        bank_name = col_c.text_input("은행명", placeholder="예: 하나은행")
-        account_number = col_d.text_input("계좌번호", placeholder="예: 123-456789-01234")
-        col_e, col_f = st.columns(2)
-        regular_payment_day = col_e.number_input("정기 지급일", min_value=1, max_value=31, value=25, step=1)
-        manager_contact = col_f.text_input("담당자 연락처", placeholder="전화번호 또는 메신저 ID")
-        memo = st.text_area("메모", placeholder="사업장 운영 특이사항")
-        submitted = st.form_submit_button("사업장 등록", type="primary")
-
-    if submitted:
-        normalized = _normalize_name(workplace_name)
-        duplicate = any(_normalize_name(row.get("workplace_name")) == normalized for row in workplaces)
-        if not workplace_name.strip():
-            st.warning("사업장명을 입력해주세요.")
-        elif duplicate:
-            st.error("이미 등록된 사업장입니다.")
-        else:
-            workplaces.append(
-                {
-                    "id": int(time.time() * 1000),
-                    "workplace_name": workplace_name.strip(),
-                    "business_number": business_number.strip(),
-                    "bank_name": bank_name.strip(),
-                    "account_number": account_number.strip(),
-                    "regular_payment_day": int(regular_payment_day),
-                    "manager_name": manager_name.strip(),
-                    "manager_contact": manager_contact.strip(),
-                    "memo": memo.strip(),
-                    "created_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
-                }
-            )
-            _save_delegated_workplaces(data)
-            st.success("사업장 정보가 등록되었습니다.")
-            st.rerun()
 
     if workplaces:
         site_df = pd.DataFrame(workplaces)
         if "business_number" not in site_df.columns:
             site_df["business_number"] = ""
+        if "memo" not in site_df.columns:
+            site_df["memo"] = ""
         site_view = site_df[
-            ["created_at", "workplace_name", "business_number", "bank_name", "account_number", "regular_payment_day", "manager_name", "memo"]
+            ["created_at", "workplace_name", "business_number", "memo"]
         ].rename(
             columns={
                 "created_at": "등록일시",
                 "workplace_name": "사업장명",
                 "business_number": "사업자번호",
-                "bank_name": "은행명",
-                "account_number": "계좌번호",
-                "regular_payment_day": "정기 지급일",
-                "manager_name": "담당자",
-                "memo": "메모",
+                "memo": "비고",
             }
         )
         st.dataframe(site_view.sort_values("등록일시", ascending=False), use_container_width=True)
     else:
         st.info("등록된 사업장이 없습니다.")
+
+    if st.session_state.get("_show_workplace_add_form"):
+        with st.form("delegated_workplace_form", clear_on_submit=True):
+            workplace_name = st.text_input("사업장명", placeholder="예: 강남 위탁사업장")
+            business_number = st.text_input("사업자번호", placeholder="예: 123-45-67890")
+            memo = st.text_area("비고", placeholder="사업장 관련 특이사항")
+            col_submit, col_cancel = st.columns(2)
+            submitted = col_submit.form_submit_button("등록", type="primary", use_container_width=True)
+            cancelled = col_cancel.form_submit_button("취소", use_container_width=True)
+
+        if submitted:
+            normalized = _normalize_name(workplace_name)
+            duplicate = any(_normalize_name(row.get("workplace_name")) == normalized for row in workplaces)
+            if not workplace_name.strip():
+                st.warning("사업장명을 입력해주세요.")
+            elif duplicate:
+                st.error("이미 등록된 사업장입니다.")
+            else:
+                workplaces.append(
+                    {
+                        "id": int(time.time() * 1000),
+                        "workplace_name": workplace_name.strip(),
+                        "business_number": business_number.strip(),
+                        "bank_name": "",
+                        "account_number": "",
+                        "regular_payment_day": 0,
+                        "manager_name": "",
+                        "manager_contact": "",
+                        "memo": memo.strip(),
+                        "created_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                )
+                _save_delegated_workplaces(data)
+                st.session_state["_show_workplace_add_form"] = False
+                st.success("사업장 정보가 등록되었습니다.")
+                st.rerun()
+        if cancelled:
+            st.session_state["_show_workplace_add_form"] = False
+            st.rerun()
+    else:
+        if st.button("+ 사업장 추가", key="show_workplace_add_form_btn"):
+            st.session_state["_show_workplace_add_form"] = True
+            st.rerun()
 
 
 def show_reports():
