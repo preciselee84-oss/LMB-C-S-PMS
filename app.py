@@ -2467,24 +2467,28 @@ def show_sidebar():
             [data-testid="stSidebarCollapsedControl"] {
                 display: none !important;
             }
+            /* ══ Zoho CRM 스타일 네비게이션 팔레트 ══
+               배경: #16284A  카드: #1F3358  테두리: #24395E
+               강조: #2F6FED  텍스트: #E8EEF8  보조: #9FB3D6
+               섹션: #7689AD  로그아웃 호버: #5A2A38              */
             [data-testid="stSidebar"] {
-                background-color: #171717 !important;
-                border-right: 1px solid #2f2f2f !important;
+                background-color: #16284A !important;
+                border-right: 1px solid #24395E !important;
             }
             [data-testid="stSidebar"] > div:first-child {
                 padding-top: 0 !important;
             }
             [data-testid="stSidebarContent"] {
-                padding: 10px 10px 12px !important;
-                background-color: #171717 !important;
+                padding: 14px 12px 16px !important;
+                background-color: #16284A !important;
             }
             [data-testid="stSidebar"] * {
-                color: #ececec !important;
+                color: #E8EEF8 !important;
             }
             [data-testid="stSidebar"] .gpt-side-shell {
                 display: flex;
                 flex-direction: column;
-                gap: 10px;
+                gap: 12px;
                 padding: 4px 2px 8px;
             }
             [data-testid="stSidebar"] .gpt-brand {
@@ -2499,15 +2503,16 @@ def show_sidebar():
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                width: 28px;
-                height: 28px;
-                border: 1px solid #3a3a3a;
-                border-radius: 8px;
+                width: 32px;
+                height: 32px;
+                border: none;
+                border-radius: 9px;
                 color: #ffffff !important;
-                font-size: 13px;
+                font-size: 14px;
                 font-weight: 900;
                 letter-spacing: 0;
-                background: #212121;
+                background: linear-gradient(135deg, #2F6FED 0%, #1B4FC4 100%);
+                box-shadow: 0 4px 10px rgba(47,111,237,0.35);
             }
             [data-testid="stSidebar"] .gpt-brand-text {
                 display: flex;
@@ -2517,20 +2522,21 @@ def show_sidebar():
             [data-testid="stSidebar"] .gpt-brand-title {
                 font-size: 15px;
                 font-weight: 800;
-                color: #f5f5f5 !important;
+                color: #ffffff !important;
             }
             [data-testid="stSidebar"] .gpt-brand-subtitle {
                 margin-top: 2px;
                 font-size: 12px;
-                color: #a7a7a7 !important;
+                color: #8FA3C7 !important;
                 font-weight: 500;
             }
             [data-testid="stSidebar"] .gpt-user-card {
                 margin: 2px 2px 8px;
-                padding: 10px;
-                border: 1px solid #2f2f2f;
-                border-radius: 12px;
-                background: #212121;
+                padding: 12px 14px;
+                border: 1px solid #29406B;
+                border-radius: 14px;
+                background: #1F3358;
+                box-shadow: 0 4px 14px rgba(0,0,0,0.18);
             }
             [data-testid="stSidebar"] .gpt-user-name {
                 font-size: 14px;
@@ -2541,16 +2547,17 @@ def show_sidebar():
             [data-testid="stSidebar"] .gpt-user-meta {
                 margin-top: 4px;
                 font-size: 11px;
-                color: #9b9b9b !important;
+                color: #9FB3D6 !important;
                 font-weight: 500;
                 line-height: 1.35;
             }
             [data-testid="stSidebar"] .gpt-section {
                 margin: 4px 8px 1px;
                 font-size: 12px;
-                color: #8e8e8e !important;
+                color: #7689AD !important;
                 font-weight: 700;
-                letter-spacing: 0;
+                letter-spacing: 0.02em;
+                text-transform: uppercase;
             }
             [data-testid="stSidebar"] .gpt-section:first-of-type {
                 margin-top: 2px;
@@ -2565,7 +2572,7 @@ def show_sidebar():
             [data-testid="stSidebar"] .gpt-sidebar-divider {
                 height: 1px;
                 margin: 12px 8px;
-                background: #2f2f2f;
+                background: #24395E;
             }
             [data-testid="stSidebar"] div.stButton {
                 margin: 0 !important;
@@ -2584,14 +2591,14 @@ def show_sidebar():
                 gap: 2px !important;
             }
             [data-testid="stSidebar"] hr {
-                border-color: #2f2f2f !important;
+                border-color: #24395E !important;
                 margin: 10px 0 !important;
             }
             [data-testid="stSidebar"] div.stButton > button {
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
-                color: #ececec !important;
+                color: #C9D6EC !important;
                 font-size: 14px !important;
                 font-weight: 600 !important;
                 text-align: left !important;
@@ -2606,18 +2613,19 @@ def show_sidebar():
             [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span {
                 font-size: 14px !important;
                 font-weight: 600 !important;
-                color: #ececec !important;
+                color: #C9D6EC !important;
                 white-space: normal !important;
                 line-height: 1.25 !important;
             }
             [data-testid="stSidebar"] div.stButton > button:hover {
-                background: #2f2f2f !important;
+                background: #233A61 !important;
                 color: #ffffff !important;
             }
             [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.gpt-nav-active) + div [data-testid="stButton"] button,
             [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.gpt-nav-active) + [data-testid="stElementContainer"] [data-testid="stButton"] button {
-                background: #2f2f2f !important;
+                background: #2F6FED !important;
                 color: #ffffff !important;
+                box-shadow: 0 4px 12px rgba(47,111,237,0.35);
             }
             [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.gpt-nav-active) + div [data-testid="stButton"] button p,
             [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.gpt-nav-active) + [data-testid="stElementContainer"] [data-testid="stButton"] button p {
@@ -2626,11 +2634,11 @@ def show_sidebar():
             }
             [data-testid="stSidebar"] .gpt-logout-marker + div [data-testid="stButton"] button,
             [data-testid="stSidebar"] .gpt-logout-marker + [data-testid="stElementContainer"] [data-testid="stButton"] button {
-                color: #d9d9d9 !important;
+                color: #B9C8E4 !important;
             }
             [data-testid="stSidebar"] .gpt-logout-marker + div [data-testid="stButton"] button:hover,
             [data-testid="stSidebar"] .gpt-logout-marker + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover {
-                background: #3a2424 !important;
+                background: #5A2A38 !important;
                 color: #ffffff !important;
             }
             </style>
@@ -10454,7 +10462,7 @@ def inject_theme_toggle():
         opacity: 0; cursor: pointer; margin: 0;
     }
     .pms-btn:has(input:checked) {
-        opacity: 1; background: #4F46E5; color: white;
+        opacity: 1; background: #2F6FED; color: white;
     }
 
     /* ══ 다크 모드 컬러 팔레트 ══
@@ -10530,22 +10538,22 @@ def inject_theme_toggle():
     }
     body:has(#pms-d:checked) hr { border-color: #45475a !important; }
 
-    /* 사이드바 */
+    /* 사이드바 — Zoho 네이비 톤은 다크모드에서도 동일 유지 */
     body:has(#pms-d:checked) [data-testid="stSidebar"],
     body:has(#pms-d:checked) [data-testid="stSidebarContent"] {
-        background-color: #171717 !important;
+        background-color: #16284A !important;
     }
     body:has(#pms-d:checked) [data-testid="stSidebar"] p,
     body:has(#pms-d:checked) [data-testid="stSidebar"] span,
     body:has(#pms-d:checked) [data-testid="stSidebar"] label {
-        color: #ffffff !important;
+        color: #E8EEF8 !important;
     }
     body:has(#pms-d:checked) [data-testid="stSidebar"] .stButton > button {
-        background-color: transparent !important; color: #ffffff !important;
+        background-color: transparent !important; color: #C9D6EC !important;
         border-color: transparent !important; box-shadow: none !important;
     }
     body:has(#pms-d:checked) [data-testid="stSidebar"] .stButton > button:hover {
-        background-color: #2f2f2f !important;
+        background-color: #233A61 !important;
     }
 
     /* 입력 컨트롤 */
