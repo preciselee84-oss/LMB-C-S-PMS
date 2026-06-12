@@ -38,6 +38,7 @@ WEEKLY_REPORT_FILE = "weekly_reports.json"
 WEEKLY_STATUS_SNAPSHOT_FILE = "weekly_status_snapshots.json"
 SALES_PIPELINE_FILE = "sales_pipeline.json"
 SERVER_CONNECTION_FILE = "server_connection.json"
+DELEGATED_WORKPLACE_FILE = "delegated_workplaces.json"
 PPT_TEMPLATE_FILE = resolve_template_file("LMB활동실적보고서_202605_하나지사.pptx")
 WEEKLY_PPT_TEMPLATE_FILE = resolve_template_file("주간보고_통합CMS고객_개설운영_주간보고_템플릿.pptx")
 EXCEL_SAMPLE_FILE = resolve_template_file("LMB월간 활동실적_000000(샘플).xlsx")
@@ -2665,7 +2666,7 @@ def show_sidebar():
         )
 
         st.markdown("<div class='gpt-section'>영업관리</div>", unsafe_allow_html=True)
-        for menu_name in ["영업 입금 자동화"]:
+        for menu_name in ["영업 입금 자동화", "위탁 사업장 관리"]:
             render_nav_button(menu_name)
 
         if st.session_state.user_role == "관리자":
@@ -3099,6 +3100,253 @@ def show_sales_payment_automation():
                 st.warning(f"{lead.get('customer_name')} · {lead.get('owner_name')} · {_format_won(lead.get('expected_amount'))}")
 
 
+def _load_delegated_workplaces():
+    default_data = {"workplaces": [], "requests": []}
+    data = load_db(DELEGATED_WORKPLACE_FILE, default_data)
+    if not isinstance(data, dict):
+        return default_data
+    data.setdefault("workplaces", [])
+    data.setdefault("requests", [])
+    return data
+
+
+def _save_delegated_workplaces(data):
+    data.setdefault("workplaces", [])
+    data.setdefault("requests", [])
+    save_db(DELEGATED_WORKPLACE_FILE, data, allow_shrink=True)
+
+
+def _current_kst():
+    return datetime.utcnow() + timedelta(hours=9)
+
+
+def _month_key(value):
+    if not value:
+        return ""
+    return str(value)[:7]
+
+
+def _workplace_request_metrics(requests):
+    current_month = _current_kst().strftime("%Y-%m")
+    month_requests = [row for row in requests if _month_key(row.get("requested_at")) == current_month]
+    paid = [row for row in month_requests if row.get("status") == "이체 완료"]
+    pending = [row for row in requests if row.get("status") == "요청"]
+    approved = [row for row in requests if row.get("status") == "품의 확정"]
+    return {
+        "pending": len(pending),
+        "approved": len(approved),
+        "paid_amount": sum(int(row.get("request_amount", 0) or 0) for row in paid),
+        "month_requests": len(month_requests),
+    }
+
+
+def _workplace_forecast_rows(workplaces, requests):
+    current_month = _current_kst().strftime("%Y-%m")
+    today_day = int(_current_kst().strftime("%d"))
+    rows = []
+    for site in workplaces:
+        site_requests = [
+            row for row in requests
+            if row.get("workplace_id") == site.get("id") and row.get("status") == "이체 완료"
+        ]
+        month_totals = {}
+        for row in site_requests:
+            key = _month_key(row.get("paid_at") or row.get("requested_at"))
+            if not key:
+                continue
+            month_totals[key] = month_totals.get(key, 0) + int(row.get("request_amount", 0) or 0)
+        historical = [amount for key, amount in month_totals.items() if key != current_month]
+        current_amount = month_totals.get(current_month, 0)
+        average_amount = int(sum(historical) / len(historical)) if historical else current_amount
+        recommended = max(average_amount, current_amount)
+        regular_day = int(site.get("regular_payment_day", 0) or 0)
+        days_to_payment = regular_day - today_day if regular_day else None
+        risk_notes = []
+        if average_amount and current_amount > average_amount * 1.3:
+            risk_notes.append("평상시 대비 사용 증가")
+        if days_to_payment is not None and 0 <= days_to_payment <= 3:
+            risk_notes.append("정기 지급일 도래")
+        if not site_requests:
+            risk_notes.append("지급 이력 없음")
+        rows.append(
+            {
+                "사업장명": site.get("workplace_name", ""),
+                "담당자": site.get("manager_name", ""),
+                "정기 지급일": f"매월 {regular_day}일" if regular_day else "미등록",
+                "당월 지급액": _format_won(current_amount),
+                "평균 지급액": _format_won(average_amount),
+                "추천 지급액": _format_won(recommended),
+                "리스크": ", ".join(risk_notes) if risk_notes else "정상",
+            }
+        )
+    return rows
+
+
+def show_delegated_workplace_management():
+    st.markdown("### 위탁 사업장 관리")
+    st.caption("사업장 등록, 전도금 요청/품의/이체, 지급 현황 예측을 한 화면에서 관리합니다.")
+
+    data = _load_delegated_workplaces()
+    workplaces = data.get("workplaces", [])
+    requests = data.get("requests", [])
+    metrics = _workplace_request_metrics(requests)
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("등록 사업장", f"{len(workplaces):,}곳")
+    m2.metric("요청 대기", f"{metrics['pending']:,}건")
+    m3.metric("품의 확정", f"{metrics['approved']:,}건")
+    m4.metric("당월 이체액", _format_won(metrics["paid_amount"]))
+
+    tab_info, tab_request, tab_report = st.tabs(["정보 등록", "요청/품의/이체", "예측/보고"])
+
+    with tab_info:
+        with st.form("delegated_workplace_form", clear_on_submit=True):
+            col_a, col_b = st.columns(2)
+            workplace_name = col_a.text_input("사업장명", placeholder="예: 강남 위탁사업장")
+            manager_name = col_b.text_input("사업장 담당자", placeholder="예: 홍길동")
+            col_c, col_d = st.columns(2)
+            bank_name = col_c.text_input("은행명", placeholder="예: 하나은행")
+            account_number = col_d.text_input("계좌번호", placeholder="예: 123-456789-01234")
+            col_e, col_f = st.columns(2)
+            regular_payment_day = col_e.number_input("정기 지급일", min_value=1, max_value=31, value=25, step=1)
+            manager_contact = col_f.text_input("담당자 연락처", placeholder="전화번호 또는 메신저 ID")
+            memo = st.text_area("메모", placeholder="사업장 운영 특이사항")
+            submitted = st.form_submit_button("사업장 등록", type="primary")
+
+        if submitted:
+            normalized = _normalize_sales_name(workplace_name)
+            duplicate = any(_normalize_sales_name(row.get("workplace_name")) == normalized for row in workplaces)
+            if not workplace_name.strip():
+                st.warning("사업장명을 입력해주세요.")
+            elif duplicate:
+                st.error("이미 등록된 사업장입니다.")
+            else:
+                workplaces.append(
+                    {
+                        "id": int(time.time() * 1000),
+                        "workplace_name": workplace_name.strip(),
+                        "bank_name": bank_name.strip(),
+                        "account_number": account_number.strip(),
+                        "regular_payment_day": int(regular_payment_day),
+                        "manager_name": manager_name.strip(),
+                        "manager_contact": manager_contact.strip(),
+                        "memo": memo.strip(),
+                        "created_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                )
+                _save_delegated_workplaces(data)
+                st.success("사업장 정보가 등록되었습니다.")
+                st.rerun()
+
+        if workplaces:
+            site_df = pd.DataFrame(workplaces)
+            site_view = site_df[
+                ["created_at", "workplace_name", "bank_name", "account_number", "regular_payment_day", "manager_name", "memo"]
+            ].rename(
+                columns={
+                    "created_at": "등록일시",
+                    "workplace_name": "사업장명",
+                    "bank_name": "은행명",
+                    "account_number": "계좌번호",
+                    "regular_payment_day": "정기 지급일",
+                    "manager_name": "담당자",
+                    "memo": "메모",
+                }
+            )
+            st.dataframe(site_view.sort_values("등록일시", ascending=False), use_container_width=True)
+
+    with tab_request:
+        if not workplaces:
+            st.info("먼저 정보 등록 탭에서 사업장을 등록해주세요.")
+        else:
+            workplace_options = {row.get("workplace_name", ""): row for row in workplaces}
+            with st.form("delegated_fund_request_form", clear_on_submit=True):
+                col_a, col_b = st.columns([2, 1])
+                selected_name = col_a.selectbox("사업장", list(workplace_options.keys()))
+                request_amount = col_b.number_input("요청 금액", min_value=0, step=100000, format="%d")
+                requested_by = st.text_input(
+                    "요청자",
+                    value=st.session_state.get("user_name", ""),
+                    placeholder="요청자명",
+                )
+                request_reason = st.text_area("요청 사유", placeholder="전도금 사용 목적 및 필요 사유")
+                requested = st.form_submit_button("전도금 요청 등록", type="primary")
+
+            if requested:
+                site = workplace_options[selected_name]
+                if request_amount <= 0:
+                    st.warning("요청 금액을 입력해주세요.")
+                else:
+                    requests.append(
+                        {
+                            "id": int(time.time() * 1000),
+                            "workplace_id": site.get("id"),
+                            "workplace_name": site.get("workplace_name"),
+                            "request_amount": int(request_amount),
+                            "requested_by": requested_by.strip(),
+                            "request_reason": request_reason.strip(),
+                            "status": "요청",
+                            "requested_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
+                            "approved_at": "",
+                            "paid_at": "",
+                        }
+                    )
+                    _save_delegated_workplaces(data)
+                    st.success("전도금 요청이 등록되었습니다.")
+                    st.rerun()
+
+        if requests:
+            st.markdown("#### 요청 처리")
+            for row in sorted(requests, key=lambda item: item.get("requested_at", ""), reverse=True):
+                cols = st.columns([2, 1, 1, 1, 2])
+                cols[0].markdown(f"**{row.get('workplace_name')}**  \n{row.get('request_reason') or '요청 사유 없음'}")
+                cols[1].write(_format_won(row.get("request_amount")))
+                cols[2].write(row.get("status"))
+                cols[3].caption(row.get("requested_at", ""))
+                with cols[4]:
+                    if row.get("status") == "요청":
+                        if st.button("품의 확정", key=f"approve_{row.get('id')}", use_container_width=True):
+                            row["status"] = "품의 확정"
+                            row["approved_at"] = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
+                            _save_delegated_workplaces(data)
+                            st.rerun()
+                    elif row.get("status") == "품의 확정":
+                        if st.button("이체 완료", key=f"pay_{row.get('id')}", use_container_width=True):
+                            row["status"] = "이체 완료"
+                            row["paid_at"] = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
+                            _save_delegated_workplaces(data)
+                            st.rerun()
+                    else:
+                        st.success("처리 완료")
+
+    with tab_report:
+        if requests:
+            request_df = pd.DataFrame(requests)
+            request_df["request_amount_won"] = request_df["request_amount"].apply(_format_won)
+            request_view = request_df[
+                ["requested_at", "workplace_name", "request_amount_won", "requested_by", "status", "approved_at", "paid_at"]
+            ].rename(
+                columns={
+                    "requested_at": "요청일시",
+                    "workplace_name": "사업장명",
+                    "request_amount_won": "요청 금액",
+                    "requested_by": "요청자",
+                    "status": "상태",
+                    "approved_at": "품의 확정일시",
+                    "paid_at": "이체 완료일시",
+                }
+            )
+            st.dataframe(request_view.sort_values("요청일시", ascending=False), use_container_width=True)
+        else:
+            st.info("전도금 지급 이력이 없습니다.")
+
+        forecast_rows = _workplace_forecast_rows(workplaces, requests)
+        if forecast_rows:
+            st.markdown("#### AI 예측 안내")
+            st.caption("현재 MVP는 지급 이력 기반의 규칙형 예측입니다. 충분한 이력이 쌓이면 모델 기반 예측으로 확장할 수 있습니다.")
+            st.dataframe(pd.DataFrame(forecast_rows), use_container_width=True)
+
+
 def _chart_layout(height=300, **overrides):
     """Plotly 차트 기본 레이아웃. 배경은 앱 테마가 보이도록 투명 처리."""
     bg = "rgba(0,0,0,0)"
@@ -3235,6 +3483,12 @@ MENU_GUIDES = {
         "🏦 입금자명과 입금액을 기준으로 계약 건을 자동 매칭합니다.",
         "🧾 VAT 포함 금액은 계약금액의 1.1배로 자동 인식합니다.",
         "⚠️ 입금 대기 건은 미수금 리스크로 확인할 수 있습니다.",
+    ],
+    "위탁 사업장 관리": [
+        "🏢 사업장 정보와 정기 지급일을 등록합니다.",
+        "🧾 전도금 요청부터 품의 확정, 이체 완료까지 상태를 관리합니다.",
+        "📊 지급 이력을 기반으로 사업장별 지급 추이와 리스크를 확인합니다.",
+        "🔔 정기 지급일 도래 및 과다 사용 사업장을 선제적으로 확인합니다.",
     ],
     "직원 및 권한설정": [
         "👤 직원 계정의 접근 권한을 허용/불가로 설정합니다.",
@@ -11083,7 +11337,7 @@ def show_main():
     persist_current_menu()
 
     menu = st.session_state.current_menu
-    allowed_menus = {"영업 입금 자동화", "직원 및 권한설정", "서버 접속 정보"}
+    allowed_menus = {"영업 입금 자동화", "위탁 사업장 관리", "직원 및 권한설정", "서버 접속 정보"}
     if menu not in allowed_menus:
         st.session_state.current_menu = "영업 입금 자동화"
         persist_current_menu()
@@ -11093,6 +11347,8 @@ def show_main():
 
     if menu == "영업 입금 자동화":
         show_sales_payment_automation()
+    elif menu == "위탁 사업장 관리":
+        show_delegated_workplace_management()
     elif menu == "직원 및 권한설정":
         show_staff_admin()
     elif menu == "서버 접속 정보":
