@@ -3370,38 +3370,68 @@ def show_company_profile():
 
     profile = _load_company_profile()
 
-    with st.form("company_profile_form"):
-        col_a, col_b = st.columns(2)
-        name = col_a.text_input("회사명", value=profile.get("name", ""), placeholder="예: (주)회사명")
-        business_number = col_b.text_input("사업자번호", value=profile.get("business_number", ""), placeholder="예: 123-45-67890")
-        col_c, col_d = st.columns(2)
-        ceo_name = col_c.text_input("대표자", value=profile.get("ceo_name", ""), placeholder="예: 홍길동")
-        contact = col_d.text_input("연락처", value=profile.get("contact", ""), placeholder="예: 02-1234-5678")
-        address = st.text_input("주소", value=profile.get("address", ""), placeholder="예: 서울특별시 강남구 ...")
-        memo = st.text_area("비고", value=profile.get("memo", ""), placeholder="회사 관련 특이사항")
-        submitted = st.form_submit_button("저장", type="primary")
+    # 등록된 회사 정보 표시
+    if profile.get("name"):
+        st.markdown("#### 등록된 회사 정보")
+        info_data = {
+            "회사명": profile.get("name", "-"),
+            "사업자번호": profile.get("business_number", "-"),
+            "대표자": profile.get("ceo_name", "-"),
+            "연락처": profile.get("contact", "-"),
+            "주소": profile.get("address", "-"),
+            "비고": profile.get("memo", "-"),
+        }
+        info_df = pd.DataFrame([info_data]).T.reset_index()
+        info_df.columns = ["항목", "내용"]
+        st.dataframe(info_df, use_container_width=True, hide_index=True)
+        if profile.get("updated_at"):
+            st.caption(f"최종 수정: {profile.get('updated_at')}")
+    else:
+        st.info("등록된 회사 정보가 없습니다.")
 
-    if submitted:
-        if not name.strip():
-            st.warning("회사명을 입력해주세요.")
-        else:
-            profile.update(
-                {
-                    "name": name.strip(),
-                    "business_number": business_number.strip(),
-                    "ceo_name": ceo_name.strip(),
-                    "address": address.strip(),
-                    "contact": contact.strip(),
-                    "memo": memo.strip(),
-                    "updated_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
-                }
-            )
-            _save_company_profile(profile)
-            st.success("회사 정보가 저장되었습니다.")
+    # 수정 폼
+    if st.session_state.get("_show_company_edit_form"):
+        with st.form("company_profile_form"):
+            col_a, col_b = st.columns(2)
+            name = col_a.text_input("회사명", value=profile.get("name", ""), placeholder="예: (주)회사명")
+            business_number = col_b.text_input("사업자번호", value=profile.get("business_number", ""), placeholder="예: 123-45-67890")
+            col_c, col_d = st.columns(2)
+            ceo_name = col_c.text_input("대표자", value=profile.get("ceo_name", ""), placeholder="예: 홍길동")
+            contact = col_d.text_input("연락처", value=profile.get("contact", ""), placeholder="예: 02-1234-5678")
+            address = st.text_input("주소", value=profile.get("address", ""), placeholder="예: 서울특별시 강남구 ...")
+            memo = st.text_area("비고", value=profile.get("memo", ""), placeholder="회사 관련 특이사항")
+            col_submit, col_cancel = st.columns(2)
+            submitted = col_submit.form_submit_button("저장", type="primary", use_container_width=True)
+            cancelled = col_cancel.form_submit_button("취소", use_container_width=True)
+
+        if submitted:
+            if not name.strip():
+                st.warning("회사명을 입력해주세요.")
+            else:
+                profile.update(
+                    {
+                        "name": name.strip(),
+                        "business_number": business_number.strip(),
+                        "ceo_name": ceo_name.strip(),
+                        "address": address.strip(),
+                        "contact": contact.strip(),
+                        "memo": memo.strip(),
+                        "updated_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                )
+                _save_company_profile(profile)
+                st.session_state["_show_company_edit_form"] = False
+                st.success("회사 정보가 저장되었습니다.")
+                st.rerun()
+        if cancelled:
+            st.session_state["_show_company_edit_form"] = False
             st.rerun()
 
-    if profile.get("updated_at"):
-        st.caption(f"최종 수정: {profile.get('updated_at')}")
+    # 수정 버튼
+    else:
+        if st.button("수정", key="show_company_edit_btn", use_container_width=False):
+            st.session_state["_show_company_edit_form"] = True
+            st.rerun()
 
 
 def show_workplace_admin():
