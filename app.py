@@ -36,7 +36,6 @@ SENT_UPLOADS_FILE = "sent_uploads.json"
 SAVED_STATE_FILE = "saved_state.json"
 WEEKLY_REPORT_FILE = "weekly_reports.json"
 WEEKLY_STATUS_SNAPSHOT_FILE = "weekly_status_snapshots.json"
-SALES_PIPELINE_FILE = "sales_pipeline.json"
 SERVER_CONNECTION_FILE = "server_connection.json"
 DELEGATED_WORKPLACE_FILE = "delegated_workplaces.json"
 PPT_TEMPLATE_FILE = resolve_template_file("LMB활동실적보고서_202605_하나지사.pptx")
@@ -592,7 +591,7 @@ def init_state():
         "user_role": "사용자",
         "user_name": "",
         "auth_mode": "login",
-        "current_menu": "영업 입금 자동화",
+        "current_menu": "위탁 사업장 관리",
         "url_analysis": DEFAULT_URL_ANALYSIS,
         "url_sync": DEFAULT_URL_SYNC,
         "url_hana": DEFAULT_URL_HANA,
@@ -638,7 +637,7 @@ def init_state():
         "운영계획",
     }
     if st.session_state.current_menu in removed_menus:
-        st.session_state.current_menu = "영업 입금 자동화"
+        st.session_state.current_menu = "위탁 사업장 관리"
 
 
 init_state()
@@ -2318,7 +2317,7 @@ def show_auth_page():
                     if report_closed_info:
                         st.session_state.report_closed = report_closed_info.get("time", "")
 
-                    st.session_state.current_menu = "영업 입금 자동화"
+                    st.session_state.current_menu = "위탁 사업장 관리"
                     persist_current_menu()
                     st.rerun()
                 elif not u_id_str:
@@ -2666,7 +2665,7 @@ def show_sidebar():
         )
 
         st.markdown("<div class='gpt-section'>영업관리</div>", unsafe_allow_html=True)
-        for menu_name in ["영업 입금 자동화", "위탁 사업장 관리"]:
+        for menu_name in ["위탁 사업장 관리"]:
             render_nav_button(menu_name)
 
         if st.session_state.user_role == "관리자":
@@ -2687,419 +2686,6 @@ def show_sidebar():
             st.rerun()
 
 
-def _load_sales_pipeline():
-    default_data = {"leads": [], "matches": []}
-    data = load_db(SALES_PIPELINE_FILE, default_data)
-    if not isinstance(data, dict):
-        return default_data
-    data.setdefault("leads", [])
-    data.setdefault("matches", [])
-    return data
-
-
-def _save_sales_pipeline(data):
-    data.setdefault("leads", [])
-    data.setdefault("matches", [])
-    save_db(SALES_PIPELINE_FILE, data, allow_shrink=True)
-
-
-def _normalize_sales_name(value):
-    return re.sub(r"\s+", "", str(value or "").strip().lower())
-
-
-def _sales_amount_rule(expected_amount, paid_amount):
-    try:
-        expected = int(float(expected_amount or 0))
-        paid = int(float(paid_amount or 0))
-    except Exception:
-        return None
-    if expected <= 0 or paid <= 0:
-        return None
-    if paid == expected:
-        return "정확 일치"
-    if paid == int(round(expected * 1.1)):
-        return "VAT 포함"
-    return None
-
-
-def _format_won(value):
-    try:
-        return f"{int(float(value or 0)):,}원"
-    except Exception:
-        return "0원"
-
-
-def _mssql_config_ready(config):
-    if not config.get("server_host") or not config.get("database_name"):
-        return False
-    if config.get("auth_type") == "SQL Server 인증" and (
-        not config.get("username") or not config.get("password")
-    ):
-        return False
-    return True
-
-
-def _build_mssql_connection_string(config):
-    driver = _resolve_mssql_driver(config)
-    server = str(config.get("server_host", "")).strip()
-    port = int(config.get("server_port", 1433) or 1433)
-    database = str(config.get("database_name", "")).strip()
-    encrypt = "yes" if config.get("encrypt") else "no"
-    trust_cert = "yes" if config.get("trust_server_certificate") else "no"
-    timeout = int(config.get("connection_timeout", 30) or 30)
-
-    parts = [
-        f"DRIVER={{{driver}}}",
-        f"SERVER={server},{port}",
-        f"DATABASE={database}",
-        f"Encrypt={encrypt}",
-        f"TrustServerCertificate={trust_cert}",
-        f"Connection Timeout={timeout}",
-    ]
-    if config.get("auth_type") == "Windows 인증":
-        parts.append("Trusted_Connection=yes")
-    else:
-        parts.extend(
-            [
-                f"UID={config.get('username', '')}",
-                f"PWD={config.get('password', '')}",
-            ]
-        )
-    return ";".join(parts) + ";"
-
-
-def _get_installed_odbc_drivers():
-    try:
-        import pyodbc
-    except ImportError:
-        return []
-    try:
-        return list(pyodbc.drivers())
-    except Exception:
-        return []
-
-
-def _preferred_mssql_driver(installed_drivers):
-    preferred = [
-        "ODBC Driver 18 for SQL Server",
-        "ODBC Driver 17 for SQL Server",
-        "SQL Server Native Client 11.0",
-        "FreeTDS",
-    ]
-    for driver in preferred:
-        if driver in installed_drivers:
-            return driver
-    sql_like = [driver for driver in installed_drivers if "SQL Server" in driver or "FreeTDS" in driver]
-    return sql_like[0] if sql_like else "ODBC Driver 18 for SQL Server"
-
-
-def _resolve_mssql_driver(config):
-    installed = _get_installed_odbc_drivers()
-    configured = config.get("driver_name")
-    if configured and (not installed or configured in installed):
-        return configured
-    return _preferred_mssql_driver(installed)
-
-
-def _mssql_driver_error_message(config):
-    installed = _get_installed_odbc_drivers()
-    selected = config.get("driver_name") or _preferred_mssql_driver(installed)
-    installed_text = ", ".join(installed) if installed else "감지된 드라이버 없음"
-    return (
-        f"선택한 ODBC 드라이버 '{selected}'를 열 수 없습니다. "
-        f"서버에 설치된 드라이버: {installed_text}. "
-        "서버 접속 정보 메뉴에서 설치된 드라이버를 선택하거나, 배포 서버에 Microsoft ODBC Driver 18/17 for SQL Server를 설치해주세요."
-    )
-
-
-def _connect_mssql(config):
-    try:
-        import pyodbc
-    except ImportError as exc:
-        raise RuntimeError("pyodbc가 설치되어 있지 않습니다. requirements.txt 반영 후 재배포가 필요합니다.") from exc
-
-    if not _mssql_config_ready(config):
-        raise RuntimeError("MSSQL 서버 접속 정보가 충분하지 않습니다.")
-    try:
-        return pyodbc.connect(_build_mssql_connection_string(config))
-    except pyodbc.Error as exc:
-        text = str(exc)
-        if "Can't open lib" in text or "file not found" in text:
-            raise RuntimeError(_mssql_driver_error_message(config)) from exc
-        raise
-
-
-def _ensure_sales_registration_table(conn):
-    ddl = """
-    IF NOT EXISTS (
-        SELECT 1
-        FROM sys.tables t
-        JOIN sys.schemas s ON t.schema_id = s.schema_id
-        WHERE t.name = 'sales_registrations' AND s.name = 'dbo'
-    )
-    BEGIN
-        CREATE TABLE dbo.sales_registrations (
-            id BIGINT NOT NULL PRIMARY KEY,
-            customer_name NVARCHAR(160) NOT NULL,
-            business_number NVARCHAR(40) NULL,
-            owner_name NVARCHAR(100) NOT NULL,
-            owner_contact NVARCHAR(100) NULL,
-            meeting_note NVARCHAR(MAX) NULL,
-            expected_amount BIGINT NOT NULL,
-            status NVARCHAR(30) NOT NULL,
-            claimed_at DATETIME2 NOT NULL,
-            created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-            updated_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
-        );
-        CREATE INDEX IX_sales_registrations_customer_name
-            ON dbo.sales_registrations(customer_name);
-        CREATE INDEX IX_sales_registrations_business_number
-            ON dbo.sales_registrations(business_number);
-        CREATE INDEX IX_sales_registrations_status
-            ON dbo.sales_registrations(status);
-    END
-    """
-    cursor = conn.cursor()
-    cursor.execute(ddl)
-    conn.commit()
-
-
-def _save_sales_lead_to_mssql(lead):
-    config = _load_server_connection()
-    try:
-        with _connect_mssql(config) as conn:
-            _ensure_sales_registration_table(conn)
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                IF EXISTS (SELECT 1 FROM dbo.sales_registrations WHERE id = ?)
-                BEGIN
-                    UPDATE dbo.sales_registrations
-                    SET customer_name = ?,
-                        business_number = ?,
-                        owner_name = ?,
-                        owner_contact = ?,
-                        meeting_note = ?,
-                        expected_amount = ?,
-                        status = ?,
-                        claimed_at = ?,
-                        updated_at = SYSUTCDATETIME()
-                    WHERE id = ?;
-                END
-                ELSE
-                BEGIN
-                    INSERT INTO dbo.sales_registrations (
-                        id, customer_name, business_number, owner_name, owner_contact,
-                        meeting_note, expected_amount, status, claimed_at
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-                END
-                """,
-                lead.get("id"),
-                lead.get("customer_name", ""),
-                lead.get("business_number", ""),
-                lead.get("owner_name", ""),
-                lead.get("owner_contact", ""),
-                lead.get("meeting_note", ""),
-                int(lead.get("expected_amount", 0) or 0),
-                lead.get("status", "입금 대기"),
-                lead.get("claimed_at"),
-                lead.get("id"),
-                lead.get("id"),
-                lead.get("customer_name", ""),
-                lead.get("business_number", ""),
-                lead.get("owner_name", ""),
-                lead.get("owner_contact", ""),
-                lead.get("meeting_note", ""),
-                int(lead.get("expected_amount", 0) or 0),
-                lead.get("status", "입금 대기"),
-                lead.get("claimed_at"),
-            )
-            conn.commit()
-        return True, "MSSQL 서버에 영업 등록 정보가 저장되었습니다."
-    except Exception as exc:
-        return False, f"MSSQL 저장 실패: {exc}"
-
-
-def show_sales_payment_automation():
-    st.markdown("### 영업 입금 자동화")
-    st.caption("영업 등록부터 입금 감지, VAT 포함 금액 자동 매칭까지 검증하는 MVP 화면입니다.")
-
-    notice = st.session_state.pop("_sales_registration_notice", None)
-    if notice:
-        level, text = notice
-        if level == "success":
-            st.success(text)
-        else:
-            st.warning(text)
-
-    data = _load_sales_pipeline()
-    leads = data.get("leads", [])
-    matches = data.get("matches", [])
-    waiting = [lead for lead in leads if lead.get("status") != "입금 완료"]
-    paid_amount = sum(int(match.get("amount", 0) or 0) for match in matches)
-    expected_amount = sum(int(lead.get("expected_amount", 0) or 0) for lead in leads)
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("전체 영업 등록", f"{len(leads):,}건")
-    c2.metric("입금 대기", f"{len(waiting):,}건")
-    c3.metric("입금 완료", f"{len(leads) - len(waiting):,}건")
-    c4.metric("확인 입금액", _format_won(paid_amount))
-
-    tab_register, tab_pipeline = st.tabs(["영업 등록", "파이프라인"])
-
-    with tab_register:
-        register_col, match_col = st.columns(2)
-
-        with register_col:
-            st.markdown("#### 영업 등록")
-            with st.form("sales_lead_form", clear_on_submit=True):
-                col_a, col_b = st.columns(2)
-                customer_name = col_a.text_input("거래처명", placeholder="예: OO기업")
-                business_number = col_b.text_input("사업자번호", placeholder="예: 123-45-67890")
-                owner_name = st.text_input(
-                    "영업 담당자",
-                    value=st.session_state.get("user_name", ""),
-                    placeholder="예: 김영업",
-                )
-                expected = st.number_input("예상 계약 금액", min_value=0, step=100000, format="%d")
-                owner_contact = st.text_input("알림 수신처", placeholder="전화번호 또는 협업툴 ID")
-                meeting_note = st.text_area("미팅 내용", placeholder="현장 미팅 메모")
-                submitted = st.form_submit_button("영업 등록", type="primary")
-
-            if submitted:
-                normalized = _normalize_sales_name(customer_name)
-                duplicate = any(_normalize_sales_name(lead.get("customer_name")) == normalized for lead in leads)
-                if not customer_name.strip() or not owner_name.strip() or expected <= 0:
-                    st.warning("거래처명, 담당자, 예상 계약 금액을 입력해주세요.")
-                elif duplicate:
-                    st.error("이미 등록된 거래처입니다.")
-                else:
-                    new_lead = {
-                        "id": int(time.time() * 1000),
-                        "customer_name": customer_name.strip(),
-                        "business_number": business_number.strip(),
-                        "owner_name": owner_name.strip(),
-                        "owner_contact": owner_contact.strip(),
-                        "meeting_note": meeting_note.strip(),
-                        "expected_amount": int(expected),
-                        "status": "입금 대기",
-                        "claimed_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
-                    }
-                    leads.append(new_lead)
-                    _save_sales_pipeline(data)
-                    synced, sync_message = _save_sales_lead_to_mssql(new_lead)
-                    if synced:
-                        st.session_state["_sales_registration_notice"] = (
-                            "success",
-                            "영업 정보가 등록되고 MSSQL 서버에 저장되었습니다.",
-                        )
-                    else:
-                        st.session_state["_sales_registration_notice"] = (
-                            "warning",
-                            f"영업 정보는 로컬에 등록되었습니다. {sync_message}",
-                        )
-                    st.rerun()
-
-        with match_col:
-            st.markdown("#### 입금 매칭")
-            st.info("금융 스크래핑 연동 전까지는 수동 입금 거래로 자동 매칭 로직을 검증합니다.")
-            with st.form("sales_match_form", clear_on_submit=True):
-                col_a, col_b = st.columns(2)
-                depositor_name = col_a.text_input("입금자명", placeholder="예: OO기업")
-                amount = col_b.number_input("입금액", min_value=0, step=100000, format="%d")
-                match_submitted = st.form_submit_button("매칭 실행", type="primary")
-
-            if match_submitted:
-                depositor = _normalize_sales_name(depositor_name)
-                matched_lead = None
-                matched_rule = None
-                for lead in leads:
-                    if lead.get("status") == "입금 완료":
-                        continue
-                    customer = _normalize_sales_name(lead.get("customer_name"))
-                    name_matches = customer and depositor and (customer in depositor or depositor in customer)
-                    rule = _sales_amount_rule(lead.get("expected_amount"), amount)
-                    if name_matches and rule:
-                        matched_lead = lead
-                        matched_rule = rule
-                        break
-
-                if matched_lead:
-                    matched_lead["status"] = "입금 완료"
-                    matches.append(
-                        {
-                            "id": int(time.time() * 1000),
-                            "sales_lead_id": matched_lead.get("id"),
-                            "customer_name": matched_lead.get("customer_name"),
-                            "business_number": matched_lead.get("business_number", ""),
-                            "owner_name": matched_lead.get("owner_name"),
-                            "depositor_name": depositor_name.strip(),
-                            "amount": int(amount),
-                            "matched_rule": matched_rule,
-                            "matched_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
-                        }
-                    )
-                    _save_sales_pipeline(data)
-                    _save_sales_lead_to_mssql(matched_lead)
-                    send_kakao_notify(
-                        f"{matched_lead.get('customer_name')} {_format_won(amount)} 입금 완료, 영업 등록 확정"
-                    )
-                    st.success(f"{matched_lead.get('customer_name')} 입금이 자동 매칭되었습니다.")
-                    st.rerun()
-                else:
-                    st.warning("매칭되는 영업 등록/계약이 없습니다. 입금자명과 금액을 확인해주세요.")
-
-            if matches:
-                match_df = pd.DataFrame(matches)
-                if "business_number" not in match_df.columns:
-                    match_df["business_number"] = ""
-                display_cols = ["matched_at", "customer_name", "business_number", "owner_name", "depositor_name", "amount", "matched_rule"]
-                match_view = match_df[display_cols].sort_values("matched_at", ascending=False).rename(
-                    columns={
-                        "matched_at": "매칭일시",
-                        "customer_name": "거래처명",
-                        "business_number": "사업자번호",
-                        "owner_name": "영업 담당자",
-                        "depositor_name": "입금자명",
-                        "amount": "입금액",
-                        "matched_rule": "매칭 방식",
-                    }
-                )
-                st.dataframe(match_view, use_container_width=True)
-
-    with tab_pipeline:
-        col_a, col_b = st.columns(2)
-        col_a.metric("예상 계약 총액", _format_won(expected_amount))
-        col_b.metric("미확인 예상액", _format_won(expected_amount - paid_amount))
-
-        if leads:
-            lead_df = pd.DataFrame(leads)
-            if "business_number" not in lead_df.columns:
-                lead_df["business_number"] = ""
-            lead_df["expected_amount"] = lead_df["expected_amount"].apply(_format_won)
-            display_cols = ["claimed_at", "customer_name", "business_number", "owner_name", "expected_amount", "status", "meeting_note"]
-            lead_view = lead_df[display_cols].sort_values("claimed_at", ascending=False).rename(
-                columns={
-                    "claimed_at": "등록일시",
-                    "customer_name": "거래처명",
-                    "business_number": "사업자번호",
-                    "owner_name": "영업 담당자",
-                    "expected_amount": "예상 계약 금액",
-                    "status": "상태",
-                    "meeting_note": "미팅 내용",
-                }
-            )
-            st.dataframe(lead_view, use_container_width=True)
-        else:
-            st.info("등록된 영업 정보가 없습니다.")
-
-        if waiting:
-            st.markdown("#### 미수금 리스크")
-            for lead in waiting[:5]:
-                st.warning(f"{lead.get('customer_name')} · {lead.get('owner_name')} · {_format_won(lead.get('expected_amount'))}")
-
-
 def _load_delegated_workplaces():
     default_data = {"workplaces": [], "requests": []}
     data = load_db(DELEGATED_WORKPLACE_FILE, default_data)
@@ -3114,6 +2700,17 @@ def _save_delegated_workplaces(data):
     data.setdefault("workplaces", [])
     data.setdefault("requests", [])
     save_db(DELEGATED_WORKPLACE_FILE, data, allow_shrink=True)
+
+
+def _normalize_name(value):
+    return re.sub(r"\s+", "", str(value or "").strip().lower())
+
+
+def _format_won(value):
+    try:
+        return f"{int(float(value or 0)):,}원"
+    except Exception:
+        return "0원"
 
 
 def _current_kst():
@@ -3214,8 +2811,8 @@ def show_delegated_workplace_management():
             submitted = st.form_submit_button("사업장 등록", type="primary")
 
         if submitted:
-            normalized = _normalize_sales_name(workplace_name)
-            duplicate = any(_normalize_sales_name(row.get("workplace_name")) == normalized for row in workplaces)
+            normalized = _normalize_name(workplace_name)
+            duplicate = any(_normalize_name(row.get("workplace_name")) == normalized for row in workplaces)
             if not workplace_name.strip():
                 st.warning("사업장명을 입력해주세요.")
             elif duplicate:
@@ -3478,12 +3075,6 @@ def apply_global_table_css():
 
 
 MENU_GUIDES = {
-    "영업 입금 자동화": [
-        "📝 현장에서 거래처 영업 정보를 등록합니다.",
-        "🏦 입금자명과 입금액을 기준으로 계약 건을 자동 매칭합니다.",
-        "🧾 VAT 포함 금액은 계약금액의 1.1배로 자동 인식합니다.",
-        "⚠️ 입금 대기 건은 미수금 리스크로 확인할 수 있습니다.",
-    ],
     "위탁 사업장 관리": [
         "🏢 사업장 정보와 정기 지급일을 등록합니다.",
         "🧾 전도금 요청부터 품의 확정, 이체 완료까지 상태를 관리합니다.",
@@ -3504,10 +3095,10 @@ MENU_GUIDES = {
 
 
 def render_page_title(menu):
-    if menu == "영업 입금 자동화":
+    if menu == "위탁 사업장 관리":
         return
 
-    if menu != "영업 입금 자동화":
+    if menu != "위탁 사업장 관리":
         st.markdown(
             """
             <style>
@@ -3570,12 +3161,12 @@ def render_page_title(menu):
             unsafe_allow_html=True,
         )
         if st.button("🏠", key=f"home_btn_{menu}", help="영업관리 홈으로 이동"):
-            st.session_state.current_menu = "영업 입금 자동화"
+            st.session_state.current_menu = "위탁 사업장 관리"
             persist_current_menu()
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-    if menu != "영업 입금 자동화":
+    if menu != "위탁 사업장 관리":
         st.markdown(f"## {menu}")
     settings_menus = ["직원 및 권한설정", "서버 접속 정보"]
     if menu in settings_menus:
@@ -3583,13 +3174,13 @@ def render_page_title(menu):
     else:
         parent_nav = "영업관리"
 
-    if menu != "영업 입금 자동화":
+    if menu != "위탁 사업장 관리":
         st.markdown(
             f"<div style='color:#718096;font-size:14px;font-weight:600;margin-top:-8px;margin-bottom:12px;'>{parent_nav} &gt; {html.escape(menu)}</div>",
             unsafe_allow_html=True,
         )
 
-    if menu in MENU_GUIDES and menu != "영업 입금 자동화":
+    if menu in MENU_GUIDES and menu != "위탁 사업장 관리":
         with st.expander("📌 메뉴 이용 안내", expanded=False):
             for line in MENU_GUIDES[menu]:
                 st.markdown(f"- {line}")
@@ -11337,24 +10928,22 @@ def show_main():
     persist_current_menu()
 
     menu = st.session_state.current_menu
-    allowed_menus = {"영업 입금 자동화", "위탁 사업장 관리", "직원 및 권한설정", "서버 접속 정보"}
+    allowed_menus = {"위탁 사업장 관리", "직원 및 권한설정", "서버 접속 정보"}
     if menu not in allowed_menus:
-        st.session_state.current_menu = "영업 입금 자동화"
+        st.session_state.current_menu = "위탁 사업장 관리"
         persist_current_menu()
         st.rerun()
 
     render_page_title(menu)
 
-    if menu == "영업 입금 자동화":
-        show_sales_payment_automation()
-    elif menu == "위탁 사업장 관리":
+    if menu == "위탁 사업장 관리":
         show_delegated_workplace_management()
     elif menu == "직원 및 권한설정":
         show_staff_admin()
     elif menu == "서버 접속 정보":
         show_server_connection_info()
     else:
-        st.session_state.current_menu = "영업 입금 자동화"
+        st.session_state.current_menu = "위탁 사업장 관리"
         st.rerun()
 
 
