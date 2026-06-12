@@ -3435,7 +3435,7 @@ def show_company_profile():
 
 
 def show_workplace_admin():
-    tab1, tab2, tab3 = st.tabs(["사업장 정보 관리", "계좌 관리", "담당자 관리"])
+    tab1, tab2, tab3 = st.tabs(["사업장 정보 관리", "계좌 관리", "사용자 관리"])
     with tab1:
         _render_workplace_info_admin()
     with tab2:
@@ -7991,25 +7991,19 @@ def _render_staff_admin():
         staff_rows.append({
             "ID": uid,
             "성명": info.get("name", ""),
-            "직급": info.get("rank", "직원"),
             "메일주소": info.get("email", ""),
-            "부서구분": info.get("dept_type", "사업부"),
-            "직원구분": info.get("staff_type", "정규직"),
-            "외주여부": info.get("outsource", "아니오"),
-            "외주 근무기간": info.get("outsource_period", "해당없음"),
-            "로그인 허용 여부": info.get("access", "불가"),
-            "메뉴 접근 권한": "관리자 메뉴" if info.get("role") == "관리자" else "사용자 메뉴",
+            "사업자 정보": info.get("dept_type", "사업부"),
+            "마스터 구분": "관리자" if info.get("role") == "관리자" else "사용자",
         })
 
     if not staff_rows:
         st.info("등록된 직원이 없습니다.")
         return
 
-    # 직급 순서로 정렬
-    rank_order = {"부서장": 0, "팀장": 1, "과장": 2, "대리": 3, "주임": 4, "직원": 5}
-    staff_rows.sort(key=lambda x: rank_order.get(x["직급"], 99))
+    # ID 순서로 정렬
+    staff_rows.sort(key=lambda x: x["ID"])
 
-    # ── 직원 목록 HTML 테이블 표시 (다크모드 호환, 가운데 정렬) ──
+    # ── 사용자 목록 HTML 테이블 표시 (다크모드 호환, 가운데 정렬) ──
     render_plain_html_table(pd.DataFrame(staff_rows), center_align=True)
 
     st.markdown("---")
