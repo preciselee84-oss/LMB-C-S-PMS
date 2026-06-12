@@ -3424,7 +3424,7 @@ def _render_bank_account_management():
     workplaces = wp_data.get("workplaces", [])
     workplaces_by_id = {site.get("id"): site for site in workplaces}
 
-    # 등록된 계좌 표시 (맨 위로 이동)
+    # 등록된 계좌 표시
     if accounts:
         st.markdown("#### 등록된 계좌")
         account_df = pd.DataFrame(accounts)
@@ -3447,8 +3447,106 @@ def _render_bank_account_management():
             }
         )
         st.dataframe(account_view, use_container_width=True)
+    else:
+        st.info("등록된 계좌가 없습니다.")
 
-        if st.session_state.get("_show_account_delete_select"):
+    # 계좌 수정 폼
+    if st.session_state.get("_show_account_edit_form"):
+        edit_target_id = st.session_state.get("_account_edit_target_id")
+        target = next((row for row in accounts if row.get("id") == edit_target_id), None)
+        if target is None:
+            st.session_state["_show_account_edit_form"] = False
+            st.rerun()
+
+        company_options = {site.get("workplace_name", ""): site for site in workplaces}
+        current_workplace_id = target.get("linked_workplace_id")
+        current_workplace = workplaces_by_id.get(current_workplace_id, {})
+        current_workplace_name = current_workplace.get("workplace_name", "")
+
+        with st.form("bank_account_edit_form", clear_on_submit=False):
+            company_label = st.selectbox("회사 선택", list(company_options.keys()),
+                                        index=list(company_options.keys()).index(current_workplace_name) if current_workplace_name in company_options.keys() else 0)
+            account_name = st.text_input("계좌명", value=target.get("account_name", ""))
+            bank_name = st.text_input("은행명", value=target.get("bank_name", ""))
+            account_number = st.text_input("계좌번호", value=target.get("account_number", ""))
+            holder_name = st.text_input("예금주", value=target.get("holder_name", ""))
+            memo = st.text_area("메모", value=target.get("memo", ""))
+            col_submit, col_cancel = st.columns(2)
+            submitted = col_submit.form_submit_button("수정 완료", type="primary", use_container_width=True)
+            cancelled = col_cancel.form_submit_button("취소", use_container_width=True)
+
+        if submitted:
+            if not account_name.strip() or not account_number.strip():
+                st.warning("계좌명과 계좌번호를 입력해주세요.")
+            else:
+                site = company_options[company_label]
+                target["account_name"] = account_name.strip()
+                target["bank_name"] = bank_name.strip()
+                target["account_number"] = account_number.strip()
+                target["holder_name"] = holder_name.strip()
+                target["linked_workplace_id"] = site.get("id")
+                target["memo"] = memo.strip()
+                _save_bank_accounts(data)
+                st.session_state["_show_account_edit_form"] = False
+                st.success("계좌 정보가 수정되었습니다.")
+                st.rerun()
+        if cancelled:
+            st.session_state["_show_account_edit_form"] = False
+            st.rerun()
+
+    # 계좌 추가 폼
+    elif st.session_state.get("_show_account_add_form"):
+        if not workplaces:
+            st.warning("[사업장 정보 관리]에서 사업장을 먼저 등록해주세요.")
+            st.session_state["_show_account_add_form"] = False
+            st.rerun()
+        else:
+            company_options = {site.get("workplace_name", ""): site for site in workplaces}
+            with st.form("bank_account_form", clear_on_submit=True):
+                col_a, col_b = st.columns(2)
+                company_label = col_a.selectbox("회사 선택", list(company_options.keys()))
+                account_name = col_b.text_input("계좌명", placeholder="예: 본사 지급계좌")
+                col_c, col_d = st.columns(2)
+                bank_name = col_c.text_input("은행명", placeholder="예: 하나은행")
+                account_number = col_d.text_input("계좌번호", placeholder="예: 123-456789-01234")
+                holder_name = st.text_input("예금주", placeholder="예: (주)회사명")
+                memo = st.text_area("메모", placeholder="계좌 관련 특이사항")
+                col_submit, col_cancel = st.columns(2)
+                submitted = col_submit.form_submit_button("등록", type="primary", use_container_width=True)
+                cancelled = col_cancel.form_submit_button("취소", use_container_width=True)
+
+            if submitted:
+                if not account_name.strip() or not account_number.strip():
+                    st.warning("계좌명과 계좌번호를 입력해주세요.")
+                else:
+                    site = company_options[company_label]
+                    accounts.append(
+                        {
+                            "id": int(time.time() * 1000),
+                            "account_type": "위탁사업장",
+                            "account_name": account_name.strip(),
+                            "bank_name": bank_name.strip(),
+                            "account_number": account_number.strip(),
+                            "holder_name": holder_name.strip(),
+                            "linked_workplace_id": site.get("id"),
+                            "balance": 0,
+                            "balance_updated_at": "",
+                            "balance_history": [],
+                            "memo": memo.strip(),
+                            "created_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
+                        }
+                    )
+                    _save_bank_accounts(data)
+                    st.session_state["_show_account_add_form"] = False
+                    st.success("계좌가 등록되었습니다.")
+                    st.rerun()
+            if cancelled:
+                st.session_state["_show_account_add_form"] = False
+                st.rerun()
+
+    # 삭제 선택
+    elif st.session_state.get("_show_account_delete_select"):
+        if accounts:
             delete_options = {f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row.get("id") for row in accounts}
             target_label = st.selectbox("삭제 대상 계좌", list(delete_options.keys()), key="bank_account_delete_target")
             target_id = delete_options[target_label]
@@ -3463,81 +3561,37 @@ def _render_bank_account_management():
             if col_cancel.button("취소", use_container_width=True):
                 st.session_state["_show_account_delete_select"] = False
                 st.rerun()
-        else:
-            if st.button("삭제", key="show_account_delete_btn", use_container_width=False):
-                st.session_state["_show_account_delete_select"] = True
+
+    # 수정 선택
+    elif st.session_state.get("_show_account_edit_select"):
+        if accounts:
+            edit_options = {f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row.get("id") for row in accounts}
+            target_label = st.selectbox("수정 대상 계좌", list(edit_options.keys()), key="bank_account_edit_target")
+            target_id = edit_options[target_label]
+
+            col_confirm, col_cancel = st.columns(2)
+            if col_confirm.button("수정 진행", type="primary", use_container_width=True):
+                st.session_state["_show_account_edit_select"] = False
+                st.session_state["_show_account_edit_form"] = True
+                st.session_state["_account_edit_target_id"] = target_id
                 st.rerun()
-    else:
-        st.info("등록된 계좌가 없습니다.")
-
-    # 계좌 등록 폼
-    if not workplaces:
-        st.warning("[사업장 정보 관리]에서 사업장을 먼저 등록해주세요.")
-    else:
-        company_options = {site.get("workplace_name", ""): site for site in workplaces}
-        with st.form("bank_account_form", clear_on_submit=True):
-            col_a, col_b = st.columns(2)
-            company_label = col_a.selectbox("회사 선택", list(company_options.keys()))
-            account_name = col_b.text_input("계좌명", placeholder="예: 본사 지급계좌")
-            col_c, col_d = st.columns(2)
-            bank_name = col_c.text_input("은행명", placeholder="예: 하나은행")
-            account_number = col_d.text_input("계좌번호", placeholder="예: 123-456789-01234")
-            holder_name = st.text_input("예금주", placeholder="예: (주)회사명")
-            memo = st.text_area("메모", placeholder="계좌 관련 특이사항")
-            submitted = st.form_submit_button("계좌 등록", type="primary")
-
-        if submitted:
-            if not account_name.strip() or not account_number.strip():
-                st.warning("계좌명과 계좌번호를 입력해주세요.")
-            else:
-                site = company_options[company_label]
-                accounts.append(
-                    {
-                        "id": int(time.time() * 1000),
-                        "account_type": "위탁사업장",
-                        "account_name": account_name.strip(),
-                        "bank_name": bank_name.strip(),
-                        "account_number": account_number.strip(),
-                        "holder_name": holder_name.strip(),
-                        "linked_workplace_id": site.get("id"),
-                        "balance": 0,
-                        "balance_updated_at": "",
-                        "balance_history": [],
-                        "memo": memo.strip(),
-                        "created_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
-                    }
-                )
-                _save_bank_accounts(data)
-                st.success("계좌가 등록되었습니다.")
+            if col_cancel.button("취소", use_container_width=True):
+                st.session_state["_show_account_edit_select"] = False
                 st.rerun()
 
-    linked_ids = {row.get("linked_workplace_id") for row in accounts if row.get("linked_workplace_id")}
-    importable = [
-        site for site in workplaces
-        if site.get("bank_name") and site.get("account_number") and site.get("id") not in linked_ids
-    ]
-    if importable:
-        if st.button(f"위탁 사업장 계좌 가져오기 ({len(importable)}건)"):
-            now_str = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
-            for offset, site in enumerate(importable):
-                accounts.append(
-                    {
-                        "id": int(time.time() * 1000) + offset,
-                        "account_type": "위탁사업장",
-                        "account_name": site.get("workplace_name", ""),
-                        "bank_name": site.get("bank_name", ""),
-                        "account_number": site.get("account_number", ""),
-                        "holder_name": site.get("workplace_name", ""),
-                        "linked_workplace_id": site.get("id"),
-                        "balance": 0,
-                        "balance_updated_at": "",
-                        "balance_history": [],
-                        "memo": "",
-                        "created_at": now_str,
-                    }
-                )
-            _save_bank_accounts(data)
-            st.success(f"{len(importable)}개 사업장 계좌를 가져왔습니다.")
+    # 버튼들
+    else:
+        col_add, col_edit, col_delete, _ = st.columns([20, 20, 20, 140])
+        if col_add.button("+ 계좌 추가", key="show_account_add_form_btn", use_container_width=True):
+            st.session_state["_show_account_add_form"] = True
+            st.rerun()
+
+        if col_edit.button("수정", key="show_account_edit_form_btn", use_container_width=True, disabled=not accounts):
+            st.session_state["_show_account_edit_select"] = True
+            st.rerun()
+
+        if col_delete.button("삭제", key="show_account_delete_btn", use_container_width=True, disabled=not accounts):
+            st.session_state["_show_account_delete_select"] = True
             st.rerun()
 
 
