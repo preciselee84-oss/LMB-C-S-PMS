@@ -3749,26 +3749,9 @@ def _render_workplace_info_admin():
             }
         ).reset_index(drop=True)
         site_view.insert(0, "순번", range(1, len(site_view) + 1))
-        table_event = st.dataframe(
-            site_view,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "순번": st.column_config.NumberColumn("순번", width="small"),
-                "사업장명": st.column_config.TextColumn("사업장명", width="medium"),
-                "사업자번호": st.column_config.TextColumn("사업자번호", width="medium"),
-                "사업자별칭": st.column_config.TextColumn("사업자별칭", width="small"),
-                "비고": st.column_config.TextColumn("비고", width="large"),
-            },
-            on_select="rerun",
-            selection_mode="single-row",
-            key="workplace_info_table",
-        )
-        selected_rows = (table_event or {}).get("selection", {}).get("rows", [])
-        selected_index = selected_rows[0] if selected_rows else None
+        render_plain_html_table(site_view, center_align=True)
     else:
         st.info("등록된 사업장이 없습니다.")
-        selected_index = None
 
     if st.session_state.get("_show_workplace_edit_form"):
         edit_target_id = st.session_state.get("_workplace_edit_target_id")
@@ -3849,9 +3832,16 @@ def _render_workplace_info_admin():
             st.session_state["_show_workplace_add_form"] = False
             st.rerun()
     else:
-        target_id = workplaces[selected_index].get("id") if selected_index is not None else None
+        target_id = None
+        if workplaces:
+            site_options = {
+                f"{row.get('workplace_name', '')} ({row.get('business_number', '') or '-'})": row.get("id")
+                for row in workplaces
+            }
+            target_label = st.selectbox("수정/삭제 대상 사업장", list(site_options.keys()), key="workplace_edit_delete_target")
+            target_id = site_options[target_label]
 
-        col_add, col_edit, col_delete = st.columns(3)
+        col_add, col_edit, col_delete, _ = st.columns([20, 20, 20, 140])
         if col_add.button("+ 사업장 추가", key="show_workplace_add_form_btn", use_container_width=True):
             st.session_state["_show_workplace_add_form"] = True
             st.rerun()
@@ -3866,9 +3856,6 @@ def _render_workplace_info_admin():
             _save_delegated_workplaces(data)
             st.success("사업장 정보가 삭제되었습니다.")
             st.rerun()
-
-        if target_id is None and workplaces:
-            st.caption("표에서 행을 선택하면 수정/삭제할 수 있습니다.")
 
 
 def show_reports():
