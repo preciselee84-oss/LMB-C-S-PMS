@@ -3516,15 +3516,25 @@ def _render_bank_account_management():
         )
         st.dataframe(account_view, use_container_width=True)
 
-        delete_options = {f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row.get("id") for row in accounts}
-        col_del, col_btn = st.columns([3, 1])
-        target_label = col_del.selectbox("삭제할 계좌", list(delete_options.keys()), key="bank_account_delete_target")
-        if col_btn.button("삭제", use_container_width=True):
+        if st.session_state.get("_show_account_delete_select"):
+            delete_options = {f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row.get("id") for row in accounts}
+            target_label = st.selectbox("삭제 대상 계좌", list(delete_options.keys()), key="bank_account_delete_target")
             target_id = delete_options[target_label]
-            data["accounts"] = [row for row in accounts if row.get("id") != target_id]
-            _save_bank_accounts(data)
-            st.success("계좌가 삭제되었습니다.")
-            st.rerun()
+
+            col_confirm, col_cancel = st.columns(2)
+            if col_confirm.button("삭제 확인", type="primary", use_container_width=True):
+                data["accounts"] = [row for row in accounts if row.get("id") != target_id]
+                _save_bank_accounts(data)
+                st.session_state["_show_account_delete_select"] = False
+                st.success("계좌가 삭제되었습니다.")
+                st.rerun()
+            if col_cancel.button("취소", use_container_width=True):
+                st.session_state["_show_account_delete_select"] = False
+                st.rerun()
+        else:
+            if st.button("삭제", key="show_account_delete_btn", use_container_width=False):
+                st.session_state["_show_account_delete_select"] = True
+                st.rerun()
     else:
         st.info("등록된 계좌가 없습니다.")
 
@@ -3828,30 +3838,55 @@ def _render_workplace_info_admin():
         if cancelled:
             st.session_state["_show_workplace_add_form"] = False
             st.rerun()
-    else:
-        target_id = None
+    elif st.session_state.get("_show_workplace_delete_select"):
         if workplaces:
             site_options = {
                 f"{row.get('workplace_name', '')} ({row.get('business_number', '') or '-'})": row.get("id")
                 for row in workplaces
             }
-            target_label = st.selectbox("수정/삭제 대상 사업장", list(site_options.keys()), key="workplace_edit_delete_target")
+            target_label = st.selectbox("삭제 대상 사업장", list(site_options.keys()), key="workplace_delete_target")
             target_id = site_options[target_label]
 
+            col_confirm, col_cancel = st.columns(2)
+            if col_confirm.button("삭제 확인", type="primary", use_container_width=True):
+                data["workplaces"] = [row for row in workplaces if row.get("id") != target_id]
+                _save_delegated_workplaces(data)
+                st.session_state["_show_workplace_delete_select"] = False
+                st.success("사업장 정보가 삭제되었습니다.")
+                st.rerun()
+            if col_cancel.button("취소", use_container_width=True):
+                st.session_state["_show_workplace_delete_select"] = False
+                st.rerun()
+    elif st.session_state.get("_show_workplace_edit_select"):
+        if workplaces:
+            site_options = {
+                f"{row.get('workplace_name', '')} ({row.get('business_number', '') or '-'})": row.get("id")
+                for row in workplaces
+            }
+            target_label = st.selectbox("수정 대상 사업장", list(site_options.keys()), key="workplace_modify_target")
+            target_id = site_options[target_label]
+
+            col_confirm, col_cancel = st.columns(2)
+            if col_confirm.button("수정 진행", type="primary", use_container_width=True):
+                st.session_state["_show_workplace_edit_select"] = False
+                st.session_state["_show_workplace_edit_form"] = True
+                st.session_state["_workplace_edit_target_id"] = target_id
+                st.rerun()
+            if col_cancel.button("취소", use_container_width=True):
+                st.session_state["_show_workplace_edit_select"] = False
+                st.rerun()
+    else:
         col_add, col_edit, col_delete, _ = st.columns([20, 20, 20, 140])
         if col_add.button("+ 사업장 추가", key="show_workplace_add_form_btn", use_container_width=True):
             st.session_state["_show_workplace_add_form"] = True
             st.rerun()
 
-        if col_edit.button("수정", key="show_workplace_edit_form_btn", use_container_width=True, disabled=target_id is None):
-            st.session_state["_show_workplace_edit_form"] = True
-            st.session_state["_workplace_edit_target_id"] = target_id
+        if col_edit.button("수정", key="show_workplace_edit_form_btn", use_container_width=True, disabled=not workplaces):
+            st.session_state["_show_workplace_edit_select"] = True
             st.rerun()
 
-        if col_delete.button("삭제", key="delete_workplace_btn", use_container_width=True, disabled=target_id is None):
-            data["workplaces"] = [row for row in workplaces if row.get("id") != target_id]
-            _save_delegated_workplaces(data)
-            st.success("사업장 정보가 삭제되었습니다.")
+        if col_delete.button("삭제", key="delete_workplace_btn", use_container_width=True, disabled=not workplaces):
+            st.session_state["_show_workplace_delete_select"] = True
             st.rerun()
 
 
