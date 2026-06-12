@@ -2873,7 +2873,8 @@ def show_workplace_info_admin():
     with st.form("delegated_workplace_form", clear_on_submit=True):
         col_a, col_b = st.columns(2)
         workplace_name = col_a.text_input("사업장명", placeholder="예: 강남 위탁사업장")
-        manager_name = col_b.text_input("사업장 담당자", placeholder="예: 홍길동")
+        business_number = col_b.text_input("사업자번호", placeholder="예: 123-45-67890")
+        manager_name = st.text_input("사업장 담당자", placeholder="예: 홍길동")
         col_c, col_d = st.columns(2)
         bank_name = col_c.text_input("은행명", placeholder="예: 하나은행")
         account_number = col_d.text_input("계좌번호", placeholder="예: 123-456789-01234")
@@ -2895,6 +2896,7 @@ def show_workplace_info_admin():
                 {
                     "id": int(time.time() * 1000),
                     "workplace_name": workplace_name.strip(),
+                    "business_number": business_number.strip(),
                     "bank_name": bank_name.strip(),
                     "account_number": account_number.strip(),
                     "regular_payment_day": int(regular_payment_day),
@@ -2910,12 +2912,15 @@ def show_workplace_info_admin():
 
     if workplaces:
         site_df = pd.DataFrame(workplaces)
+        if "business_number" not in site_df.columns:
+            site_df["business_number"] = ""
         site_view = site_df[
-            ["created_at", "workplace_name", "bank_name", "account_number", "regular_payment_day", "manager_name", "memo"]
+            ["created_at", "workplace_name", "business_number", "bank_name", "account_number", "regular_payment_day", "manager_name", "memo"]
         ].rename(
             columns={
                 "created_at": "등록일시",
                 "workplace_name": "사업장명",
+                "business_number": "사업자번호",
                 "bank_name": "은행명",
                 "account_number": "계좌번호",
                 "regular_payment_day": "정기 지급일",
