@@ -2728,9 +2728,159 @@ def _format_won(value):
         return "0원"
 
 
+def _mssql_config_ready(config):
+    if not config.get("server_host") or not config.get("database_name"):
+        return False
+    if config.get("auth_type") == "SQL Server 인증" and (
+        not config.get("username") or not config.get("password")
+    ):
+        return False
+    return True
+
+
+def _build_mssql_connection_string(config):
+    driver = config.get("driver_name") or "ODBC Driver 18 for SQL Server"
+    server = str(config.get("server_host", "")).strip()
+    port = int(config.get("server_port", 1433) or 1433)
+    database = str(config.get("database_name", "")).strip()
+    encrypt = "yes" if config.get("encrypt") else "no"
+    trust_cert = "yes" if config.get("trust_server_certificate") else "no"
+    timeout = int(config.get("connection_timeout", 30) or 30)
+
+    parts = [
+        f"DRIVER={{{driver}}}",
+        f"SERVER={server},{port}",
+        f"DATABASE={database}",
+        f"Encrypt={encrypt}",
+        f"TrustServerCertificate={trust_cert}",
+        f"Connection Timeout={timeout}",
+    ]
+    if config.get("auth_type") == "Windows 인증":
+        parts.append("Trusted_Connection=yes")
+    else:
+        parts.extend(
+            [
+                f"UID={config.get('username', '')}",
+                f"PWD={config.get('password', '')}",
+            ]
+        )
+    return ";".join(parts) + ";"
+
+
+def _connect_mssql(config):
+    try:
+        import pyodbc
+    except ImportError as exc:
+        raise RuntimeError("pyodbc가 설치되어 있지 않습니다. requirements.txt 반영 후 재배포가 필요합니다.") from exc
+
+    if not _mssql_config_ready(config):
+        raise RuntimeError("MSSQL 서버 접속 정보가 충분하지 않습니다.")
+    return pyodbc.connect(_build_mssql_connection_string(config))
+
+
+def _ensure_sales_registration_table(conn):
+    ddl = """
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.tables t
+        JOIN sys.schemas s ON t.schema_id = s.schema_id
+        WHERE t.name = 'sales_registrations' AND s.name = 'dbo'
+    )
+    BEGIN
+        CREATE TABLE dbo.sales_registrations (
+            id BIGINT NOT NULL PRIMARY KEY,
+            customer_name NVARCHAR(160) NOT NULL,
+            business_number NVARCHAR(40) NULL,
+            owner_name NVARCHAR(100) NOT NULL,
+            owner_contact NVARCHAR(100) NULL,
+            meeting_note NVARCHAR(MAX) NULL,
+            expected_amount BIGINT NOT NULL,
+            status NVARCHAR(30) NOT NULL,
+            claimed_at DATETIME2 NOT NULL,
+            created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+            updated_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+        );
+        CREATE INDEX IX_sales_registrations_customer_name
+            ON dbo.sales_registrations(customer_name);
+        CREATE INDEX IX_sales_registrations_business_number
+            ON dbo.sales_registrations(business_number);
+        CREATE INDEX IX_sales_registrations_status
+            ON dbo.sales_registrations(status);
+    END
+    """
+    cursor = conn.cursor()
+    cursor.execute(ddl)
+    conn.commit()
+
+
+def _save_sales_lead_to_mssql(lead):
+    config = _load_server_connection()
+    try:
+        with _connect_mssql(config) as conn:
+            _ensure_sales_registration_table(conn)
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                IF EXISTS (SELECT 1 FROM dbo.sales_registrations WHERE id = ?)
+                BEGIN
+                    UPDATE dbo.sales_registrations
+                    SET customer_name = ?,
+                        business_number = ?,
+                        owner_name = ?,
+                        owner_contact = ?,
+                        meeting_note = ?,
+                        expected_amount = ?,
+                        status = ?,
+                        claimed_at = ?,
+                        updated_at = SYSUTCDATETIME()
+                    WHERE id = ?;
+                END
+                ELSE
+                BEGIN
+                    INSERT INTO dbo.sales_registrations (
+                        id, customer_name, business_number, owner_name, owner_contact,
+                        meeting_note, expected_amount, status, claimed_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                END
+                """,
+                lead.get("id"),
+                lead.get("customer_name", ""),
+                lead.get("business_number", ""),
+                lead.get("owner_name", ""),
+                lead.get("owner_contact", ""),
+                lead.get("meeting_note", ""),
+                int(lead.get("expected_amount", 0) or 0),
+                lead.get("status", "입금 대기"),
+                lead.get("claimed_at"),
+                lead.get("id"),
+                lead.get("id"),
+                lead.get("customer_name", ""),
+                lead.get("business_number", ""),
+                lead.get("owner_name", ""),
+                lead.get("owner_contact", ""),
+                lead.get("meeting_note", ""),
+                int(lead.get("expected_amount", 0) or 0),
+                lead.get("status", "입금 대기"),
+                lead.get("claimed_at"),
+            )
+            conn.commit()
+        return True, "MSSQL 서버에 영업 등록 정보가 저장되었습니다."
+    except Exception as exc:
+        return False, f"MSSQL 저장 실패: {exc}"
+
+
 def show_sales_payment_automation():
     st.markdown("### 영업 입금 자동화")
     st.caption("영업 등록부터 입금 감지, VAT 포함 금액 자동 매칭까지 검증하는 MVP 화면입니다.")
+
+    notice = st.session_state.pop("_sales_registration_notice", None)
+    if notice:
+        level, text = notice
+        if level == "success":
+            st.success(text)
+        else:
+            st.warning(text)
 
     data = _load_sales_pipeline()
     leads = data.get("leads", [])
@@ -2774,21 +2924,30 @@ def show_sales_payment_automation():
                 elif duplicate:
                     st.error("이미 등록된 거래처입니다.")
                 else:
-                    leads.append(
-                        {
-                            "id": int(time.time() * 1000),
-                            "customer_name": customer_name.strip(),
-                            "business_number": business_number.strip(),
-                            "owner_name": owner_name.strip(),
-                            "owner_contact": owner_contact.strip(),
-                            "meeting_note": meeting_note.strip(),
-                            "expected_amount": int(expected),
-                            "status": "입금 대기",
-                            "claimed_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
-                        }
-                    )
+                    new_lead = {
+                        "id": int(time.time() * 1000),
+                        "customer_name": customer_name.strip(),
+                        "business_number": business_number.strip(),
+                        "owner_name": owner_name.strip(),
+                        "owner_contact": owner_contact.strip(),
+                        "meeting_note": meeting_note.strip(),
+                        "expected_amount": int(expected),
+                        "status": "입금 대기",
+                        "claimed_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                    leads.append(new_lead)
                     _save_sales_pipeline(data)
-                    st.success("영업 정보가 등록되었습니다.")
+                    synced, sync_message = _save_sales_lead_to_mssql(new_lead)
+                    if synced:
+                        st.session_state["_sales_registration_notice"] = (
+                            "success",
+                            "영업 정보가 등록되고 MSSQL 서버에 저장되었습니다.",
+                        )
+                    else:
+                        st.session_state["_sales_registration_notice"] = (
+                            "warning",
+                            f"영업 정보는 로컬에 등록되었습니다. {sync_message}",
+                        )
                     st.rerun()
 
         with match_col:
@@ -2831,6 +2990,7 @@ def show_sales_payment_automation():
                         }
                     )
                     _save_sales_pipeline(data)
+                    _save_sales_lead_to_mssql(matched_lead)
                     send_kakao_notify(
                         f"{matched_lead.get('customer_name')} {_format_won(amount)} 입금 완료, 영업 등록 확정"
                     )
@@ -9834,6 +9994,7 @@ def _load_server_connection():
     default_data = {
         "server_host": "",
         "server_port": 1433,
+        "driver_name": "ODBC Driver 18 for SQL Server",
         "database_name": "",
         "auth_type": "SQL Server 인증",
         "username": "",
@@ -9893,6 +10054,11 @@ def show_server_connection_info():
             value=config.get("database_name", ""),
             placeholder="예: SalesManagement",
         )
+        driver_name = st.text_input(
+            "ODBC 드라이버명",
+            value=config.get("driver_name", "ODBC Driver 18 for SQL Server"),
+            placeholder="예: ODBC Driver 18 for SQL Server",
+        )
 
         col_c, col_d = st.columns(2)
         auth_type = col_c.selectbox(
@@ -9934,6 +10100,7 @@ def show_server_connection_info():
             payload = {
                 "server_host": server_host.strip(),
                 "server_port": int(server_port),
+                "driver_name": driver_name.strip() or "ODBC Driver 18 for SQL Server",
                 "database_name": database_name.strip(),
                 "auth_type": auth_type,
                 "username": username.strip(),
@@ -9949,12 +10116,24 @@ def show_server_connection_info():
             st.rerun()
 
     st.divider()
+    test_col, _ = st.columns([1, 3])
+    with test_col:
+        if st.button("테이블 생성/접속 테스트", use_container_width=True):
+            try:
+                latest_for_test = _load_server_connection()
+                with _connect_mssql(latest_for_test) as conn:
+                    _ensure_sales_registration_table(conn)
+                st.success("MSSQL 접속 및 dbo.sales_registrations 테이블 확인이 완료되었습니다.")
+            except Exception as exc:
+                st.error(f"MSSQL 접속 또는 테이블 생성에 실패했습니다: {exc}")
+
     latest = _load_server_connection()
     st.markdown("#### 현재 등록 정보")
     summary_df = pd.DataFrame(
         [
             {"항목": "서버 주소", "값": latest.get("server_host") or "미등록"},
             {"항목": "포트", "값": latest.get("server_port") or "미등록"},
+            {"항목": "ODBC 드라이버명", "값": latest.get("driver_name") or "미등록"},
             {"항목": "데이터베이스명", "값": latest.get("database_name") or "미등록"},
             {"항목": "인증 방식", "값": latest.get("auth_type") or "미등록"},
             {"항목": "계정", "값": latest.get("username") or "미등록"},

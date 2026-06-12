@@ -6,3 +6,4 @@ python-pptx
 plotly
 streamlit-cookies-controller
 xlrd
+pyodbc
