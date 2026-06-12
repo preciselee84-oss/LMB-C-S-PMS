@@ -3174,7 +3174,7 @@ def show_e_approval():
     wp_requests = wp_data.get("requests", [])
     requests_by_id = {row.get("id"): row for row in wp_requests}
 
-    pending_tab, done_tab = st.tabs(["결재대기", "처리 완료"])
+    pending_tab, done_tab, stats_tab = st.tabs(["결재대기", "처리 완료", "처리 통계"])
 
     with pending_tab:
         pending_docs = [doc for doc in documents if doc.get("status") == "결재대기"]
@@ -3256,6 +3256,30 @@ def show_e_approval():
                 }
             )
             st.dataframe(done_view.sort_values("요청일시", ascending=False), use_container_width=True)
+
+    with stats_tab:
+        if documents:
+            pending_n = len([doc for doc in documents if doc.get("status") == "결재대기"])
+            approved_n = len([doc for doc in documents if doc.get("status") == "승인"])
+            rejected_n = len([doc for doc in documents if doc.get("status") == "반려"])
+            s1, s2, s3 = st.columns(3)
+            s1.metric("결재대기", f"{pending_n:,}건")
+            s2.metric("승인", f"{approved_n:,}건")
+            s3.metric("반려", f"{rejected_n:,}건")
+
+            month_counts = {}
+            for doc in documents:
+                key = _month_key(doc.get("requested_at"))
+                if key:
+                    month_counts[key] = month_counts.get(key, 0) + 1
+            if month_counts:
+                import plotly.graph_objects as go
+                months = sorted(month_counts.keys())
+                fig = go.Figure(go.Bar(x=months, y=[month_counts[m] for m in months]))
+                fig.update_layout(**_chart_layout(height=280))
+                st.plotly_chart(fig, use_container_width=True, theme=None)
+        else:
+            st.info("전자결재 이력이 없습니다.")
 
 
 def show_approval_result():
@@ -3679,7 +3703,7 @@ def show_workplace_info_admin():
 
 def show_reports():
     st.markdown("### 보고서")
-    st.caption("위탁 사업장 운영 현황과 전자결재 처리 통계를 확인합니다.")
+    st.caption("위탁 사업장 운영 현황과 전도금 지급 이력, 계좌 잔고 현황을 확인합니다.")
 
     wp_data = _load_delegated_workplaces()
     workplaces = wp_data.get("workplaces", [])
@@ -3727,32 +3751,6 @@ def show_reports():
         st.dataframe(pd.DataFrame(forecast_rows), use_container_width=True)
     elif not workplaces:
         st.info("예측을 위해 먼저 사업장 정보를 등록해주세요.")
-
-    st.markdown("#### 전자결재 처리 통계")
-    approvals = _load_approvals()
-    documents = approvals.get("documents", [])
-    if documents:
-        pending_n = len([doc for doc in documents if doc.get("status") == "결재대기"])
-        approved_n = len([doc for doc in documents if doc.get("status") == "승인"])
-        rejected_n = len([doc for doc in documents if doc.get("status") == "반려"])
-        s1, s2, s3 = st.columns(3)
-        s1.metric("결재대기", f"{pending_n:,}건")
-        s2.metric("승인", f"{approved_n:,}건")
-        s3.metric("반려", f"{rejected_n:,}건")
-
-        month_counts = {}
-        for doc in documents:
-            key = _month_key(doc.get("requested_at"))
-            if key:
-                month_counts[key] = month_counts.get(key, 0) + 1
-        if month_counts:
-            import plotly.graph_objects as go
-            months = sorted(month_counts.keys())
-            fig = go.Figure(go.Bar(x=months, y=[month_counts[m] for m in months]))
-            fig.update_layout(**_chart_layout(height=280))
-            st.plotly_chart(fig, use_container_width=True, theme=None)
-    else:
-        st.info("전자결재 이력이 없습니다.")
 
     st.markdown("#### 계좌별 잔고 현황")
     bank_data = _load_bank_accounts()
@@ -3911,12 +3909,13 @@ def apply_global_table_css():
 MENU_GUIDES = {
     "보고서": [
         "📊 사업장 현황, 전도금 지급 이력, AI 예측 안내를 한 화면에서 확인합니다.",
-        "🧾 전자결재 처리 통계와 계좌별 잔고 현황도 함께 제공합니다.",
+        "🏦 계좌별 잔고 현황도 함께 제공합니다.",
     ],
     "전자결재": [
         "📥 결재대기 문서를 승인/반려 처리합니다. (관리자)",
         "✅ 승인 시 해당 전도금 요청이 [품의 결과]에 '품의 확정'으로 반영됩니다.",
         "🗂️ 처리 완료 탭에서 과거 결재 이력을 조회할 수 있습니다.",
+        "📈 처리 통계 탭에서 결재대기/승인/반려 건수와 월별 처리 추이를 확인합니다.",
     ],
     "사업장 관리": [
         "🏢 사업장 정보와 정기 지급일을 등록합니다.",
