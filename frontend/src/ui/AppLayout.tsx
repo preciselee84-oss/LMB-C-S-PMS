@@ -1,6 +1,6 @@
-import { BarChartOutlined, DatabaseOutlined, LogoutOutlined } from '@ant-design/icons';
+import { BarChartOutlined, LogoutOutlined, TransactionOutlined } from '@ant-design/icons';
 import { Button, Layout, Menu, Typography } from 'antd';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuthStore } from '../stores/authStore';
 
@@ -8,26 +8,36 @@ const { Header, Sider, Content } = Layout;
 
 export function AppLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const logout = useAuthStore((state) => state.logout);
+  const selectedKey = location.pathname.startsWith('/sales-payment') ? 'sales-payment' : 'dashboard';
 
   return (
     <Layout className="app-shell">
       <Sider width={248} className="app-sidebar">
         <Typography.Title level={4} className="app-logo">
-          LMB 실적관리
+          LMB 영업 관리
         </Typography.Title>
         <Menu
           mode="inline"
-          defaultSelectedKeys={['dashboard']}
+          selectedKeys={[selectedKey]}
+          onClick={({ key }) => {
+            if (key === 'dashboard') {
+              navigate('/');
+            }
+            if (key === 'sales-payment') {
+              navigate('/sales-payment');
+            }
+          }}
           items={[
             { key: 'dashboard', icon: <BarChartOutlined />, label: '대시보드' },
-            { key: 'data', icon: <DatabaseOutlined />, label: '데이터 관리' },
+            { key: 'sales-payment', icon: <TransactionOutlined />, label: '영업 입금 자동화' },
           ]}
         />
       </Sider>
       <Layout>
         <Header className="app-header">
-          <Typography.Text strong>정식 전환 프로젝트</Typography.Text>
+          <Typography.Text strong>SMB 영업/입금 자동화 MVP</Typography.Text>
           <Button
             icon={<LogoutOutlined />}
             onClick={() => {
@@ -45,4 +55,3 @@ export function AppLayout() {
     </Layout>
   );
 }
-
