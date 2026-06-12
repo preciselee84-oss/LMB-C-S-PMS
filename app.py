@@ -2767,6 +2767,42 @@ def _build_mssql_connection_string(config):
     return ";".join(parts) + ";"
 
 
+def _get_installed_odbc_drivers():
+    try:
+        import pyodbc
+    except ImportError:
+        return []
+    try:
+        return list(pyodbc.drivers())
+    except Exception:
+        return []
+
+
+def _preferred_mssql_driver(installed_drivers):
+    preferred = [
+        "ODBC Driver 18 for SQL Server",
+        "ODBC Driver 17 for SQL Server",
+        "SQL Server Native Client 11.0",
+        "FreeTDS",
+    ]
+    for driver in preferred:
+        if driver in installed_drivers:
+            return driver
+    sql_like = [driver for driver in installed_drivers if "SQL Server" in driver or "FreeTDS" in driver]
+    return sql_like[0] if sql_like else "ODBC Driver 18 for SQL Server"
+
+
+def _mssql_driver_error_message(config):
+    installed = _get_installed_odbc_drivers()
+    selected = config.get("driver_name") or "ODBC Driver 18 for SQL Server"
+    installed_text = ", ".join(installed) if installed else "감지된 드라이버 없음"
+    return (
+        f"선택한 ODBC 드라이버 '{selected}'를 열 수 없습니다. "
+        f"서버에 설치된 드라이버: {installed_text}. "
+        "서버 접속 정보 메뉴에서 설치된 드라이버를 선택하거나, 배포 서버에 Microsoft ODBC Driver 18/17 for SQL Server를 설치해주세요."
+    )
+
+
 def _connect_mssql(config):
     try:
         import pyodbc
@@ -2775,7 +2811,13 @@ def _connect_mssql(config):
 
     if not _mssql_config_ready(config):
         raise RuntimeError("MSSQL 서버 접속 정보가 충분하지 않습니다.")
-    return pyodbc.connect(_build_mssql_connection_string(config))
+    try:
+        return pyodbc.connect(_build_mssql_connection_string(config))
+    except pyodbc.Error as exc:
+        text = str(exc)
+        if "Can't open lib" in text or "file not found" in text:
+            raise RuntimeError(_mssql_driver_error_message(config)) from exc
+        raise
 
 
 def _ensure_sales_registration_table(conn):
@@ -9991,10 +10033,11 @@ def show_google_sync():
 
 
 def _load_server_connection():
+    installed_drivers = _get_installed_odbc_drivers()
     default_data = {
         "server_host": "",
         "server_port": 1433,
-        "driver_name": "ODBC Driver 18 for SQL Server",
+        "driver_name": _preferred_mssql_driver(installed_drivers),
         "database_name": "",
         "auth_type": "SQL Server 인증",
         "username": "",
@@ -10033,6 +10076,13 @@ def show_server_connection_info():
     st.caption("영업관리 시스템에서 사용할 MSSQL 서버 접속 정보를 관리합니다.")
 
     config = _load_server_connection()
+    installed_drivers = _get_installed_odbc_drivers()
+    driver_options = installed_drivers.copy()
+    current_driver = config.get("driver_name", "")
+    if current_driver and current_driver not in driver_options:
+        driver_options.insert(0, current_driver)
+    if not driver_options:
+        driver_options = ["ODBC Driver 18 for SQL Server", "ODBC Driver 17 for SQL Server", "FreeTDS"]
 
     with st.form("mssql_connection_form"):
         col_a, col_b = st.columns([3, 1])
@@ -10054,11 +10104,15 @@ def show_server_connection_info():
             value=config.get("database_name", ""),
             placeholder="예: SalesManagement",
         )
-        driver_name = st.text_input(
+        driver_name = st.selectbox(
             "ODBC 드라이버명",
-            value=config.get("driver_name", "ODBC Driver 18 for SQL Server"),
-            placeholder="예: ODBC Driver 18 for SQL Server",
+            driver_options,
+            index=driver_options.index(current_driver) if current_driver in driver_options else 0,
         )
+        if installed_drivers:
+            st.caption(f"현재 서버에서 감지된 ODBC 드라이버: {', '.join(installed_drivers)}")
+        else:
+            st.warning("현재 서버에서 감지된 ODBC 드라이버가 없습니다. MSSQL 접속 전 시스템 드라이버 설치가 필요합니다.")
 
         col_c, col_d = st.columns(2)
         auth_type = col_c.selectbox(
@@ -10100,7 +10154,7 @@ def show_server_connection_info():
             payload = {
                 "server_host": server_host.strip(),
                 "server_port": int(server_port),
-                "driver_name": driver_name.strip() or "ODBC Driver 18 for SQL Server",
+                "driver_name": str(driver_name).strip() or _preferred_mssql_driver(installed_drivers),
                 "database_name": database_name.strip(),
                 "auth_type": auth_type,
                 "username": username.strip(),
