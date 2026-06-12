@@ -36,6 +36,7 @@ SENT_UPLOADS_FILE = "sent_uploads.json"
 SAVED_STATE_FILE = "saved_state.json"
 WEEKLY_REPORT_FILE = "weekly_reports.json"
 WEEKLY_STATUS_SNAPSHOT_FILE = "weekly_status_snapshots.json"
+SALES_PIPELINE_FILE = "sales_pipeline.json"
 PPT_TEMPLATE_FILE = resolve_template_file("LMB활동실적보고서_202605_하나지사.pptx")
 WEEKLY_PPT_TEMPLATE_FILE = resolve_template_file("주간보고_통합CMS고객_개설운영_주간보고_템플릿.pptx")
 EXCEL_SAMPLE_FILE = resolve_template_file("LMB월간 활동실적_000000(샘플).xlsx")
@@ -2655,7 +2656,7 @@ def show_sidebar():
                 render_nav_button(menu_name)
 
         st.markdown("<div class='gpt-section'>사용자 메뉴</div>", unsafe_allow_html=True)
-        for menu_name in ["업로드 및 실적 확인", "이번달 활동 대상고객 추천", "주간보고 이력 작성", "방문이력 작성"]:
+        for menu_name in ["업로드 및 실적 확인", "영업 입금 자동화", "이번달 활동 대상고객 추천", "주간보고 이력 작성", "방문이력 작성"]:
             render_nav_button(menu_name)
 
         if st.session_state.user_role == "관리자":
@@ -2674,6 +2675,175 @@ def show_sidebar():
             except Exception:
                 pass
             st.rerun()
+
+
+def _load_sales_pipeline():
+    default_data = {"leads": [], "matches": []}
+    data = load_db(SALES_PIPELINE_FILE, default_data)
+    if not isinstance(data, dict):
+        return default_data
+    data.setdefault("leads", [])
+    data.setdefault("matches", [])
+    return data
+
+
+def _save_sales_pipeline(data):
+    data.setdefault("leads", [])
+    data.setdefault("matches", [])
+    save_db(SALES_PIPELINE_FILE, data, allow_shrink=True)
+
+
+def _normalize_sales_name(value):
+    return re.sub(r"\s+", "", str(value or "").strip().lower())
+
+
+def _sales_amount_rule(expected_amount, paid_amount):
+    try:
+        expected = int(float(expected_amount or 0))
+        paid = int(float(paid_amount or 0))
+    except Exception:
+        return None
+    if expected <= 0 or paid <= 0:
+        return None
+    if paid == expected:
+        return "정확 일치"
+    if paid == int(round(expected * 1.1)):
+        return "VAT 포함"
+    return None
+
+
+def _format_won(value):
+    try:
+        return f"{int(float(value or 0)):,}원"
+    except Exception:
+        return "0원"
+
+
+def show_sales_payment_automation():
+    st.markdown("### 영업 입금 자동화")
+    st.caption("영업 선점 등록부터 입금 감지, VAT 포함 금액 자동 매칭까지 검증하는 MVP 화면입니다.")
+
+    data = _load_sales_pipeline()
+    leads = data.get("leads", [])
+    matches = data.get("matches", [])
+    waiting = [lead for lead in leads if lead.get("status") != "입금 완료"]
+    paid_amount = sum(int(match.get("amount", 0) or 0) for match in matches)
+    expected_amount = sum(int(lead.get("expected_amount", 0) or 0) for lead in leads)
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("전체 선점", f"{len(leads):,}건")
+    c2.metric("입금 대기", f"{len(waiting):,}건")
+    c3.metric("입금 완료", f"{len(leads) - len(waiting):,}건")
+    c4.metric("확인 입금액", _format_won(paid_amount))
+
+    tab_lead, tab_match, tab_pipeline = st.tabs(["선점 등록", "입금 매칭", "파이프라인"])
+
+    with tab_lead:
+        with st.form("sales_lead_form", clear_on_submit=True):
+            col_a, col_b = st.columns(2)
+            customer_name = col_a.text_input("거래처명", placeholder="예: OO기업")
+            owner_name = col_b.text_input(
+                "영업 담당자",
+                value=st.session_state.get("user_name", ""),
+                placeholder="예: 김영업",
+            )
+            expected = st.number_input("예상 계약 금액", min_value=0, step=100000, format="%d")
+            owner_contact = st.text_input("알림 수신처", placeholder="전화번호 또는 협업툴 ID")
+            meeting_note = st.text_area("미팅 내용", placeholder="현장 미팅 메모")
+            submitted = st.form_submit_button("선점 등록", type="primary")
+
+        if submitted:
+            normalized = _normalize_sales_name(customer_name)
+            duplicate = any(_normalize_sales_name(lead.get("customer_name")) == normalized for lead in leads)
+            if not customer_name.strip() or not owner_name.strip() or expected <= 0:
+                st.warning("거래처명, 담당자, 예상 계약 금액을 입력해주세요.")
+            elif duplicate:
+                st.error("이미 선점된 거래처입니다.")
+            else:
+                leads.append(
+                    {
+                        "id": int(time.time() * 1000),
+                        "customer_name": customer_name.strip(),
+                        "owner_name": owner_name.strip(),
+                        "owner_contact": owner_contact.strip(),
+                        "meeting_note": meeting_note.strip(),
+                        "expected_amount": int(expected),
+                        "status": "입금 대기",
+                        "claimed_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                )
+                _save_sales_pipeline(data)
+                st.success("영업 선점이 등록되었습니다.")
+                st.rerun()
+
+    with tab_match:
+        st.info("금융 스크래핑 연동 전까지는 수동 입금 거래로 자동 매칭 로직을 검증합니다.")
+        with st.form("sales_match_form", clear_on_submit=True):
+            col_a, col_b = st.columns(2)
+            depositor_name = col_a.text_input("입금자명", placeholder="예: OO기업")
+            amount = col_b.number_input("입금액", min_value=0, step=100000, format="%d")
+            match_submitted = st.form_submit_button("매칭 실행", type="primary")
+
+        if match_submitted:
+            depositor = _normalize_sales_name(depositor_name)
+            matched_lead = None
+            matched_rule = None
+            for lead in leads:
+                if lead.get("status") == "입금 완료":
+                    continue
+                customer = _normalize_sales_name(lead.get("customer_name"))
+                name_matches = customer and depositor and (customer in depositor or depositor in customer)
+                rule = _sales_amount_rule(lead.get("expected_amount"), amount)
+                if name_matches and rule:
+                    matched_lead = lead
+                    matched_rule = rule
+                    break
+
+            if matched_lead:
+                matched_lead["status"] = "입금 완료"
+                matches.append(
+                    {
+                        "id": int(time.time() * 1000),
+                        "sales_lead_id": matched_lead.get("id"),
+                        "customer_name": matched_lead.get("customer_name"),
+                        "owner_name": matched_lead.get("owner_name"),
+                        "depositor_name": depositor_name.strip(),
+                        "amount": int(amount),
+                        "matched_rule": matched_rule,
+                        "matched_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                )
+                _save_sales_pipeline(data)
+                send_kakao_notify(
+                    f"{matched_lead.get('customer_name')} {_format_won(amount)} 입금 완료, 선점 확정"
+                )
+                st.success(f"{matched_lead.get('customer_name')} 입금이 자동 매칭되었습니다.")
+                st.rerun()
+            else:
+                st.warning("매칭되는 선점/계약이 없습니다. 입금자명과 금액을 확인해주세요.")
+
+        if matches:
+            match_df = pd.DataFrame(matches)
+            display_cols = ["matched_at", "customer_name", "owner_name", "depositor_name", "amount", "matched_rule"]
+            st.dataframe(match_df[display_cols].sort_values("matched_at", ascending=False), use_container_width=True)
+
+    with tab_pipeline:
+        col_a, col_b = st.columns(2)
+        col_a.metric("예상 계약 총액", _format_won(expected_amount))
+        col_b.metric("미확인 예상액", _format_won(expected_amount - paid_amount))
+
+        if leads:
+            lead_df = pd.DataFrame(leads)
+            lead_df["expected_amount"] = lead_df["expected_amount"].apply(_format_won)
+            display_cols = ["claimed_at", "customer_name", "owner_name", "expected_amount", "status", "meeting_note"]
+            st.dataframe(lead_df[display_cols].sort_values("claimed_at", ascending=False), use_container_width=True)
+        else:
+            st.info("등록된 영업 선점이 없습니다.")
+
+        if waiting:
+            st.markdown("#### 미수금 리스크")
+            for lead in waiting[:5]:
+                st.warning(f"{lead.get('customer_name')} · {lead.get('owner_name')} · {_format_won(lead.get('expected_amount'))}")
 
 
 def _chart_layout(height=300, **overrides):
@@ -10509,6 +10679,8 @@ def show_main():
         show_dashboard()
     elif menu == "업로드 및 실적 확인":
         show_user_history()
+    elif menu == "영업 입금 자동화":
+        show_sales_payment_automation()
     elif menu == "이번달 활동 대상고객 추천":
         show_target_customers()
     elif menu == "최종 실적 확인":
