@@ -7992,6 +7992,7 @@ def _render_staff_admin():
             "ID": uid,
             "성명": info.get("name", ""),
             "메일주소": info.get("email", ""),
+            "핸드폰": info.get("phone", ""),
             "사업자 정보": info.get("dept_type", "사업부"),
             "마스터 구분": "관리자" if info.get("role") == "관리자" else "사용자",
         })
