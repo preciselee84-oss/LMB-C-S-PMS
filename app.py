@@ -645,7 +645,9 @@ def init_state():
         "위탁 사업장 관리": "전도금 요청",
         "사업장 정보 등록": "사업장 관리",
         "사업장 예측/보고": "보고서",
-        "직원 및 권한설정": "담당자 관리",
+        "직원 및 권한설정": "사업장 관리",
+        "계좌 관리": "사업장 관리",
+        "담당자 관리": "사업장 관리",
     }
     if st.session_state.current_menu in RENAMED_MENUS:
         st.session_state.current_menu = RENAMED_MENUS[st.session_state.current_menu]
@@ -2688,7 +2690,7 @@ def show_sidebar():
 
         if st.session_state.user_role == "관리자":
             st.markdown("<div class='gpt-section'>관리자 메뉴</div>", unsafe_allow_html=True)
-            for menu_name in ["사업장 관리", "계좌 관리", "담당자 관리", "서버 접속 정보"]:
+            for menu_name in ["사업장 관리", "서버 접속 정보"]:
                 render_nav_button(menu_name)
 
         st.markdown("<div class='gpt-section'>지급 관리</div>", unsafe_allow_html=True)
@@ -3332,8 +3334,20 @@ def show_approval_result():
     st.dataframe(result_view.sort_values("요청일시", ascending=False), use_container_width=True)
 
 
-def show_bank_account_management():
-    st.markdown("### 계좌 관리")
+def show_workplace_admin():
+    st.markdown("### 사업장 관리")
+    st.caption("사업장 정보, 계좌, 담당자를 한 화면에서 관리합니다.")
+
+    tab1, tab2, tab3 = st.tabs(["사업장 정보 관리", "계좌 관리", "담당자 관리"])
+    with tab1:
+        _render_workplace_info_admin()
+    with tab2:
+        _render_bank_account_management()
+    with tab3:
+        _render_staff_admin()
+
+
+def _render_bank_account_management():
     st.caption("회사 및 위탁 사업장의 계좌 정보를 관리합니다.")
 
     data = _load_bank_accounts()
@@ -3631,8 +3645,7 @@ def show_account_balance_check():
         st.plotly_chart(fig, use_container_width=True, theme=None)
 
 
-def show_workplace_info_admin():
-    st.markdown("### 사업장 관리")
+def _render_workplace_info_admin():
     st.caption("위탁 사업장 기본 정보와 정기 지급일, 담당자 정보를 관리합니다.")
 
     data = _load_delegated_workplaces()
@@ -3918,18 +3931,10 @@ MENU_GUIDES = {
         "📈 처리 통계 탭에서 결재대기/승인/반려 건수와 월별 처리 추이를 확인합니다.",
     ],
     "사업장 관리": [
-        "🏢 사업장 정보와 정기 지급일을 등록합니다.",
-        "👤 사업장 담당자와 연락처를 관리합니다.",
-        "🏦 전도금 지급 계좌 정보를 관리합니다.",
-    ],
-    "계좌 관리": [
-        "🏦 회사 및 위탁 사업장의 계좌 정보를 등록/관리합니다.",
-        "🔄 '위탁 사업장 계좌 가져오기'로 사업장 계좌를 일괄 등록할 수 있습니다.",
-    ],
-    "담당자 관리": [
-        "👤 직원 계정의 접근 권한을 허용/불가로 설정합니다.",
-        "🔑 비밀번호 초기화 및 역할(관리자/사용자) 변경이 가능합니다.",
-        "➕ 신규 직원 계정을 직접 등록할 수 있습니다.",
+        "🏢 [사업장 정보 관리] 탭에서 사업장 정보와 정기 지급일을 등록합니다.",
+        "🏦 [계좌 관리] 탭에서 회사 및 위탁 사업장의 계좌 정보를 등록/관리합니다.",
+        "🔄 계좌 관리에서 '위탁 사업장 계좌 가져오기'로 사업장 계좌를 일괄 등록할 수 있습니다.",
+        "👤 [담당자 관리] 탭에서 직원 계정의 접근 권한, 비밀번호, 역할을 관리합니다.",
     ],
     "서버 접속 정보": [
         "🗄️ MSSQL 서버 접속 정보를 등록합니다.",
@@ -4029,7 +4034,7 @@ def render_page_title(menu):
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown(f"## {menu}")
-    if menu in {"사업장 관리", "계좌 관리", "담당자 관리", "서버 접속 정보"}:
+    if menu in {"사업장 관리", "서버 접속 정보"}:
         parent_nav = "관리자 메뉴"
     elif menu in {"이체 자료 생성", "지급 결과 확인"}:
         parent_nav = "지급 관리"
@@ -7637,8 +7642,7 @@ def show_report():
     render_report_action_buttons(report_df, pd.DataFrame(compare_all_rows), curr_month_label, prev_month_label)
 
 
-def show_staff_admin():
-    st.markdown("### 담당자 관리")
+def _render_staff_admin():
     st.caption("직원 계정과 메뉴 접근 권한을 관리합니다.")
 
     # 파일 기준으로 재로드 (_deleted 목록 포함 반영)
@@ -11794,7 +11798,7 @@ def show_main():
     menu = st.session_state.current_menu
     allowed_menus = {
         "보고서", "전자결재",
-        "사업장 관리", "계좌 관리", "담당자 관리", "서버 접속 정보",
+        "사업장 관리", "서버 접속 정보",
         "이체 자료 생성", "지급 결과 확인",
         "전도금 요청", "품의 결과", "계좌 잔고 확인",
     }
@@ -11802,7 +11806,7 @@ def show_main():
         st.session_state.current_menu = "전도금 요청"
         persist_current_menu()
         st.rerun()
-    admin_only_menus = {"사업장 관리", "계좌 관리", "담당자 관리", "서버 접속 정보"}
+    admin_only_menus = {"사업장 관리", "서버 접속 정보"}
     if menu in admin_only_menus and st.session_state.user_role != "관리자":
         st.session_state.current_menu = "전도금 요청"
         persist_current_menu()
@@ -11815,11 +11819,7 @@ def show_main():
     elif menu == "전자결재":
         show_e_approval()
     elif menu == "사업장 관리":
-        show_workplace_info_admin()
-    elif menu == "계좌 관리":
-        show_bank_account_management()
-    elif menu == "담당자 관리":
-        show_staff_admin()
+        show_workplace_admin()
     elif menu == "서버 접속 정보":
         show_server_connection_info()
     elif menu == "이체 자료 생성":
