@@ -40,6 +40,7 @@ SERVER_CONNECTION_FILE = "server_connection.json"
 DELEGATED_WORKPLACE_FILE = "delegated_workplaces.json"
 APPROVAL_FILE = "approvals.json"
 BANK_ACCOUNT_FILE = "bank_accounts.json"
+COMPANY_PROFILE_FILE = "company_profile.json"
 PPT_TEMPLATE_FILE = resolve_template_file("LMB활동실적보고서_202605_하나지사.pptx")
 WEEKLY_PPT_TEMPLATE_FILE = resolve_template_file("주간보고_통합CMS고객_개설운영_주간보고_템플릿.pptx")
 EXCEL_SAMPLE_FILE = resolve_template_file("LMB월간 활동실적_000000(샘플).xlsx")
@@ -2690,7 +2691,7 @@ def show_sidebar():
 
         if st.session_state.user_role == "관리자":
             st.markdown("<div class='gpt-section'>관리자 메뉴</div>", unsafe_allow_html=True)
-            for menu_name in ["사업장 관리", "서버 접속 정보"]:
+            for menu_name in ["회사 관리", "사업장 관리", "서버 접속 정보"]:
                 render_nav_button(menu_name)
 
         st.markdown("<div class='gpt-section'>지급 관리</div>", unsafe_allow_html=True)
@@ -2756,6 +2757,28 @@ def _load_bank_accounts():
 def _save_bank_accounts(data):
     data.setdefault("accounts", [])
     save_db(BANK_ACCOUNT_FILE, data, allow_shrink=True)
+
+
+def _load_company_profile():
+    default_data = {
+        "name": "",
+        "business_number": "",
+        "ceo_name": "",
+        "address": "",
+        "contact": "",
+        "memo": "",
+        "updated_at": "",
+    }
+    data = load_db(COMPANY_PROFILE_FILE, default_data)
+    if not isinstance(data, dict):
+        return default_data
+    for key, value in default_data.items():
+        data.setdefault(key, value)
+    return data
+
+
+def _save_company_profile(data):
+    save_db(COMPANY_PROFILE_FILE, data, allow_shrink=True)
 
 
 def _normalize_name(value):
@@ -3332,6 +3355,46 @@ def show_approval_result():
         }
     )
     st.dataframe(result_view.sort_values("요청일시", ascending=False), use_container_width=True)
+
+
+def show_company_profile():
+    st.markdown("### 회사 관리")
+    st.caption("당사(우리 회사)의 기본 정보를 관리합니다.")
+
+    profile = _load_company_profile()
+
+    with st.form("company_profile_form"):
+        col_a, col_b = st.columns(2)
+        name = col_a.text_input("회사명", value=profile.get("name", ""), placeholder="예: (주)회사명")
+        business_number = col_b.text_input("사업자번호", value=profile.get("business_number", ""), placeholder="예: 123-45-67890")
+        col_c, col_d = st.columns(2)
+        ceo_name = col_c.text_input("대표자", value=profile.get("ceo_name", ""), placeholder="예: 홍길동")
+        contact = col_d.text_input("연락처", value=profile.get("contact", ""), placeholder="예: 02-1234-5678")
+        address = st.text_input("주소", value=profile.get("address", ""), placeholder="예: 서울특별시 강남구 ...")
+        memo = st.text_area("비고", value=profile.get("memo", ""), placeholder="회사 관련 특이사항")
+        submitted = st.form_submit_button("저장", type="primary")
+
+    if submitted:
+        if not name.strip():
+            st.warning("회사명을 입력해주세요.")
+        else:
+            profile.update(
+                {
+                    "name": name.strip(),
+                    "business_number": business_number.strip(),
+                    "ceo_name": ceo_name.strip(),
+                    "address": address.strip(),
+                    "contact": contact.strip(),
+                    "memo": memo.strip(),
+                    "updated_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
+                }
+            )
+            _save_company_profile(profile)
+            st.success("회사 정보가 저장되었습니다.")
+            st.rerun()
+
+    if profile.get("updated_at"):
+        st.caption(f"최종 수정: {profile.get('updated_at')}")
 
 
 def show_workplace_admin():
@@ -3931,6 +3994,11 @@ MENU_GUIDES = {
         "🗂️ 처리 완료 탭에서 과거 결재 이력을 조회할 수 있습니다.",
         "📈 처리 통계 탭에서 결재대기/승인/반려 건수와 월별 처리 추이를 확인합니다.",
     ],
+    "회사 관리": [
+        "🏬 당사(우리 회사)의 회사명, 사업자번호, 대표자, 연락처, 주소 등 기본 정보를 등록/수정합니다.",
+        "💾 저장 시 최종 수정 일시가 자동으로 기록됩니다.",
+        "📄 등록된 회사 정보는 문서 출력 및 엑셀 양식 등에서 활용됩니다.",
+    ],
     "사업장 관리": [
         "🏢 [사업장 정보 관리] 탭에서 사업장 정보와 정기 지급일을 등록합니다.",
         "🏦 [계좌 관리] 탭에서 회사 및 위탁 사업장의 계좌 정보를 등록/관리합니다.",
@@ -4035,7 +4103,7 @@ def render_page_title(menu):
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown(f"## {menu}")
-    if menu in {"사업장 관리", "서버 접속 정보"}:
+    if menu in {"회사 관리", "사업장 관리", "서버 접속 정보"}:
         parent_nav = "관리자 메뉴"
     elif menu in {"이체 자료 생성", "지급 결과 확인"}:
         parent_nav = "지급 관리"
@@ -11799,7 +11867,7 @@ def show_main():
     menu = st.session_state.current_menu
     allowed_menus = {
         "보고서", "전자결재",
-        "사업장 관리", "서버 접속 정보",
+        "회사 관리", "사업장 관리", "서버 접속 정보",
         "이체 자료 생성", "지급 결과 확인",
         "전도금 요청", "품의 결과", "계좌 잔고 확인",
     }
@@ -11807,7 +11875,7 @@ def show_main():
         st.session_state.current_menu = "전도금 요청"
         persist_current_menu()
         st.rerun()
-    admin_only_menus = {"사업장 관리", "서버 접속 정보"}
+    admin_only_menus = {"회사 관리", "사업장 관리", "서버 접속 정보"}
     if menu in admin_only_menus and st.session_state.user_role != "관리자":
         st.session_state.current_menu = "전도금 요청"
         persist_current_menu()
@@ -11819,6 +11887,8 @@ def show_main():
         show_reports()
     elif menu == "전자결재":
         show_e_approval()
+    elif menu == "회사 관리":
+        show_company_profile()
     elif menu == "사업장 관리":
         show_workplace_admin()
     elif menu == "서버 접속 정보":
