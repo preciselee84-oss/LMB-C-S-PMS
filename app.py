@@ -643,12 +643,12 @@ def init_state():
         st.session_state.current_menu = "전도금 요청"
 
     RENAMED_MENUS = {
-        "위탁 사업장 관리": "전도금 요청",
-        "사업장 정보 등록": "사업장 관리",
+        "사업장 정보 등록": "위탁 사업장 관리",
         "사업장 예측/보고": "보고서",
-        "직원 및 권한설정": "사업장 관리",
-        "계좌 관리": "사업장 관리",
-        "담당자 관리": "사업장 관리",
+        "직원 및 권한설정": "위탁 사업장 관리",
+        "계좌 관리": "위탁 사업장 관리",
+        "담당자 관리": "위탁 사업장 관리",
+        "사업장 관리": "위탁 사업장 관리",
     }
     if st.session_state.current_menu in RENAMED_MENUS:
         st.session_state.current_menu = RENAMED_MENUS[st.session_state.current_menu]
@@ -2691,7 +2691,7 @@ def show_sidebar():
 
         if st.session_state.user_role == "관리자":
             st.markdown("<div class='gpt-section'>관리자 메뉴</div>", unsafe_allow_html=True)
-            for menu_name in ["회사 관리", "사업장 관리", "서버 접속 정보"]:
+            for menu_name in ["회사 관리", "위탁 사업장 관리", "서버 접속 정보"]:
                 render_nav_button(menu_name)
 
         st.markdown("<div class='gpt-section'>지급 관리</div>", unsafe_allow_html=True)
@@ -3107,7 +3107,7 @@ def show_advance_payment_request():
     requests = data.get("requests", [])
 
     if not workplaces:
-        st.info("관리자 메뉴의 [사업장 관리]에서 사업장을 먼저 등록해주세요.")
+        st.info("관리자 메뉴의 [위탁 사업장 관리]에서 사업장을 먼저 등록해주세요.")
     else:
         workplace_options = {row.get("workplace_name", ""): row for row in workplaces}
         with st.form("delegated_fund_request_form", clear_on_submit=True):
@@ -3405,7 +3405,7 @@ def show_company_profile():
 
 
 def show_workplace_admin():
-    st.markdown("### 사업장 관리")
+    st.markdown("### 위탁 사업장 관리")
     st.caption("사업장 정보, 계좌, 담당자를 한 화면에서 관리합니다.")
 
     tab1, tab2, tab3 = st.tabs(["사업장 정보 관리", "계좌 관리", "담당자 관리"])
@@ -3749,11 +3749,60 @@ def _render_workplace_info_admin():
             }
         ).reset_index(drop=True)
         site_view.insert(0, "순번", range(1, len(site_view) + 1))
-        st.dataframe(site_view, use_container_width=True, hide_index=True)
+        st.dataframe(
+            site_view,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "순번": st.column_config.NumberColumn("순번", width="small"),
+                "사업장명": st.column_config.TextColumn("사업장명", width="medium"),
+                "사업자번호": st.column_config.TextColumn("사업자번호", width="medium"),
+                "사업자별칭": st.column_config.TextColumn("사업자별칭", width="medium"),
+                "비고": st.column_config.TextColumn("비고", width="large"),
+            },
+        )
     else:
         st.info("등록된 사업장이 없습니다.")
 
-    if st.session_state.get("_show_workplace_add_form"):
+    if st.session_state.get("_show_workplace_edit_form"):
+        edit_target_id = st.session_state.get("_workplace_edit_target_id")
+        target = next((row for row in workplaces if row.get("id") == edit_target_id), None)
+        if target is None:
+            st.session_state["_show_workplace_edit_form"] = False
+            st.rerun()
+
+        with st.form("delegated_workplace_edit_form", clear_on_submit=False):
+            workplace_name = st.text_input("사업장명", value=target.get("workplace_name", ""))
+            business_number = st.text_input("사업자번호", value=target.get("business_number", ""))
+            business_alias = st.text_input("사업자별칭", value=target.get("business_alias", ""))
+            memo = st.text_area("비고", value=target.get("memo", ""))
+            col_submit, col_cancel = st.columns(2)
+            submitted = col_submit.form_submit_button("수정 완료", type="primary", use_container_width=True)
+            cancelled = col_cancel.form_submit_button("취소", use_container_width=True)
+
+        if submitted:
+            normalized = _normalize_name(workplace_name)
+            duplicate = any(
+                row.get("id") != edit_target_id and _normalize_name(row.get("workplace_name")) == normalized
+                for row in workplaces
+            )
+            if not workplace_name.strip():
+                st.warning("사업장명을 입력해주세요.")
+            elif duplicate:
+                st.error("이미 등록된 사업장입니다.")
+            else:
+                target["workplace_name"] = workplace_name.strip()
+                target["business_number"] = business_number.strip()
+                target["business_alias"] = business_alias.strip()
+                target["memo"] = memo.strip()
+                _save_delegated_workplaces(data)
+                st.session_state["_show_workplace_edit_form"] = False
+                st.success("사업장 정보가 수정되었습니다.")
+                st.rerun()
+        if cancelled:
+            st.session_state["_show_workplace_edit_form"] = False
+            st.rerun()
+    elif st.session_state.get("_show_workplace_add_form"):
         with st.form("delegated_workplace_form", clear_on_submit=True):
             workplace_name = st.text_input("사업장명", placeholder="예: 강남 위탁사업장")
             business_number = st.text_input("사업자번호", placeholder="예: 123-45-67890")
@@ -3794,9 +3843,34 @@ def _render_workplace_info_admin():
             st.session_state["_show_workplace_add_form"] = False
             st.rerun()
     else:
-        if st.button("+ 사업장 추가", key="show_workplace_add_form_btn"):
+        col_add, col_edit, col_delete, col_target = st.columns([1, 1, 1, 3])
+        if col_add.button("+ 사업장 추가", key="show_workplace_add_form_btn", use_container_width=True):
             st.session_state["_show_workplace_add_form"] = True
             st.rerun()
+
+        if workplaces:
+            site_options = {
+                f"{row.get('workplace_name', '')} ({row.get('business_number', '') or '-'})": row.get("id")
+                for row in workplaces
+            }
+            target_label = col_target.selectbox(
+                "대상 사업장", list(site_options.keys()), key="workplace_edit_delete_target", label_visibility="collapsed"
+            )
+            target_id = site_options[target_label]
+
+            if col_edit.button("수정", key="show_workplace_edit_form_btn", use_container_width=True):
+                st.session_state["_show_workplace_edit_form"] = True
+                st.session_state["_workplace_edit_target_id"] = target_id
+                st.rerun()
+
+            if col_delete.button("삭제", key="delete_workplace_btn", use_container_width=True):
+                data["workplaces"] = [row for row in workplaces if row.get("id") != target_id]
+                _save_delegated_workplaces(data)
+                st.success("사업장 정보가 삭제되었습니다.")
+                st.rerun()
+        else:
+            col_edit.button("수정", use_container_width=True, disabled=True)
+            col_delete.button("삭제", use_container_width=True, disabled=True)
 
 
 def show_reports():
@@ -4021,7 +4095,7 @@ MENU_GUIDES = {
         "💾 저장 시 최종 수정 일시가 자동으로 기록됩니다.",
         "📄 등록된 회사 정보는 문서 출력 및 엑셀 양식 등에서 활용됩니다.",
     ],
-    "사업장 관리": [
+    "위탁 사업장 관리": [
         "🏢 [사업장 정보 관리] 탭에서 사업장 정보와 정기 지급일을 등록합니다.",
         "🏦 [계좌 관리] 탭에서 [사업장 정보 관리]에 등록된 사업장을 선택하여 계좌 정보를 등록/관리합니다.",
         "🔄 계좌 관리에서 '위탁 사업장 계좌 가져오기'로 사업장 계좌를 일괄 등록할 수 있습니다.",
@@ -4125,7 +4199,7 @@ def render_page_title(menu):
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown(f"## {menu}")
-    if menu in {"회사 관리", "사업장 관리", "서버 접속 정보"}:
+    if menu in {"회사 관리", "위탁 사업장 관리", "서버 접속 정보"}:
         parent_nav = "관리자 메뉴"
     elif menu in {"이체 자료 생성", "지급 결과 확인"}:
         parent_nav = "지급 관리"
@@ -11889,7 +11963,7 @@ def show_main():
     menu = st.session_state.current_menu
     allowed_menus = {
         "보고서", "전자결재",
-        "회사 관리", "사업장 관리", "서버 접속 정보",
+        "회사 관리", "위탁 사업장 관리", "서버 접속 정보",
         "이체 자료 생성", "지급 결과 확인",
         "전도금 요청", "품의 결과", "계좌 잔고 확인",
     }
@@ -11897,7 +11971,7 @@ def show_main():
         st.session_state.current_menu = "전도금 요청"
         persist_current_menu()
         st.rerun()
-    admin_only_menus = {"회사 관리", "사업장 관리", "서버 접속 정보"}
+    admin_only_menus = {"회사 관리", "위탁 사업장 관리", "서버 접속 정보"}
     if menu in admin_only_menus and st.session_state.user_role != "관리자":
         st.session_state.current_menu = "전도금 요청"
         persist_current_menu()
@@ -11911,7 +11985,7 @@ def show_main():
         show_e_approval()
     elif menu == "회사 관리":
         show_company_profile()
-    elif menu == "사업장 관리":
+    elif menu == "위탁 사업장 관리":
         show_workplace_admin()
     elif menu == "서버 접속 정보":
         show_server_connection_info()
