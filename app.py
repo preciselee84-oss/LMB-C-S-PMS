@@ -3963,6 +3963,34 @@ def apply_global_table_css():
     st.markdown(
         """
         <style>
+        /* 전체 버튼 색상 통일 */
+        div.stButton > button,
+        [data-testid="stFormSubmitButton"] button,
+        [data-testid="stDownloadButton"] button {
+            background-color: #34495E !important;
+            color: #FFFFFF !important;
+            border-color: #34495E !important;
+        }
+        div.stButton > button p, div.stButton > button span,
+        [data-testid="stFormSubmitButton"] button p, [data-testid="stFormSubmitButton"] button span,
+        [data-testid="stDownloadButton"] button p, [data-testid="stDownloadButton"] button span {
+            color: #FFFFFF !important;
+        }
+        div.stButton > button:hover,
+        [data-testid="stFormSubmitButton"] button:hover,
+        [data-testid="stDownloadButton"] button:hover {
+            background-color: #2C3E50 !important;
+            border-color: #2C3E50 !important;
+            color: #FFFFFF !important;
+        }
+        div.stButton > button:disabled,
+        [data-testid="stFormSubmitButton"] button:disabled,
+        [data-testid="stDownloadButton"] button:disabled {
+            background-color: #A0AEC0 !important;
+            border-color: #A0AEC0 !important;
+            color: #F1F5F9 !important;
+            opacity: 0.7;
+        }
         div[data-testid="stDataFrame"] th,
         div[data-testid="stDataFrame"] td,
         div[data-testid="stDataFrame"] [role="columnheader"],
