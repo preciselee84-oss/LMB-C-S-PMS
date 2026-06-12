@@ -3734,19 +3734,22 @@ def _render_workplace_info_admin():
         site_df = pd.DataFrame(workplaces)
         if "business_number" not in site_df.columns:
             site_df["business_number"] = ""
+        if "business_alias" not in site_df.columns:
+            site_df["business_alias"] = ""
         if "memo" not in site_df.columns:
             site_df["memo"] = ""
         site_view = site_df[
-            ["created_at", "workplace_name", "business_number", "memo"]
+            ["workplace_name", "business_number", "business_alias", "memo"]
         ].rename(
             columns={
-                "created_at": "등록일시",
                 "workplace_name": "사업장명",
                 "business_number": "사업자번호",
+                "business_alias": "사업자별칭",
                 "memo": "비고",
             }
-        )
-        st.dataframe(site_view.sort_values("등록일시", ascending=False), use_container_width=True)
+        ).reset_index(drop=True)
+        site_view.insert(0, "순번", range(1, len(site_view) + 1))
+        st.dataframe(site_view, use_container_width=True, hide_index=True)
     else:
         st.info("등록된 사업장이 없습니다.")
 
@@ -3754,6 +3757,7 @@ def _render_workplace_info_admin():
         with st.form("delegated_workplace_form", clear_on_submit=True):
             workplace_name = st.text_input("사업장명", placeholder="예: 강남 위탁사업장")
             business_number = st.text_input("사업자번호", placeholder="예: 123-45-67890")
+            business_alias = st.text_input("사업자별칭", placeholder="예: 강남점")
             memo = st.text_area("비고", placeholder="사업장 관련 특이사항")
             col_submit, col_cancel = st.columns(2)
             submitted = col_submit.form_submit_button("등록", type="primary", use_container_width=True)
@@ -3772,6 +3776,7 @@ def _render_workplace_info_admin():
                         "id": int(time.time() * 1000),
                         "workplace_name": workplace_name.strip(),
                         "business_number": business_number.strip(),
+                        "business_alias": business_alias.strip(),
                         "bank_name": "",
                         "account_number": "",
                         "regular_payment_day": 0,
