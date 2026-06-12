@@ -4198,10 +4198,10 @@ def render_page_title(menu):
                 filter: opacity(0.86);
             }
             </style>
-            <div class="home-btn">
             """,
-            unsafe_allow_html=True,
-        )
+        unsafe_allow_html=True,
+    )
+    st.markdown('<div class="home-btn">', unsafe_allow_html=True)
     if st.button("🏠", key=f"home_btn_{menu}", help="영업관리 홈으로 이동"):
         st.session_state.current_menu = "전도금 요청"
         persist_current_menu()
