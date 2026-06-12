@@ -3405,9 +3405,6 @@ def show_company_profile():
 
 
 def show_workplace_admin():
-    st.markdown("### 위탁 사업장 관리")
-    st.caption("사업장 정보, 계좌, 담당자를 한 화면에서 관리합니다.")
-
     tab1, tab2, tab3 = st.tabs(["사업장 정보 관리", "계좌 관리", "담당자 관리"])
     with tab1:
         _render_workplace_info_admin()
