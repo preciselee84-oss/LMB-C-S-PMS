@@ -4209,19 +4209,6 @@ def render_page_title(menu):
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown(f"## {menu}")
-    if menu in {"회사 관리", "위탁 사업장 관리", "서버 접속 정보"}:
-        parent_nav = "관리자 메뉴"
-    elif menu in {"이체 자료 생성", "지급 결과 확인"}:
-        parent_nav = "지급 관리"
-    elif menu in {"전도금 요청", "품의 결과", "계좌 잔고 확인"}:
-        parent_nav = "위탁 사업장"
-    else:
-        parent_nav = "메뉴"
-
-    st.markdown(
-        f"<div style='color:#718096;font-size:14px;font-weight:600;margin-top:-8px;margin-bottom:12px;'>{parent_nav} &gt; {html.escape(menu)}</div>",
-        unsafe_allow_html=True,
-    )
 
     if menu in MENU_GUIDES:
         with st.expander("📌 메뉴 이용 안내", expanded=False):
