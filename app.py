@@ -37,6 +37,7 @@ SAVED_STATE_FILE = "saved_state.json"
 WEEKLY_REPORT_FILE = "weekly_reports.json"
 WEEKLY_STATUS_SNAPSHOT_FILE = "weekly_status_snapshots.json"
 SALES_PIPELINE_FILE = "sales_pipeline.json"
+SERVER_CONNECTION_FILE = "server_connection.json"
 PPT_TEMPLATE_FILE = resolve_template_file("LMB활동실적보고서_202605_하나지사.pptx")
 WEEKLY_PPT_TEMPLATE_FILE = resolve_template_file("주간보고_통합CMS고객_개설운영_주간보고_템플릿.pptx")
 EXCEL_SAMPLE_FILE = resolve_template_file("LMB월간 활동실적_000000(샘플).xlsx")
@@ -615,6 +616,9 @@ def init_state():
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+
+    if st.session_state.current_menu == "구글 스트레드시트 연동":
+        st.session_state.current_menu = "서버 접속 정보"
 
     removed_menus = {
         "이력확인 및 작성",
@@ -2666,7 +2670,7 @@ def show_sidebar():
 
         if st.session_state.user_role == "관리자":
             st.markdown("<div class='gpt-section'>설정</div>", unsafe_allow_html=True)
-            for menu_name in ["직원 및 권한설정", "구글 스트레드시트 연동"]:
+            for menu_name in ["직원 및 권한설정", "서버 접속 정보"]:
                 render_nav_button(menu_name)
 
         st.markdown("<div class='gpt-sidebar-divider'></div><div class='gpt-logout-marker'></div>", unsafe_allow_html=True)
@@ -2998,10 +3002,10 @@ MENU_GUIDES = {
         "🔑 비밀번호 초기화 및 역할(관리자/사용자) 변경이 가능합니다.",
         "➕ 신규 직원 계정을 직접 등록할 수 있습니다.",
     ],
-    "구글 스트레드시트 연동": [
-        "🔗 분석용·동기화용 구글 스프레드시트 URL을 설정합니다.",
-        "🔄 [데이터 새로고침] 버튼으로 최신 데이터를 불러옵니다.",
-        "⚠️ URL이 잘못된 경우 데이터를 불러오지 못할 수 있습니다.",
+    "서버 접속 정보": [
+        "🗄️ MSSQL 서버 접속 정보를 등록합니다.",
+        "🔐 비밀번호는 화면에 마스킹되어 표시됩니다.",
+        "⚙️ 운영 환경에 맞게 인증 방식과 암호화 옵션을 설정합니다.",
     ],
 }
 
@@ -3080,7 +3084,7 @@ def render_page_title(menu):
 
     if menu != "영업 입금 자동화":
         st.markdown(f"## {menu}")
-    settings_menus = ["직원 및 권한설정", "구글 스트레드시트 연동"]
+    settings_menus = ["직원 및 권한설정", "서버 접속 정보"]
     if menu in settings_menus:
         parent_nav = "설정"
     else:
@@ -3563,21 +3567,13 @@ def show_all_staff_summary(staff_names):
             st.error("⚠️ 본사 구글시트를 불러오지 못했습니다.")
             with st.expander("📋 오류 상세 정보"):
                 st.code(str(e))
-            st.info("💡 [구글 스트레드시트 연동] 메뉴에서 '본사 구글 시트 CSV URL'을 확인해주세요.")
-
-            if st.button("🔗 구글 스트레드시트 연동 메뉴로 이동", use_container_width=True):
-                st.session_state.current_menu = "구글 스트레드시트 연동"
-                st.rerun()
+            st.info("💡 데이터 원본 설정을 확인해주세요.")
             return
 
     cloud_df = st.session_state.get("cloud_sheet_df")
     if cloud_df is None or cloud_df.empty:
         st.warning("📂 본사 구글시트 데이터가 없습니다.")
-        st.info("💡 [구글 스트레드시트 연동] 메뉴에서 URL 설정 및 데이터 새로고침을 해주세요.")
-
-        if st.button("🔗 구글 스트레드시트 연동 메뉴로 이동", use_container_width=True):
-            st.session_state.current_menu = "구글 스트레드시트 연동"
-            st.rerun()
+        st.info("💡 데이터 원본 설정을 확인해주세요.")
         return
 
     # 운영 실적용 데이터: 업로드한 엑셀 파일만 사용 (없으면 None)
@@ -8848,7 +8844,7 @@ def show_dashboard():
     user_name = st.session_state.user_name
 
     if df_hana is None or df_hana.empty:
-        st.info("📂 데이터를 불러올 수 없습니다. [구글 스트레드시트 연동] 메뉴에서 URL을 확인해주세요.")
+        st.info("📂 데이터를 불러올 수 없습니다. 데이터 원본 설정을 확인해주세요.")
         return
 
     # ── 하나은행 데이터 전처리 (당월용) ───────────────
@@ -9632,7 +9628,7 @@ def show_billing_materials():
             st.success("새로고침 완료")
     except Exception as e:
         st.error(f"청구자료 생성용 구글 시트를 불러오지 못했습니다: {e}")
-        st.info("[구글 스트레드시트 연동] 메뉴에서 하나은행 구글 시트 CSV URL과 하나은행 청구 시트 CSV URL을 확인해주세요.")
+        st.info("데이터 원본 설정을 확인해주세요.")
         return
 
     if hana_df is None or hana_df.empty or billing_df is None or billing_df.empty:
@@ -9803,6 +9799,145 @@ def show_google_sync():
     if st.session_state.get("hana_performance_df") is not None:
         st.markdown("**하나지사 실적관리 데이터** (상위 20행)")
         render_plain_html_table(st.session_state.hana_performance_df, max_rows=20)
+
+
+def _load_server_connection():
+    default_data = {
+        "server_host": "",
+        "server_port": 1433,
+        "database_name": "",
+        "auth_type": "SQL Server 인증",
+        "username": "",
+        "password": "",
+        "encrypt": True,
+        "trust_server_certificate": False,
+        "connection_timeout": 30,
+        "updated_at": "",
+        "updated_by": "",
+    }
+    if not os.path.exists(SERVER_CONNECTION_FILE):
+        return default_data
+    try:
+        with open(SERVER_CONNECTION_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return default_data
+    if not isinstance(data, dict):
+        return default_data
+    return {**default_data, **data}
+
+
+def _save_server_connection(data):
+    with open(SERVER_CONNECTION_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+
+def _mask_secret(value):
+    if not value:
+        return "미등록"
+    return "●" * min(max(len(str(value)), 6), 12)
+
+
+def show_server_connection_info():
+    st.markdown("### 서버 접속 정보")
+    st.caption("영업관리 시스템에서 사용할 MSSQL 서버 접속 정보를 관리합니다.")
+
+    config = _load_server_connection()
+
+    with st.form("mssql_connection_form"):
+        col_a, col_b = st.columns([3, 1])
+        server_host = col_a.text_input(
+            "MSSQL 서버 주소",
+            value=config.get("server_host", ""),
+            placeholder="예: 10.10.10.20 또는 db.company.local",
+        )
+        server_port = col_b.number_input(
+            "포트",
+            min_value=1,
+            max_value=65535,
+            value=int(config.get("server_port", 1433) or 1433),
+            step=1,
+        )
+
+        database_name = st.text_input(
+            "데이터베이스명",
+            value=config.get("database_name", ""),
+            placeholder="예: SalesManagement",
+        )
+
+        col_c, col_d = st.columns(2)
+        auth_type = col_c.selectbox(
+            "인증 방식",
+            ["SQL Server 인증", "Windows 인증"],
+            index=0 if config.get("auth_type", "SQL Server 인증") == "SQL Server 인증" else 1,
+        )
+        connection_timeout = col_d.number_input(
+            "접속 제한 시간(초)",
+            min_value=1,
+            max_value=300,
+            value=int(config.get("connection_timeout", 30) or 30),
+            step=1,
+        )
+
+        username = st.text_input("계정", value=config.get("username", ""), placeholder="예: sales_app")
+        password = st.text_input(
+            "비밀번호",
+            value=config.get("password", ""),
+            type="password",
+            placeholder="MSSQL 접속 비밀번호",
+        )
+
+        col_e, col_f = st.columns(2)
+        encrypt = col_e.checkbox("암호화 연결 사용", value=bool(config.get("encrypt", True)))
+        trust_server_certificate = col_f.checkbox(
+            "서버 인증서 신뢰",
+            value=bool(config.get("trust_server_certificate", False)),
+        )
+
+        saved = st.form_submit_button("서버 접속 정보 저장", type="primary")
+
+    if saved:
+        if not server_host.strip() or not database_name.strip():
+            st.warning("MSSQL 서버 주소와 데이터베이스명을 입력해주세요.")
+        elif auth_type == "SQL Server 인증" and (not username.strip() or not password):
+            st.warning("SQL Server 인증을 사용하려면 계정과 비밀번호를 입력해주세요.")
+        else:
+            payload = {
+                "server_host": server_host.strip(),
+                "server_port": int(server_port),
+                "database_name": database_name.strip(),
+                "auth_type": auth_type,
+                "username": username.strip(),
+                "password": password,
+                "encrypt": bool(encrypt),
+                "trust_server_certificate": bool(trust_server_certificate),
+                "connection_timeout": int(connection_timeout),
+                "updated_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
+                "updated_by": st.session_state.get("user_name", ""),
+            }
+            _save_server_connection(payload)
+            st.success("MSSQL 서버 접속 정보가 저장되었습니다.")
+            st.rerun()
+
+    st.divider()
+    latest = _load_server_connection()
+    st.markdown("#### 현재 등록 정보")
+    summary_df = pd.DataFrame(
+        [
+            {"항목": "서버 주소", "값": latest.get("server_host") or "미등록"},
+            {"항목": "포트", "값": latest.get("server_port") or "미등록"},
+            {"항목": "데이터베이스명", "값": latest.get("database_name") or "미등록"},
+            {"항목": "인증 방식", "값": latest.get("auth_type") or "미등록"},
+            {"항목": "계정", "값": latest.get("username") or "미등록"},
+            {"항목": "비밀번호", "값": _mask_secret(latest.get("password"))},
+            {"항목": "암호화 연결", "값": "사용" if latest.get("encrypt") else "미사용"},
+            {"항목": "서버 인증서 신뢰", "값": "사용" if latest.get("trust_server_certificate") else "미사용"},
+            {"항목": "접속 제한 시간", "값": f"{latest.get('connection_timeout') or 30}초"},
+            {"항목": "최종 수정", "값": latest.get("updated_at") or "미등록"},
+            {"항목": "수정자", "값": latest.get("updated_by") or "미등록"},
+        ]
+    )
+    st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
 
 def inject_theme_toggle():
@@ -10656,7 +10791,7 @@ def show_main():
     persist_current_menu()
 
     menu = st.session_state.current_menu
-    allowed_menus = {"영업 입금 자동화", "직원 및 권한설정", "구글 스트레드시트 연동"}
+    allowed_menus = {"영업 입금 자동화", "직원 및 권한설정", "서버 접속 정보"}
     if menu not in allowed_menus:
         st.session_state.current_menu = "영업 입금 자동화"
         persist_current_menu()
@@ -10668,8 +10803,8 @@ def show_main():
         show_sales_payment_automation()
     elif menu == "직원 및 권한설정":
         show_staff_admin()
-    elif menu == "구글 스트레드시트 연동":
-        show_google_sync()
+    elif menu == "서버 접속 정보":
+        show_server_connection_info()
     else:
         st.session_state.current_menu = "영업 입금 자동화"
         st.rerun()
