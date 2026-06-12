@@ -10166,10 +10166,29 @@ def show_server_connection_info():
                 "updated_by": st.session_state.get("user_name", ""),
             }
             _save_server_connection(payload)
-            st.success("MSSQL 서버 접속 정보가 저장되었습니다.")
+            try:
+                with _connect_mssql(payload) as conn:
+                    _ensure_sales_registration_table(conn)
+                st.session_state["_server_connection_notice"] = (
+                    "success",
+                    "MSSQL 서버 접속 정보가 저장되었고, 접속 및 테이블 확인까지 완료되었습니다.",
+                )
+            except Exception as exc:
+                st.session_state["_server_connection_notice"] = (
+                    "warning",
+                    f"MSSQL 서버 접속 정보는 저장되었지만 연결 확인에 실패했습니다: {exc}",
+                )
             st.rerun()
 
     st.divider()
+    notice = st.session_state.pop("_server_connection_notice", None)
+    if notice:
+        level, text = notice
+        if level == "success":
+            st.success(text)
+        else:
+            st.warning(text)
+
     test_col, _ = st.columns([1, 3])
     with test_col:
         if st.button("테이블 생성/접속 테스트", use_container_width=True):
