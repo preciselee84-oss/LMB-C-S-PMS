@@ -2726,7 +2726,7 @@ def _format_won(value):
 
 def show_sales_payment_automation():
     st.markdown("### 영업 입금 자동화")
-    st.caption("영업 선점 등록부터 입금 감지, VAT 포함 금액 자동 매칭까지 검증하는 MVP 화면입니다.")
+    st.caption("영업 등록부터 입금 감지, VAT 포함 금액 자동 매칭까지 검증하는 MVP 화면입니다.")
 
     data = _load_sales_pipeline()
     leads = data.get("leads", [])
@@ -2736,101 +2736,106 @@ def show_sales_payment_automation():
     expected_amount = sum(int(lead.get("expected_amount", 0) or 0) for lead in leads)
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("전체 선점", f"{len(leads):,}건")
+    c1.metric("전체 영업 등록", f"{len(leads):,}건")
     c2.metric("입금 대기", f"{len(waiting):,}건")
     c3.metric("입금 완료", f"{len(leads) - len(waiting):,}건")
     c4.metric("확인 입금액", _format_won(paid_amount))
 
-    tab_lead, tab_match, tab_pipeline = st.tabs(["선점 등록", "입금 매칭", "파이프라인"])
+    tab_register, tab_pipeline = st.tabs(["영업 등록", "파이프라인"])
 
-    with tab_lead:
-        with st.form("sales_lead_form", clear_on_submit=True):
-            col_a, col_b = st.columns(2)
-            customer_name = col_a.text_input("거래처명", placeholder="예: OO기업")
-            owner_name = col_b.text_input(
-                "영업 담당자",
-                value=st.session_state.get("user_name", ""),
-                placeholder="예: 김영업",
-            )
-            expected = st.number_input("예상 계약 금액", min_value=0, step=100000, format="%d")
-            owner_contact = st.text_input("알림 수신처", placeholder="전화번호 또는 협업툴 ID")
-            meeting_note = st.text_area("미팅 내용", placeholder="현장 미팅 메모")
-            submitted = st.form_submit_button("선점 등록", type="primary")
+    with tab_register:
+        register_col, match_col = st.columns(2)
 
-        if submitted:
-            normalized = _normalize_sales_name(customer_name)
-            duplicate = any(_normalize_sales_name(lead.get("customer_name")) == normalized for lead in leads)
-            if not customer_name.strip() or not owner_name.strip() or expected <= 0:
-                st.warning("거래처명, 담당자, 예상 계약 금액을 입력해주세요.")
-            elif duplicate:
-                st.error("이미 선점된 거래처입니다.")
-            else:
-                leads.append(
-                    {
-                        "id": int(time.time() * 1000),
-                        "customer_name": customer_name.strip(),
-                        "owner_name": owner_name.strip(),
-                        "owner_contact": owner_contact.strip(),
-                        "meeting_note": meeting_note.strip(),
-                        "expected_amount": int(expected),
-                        "status": "입금 대기",
-                        "claimed_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
-                    }
+        with register_col:
+            st.markdown("#### 영업 등록")
+            with st.form("sales_lead_form", clear_on_submit=True):
+                col_a, col_b = st.columns(2)
+                customer_name = col_a.text_input("거래처명", placeholder="예: OO기업")
+                owner_name = col_b.text_input(
+                    "영업 담당자",
+                    value=st.session_state.get("user_name", ""),
+                    placeholder="예: 김영업",
                 )
-                _save_sales_pipeline(data)
-                st.success("영업 선점이 등록되었습니다.")
-                st.rerun()
+                expected = st.number_input("예상 계약 금액", min_value=0, step=100000, format="%d")
+                owner_contact = st.text_input("알림 수신처", placeholder="전화번호 또는 협업툴 ID")
+                meeting_note = st.text_area("미팅 내용", placeholder="현장 미팅 메모")
+                submitted = st.form_submit_button("영업 등록", type="primary")
 
-    with tab_match:
-        st.info("금융 스크래핑 연동 전까지는 수동 입금 거래로 자동 매칭 로직을 검증합니다.")
-        with st.form("sales_match_form", clear_on_submit=True):
-            col_a, col_b = st.columns(2)
-            depositor_name = col_a.text_input("입금자명", placeholder="예: OO기업")
-            amount = col_b.number_input("입금액", min_value=0, step=100000, format="%d")
-            match_submitted = st.form_submit_button("매칭 실행", type="primary")
+            if submitted:
+                normalized = _normalize_sales_name(customer_name)
+                duplicate = any(_normalize_sales_name(lead.get("customer_name")) == normalized for lead in leads)
+                if not customer_name.strip() or not owner_name.strip() or expected <= 0:
+                    st.warning("거래처명, 담당자, 예상 계약 금액을 입력해주세요.")
+                elif duplicate:
+                    st.error("이미 등록된 거래처입니다.")
+                else:
+                    leads.append(
+                        {
+                            "id": int(time.time() * 1000),
+                            "customer_name": customer_name.strip(),
+                            "owner_name": owner_name.strip(),
+                            "owner_contact": owner_contact.strip(),
+                            "meeting_note": meeting_note.strip(),
+                            "expected_amount": int(expected),
+                            "status": "입금 대기",
+                            "claimed_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
+                        }
+                    )
+                    _save_sales_pipeline(data)
+                    st.success("영업 정보가 등록되었습니다.")
+                    st.rerun()
 
-        if match_submitted:
-            depositor = _normalize_sales_name(depositor_name)
-            matched_lead = None
-            matched_rule = None
-            for lead in leads:
-                if lead.get("status") == "입금 완료":
-                    continue
-                customer = _normalize_sales_name(lead.get("customer_name"))
-                name_matches = customer and depositor and (customer in depositor or depositor in customer)
-                rule = _sales_amount_rule(lead.get("expected_amount"), amount)
-                if name_matches and rule:
-                    matched_lead = lead
-                    matched_rule = rule
-                    break
+        with match_col:
+            st.markdown("#### 입금 매칭")
+            st.info("금융 스크래핑 연동 전까지는 수동 입금 거래로 자동 매칭 로직을 검증합니다.")
+            with st.form("sales_match_form", clear_on_submit=True):
+                col_a, col_b = st.columns(2)
+                depositor_name = col_a.text_input("입금자명", placeholder="예: OO기업")
+                amount = col_b.number_input("입금액", min_value=0, step=100000, format="%d")
+                match_submitted = st.form_submit_button("매칭 실행", type="primary")
 
-            if matched_lead:
-                matched_lead["status"] = "입금 완료"
-                matches.append(
-                    {
-                        "id": int(time.time() * 1000),
-                        "sales_lead_id": matched_lead.get("id"),
-                        "customer_name": matched_lead.get("customer_name"),
-                        "owner_name": matched_lead.get("owner_name"),
-                        "depositor_name": depositor_name.strip(),
-                        "amount": int(amount),
-                        "matched_rule": matched_rule,
-                        "matched_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
-                    }
-                )
-                _save_sales_pipeline(data)
-                send_kakao_notify(
-                    f"{matched_lead.get('customer_name')} {_format_won(amount)} 입금 완료, 선점 확정"
-                )
-                st.success(f"{matched_lead.get('customer_name')} 입금이 자동 매칭되었습니다.")
-                st.rerun()
-            else:
-                st.warning("매칭되는 선점/계약이 없습니다. 입금자명과 금액을 확인해주세요.")
+            if match_submitted:
+                depositor = _normalize_sales_name(depositor_name)
+                matched_lead = None
+                matched_rule = None
+                for lead in leads:
+                    if lead.get("status") == "입금 완료":
+                        continue
+                    customer = _normalize_sales_name(lead.get("customer_name"))
+                    name_matches = customer and depositor and (customer in depositor or depositor in customer)
+                    rule = _sales_amount_rule(lead.get("expected_amount"), amount)
+                    if name_matches and rule:
+                        matched_lead = lead
+                        matched_rule = rule
+                        break
 
-        if matches:
-            match_df = pd.DataFrame(matches)
-            display_cols = ["matched_at", "customer_name", "owner_name", "depositor_name", "amount", "matched_rule"]
-            st.dataframe(match_df[display_cols].sort_values("matched_at", ascending=False), use_container_width=True)
+                if matched_lead:
+                    matched_lead["status"] = "입금 완료"
+                    matches.append(
+                        {
+                            "id": int(time.time() * 1000),
+                            "sales_lead_id": matched_lead.get("id"),
+                            "customer_name": matched_lead.get("customer_name"),
+                            "owner_name": matched_lead.get("owner_name"),
+                            "depositor_name": depositor_name.strip(),
+                            "amount": int(amount),
+                            "matched_rule": matched_rule,
+                            "matched_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
+                        }
+                    )
+                    _save_sales_pipeline(data)
+                    send_kakao_notify(
+                        f"{matched_lead.get('customer_name')} {_format_won(amount)} 입금 완료, 영업 등록 확정"
+                    )
+                    st.success(f"{matched_lead.get('customer_name')} 입금이 자동 매칭되었습니다.")
+                    st.rerun()
+                else:
+                    st.warning("매칭되는 영업 등록/계약이 없습니다. 입금자명과 금액을 확인해주세요.")
+
+            if matches:
+                match_df = pd.DataFrame(matches)
+                display_cols = ["matched_at", "customer_name", "owner_name", "depositor_name", "amount", "matched_rule"]
+                st.dataframe(match_df[display_cols].sort_values("matched_at", ascending=False), use_container_width=True)
 
     with tab_pipeline:
         col_a, col_b = st.columns(2)
@@ -2843,7 +2848,7 @@ def show_sales_payment_automation():
             display_cols = ["claimed_at", "customer_name", "owner_name", "expected_amount", "status", "meeting_note"]
             st.dataframe(lead_df[display_cols].sort_values("claimed_at", ascending=False), use_container_width=True)
         else:
-            st.info("등록된 영업 선점이 없습니다.")
+            st.info("등록된 영업 정보가 없습니다.")
 
         if waiting:
             st.markdown("#### 미수금 리스크")
@@ -2983,7 +2988,7 @@ def apply_global_table_css():
 
 MENU_GUIDES = {
     "영업 입금 자동화": [
-        "📝 현장에서 거래처 선점을 등록합니다.",
+        "📝 현장에서 거래처 영업 정보를 등록합니다.",
         "🏦 입금자명과 입금액을 기준으로 계약 건을 자동 매칭합니다.",
         "🧾 VAT 포함 금액은 계약금액의 1.1배로 자동 인식합니다.",
         "⚠️ 입금 대기 건은 미수금 리스크로 확인할 수 있습니다.",
