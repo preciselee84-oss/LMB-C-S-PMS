@@ -14,7 +14,7 @@ from io import BytesIO
 from datetime import datetime, timedelta
 from streamlit_cookies_controller import CookieController
 
-st.set_page_config(page_title="실적관리 시스템", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="영업관리 시스템", layout="wide", initial_sidebar_state="expanded")
 
 
 def resolve_template_file(file_name):
@@ -590,7 +590,7 @@ def init_state():
         "user_role": "사용자",
         "user_name": "",
         "auth_mode": "login",
-        "current_menu": "대시보드",
+        "current_menu": "영업 입금 자동화",
         "url_analysis": DEFAULT_URL_ANALYSIS,
         "url_sync": DEFAULT_URL_SYNC,
         "url_hana": DEFAULT_URL_HANA,
@@ -616,12 +616,24 @@ def init_state():
         if key not in st.session_state:
             st.session_state[key] = value
 
-    if st.session_state.current_menu == "이력확인 및 작성":
-        st.session_state.current_menu = "업로드 및 실적 확인"
-    if st.session_state.current_menu == "최종 실적 확인":
-        st.session_state.current_menu = "업로드 및 실적 확인"
-    if st.session_state.current_menu == "은행 이력 업로드":
-        st.session_state.current_menu = "업로드 및 실적 확인"
+    removed_menus = {
+        "이력확인 및 작성",
+        "은행 이력 업로드",
+        "대시보드",
+        "업로드 및 실적 확인",
+        "이번달 활동 대상고객 추천",
+        "최종 실적 확인",
+        "관리자용 실적 확인",
+        "실적 분석/계산",
+        "실적 보고서",
+        "청구자료 작성",
+        "주간보고 이력 작성",
+        "방문이력 작성",
+        "주간보고 취합",
+        "운영계획",
+    }
+    if st.session_state.current_menu in removed_menus:
+        st.session_state.current_menu = "영업 입금 자동화"
 
 
 init_state()
@@ -2235,8 +2247,8 @@ def show_auth_page():
         st.markdown(
             """
             <div class="auth-logo-card">
-                <div class="auth-logo-title">실적관리 시스템</div>
-                <div class="auth-logo-sub">Performance Management System</div>
+                <div class="auth-logo-title">영업관리 시스템</div>
+                <div class="auth-logo-sub">Sales Management System</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -2301,7 +2313,7 @@ def show_auth_page():
                     if report_closed_info:
                         st.session_state.report_closed = report_closed_info.get("time", "")
 
-                    st.session_state.current_menu = "대시보드"
+                    st.session_state.current_menu = "영업 입금 자동화"
                     persist_current_menu()
                     st.rerun()
                 elif not u_id_str:
@@ -2628,8 +2640,6 @@ def show_sidebar():
             if st.button(menu_name, use_container_width=True, key=f"nav_{menu_name}"):
                 st.session_state.current_menu = menu_name
                 persist_current_menu()
-                if menu_name == "업로드 및 실적 확인":
-                    st.session_state["show_add_history_form"] = False
                 st.session_state["_close_sidebar_mobile"] = True
                 st.rerun()
 
@@ -2637,10 +2647,10 @@ def show_sidebar():
         st.markdown(
             f"<div class='gpt-side-shell'>"
             f"<div class='gpt-brand'>"
-            f"<div class='gpt-brand-mark'>P</div>"
+            f"<div class='gpt-brand-mark'>S</div>"
             f"<div class='gpt-brand-text'>"
-            f"<div class='gpt-brand-title'>실적관리 시스템</div>"
-            f"<div class='gpt-brand-subtitle'>Performance workspace</div>"
+            f"<div class='gpt-brand-title'>영업관리 시스템</div>"
+            f"<div class='gpt-brand-subtitle'>Sales workspace</div>"
             f"</div></div>"
             f"<div class='gpt-user-card'>"
             f"<div class='gpt-user-name'>{html.escape(st.session_state.user_name)}님</div>"
@@ -2650,13 +2660,8 @@ def show_sidebar():
             unsafe_allow_html=True,
         )
 
-        if st.session_state.user_role == "관리자":
-            st.markdown("<div class='gpt-section'>관리자 메뉴</div>", unsafe_allow_html=True)
-            for menu_name in ["관리자용 실적 확인", "실적 분석/계산", "실적 보고서", "청구자료 작성", "주간보고 취합", "운영계획"]:
-                render_nav_button(menu_name)
-
-        st.markdown("<div class='gpt-section'>사용자 메뉴</div>", unsafe_allow_html=True)
-        for menu_name in ["업로드 및 실적 확인", "영업 입금 자동화", "이번달 활동 대상고객 추천", "주간보고 이력 작성", "방문이력 작성"]:
+        st.markdown("<div class='gpt-section'>영업관리</div>", unsafe_allow_html=True)
+        for menu_name in ["영업 입금 자동화"]:
             render_nav_button(menu_name)
 
         if st.session_state.user_role == "관리자":
@@ -2977,29 +2982,11 @@ def apply_global_table_css():
 
 
 MENU_GUIDES = {
-    "대시보드": [
-        "📊 로그인한 본인의 이번달 실적 추정치를 한눈에 확인할 수 있습니다.",
-        "📅 전월 및 전년 동월과의 포인트 증감을 비교합니다.",
-        "💡 현재 부족한 실적을 채울 수 있는 활동 방안을 안내합니다.",
-        "🏦 이번달 추정 포인트는 하나은행 구글 시트에 입력된 수치를 기준으로 표시됩니다.",
-        "📋 전월 대비 · 전년 동월 대비는 본사에 최종 제출하는 활동이력 데이터를 참조하여 표시됩니다.",
-    ],
-    "관리자용 실적 확인": [
-        "👥 전체 직원의 실적 현황을 한눈에 확인할 수 있습니다.",
-        "📊 담당자별 개설/연계/운영 실적과 포인트를 조회합니다.",
-        "🔍 직원 검색, 필터링, 정렬 기능으로 빠르게 실적을 파악하세요.",
-        "📥 전체 실적 데이터를 Excel로 다운로드할 수 있습니다.",
-    ],
-    "실적 분석/계산": [
-        "📂 구글 스프레드시트에서 불러온 실적 데이터를 분석·계산합니다.",
-        "📊 당월/전월 데이터를 비교하여 포인트 및 지급예상금액을 확인할 수 있습니다.",
-        "✅ 검증 탭에서 중복/초과 방문, 누락 데이터 등 오류 여부를 확인하세요.",
-        "🔒 검토 완료 후 [마감] 버튼을 눌러 실적을 확정합니다.",
-    ],
-    "실적 보고서": [
-        "📋 마감된 실적 데이터를 기반으로 보고서를 조회합니다.",
-        "📥 Excel 또는 PPT 형식으로 보고서를 다운로드할 수 있습니다.",
-        "📅 당월·전월 비교 데이터가 함께 표시됩니다.",
+    "영업 입금 자동화": [
+        "📝 현장에서 거래처 선점을 등록합니다.",
+        "🏦 입금자명과 입금액을 기준으로 계약 건을 자동 매칭합니다.",
+        "🧾 VAT 포함 금액은 계약금액의 1.1배로 자동 인식합니다.",
+        "⚠️ 입금 대기 건은 미수금 리스크로 확인할 수 있습니다.",
     ],
     "직원 및 권한설정": [
         "👤 직원 계정의 접근 권한을 허용/불가로 설정합니다.",
@@ -3011,20 +2998,14 @@ MENU_GUIDES = {
         "🔄 [데이터 새로고침] 버튼으로 최신 데이터를 불러옵니다.",
         "⚠️ URL이 잘못된 경우 데이터를 불러오지 못할 수 있습니다.",
     ],
-    "업로드 및 실적 확인": [
-        "📝 본인의 활동 이력을 엑셀 파일로 업로드합니다.",
-        "🔍 업로드 후 중복·초과 방문, 오류 데이터를 탭에서 확인하세요.",
-        "💾 [저장] 버튼으로 임시 저장 후 [실적 결과 전송]으로 제출합니다.",
-        "⚠️ 전송 전 검증 오류 항목을 반드시 확인하세요.",
-    ],
 }
 
 
 def render_page_title(menu):
-    if menu == "대시보드":
+    if menu == "영업 입금 자동화":
         return
 
-    if menu != "대시보드":
+    if menu != "영업 입금 자동화":
         st.markdown(
             """
             <style>
@@ -3086,30 +3067,27 @@ def render_page_title(menu):
             """,
             unsafe_allow_html=True,
         )
-        if st.button("🏠", key=f"home_btn_{menu}", help="대시보드로 이동"):
-            st.session_state.current_menu = "대시보드"
+        if st.button("🏠", key=f"home_btn_{menu}", help="영업관리 홈으로 이동"):
+            st.session_state.current_menu = "영업 입금 자동화"
             persist_current_menu()
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-    if menu != "대시보드":
+    if menu != "영업 입금 자동화":
         st.markdown(f"## {menu}")
     settings_menus = ["직원 및 권한설정", "구글 스트레드시트 연동"]
-    admin_menus = ["관리자용 실적 확인", "실적 분석/계산", "실적 보고서", "청구자료 작성", "주간보고 취합", "운영계획"]
     if menu in settings_menus:
         parent_nav = "설정"
-    elif menu in admin_menus:
-        parent_nav = "관리자 메뉴"
     else:
-        parent_nav = "사용자 메뉴"
+        parent_nav = "영업관리"
 
-    if menu != "대시보드":
+    if menu != "영업 입금 자동화":
         st.markdown(
             f"<div style='color:#718096;font-size:14px;font-weight:600;margin-top:-8px;margin-bottom:12px;'>{parent_nav} &gt; {html.escape(menu)}</div>",
             unsafe_allow_html=True,
         )
 
-    if menu in MENU_GUIDES and menu != "대시보드":
+    if menu in MENU_GUIDES and menu != "영업 입금 자동화":
         with st.expander("📌 메뉴 이용 안내", expanded=False):
             for line in MENU_GUIDES[menu]:
                 st.markdown(f"- {line}")
@@ -10673,39 +10651,23 @@ def show_main():
     persist_current_menu()
 
     menu = st.session_state.current_menu
+    allowed_menus = {"영업 입금 자동화", "직원 및 권한설정", "구글 스트레드시트 연동"}
+    if menu not in allowed_menus:
+        st.session_state.current_menu = "영업 입금 자동화"
+        persist_current_menu()
+        st.rerun()
+
     render_page_title(menu)
 
-    if menu == "대시보드":
-        show_dashboard()
-    elif menu == "업로드 및 실적 확인":
-        show_user_history()
-    elif menu == "영업 입금 자동화":
+    if menu == "영업 입금 자동화":
         show_sales_payment_automation()
-    elif menu == "이번달 활동 대상고객 추천":
-        show_target_customers()
-    elif menu == "최종 실적 확인":
-        st.session_state.current_menu = "업로드 및 실적 확인"
-        st.rerun()
-    elif menu == "관리자용 실적 확인":
-        show_admin_performance()
-    elif menu == "실적 분석/계산":
-        show_admin_analysis()
-    elif menu == "실적 보고서":
-        show_report()
-    elif menu == "청구자료 작성":
-        show_billing_materials()
     elif menu == "직원 및 권한설정":
         show_staff_admin()
     elif menu == "구글 스트레드시트 연동":
         show_google_sync()
-    elif menu == "주간보고 이력 작성":
-        show_weekly_report_user()
-    elif menu == "방문이력 작성":
-        show_visit_history()
-    elif menu == "주간보고 취합":
-        show_weekly_report_admin()
-    elif menu == "운영계획":
-        show_operation_plan()
+    else:
+        st.session_state.current_menu = "영업 입금 자동화"
+        st.rerun()
 
 
 restore_login_from_cookie()
