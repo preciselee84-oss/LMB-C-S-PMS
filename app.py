@@ -3777,14 +3777,18 @@ def show_transfer_file_generation():
     target_rows = []
     for row in sorted(targets, key=lambda item: item.get("requested_at", "")):
         site = workplaces_by_id.get(row.get("workplace_id"), {})
+        workplace_name = row.get("workplace_name", "")
+        passbook_label = f"{workplace_name} 전도금"
         target_rows.append(
             {
                 "id": row.get("id"),
                 "선택": True,
-                "사업장명": row.get("workplace_name", ""),
-                "요청금액": _format_won(row.get("request_amount")),
                 "입금은행": site.get("bank_name", ""),
-                "계좌번호": site.get("account_number", ""),
+                "입금계좌번호": site.get("account_number", ""),
+                "입금액": _format_won(row.get("request_amount")),
+                "예상예금주": workplace_name,
+                "입금통장표시": passbook_label,
+                "출금통장표시": passbook_label,
             }
         )
 
@@ -3794,10 +3798,12 @@ def show_transfer_file_generation():
         column_config={
             "id": None,
             "선택": st.column_config.CheckboxColumn("선택"),
-            "사업장명": st.column_config.TextColumn("사업장명", disabled=True),
-            "요청금액": st.column_config.TextColumn("요청금액", disabled=True),
             "입금은행": st.column_config.TextColumn("입금은행", disabled=True),
-            "계좌번호": st.column_config.TextColumn("계좌번호", disabled=True),
+            "입금계좌번호": st.column_config.TextColumn("입금계좌번호", disabled=True),
+            "입금액": st.column_config.TextColumn("입금액", disabled=True),
+            "예상예금주": st.column_config.TextColumn("예상예금주", disabled=True),
+            "입금통장표시": st.column_config.TextColumn("입금통장표시"),
+            "출금통장표시": st.column_config.TextColumn("출금통장표시"),
         },
         hide_index=True,
         use_container_width=True,
@@ -3809,19 +3815,22 @@ def show_transfer_file_generation():
         source = source_options[source_label]
         rows = []
         now_str = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
+        edited_by_id = {item["id"]: item for item in edited_df.to_dict("records")}
         for row in targets:
             if row.get("id") not in selected_ids:
                 continue
             site = workplaces_by_id.get(row.get("workplace_id"), {})
+            edited_row = edited_by_id.get(row.get("id"), {})
             rows.append(
                 {
                     "출금은행": source.get("bank_name", ""),
                     "출금계좌번호": source.get("account_number", ""),
+                    "출금통장표시": edited_row.get("출금통장표시", ""),
                     "입금은행": site.get("bank_name", ""),
                     "입금계좌번호": site.get("account_number", ""),
-                    "예금주": site.get("workplace_name", ""),
-                    "이체금액": row.get("request_amount", 0),
-                    "이체메모": "전도금 지급",
+                    "입금액": row.get("request_amount", 0),
+                    "예상예금주": site.get("workplace_name", ""),
+                    "입금통장표시": edited_row.get("입금통장표시", ""),
                     "사업장명": row.get("workplace_name", ""),
                 }
             )
