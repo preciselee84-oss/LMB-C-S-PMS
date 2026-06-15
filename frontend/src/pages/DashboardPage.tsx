@@ -73,6 +73,8 @@ export function DashboardPage() {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [requests, setRequests] = useState<AdvanceRequest[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [isUserCreateOpen, setIsUserCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(false);
   const [workplaceForm] = Form.useForm();
@@ -184,20 +186,6 @@ export function DashboardPage() {
       key: 'is_active',
       render: (value) => <Tag color={value ? 'success' : 'default'}>{value ? '사용' : '중지'}</Tag>,
     },
-    {
-      title: '관리',
-      key: 'actions',
-      render: (_, row) => (
-        <Space wrap>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openUserEdit(row)}>
-            수정
-          </Button>
-          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => void handleDeleteUser(row)}>
-            삭제
-          </Button>
-        </Space>
-      ),
-    },
   ];
 
   const handleCreateWorkplace = async (values: Partial<Workplace>) => {
@@ -290,12 +278,15 @@ export function DashboardPage() {
     try {
       await createUser(values);
       userForm.resetFields();
+      setIsUserCreateOpen(false);
       message.success('사용자가 등록되었습니다.');
       await loadDashboard();
     } catch {
       message.error('사용자 등록에 실패했습니다. 중복 ID를 확인해주세요.');
     }
   };
+
+  const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
 
   const openUserEdit = (user: AdminUser) => {
     setEditingUser(user);
@@ -331,6 +322,7 @@ export function DashboardPage() {
       cancelText: '취소',
       onOk: async () => {
         await deleteUser(user.id);
+        setSelectedUserId(null);
         message.success('사용자가 삭제되었습니다.');
         await loadDashboard();
       },
@@ -509,45 +501,34 @@ export function DashboardPage() {
                     key: 'users',
                     label: '사용자 관리',
                     children: (
-                      <Row gutter={[16, 16]}>
-                        <Col xs={24} lg={9}>
-                          <Card title="사용자 등록">
-                            <Form form={userForm} layout="vertical" onFinish={handleCreateUser} initialValues={{ role: 'staff', is_active: true }}>
-                              <Form.Item name="username" label="ID" rules={[{ required: true }]}>
-                                <Input placeholder="로그인 ID" />
-                              </Form.Item>
-                              <Form.Item name="password" label="초기 비밀번호" rules={[{ required: true, min: 4 }]}>
-                                <Input.Password placeholder="초기 비밀번호" />
-                              </Form.Item>
-                              <Form.Item name="name" label="성명" rules={[{ required: true }]}>
-                                <Input placeholder="사용자명" />
-                              </Form.Item>
-                              <Form.Item name="email" label="이메일">
-                                <Input placeholder="user@example.com" />
-                              </Form.Item>
-                              <Form.Item name="role" label="권한" rules={[{ required: true }]}>
-                                <Select
-                                  options={[
-                                    { label: '사용자', value: 'staff' },
-                                    { label: '관리자', value: 'admin' },
-                                  ]}
-                                />
-                              </Form.Item>
-                              <Form.Item name="is_active" label="로그인 허용" valuePropName="checked">
-                                <Switch checkedChildren="사용" unCheckedChildren="중지" />
-                              </Form.Item>
-                              <Button type="primary" htmlType="submit" icon={<UserAddOutlined />} block>
-                                사용자 등록
-                              </Button>
-                            </Form>
-                          </Card>
-                        </Col>
-                        <Col xs={24} lg={15}>
-                          <Card title="사용자 목록">
-                            <Table rowKey="id" columns={userColumns} dataSource={users} loading={loading} pagination={{ pageSize: 6 }} />
-                          </Card>
-                        </Col>
-                      </Row>
+                      <Card title="사용자 목록">
+                        <Table
+                          rowKey="id"
+                          columns={userColumns}
+                          dataSource={users}
+                          loading={loading}
+                          pagination={{ pageSize: 8 }}
+                          rowSelection={{
+                            type: 'radio',
+                            selectedRowKeys: selectedUserId ? [selectedUserId] : [],
+                            onChange: (keys) => setSelectedUserId(keys.length ? Number(keys[0]) : null),
+                          }}
+                          onRow={(row) => ({
+                            onClick: () => setSelectedUserId(row.id),
+                          })}
+                        />
+                        <div className="table-action-bar">
+                          <Button type="primary" icon={<UserAddOutlined />} onClick={() => setIsUserCreateOpen(true)}>
+                            사용자 추가
+                          </Button>
+                          <Button icon={<EditOutlined />} disabled={!selectedUser} onClick={() => selectedUser && openUserEdit(selectedUser)}>
+                            수정
+                          </Button>
+                          <Button danger icon={<DeleteOutlined />} disabled={!selectedUser} onClick={() => selectedUser && void handleDeleteUser(selectedUser)}>
+                            삭제
+                          </Button>
+                        </div>
+                      </Card>
                     ),
                   },
                 ]}
@@ -591,9 +572,49 @@ export function DashboardPage() {
         ]}
       />
       <Modal
+        title="사용자 추가"
+        open={isUserCreateOpen}
+        onCancel={() => {
+          setIsUserCreateOpen(false);
+          userForm.resetFields();
+        }}
+        onOk={() => userForm.submit()}
+        okText="등록"
+        cancelText="취소"
+      >
+        <Form form={userForm} layout="vertical" onFinish={handleCreateUser} initialValues={{ role: 'staff', is_active: true }}>
+          <Form.Item name="username" label="ID" rules={[{ required: true }]}>
+            <Input placeholder="로그인 ID" />
+          </Form.Item>
+          <Form.Item name="password" label="초기 비밀번호" rules={[{ required: true, min: 4 }]}>
+            <Input.Password placeholder="초기 비밀번호" />
+          </Form.Item>
+          <Form.Item name="name" label="성명" rules={[{ required: true }]}>
+            <Input placeholder="사용자명" />
+          </Form.Item>
+          <Form.Item name="email" label="이메일">
+            <Input placeholder="user@example.com" />
+          </Form.Item>
+          <Form.Item name="role" label="권한" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { label: '사용자', value: 'staff' },
+                { label: '관리자', value: 'admin' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="is_active" label="로그인 허용" valuePropName="checked">
+            <Switch checkedChildren="사용" unCheckedChildren="중지" />
+          </Form.Item>
+        </Form>
+      </Modal>
+      <Modal
         title="사용자 정보 수정"
         open={Boolean(editingUser)}
-        onCancel={() => setEditingUser(null)}
+        onCancel={() => {
+          setEditingUser(null);
+          userEditForm.resetFields();
+        }}
         onOk={() => userEditForm.submit()}
         okText="저장"
         cancelText="취소"
