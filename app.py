@@ -3234,7 +3234,7 @@ def show_e_approval():
                     "reject_reason": "반려사유",
                 }
             )
-            st.dataframe(done_view.sort_values("요청일시", ascending=False), use_container_width=True)
+            render_plain_html_table(done_view.sort_values("요청일시", ascending=False), center_align=True)
 
     with stats_tab:
         if documents:
@@ -3308,7 +3308,7 @@ def show_approval_result():
             "reject_reason": "반려사유",
         }
     )
-    st.dataframe(result_view.sort_values("요청일시", ascending=False), use_container_width=True)
+    render_plain_html_table(result_view.sort_values("요청일시", ascending=False), center_align=True)
 
 
 def show_company_profile():
@@ -3331,7 +3331,7 @@ def show_company_profile():
         }
         info_df = pd.DataFrame([info_data]).T.reset_index()
         info_df.columns = ["항목", "내용"]
-        st.dataframe(info_df, use_container_width=True, hide_index=True)
+        render_plain_html_table(info_df, center_align=True)
         if profile.get("updated_at"):
             st.caption(f"최종 수정: {profile.get('updated_at')}")
     else:
@@ -3536,7 +3536,7 @@ def _render_bank_account_management():
                 "memo": "메모",
             }
         )
-        st.dataframe(account_view, use_container_width=True)
+        render_plain_html_table(account_view, center_align=True)
     else:
         st.info("등록된 계좌가 없습니다.")
 
@@ -3835,7 +3835,7 @@ def show_transfer_result_confirmation():
                 "requested_at": "요청일시",
             }
         )
-        st.dataframe(done_view.sort_values("이체완료일시", ascending=False), use_container_width=True)
+        render_plain_html_table(done_view.sort_values("이체완료일시", ascending=False), center_align=True)
     else:
         st.info("이체 완료 이력이 없습니다.")
 
@@ -3882,7 +3882,7 @@ def show_account_balance_check():
             st.session_state.show_balance_update_form = True
             st.rerun()
 
-    st.dataframe(account_view, use_container_width=True)
+    render_plain_html_table(account_view, center_align=True)
 
     if not st.session_state.get("show_balance_update_form"):
         return
@@ -4142,7 +4142,7 @@ def show_reports():
                 "reject_reason": "반려사유",
             }
         )
-        st.dataframe(request_view.sort_values("요청일시", ascending=False), use_container_width=True)
+        render_plain_html_table(request_view.sort_values("요청일시", ascending=False), center_align=True)
     else:
         st.info("전도금 지급 이력이 없습니다.")
 
@@ -4150,7 +4150,7 @@ def show_reports():
     if forecast_rows:
         st.markdown("#### AI 예측 안내")
         st.caption("현재 MVP는 지급 이력 기반의 규칙형 예측입니다. 충분한 이력이 쌓이면 모델 기반 예측으로 확장할 수 있습니다.")
-        st.dataframe(pd.DataFrame(forecast_rows), use_container_width=True)
+        render_plain_html_table(pd.DataFrame(forecast_rows), center_align=True)
     elif not workplaces:
         st.info("예측을 위해 먼저 사업장 정보를 등록해주세요.")
 
@@ -4174,7 +4174,7 @@ def show_reports():
                 "balance_updated_at": "최종업데이트",
             }
         )
-        st.dataframe(account_view, use_container_width=True)
+        render_plain_html_table(account_view, center_align=True)
     else:
         st.info("등록된 계좌가 없습니다.")
 
