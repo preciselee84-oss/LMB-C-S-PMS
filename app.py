@@ -2158,7 +2158,7 @@ def show_auth_page():
         }
         .auth-logo-title {
             color: #1E1A3A;
-            font-size: 100px;
+            font-size: 56px;
             font-weight: 900;
             letter-spacing: 0;
             line-height: 1.05;
@@ -2166,7 +2166,7 @@ def show_auth_page():
         }
         .auth-logo-sub {
             color: #7B79AA;
-            font-size: 20px;
+            font-size: 16px;
             font-weight: 600;
             letter-spacing: 0.3px;
         }
@@ -2289,7 +2289,7 @@ def show_auth_page():
                 flex: 1 1 100% !important;
             }
             .auth-logo-title {
-                font-size: 64px !important;
+                font-size: 36px !important;
             }
             .auth-logo-sub {
                 font-size: 14px !important;
