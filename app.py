@@ -4684,71 +4684,10 @@ def render_page_title(menu):
         """
         <style>
             .block-container { padding-top: 1rem !important; }
-            /* .home-btn div와 button은 DOM에서 형제(sibling) — :has()+인접형제로 타겟팅 */
-            [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button {
-                background: transparent !important;
-                background-color: transparent !important;
-                border: none !important;
-                box-shadow: none !important;
-                display: inline-flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                font-size: 0 !important;
-                padding: 0 !important;
-                height: 82px !important;
-                line-height: 1 !important;
-                color: transparent !important;
-                width: 82px !important;
-            }
-            [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button * {
-                color: transparent !important;
-                display: none !important;
-                font-size: 0 !important;
-            }
-            [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button::before {
-                content: "";
-                width: 75px;
-                height: 75px;
-                display: block;
-                flex: 0 0 auto;
-                background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Cpath fill='%23000' d='M32 8h56v56c0 13.255-10.745 24-24 24H8V32C8 18.745 18.745 8 32 8Z'/%3E%3Cpath fill='%23fff' d='M20 52 48 26l28 26h-10v26H30V52H20Z'/%3E%3Cpath fill='%23fff' d='M58 34h12v18H58z'/%3E%3Cpath fill='%23000' d='M41 52h8v8h-8zM53 52h8v8h-8zM41 64h8v8h-8zM53 64h8v8h-8z'/%3E%3C/svg%3E") center / contain no-repeat;
-            }
-            [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover {
-                background: transparent !important;
-                background-color: transparent !important;
-            }
-            [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover::before {
-                filter: opacity(0.86);
-            }
-            body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button {
-                background: transparent !important;
-                background-color: transparent !important;
-                border: none !important;
-            }
-            body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button::before {
-                filter: none;
-            }
-            body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover {
-                background: transparent !important;
-                background-color: transparent !important;
-                border: none !important;
-            }
-            body:has(#pms-d:checked) [data-testid="stElementContainer"]:has(.home-btn) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover::before {
-                filter: opacity(0.86);
-            }
-            </style>
-            """,
+        </style>
+        """,
         unsafe_allow_html=True,
     )
-    st.markdown('<div class="home-btn">', unsafe_allow_html=True)
-    if st.button("HOME", key=f"home_btn_{menu}", help="대시보드로 이동"):
-        st.session_state.current_menu = "대시보드"
-        persist_current_menu()
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    if menu != "대시보드":
-        st.markdown(f"## {menu}")
 
     if menu in MENU_GUIDES:
         with st.expander("📌 메뉴 이용 안내", expanded=False):
