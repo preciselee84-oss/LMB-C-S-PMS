@@ -3106,15 +3106,15 @@ def show_advance_payment_request():
                 if row.get("status") == "반려" and row.get("reject_reason"):
                     reject_line = f"<div class='request-meta'>반려 사유: {html.escape(str(row.get('reject_reason')))}</div>"
                 st.markdown(
-                    f"""
-                    <div class="request-card">
-                        <div class="request-title">{html.escape(str(row.get('workplace_name', '')))}</div>
-                        <div class="request-meta">{html.escape(str(row.get('request_reason') or '요청 사유 없음'))}</div>
-                        <div class="request-meta">{html.escape(_format_won(row.get('request_amount')))} · {html.escape(str(row.get('requested_at', '')))}</div>
-                        {reject_line}
-                        <span class="status-chip">{html.escape(str(row.get('status', '')))}</span>
-                    </div>
-                    """,
+                    (
+                        "<div class='request-card'>"
+                        f"<div class='request-title'>{html.escape(str(row.get('workplace_name', '')))}</div>"
+                        f"<div class='request-meta'>{html.escape(str(row.get('request_reason') or '요청 사유 없음'))}</div>"
+                        f"<div class='request-meta'>{html.escape(_format_won(row.get('request_amount')))} · {html.escape(str(row.get('requested_at', '')))}</div>"
+                        f"{reject_line}"
+                        f"<span class='status-chip'>{html.escape(str(row.get('status', '')))}</span>"
+                        "</div>"
+                    ),
                     unsafe_allow_html=True,
                 )
     else:
@@ -3143,15 +3143,15 @@ def show_e_approval():
             for index, doc in enumerate(sorted(pending_docs, key=lambda item: item.get("requested_at", ""), reverse=True)):
                 with cols[index % 3]:
                     st.markdown(
-                        f"""
-                        <div class="request-card">
-                            <div class="request-title">{html.escape(str(doc.get('title', '')))}</div>
-                            <div class="request-meta">{html.escape(str(doc.get('reason') or '사유 없음'))}</div>
-                            <div class="request-meta">{html.escape(_format_won(doc.get('amount')))} · {html.escape(str(doc.get('requester', '')))}</div>
-                            <div class="request-meta">{html.escape(str(doc.get('requested_at', '')))}</div>
-                            <span class="status-chip">{html.escape(str(doc.get('status', '')))}</span>
-                        </div>
-                        """,
+                        (
+                            "<div class='request-card'>"
+                            f"<div class='request-title'>{html.escape(str(doc.get('title', '')))}</div>"
+                            f"<div class='request-meta'>{html.escape(str(doc.get('reason') or '사유 없음'))}</div>"
+                            f"<div class='request-meta'>{html.escape(_format_won(doc.get('amount')))} · {html.escape(str(doc.get('requester', '')))}</div>"
+                            f"<div class='request-meta'>{html.escape(str(doc.get('requested_at', '')))}</div>"
+                            f"<span class='status-chip'>{html.escape(str(doc.get('status', '')))}</span>"
+                            "</div>"
+                        ),
                         unsafe_allow_html=True,
                     )
                     if st.session_state.user_role == "관리자":
@@ -3633,14 +3633,14 @@ def show_transfer_result_confirmation():
         for index, row in enumerate(sorted(pending, key=lambda item: item.get("transfer_file_generated_at", ""), reverse=True)):
             with cols[index % 3]:
                 st.markdown(
-                    f"""
-                    <div class="request-card">
-                        <div class="request-title">{html.escape(str(row.get('workplace_name', '')))}</div>
-                        <div class="request-meta">{html.escape(_format_won(row.get('request_amount')))}</div>
-                        <div class="request-meta">이체자료 생성 {html.escape(str(row.get('transfer_file_generated_at', '')))}</div>
-                        <span class="status-chip">{html.escape(str(row.get('status', '')))}</span>
-                    </div>
-                    """,
+                    (
+                        "<div class='request-card'>"
+                        f"<div class='request-title'>{html.escape(str(row.get('workplace_name', '')))}</div>"
+                        f"<div class='request-meta'>{html.escape(_format_won(row.get('request_amount')))}</div>"
+                        f"<div class='request-meta'>이체자료 생성 {html.escape(str(row.get('transfer_file_generated_at', '')))}</div>"
+                        f"<span class='status-chip'>{html.escape(str(row.get('status', '')))}</span>"
+                        "</div>"
+                    ),
                     unsafe_allow_html=True,
                 )
                 if st.button("이체 완료 확인", key=f"confirm_pay_{row.get('id')}", use_container_width=True, type="primary"):
