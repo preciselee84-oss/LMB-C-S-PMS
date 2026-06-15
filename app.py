@@ -3774,50 +3774,121 @@ def _render_usage_report_form():
             value=today.replace(day=1)
         )
 
+    # 조회 버튼
+    if st.button("출금 내역 조회", type="primary"):
+        st.session_state.withdrawal_query_done = True
+        st.rerun()
+
+    if not st.session_state.get("withdrawal_query_done"):
+        st.info("계좌와 보고 월을 선택한 후 '출금 내역 조회' 버튼을 클릭해주세요.")
+        return
+
     st.markdown("---")
-    st.markdown("#### 출금 내역 및 사용 사유")
+    st.markdown("#### 출금 내역 및 사용 사유 입력")
 
-    # 출금 내역 입력 (실제로는 계좌 거래내역에서 가져와야 하지만, 여기서는 수동 입력)
+    # 계좌 거래내역에서 출금 데이터 가져오기
+    # 실제 거래내역이 있다면 여기서 필터링
+    # 임시로 샘플 데이터 또는 balance_history 활용
+    transactions = selected_account.get("transactions", [])
+
+    # 보고 월에 해당하는 출금 내역만 필터링
+    start_date = report_month.replace(day=1)
+    if report_month.month == 12:
+        end_date = report_month.replace(year=report_month.year + 1, month=1, day=1)
+    else:
+        end_date = report_month.replace(month=report_month.month + 1, day=1)
+
+    withdrawals = [
+        t for t in transactions
+        if t.get("type") == "출금" and start_date <= pd.to_datetime(t.get("date")).date() < end_date
+    ]
+
+    if not withdrawals:
+        st.warning(
+            "선택한 기간에 출금 내역이 없습니다.\n\n"
+            "💡 참고: 거래내역은 [계좌 잔고 확인] 메뉴의 거래내역조회에서 확인할 수 있습니다."
+        )
+        st.info(
+            "**임시 입력 모드**\n\n"
+            "아래 버튼을 클릭하여 출금 내역을 직접 입력할 수 있습니다."
+        )
+
+    # 출금 항목별 사용 사유 입력
     if "usage_report_items" not in st.session_state:
-        st.session_state.usage_report_items = []
+        st.session_state.usage_report_items = {}
 
-    # 출금 항목 추가
-    with st.expander("➕ 출금 항목 추가", expanded=len(st.session_state.usage_report_items) == 0):
-        with st.form("add_usage_item_form"):
-            col_a, col_b, col_c = st.columns(3)
-            with col_a:
-                usage_date = st.date_input("출금일자")
-            with col_b:
-                usage_amount = st.number_input("출금금액", min_value=0, step=1000, format="%d")
-            with col_c:
-                usage_recipient = st.text_input("거래처")
+    # 거래내역이 있으면 표시하고 사용 사유 입력 받기
+    if withdrawals:
+        st.markdown(f"**조회된 출금 내역: {len(withdrawals)}건**")
 
-            usage_reason = st.text_area("사용 사유", placeholder="출금 사용 목적을 상세히 작성해주세요.")
-            usage_file = st.file_uploader("증빙서류 첨부 (선택)", type=["pdf", "jpg", "jpeg", "png"])
+        for idx, withdrawal in enumerate(withdrawals):
+            with st.expander(
+                f"📤 {withdrawal.get('date')} | {_format_won(withdrawal.get('amount'))} | {withdrawal.get('recipient', '-')}"
+            ):
+                trans_id = f"{withdrawal.get('date')}_{withdrawal.get('amount')}"
 
-            if st.form_submit_button("추가", type="primary", use_container_width=True):
-                if not usage_reason.strip():
-                    st.warning("사용 사유를 입력해주세요.")
-                else:
-                    file_name = ""
-                    if usage_file:
-                        file_name = usage_file.name
+                usage_reason = st.text_area(
+                    "사용 사유",
+                    key=f"reason_{idx}",
+                    placeholder="출금 사용 목적을 상세히 작성해주세요.",
+                    value=st.session_state.usage_report_items.get(trans_id, {}).get("reason", "")
+                )
 
-                    st.session_state.usage_report_items.append({
-                        "date": usage_date.strftime("%Y-%m-%d"),
-                        "amount": int(usage_amount),
-                        "recipient": usage_recipient.strip(),
+                usage_file = st.file_uploader(
+                    "증빙서류 첨부 (선택)",
+                    key=f"file_{idx}",
+                    type=["pdf", "jpg", "jpeg", "png"]
+                )
+
+                if st.button("저장", key=f"save_{idx}", type="primary"):
+                    file_name = usage_file.name if usage_file else ""
+                    st.session_state.usage_report_items[trans_id] = {
+                        "date": withdrawal.get("date"),
+                        "amount": withdrawal.get("amount"),
+                        "recipient": withdrawal.get("recipient", ""),
                         "reason": usage_reason.strip(),
                         "file_name": file_name,
-                    })
+                    }
+                    st.success("저장되었습니다.")
+
+    # 수동 입력 옵션
+    with st.expander("➕ 출금 내역 수동 추가"):
+        with st.form("add_withdrawal_manual"):
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                manual_date = st.date_input("출금일자")
+            with col_b:
+                manual_amount = st.number_input("출금금액", min_value=0, step=1000, format="%d")
+            with col_c:
+                manual_recipient = st.text_input("거래처")
+
+            manual_reason = st.text_area("사용 사유", placeholder="출금 사용 목적을 상세히 작성해주세요.")
+            manual_file = st.file_uploader("증빙서류 첨부 (선택)", type=["pdf", "jpg", "jpeg", "png"])
+
+            if st.form_submit_button("추가", type="primary", use_container_width=True):
+                if not manual_reason.strip():
+                    st.warning("사용 사유를 입력해주세요.")
+                else:
+                    trans_id = f"{manual_date.strftime('%Y-%m-%d')}_{manual_amount}_manual"
+                    file_name = manual_file.name if manual_file else ""
+
+                    st.session_state.usage_report_items[trans_id] = {
+                        "date": manual_date.strftime("%Y-%m-%d"),
+                        "amount": int(manual_amount),
+                        "recipient": manual_recipient.strip(),
+                        "reason": manual_reason.strip(),
+                        "file_name": file_name,
+                    }
                     st.success("출금 항목이 추가되었습니다.")
                     st.rerun()
 
-    # 추가된 항목 표시
-    if st.session_state.usage_report_items:
-        st.markdown("**추가된 출금 항목**")
+    st.markdown("---")
 
-        for idx, item in enumerate(st.session_state.usage_report_items):
+    # 입력된 항목 표시
+    if st.session_state.usage_report_items:
+        st.markdown("#### 작성된 사용 사유")
+
+        for trans_id, item in st.session_state.usage_report_items.items():
             with st.container():
                 col_info, col_del = st.columns([0.9, 0.1])
                 with col_info:
@@ -3829,41 +3900,49 @@ def _render_usage_report_form():
                         """
                     )
                 with col_del:
-                    if st.button("🗑️", key=f"del_usage_{idx}"):
-                        st.session_state.usage_report_items.pop(idx)
+                    if st.button("🗑️", key=f"del_{trans_id}"):
+                        del st.session_state.usage_report_items[trans_id]
                         st.rerun()
                 st.markdown("---")
 
         # 보고서 제출
-        total_amount = sum(item['amount'] for item in st.session_state.usage_report_items)
+        total_amount = sum(item['amount'] for item in st.session_state.usage_report_items.values())
         st.markdown(f"**총 출금액:** {_format_won(total_amount)}")
+        st.markdown(f"**작성 완료 건수:** {len(st.session_state.usage_report_items)}건")
 
         if st.button("보고서 제출", type="primary", use_container_width=True):
-            # 보고서 저장
-            usage_data = _load_usage_reports()
-            if "reports" not in usage_data:
-                usage_data["reports"] = []
+            # 사용 사유가 입력되지 않은 항목 확인
+            incomplete = [item for item in st.session_state.usage_report_items.values() if not item.get('reason', '').strip()]
 
-            workplace_name = workplaces_by_id.get(selected_account.get("linked_workplace_id"), {}).get("workplace_name", "")
+            if incomplete:
+                st.warning(f"사용 사유가 입력되지 않은 항목이 {len(incomplete)}건 있습니다. 모든 항목의 사용 사유를 입력해주세요.")
+            else:
+                # 보고서 저장
+                usage_data = _load_usage_reports()
+                if "reports" not in usage_data:
+                    usage_data["reports"] = []
 
-            usage_data["reports"].append({
-                "id": int(time.time() * 1000),
-                "workplace_id": selected_account.get("linked_workplace_id"),
-                "workplace_name": workplace_name,
-                "account_id": selected_account.get("id"),
-                "report_month": report_month.strftime("%Y-%m"),
-                "total_amount": total_amount,
-                "items": st.session_state.usage_report_items.copy(),
-                "status": "제출완료",
-                "requested_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
-            })
+                workplace_name = workplaces_by_id.get(selected_account.get("linked_workplace_id"), {}).get("workplace_name", "")
 
-            _save_usage_reports(usage_data)
-            st.session_state.usage_report_items = []
-            st.success("전도금 사용 결의 보고서가 제출되었습니다.")
-            st.rerun()
+                usage_data["reports"].append({
+                    "id": int(time.time() * 1000),
+                    "workplace_id": selected_account.get("linked_workplace_id"),
+                    "workplace_name": workplace_name,
+                    "account_id": selected_account.get("id"),
+                    "report_month": report_month.strftime("%Y-%m"),
+                    "total_amount": total_amount,
+                    "items": list(st.session_state.usage_report_items.values()),
+                    "status": "제출완료",
+                    "requested_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
+                })
+
+                _save_usage_reports(usage_data)
+                st.session_state.usage_report_items = {}
+                st.session_state.withdrawal_query_done = False
+                st.success("전도금 사용 결의 보고서가 제출되었습니다.")
+                st.rerun()
     else:
-        st.info("출금 항목을 추가해주세요.")
+        st.info("출금 내역의 사용 사유를 입력해주세요.")
 
 
 def _render_usage_report_history():
