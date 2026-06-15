@@ -4522,13 +4522,8 @@ def show_account_balance_check():
     period_presets = {
         "오늘": (today, today),
         "어제": (today - timedelta(days=1), today - timedelta(days=1)),
-        "2일": (today - timedelta(days=1), today),
-        "3일": (today - timedelta(days=2), today),
         "1주일": (today - timedelta(days=6), today),
         "1개월": (today - timedelta(days=30), today),
-        "3개월": (today - timedelta(days=90), today),
-        "6개월": (today - timedelta(days=180), today),
-        "12개월": (today - timedelta(days=365), today),
     }
 
     st.markdown(
@@ -4568,7 +4563,7 @@ def show_account_balance_check():
         with period_label_col:
             st.markdown("**조회기간**")
         with period_input_col:
-            preset_cols = st.columns([0.06, 0.06, 0.06, 0.06, 0.08, 0.08, 0.08, 0.08, 0.09, 0.35])
+            preset_cols = st.columns([0.13, 0.13, 0.17, 0.17, 0.40])
             for index, (label, date_range) in enumerate(period_presets.items()):
                 button_type = "primary" if label == st.session_state.get("balance_history_preset", "1주일") else "secondary"
                 if preset_cols[index].button(label, key=f"balance_history_preset_{label}", type=button_type, use_container_width=True):
