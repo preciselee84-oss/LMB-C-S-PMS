@@ -4036,6 +4036,7 @@ def show_transfer_file_generation():
         target_rows.append(
             {
                 "id": row.get("id"),
+                "사업장명": workplace_name,
                 "선택": True,
                 "입금은행": account.get("bank_name", ""),
                 "입금계좌번호": account.get("account_number", ""),
@@ -4048,16 +4049,15 @@ def show_transfer_file_generation():
         )
 
     target_df = pd.DataFrame(target_rows)
+    info_view = target_df[["사업장명", "입금은행", "입금계좌번호", "입금액", "예상예금주", "조회한예금주"]]
+    render_plain_html_table(info_view, center_align=True)
+
     edited_df = st.data_editor(
-        target_df,
+        target_df[["id", "사업장명", "선택", "입금통장표시", "출금통장표시"]],
         column_config={
             "id": None,
+            "사업장명": st.column_config.TextColumn("사업장명", disabled=True),
             "선택": st.column_config.CheckboxColumn("선택"),
-            "입금은행": st.column_config.TextColumn("입금은행", disabled=True),
-            "입금계좌번호": st.column_config.TextColumn("입금계좌번호", disabled=True),
-            "입금액": st.column_config.TextColumn("입금액", disabled=True),
-            "예상예금주": st.column_config.TextColumn("예상예금주", disabled=True),
-            "조회한예금주": st.column_config.TextColumn("조회한예금주", disabled=True),
             "입금통장표시": st.column_config.TextColumn("입금통장표시"),
             "출금통장표시": st.column_config.TextColumn("출금통장표시"),
         },
