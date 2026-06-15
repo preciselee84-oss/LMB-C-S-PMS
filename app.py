@@ -2495,12 +2495,12 @@ def show_sidebar():
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                width: 32px;
-                height: 32px;
+                width: 48px;
+                height: 48px;
                 border: none;
-                border-radius: 9px;
+                border-radius: 12px;
                 color: #ffffff !important;
-                font-size: 14px;
+                font-size: 20px;
                 font-weight: 900;
                 letter-spacing: 0;
                 background: linear-gradient(135deg, #2F6FED 0%, #1B4FC4 100%);
@@ -2667,7 +2667,7 @@ def show_sidebar():
         )
 
         if st.session_state.user_role == "관리자":
-            for menu_name in ["대시보드", "전자결재"]:
+            for menu_name in ["전자결재"]:
                 render_nav_button(menu_name)
 
             st.markdown("<div class='gpt-section'>관리자 메뉴</div>", unsafe_allow_html=True)
@@ -3366,6 +3366,26 @@ def show_e_approval():
     wp_data = _load_delegated_workplaces()
     wp_requests = wp_data.get("requests", [])
     requests_by_id = {row.get("id"): row for row in wp_requests}
+
+    # 결재함 정보 표시
+    pending_count = len([doc for doc in documents if doc.get("status") == "결재대기"])
+    done_count = len([doc for doc in documents if doc.get("status") in ["승인", "반려"]])
+
+    st.markdown(
+        f"""
+        <div style='background: linear-gradient(135deg, #2F6FED 0%, #1B4FC4 100%);
+                    padding: 20px; border-radius: 12px; margin-bottom: 20px; color: white;'>
+            <div style='font-size: 18px; font-weight: 700; margin-bottom: 10px;'>
+                {html.escape(st.session_state.user_name)}님 반갑습니다
+            </div>
+            <div style='display: flex; gap: 30px; font-size: 14px;'>
+                <div><strong>결재대기:</strong> {pending_count}건</div>
+                <div><strong>처리완료:</strong> {done_count}건</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     pending_tab, done_tab, stats_tab = st.tabs(["결재대기", "처리 완료", "처리 통계"])
 
