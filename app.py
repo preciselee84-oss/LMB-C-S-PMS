@@ -4551,17 +4551,19 @@ def show_account_balance_check():
         )
 
         with st.container(border=False):
-            account_label_col, account_input_col, _ = st.columns([0.12, 0.42, 0.46])
+            account_label_col, account_input_col = st.columns([0.12, 0.88])
             with account_label_col:
                 st.markdown("**계좌번호 <span style='color:#008c78'>*</span>**", unsafe_allow_html=True)
             with account_input_col:
-                history_label = st.selectbox(
-                    "계좌번호",
-                    list(history_options.keys()),
-                    key="balance_history_account",
-                    label_visibility="collapsed",
-                    placeholder="계좌 선택",
-                )
+                account_select_col, _ = st.columns([0.48, 0.52])
+                with account_select_col:
+                    history_label = st.selectbox(
+                        "계좌번호",
+                        list(history_options.keys()),
+                        key="balance_history_account",
+                        label_visibility="collapsed",
+                        placeholder="계좌 선택",
+                    )
 
             period_label_col, period_input_col = st.columns([0.12, 0.88])
             with period_label_col:
