@@ -74,6 +74,26 @@ body {
   margin-top: 16px;
 }
 
+.metric-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eef0f4;
+}
+
+.metric-line:last-child {
+  border-bottom: 0;
+}
+
+.transfer-preview {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  line-height: 1.6;
+}
+
 .risk-item {
   display: flex;
   align-items: center;

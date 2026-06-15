@@ -28,7 +28,7 @@ export function LoginPage() {
     <main className="login-page">
       {contextHolder}
       <Card className="login-card">
-        <Typography.Title level={3}>LMB 실적관리</Typography.Title>
+        <Typography.Title level={3}>위탁사업장 관리</Typography.Title>
         <Form layout="vertical" onFinish={handleFinish}>
           <Form.Item name="username" label="아이디" rules={[{ required: true }]}>
             <Input autoComplete="username" />
@@ -44,4 +44,3 @@ export function LoginPage() {
     </main>
   );
 }
-

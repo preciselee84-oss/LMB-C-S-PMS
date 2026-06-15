@@ -9,6 +9,7 @@ from app.models.base import Base
 from app.models.performance_record import PerformanceRecord
 from app.models.sales import PaymentMatch, SalesLead
 from app.models.user import User
+from app.models.workplace import AdvancePaymentRequest, BankAccount, CompanyProfile, DelegatedWorkplace
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
