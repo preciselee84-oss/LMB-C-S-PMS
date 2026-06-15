@@ -7857,8 +7857,48 @@ def _render_staff_admin():
     if st.session_state.pop("reset_staff_edit_sel", False):
         st.session_state.staff_edit_sel = "선택안함"
 
-    # ── 직원 직접 추가 ──
-    with st.expander("직원 직접 추가", expanded=False):
+    staff_rows = []
+    for uid, info in st.session_state.user_db.items():
+        if uid == "1":
+            continue
+        staff_rows.append({
+            "ID": uid,
+            "성명": info.get("name", ""),
+            "메일주소": info.get("email", ""),
+            "핸드폰": info.get("phone", ""),
+            "사업자 정보": info.get("dept_type", "사업부"),
+            "마스터 구분": "관리자" if info.get("role") == "관리자" else "사용자",
+        })
+
+    if staff_rows:
+        # ID 순서로 정렬
+        staff_rows.sort(key=lambda x: x["ID"])
+
+        # ── 사용자 목록 HTML 테이블 표시 (다크모드 호환, 가운데 정렬) ──
+        render_plain_html_table(pd.DataFrame(staff_rows), center_align=True)
+    else:
+        st.info("등록된 직원이 없습니다.")
+
+    st.markdown("---")
+
+    action_cols = st.columns([0.15, 0.15, 0.15, 0.55])
+    with action_cols[0]:
+        if st.button("사용자 추가", key="staff_action_add", use_container_width=True, type="primary"):
+            st.session_state.staff_admin_action = "add"
+            st.rerun()
+    with action_cols[1]:
+        if st.button("수정", key="staff_action_edit", use_container_width=True):
+            st.session_state.staff_admin_action = "edit"
+            st.rerun()
+    with action_cols[2]:
+        if st.button("삭제", key="staff_action_delete", use_container_width=True):
+            st.session_state.staff_admin_action = "delete"
+            st.rerun()
+
+    action = st.session_state.get("staff_admin_action", "")
+
+    if action == "add":
+        st.markdown("#### 사용자 추가")
         with st.form("add_staff_form"):
             ac1, ac2 = st.columns(2)
             with ac1:
@@ -7903,45 +7943,57 @@ def _render_staff_admin():
                 if "_deleted" in _cur_file:
                     save_data["_deleted"] = _cur_file["_deleted"]
                 save_db(DB_FILE, save_data)
+                st.session_state.staff_admin_action = ""
                 st.success(f"직원 '{name_str}({uid_str})'을(를) 추가했습니다.")
                 st.rerun()
 
-    staff_rows = []
-    for uid, info in st.session_state.user_db.items():
-        if uid == "1":
-            continue
-        staff_rows.append({
-            "ID": uid,
-            "성명": info.get("name", ""),
-            "메일주소": info.get("email", ""),
-            "핸드폰": info.get("phone", ""),
-            "사업자 정보": info.get("dept_type", "사업부"),
-            "마스터 구분": "관리자" if info.get("role") == "관리자" else "사용자",
-        })
-
-    if not staff_rows:
-        st.info("등록된 직원이 없습니다.")
         return
 
-    # ID 순서로 정렬
-    staff_rows.sort(key=lambda x: x["ID"])
+    if action not in {"edit", "delete"}:
+        return
 
-    # ── 사용자 목록 HTML 테이블 표시 (다크모드 호환, 가운데 정렬) ──
-    render_plain_html_table(pd.DataFrame(staff_rows), center_align=True)
-
-    st.markdown("---")
-    st.markdown("#### 직원 정보 수정")
+    st.markdown("#### 직원 정보 수정" if action == "edit" else "#### 직원 삭제")
 
     uid_options = [f"{r['ID']} — {r['성명']}" for r in staff_rows]
     sel_col, _ = st.columns([0.32, 0.68])
     with sel_col:
-        sel = st.selectbox("수정할 직원 선택", ["선택안함"] + uid_options, key="staff_edit_sel")
+        sel = st.selectbox("대상 직원 선택", ["선택안함"] + uid_options, key="staff_edit_sel")
 
     if sel == "선택안함":
         return
 
     sel_uid = sel.split(" — ")[0].strip()
     info = st.session_state.user_db.get(sel_uid, {})
+
+    if action == "delete":
+        st.warning(f"{sel} 계정을 삭제합니다. 삭제 후 기본 계정에서도 복원되지 않도록 처리됩니다.")
+        del_col, cancel_col, _ = st.columns([0.15, 0.15, 0.7])
+        with del_col:
+            if st.button("삭제 실행", type="primary", use_container_width=True):
+                del st.session_state.user_db[sel_uid]
+                # _deleted 목록을 파일에 함께 저장해 기본 계정에서도 복원되지 않도록 함
+                _cur_file = {}
+                if os.path.exists(DB_FILE):
+                    try:
+                        with open(DB_FILE, "r", encoding="utf-8") as _f:
+                            _cur_file = json.load(_f)
+                    except Exception:
+                        pass
+                _deleted_set = set(_cur_file.get("_deleted", []))
+                _deleted_set.add(sel_uid)
+                save_data = dict(st.session_state.user_db)
+                save_data["_deleted"] = list(_deleted_set)
+                save_db(DB_FILE, save_data, allow_shrink=True)
+                st.session_state.reset_staff_edit_sel = True
+                st.session_state.staff_admin_action = ""
+                st.success(f"{sel} 삭제 완료")
+                time.sleep(0.5)
+                st.rerun()
+        with cancel_col:
+            if st.button("취소", use_container_width=True):
+                st.session_state.staff_admin_action = ""
+                st.rerun()
+        return
 
     st.markdown(f"**메일주소:** {info.get('email', '—')}")
 
@@ -8000,28 +8052,14 @@ def _render_staff_admin():
                 save_data["_deleted"] = _cur_file["_deleted"]
             save_db(DB_FILE, save_data)
             st.session_state.reset_staff_edit_sel = True
+            st.session_state.staff_admin_action = ""
             st.success("저장 완료")
             time.sleep(0.5)
             st.rerun()
     with bc2:
-        if st.button("삭제", type="secondary", use_container_width=True):
-            del st.session_state.user_db[sel_uid]
-            # _deleted 목록을 파일에 함께 저장해 기본 계정에서도 복원되지 않도록 함
-            _cur_file = {}
-            if os.path.exists(DB_FILE):
-                try:
-                    with open(DB_FILE, "r", encoding="utf-8") as _f:
-                        _cur_file = json.load(_f)
-                except Exception:
-                    pass
-            _deleted_set = set(_cur_file.get("_deleted", []))
-            _deleted_set.add(sel_uid)
-            save_data = dict(st.session_state.user_db)
-            save_data["_deleted"] = list(_deleted_set)
-            save_db(DB_FILE, save_data, allow_shrink=True)
+        if st.button("취소", use_container_width=True):
+            st.session_state.staff_admin_action = ""
             st.session_state.reset_staff_edit_sel = True
-            st.success(f"{sel} 삭제 완료")
-            time.sleep(0.5)
             st.rerun()
 
 
