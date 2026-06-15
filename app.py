@@ -3717,12 +3717,36 @@ def show_transfer_file_generation():
     source_label = st.selectbox("출금 계좌", list(source_options.keys()))
 
     st.markdown("#### 이체 대상 선택")
-    selected_ids = []
+    target_rows = []
     for row in sorted(targets, key=lambda item: item.get("requested_at", "")):
         site = workplaces_by_id.get(row.get("workplace_id"), {})
-        label = f"{row.get('workplace_name', '')} · {_format_won(row.get('request_amount'))} · {site.get('bank_name', '')} {site.get('account_number', '')}"
-        if st.checkbox(label, key=f"transfer_target_{row.get('id')}", value=True):
-            selected_ids.append(row.get("id"))
+        target_rows.append(
+            {
+                "id": row.get("id"),
+                "선택": True,
+                "사업장명": row.get("workplace_name", ""),
+                "요청금액": _format_won(row.get("request_amount")),
+                "입금은행": site.get("bank_name", ""),
+                "계좌번호": site.get("account_number", ""),
+            }
+        )
+
+    target_df = pd.DataFrame(target_rows)
+    edited_df = st.data_editor(
+        target_df,
+        column_config={
+            "id": None,
+            "선택": st.column_config.CheckboxColumn("선택"),
+            "사업장명": st.column_config.TextColumn("사업장명", disabled=True),
+            "요청금액": st.column_config.TextColumn("요청금액", disabled=True),
+            "입금은행": st.column_config.TextColumn("입금은행", disabled=True),
+            "계좌번호": st.column_config.TextColumn("계좌번호", disabled=True),
+        },
+        hide_index=True,
+        use_container_width=True,
+        key="transfer_target_editor",
+    )
+    selected_ids = edited_df[edited_df["선택"]]["id"].tolist()
 
     if st.button("이체 자료 생성", type="primary", disabled=not selected_ids):
         source = source_options[source_label]
