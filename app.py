@@ -1937,7 +1937,7 @@ def render_plain_html_table(df, max_rows=500, center_align=True, merge_cols=None
             if col in rowspan_map and rowspan_map[col].get(i, 1) == 0:
                 continue
             val = "" if pd.isna(row[col]) else html.escape(str(row[col]))
-            align = "left" if str(col).strip() == "활동내역" else ("center" if center_align else "left")
+            align = "center" if center_align else "left"
             td_align = f"text-align:{align};"
             rowspan = ""
             if col in rowspan_map and rowspan_map[col].get(i, 1) > 1:
@@ -4386,6 +4386,24 @@ def apply_global_table_css():
             max-height: 20px !important;
             line-height: 20px !important;
         }
+        /* 표 전체 가운데 정렬 */
+        div[data-testid="stDataFrame"] [role="columnheader"],
+        div[data-testid="stDataFrame"] [role="gridcell"],
+        div[data-testid="stDataEditor"] [role="columnheader"],
+        div[data-testid="stDataEditor"] [role="gridcell"] {
+            text-align: center !important;
+            justify-content: center !important;
+        }
+        /* 버튼 크기 공통 (높이 30px) */
+        div.stButton > button,
+        [data-testid="stFormSubmitButton"] button,
+        [data-testid="stDownloadButton"] button {
+            min-height: 30px !important;
+            height: 30px !important;
+            padding: 0 0.75rem !important;
+            font-size: 13px !important;
+            line-height: 1.2 !important;
+        }
         .action-btn button p, .action-btn button span {
             font-size: 10px !important;
         }
@@ -4465,9 +4483,10 @@ def apply_global_table_css():
         body:has(#pms-d:checked) [data-testid="stDownloadButton"] a span {
             color: #ffffff !important;
         }
-        /* 익스팬더(메뉴 이용 안내 등) 헤더 크기 축소 */
+        /* 익스팬더(메뉴 이용 안내 등) 헤더 크기 공통 (높이 40px) */
         [data-testid="stExpander"] summary {
-            min-height: 30px !important;
+            min-height: 40px !important;
+            height: 40px !important;
             padding: 0.25rem 0.75rem !important;
         }
         [data-testid="stExpander"] summary p {
