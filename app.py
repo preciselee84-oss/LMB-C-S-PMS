@@ -4156,8 +4156,16 @@ def show_transfer_file_generation():
         now_str = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
         for row in targets:
             if row.get("id") in selected_ids:
+                account = accounts_by_workplace_id.get(row.get("workplace_id"), {})
+                edited_row = edited_by_id.get(row.get("id"), {})
                 row["status"] = "이체 대상"
                 row["transfer_file_generated_at"] = now_str
+                row["transfer_expected_holder"] = (
+                    lookup_map.get(row.get("id")) or account.get("holder_name", "") or row.get("workplace_name", "")
+                )
+                row["transfer_verified_holder"] = lookup_map.get(row.get("id"), "")
+                row["transfer_deposit_passbook"] = edited_row.get("입금통장표시", "")
+                row["transfer_withdrawal_passbook"] = edited_row.get("출금통장표시", "")
 
         st.session_state["_transfer_holder_lookup"] = {
             row_id: name for row_id, name in lookup_map.items() if row_id not in selected_ids
@@ -4188,38 +4196,48 @@ def show_transfer_result_confirmation():
     st.markdown("#### 이체 대상")
     if pending:
         pending_sorted = sorted(pending, key=lambda item: item.get("transfer_file_generated_at", ""), reverse=True)
-        pending_view = pd.DataFrame(
-            [
+        pending_rows = []
+        for row in pending_sorted:
+            account = accounts_by_workplace_id.get(row.get("workplace_id"), {})
+            pending_rows.append(
                 {
+                    "id": row.get("id"),
+                    "선택": False,
                     "사업장명": row.get("workplace_name", ""),
-                    "입금은행": accounts_by_workplace_id.get(row.get("workplace_id"), {}).get("bank_name", ""),
-                    "입금계좌번호": accounts_by_workplace_id.get(row.get("workplace_id"), {}).get("account_number", ""),
+                    "입금은행": account.get("bank_name", ""),
+                    "입금계좌번호": account.get("account_number", ""),
                     "입금액": _format_won(row.get("request_amount")),
-                    "이체자료확정일시": row.get("transfer_file_generated_at", ""),
+                    "예상예금주": row.get("transfer_expected_holder", "") or account.get("holder_name", "") or row.get("workplace_name", ""),
+                    "조회한예금주": row.get("transfer_verified_holder", ""),
+                    "입금통장표시": row.get("transfer_deposit_passbook", ""),
+                    "출금통장표시": row.get("transfer_withdrawal_passbook", ""),
                 }
-                for row in pending_sorted
-            ]
-        )
-        render_plain_html_table(pending_view, center_align=True)
+            )
 
-        confirm_df = pd.DataFrame(
-            [
-                {"id": row.get("id"), "사업장명": row.get("workplace_name", ""), "이체완료확인": False}
-                for row in pending_sorted
-            ]
-        )
+        pending_df = pd.DataFrame(pending_rows)
+        column_order = [
+            "id", "선택", "사업장명", "입금은행", "입금계좌번호", "입금액",
+            "예상예금주", "조회한예금주", "입금통장표시", "출금통장표시",
+        ]
         edited_confirm = st.data_editor(
-            confirm_df,
+            pending_df[column_order],
             column_config={
                 "id": None,
-                "사업장명": st.column_config.TextColumn("사업장명", disabled=True),
-                "이체완료확인": st.column_config.CheckboxColumn("이체완료확인"),
+                "선택": st.column_config.CheckboxColumn("선택", width="small"),
+                "사업장명": st.column_config.TextColumn("사업장명", disabled=True, width="small"),
+                "입금은행": st.column_config.TextColumn("입금은행", disabled=True, width="small"),
+                "입금계좌번호": st.column_config.TextColumn("입금계좌번호", disabled=True, width="small"),
+                "입금액": st.column_config.TextColumn("입금액", disabled=True, width="small"),
+                "예상예금주": st.column_config.TextColumn("예상예금주", disabled=True, width="small"),
+                "조회한예금주": st.column_config.TextColumn("조회한예금주", disabled=True, width="small"),
+                "입금통장표시": st.column_config.TextColumn("입금통장표시", disabled=True, width="small"),
+                "출금통장표시": st.column_config.TextColumn("출금통장표시", disabled=True, width="small"),
             },
             hide_index=True,
             use_container_width=True,
             key="transfer_confirm_editor",
         )
-        confirm_ids = edited_confirm[edited_confirm["이체완료확인"]]["id"].tolist()
+        confirm_ids = edited_confirm[edited_confirm["선택"]]["id"].tolist()
         if st.button("선택 건 이체 완료 확인", type="primary", disabled=not confirm_ids):
             now_str = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
             for row in pending:
