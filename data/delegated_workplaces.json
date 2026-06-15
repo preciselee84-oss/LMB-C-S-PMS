@@ -81,13 +81,22 @@
             "requested_by": "이성환",
             "requester_phone": "",
             "request_reason": "",
-            "status": "품의 확정",
+            "status": "이체 대상",
             "requested_at": "2026-06-15 15:52:36",
             "approved_at": "2026-06-15 15:53:32",
             "paid_at": "",
             "approval_doc_id": 1781506356615,
             "reject_reason": "",
-            "transfer_file_generated_at": ""
+            "transfer_file_generated_at": "2026-06-15 16:56:53",
+            "transfer_expected_holder": "웹케시",
+            "transfer_verified_holder": "웹케시",
+            "transfer_deposit_passbook": "웹케시 테스트 전도금",
+            "transfer_withdrawal_passbook": "웹케시 테스트 전도금",
+            "transfer_bank_name": "국민은행",
+            "transfer_account_number": "12545121354",
+            "transfer_amount": 100000,
+            "deposit_reconciliation": "",
+            "deposit_reconciled_at": ""
         }
     ]
 }
