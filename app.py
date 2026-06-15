@@ -4509,7 +4509,7 @@ def show_account_balance_check():
             st.session_state.show_balance_update_form = True
             st.rerun()
 
-    render_plain_html_table(account_view, center_align=True, stretch=False, max_width="700px", border=False)
+    render_plain_html_table(account_view, center_align=True, stretch=True, max_width="100%", border=False)
 
     st.markdown("#### 거래내역조회")
 
