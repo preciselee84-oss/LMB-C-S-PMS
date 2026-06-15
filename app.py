@@ -3513,7 +3513,9 @@ def show_approval_result():
                     st.session_state.approval_result_end_date = date_range[1]
                     st.rerun()
 
-            date_start_col, tilde_col, date_end_col, month_col, _ = st.columns([0.22, 0.03, 0.22, 0.18, 0.35])
+            date_start_col, tilde_col, date_end_col, month_col, request_check_col, process_check_col, _ = st.columns(
+                [0.18, 0.03, 0.18, 0.16, 0.11, 0.11, 0.23]
+            )
             with date_start_col:
                 request_start_date = st.date_input(
                     "조회 시작일",
@@ -3539,6 +3541,10 @@ def show_approval_result():
                     key="approval_result_month",
                     label_visibility="collapsed",
                 )
+            with request_check_col:
+                date_by_request = st.checkbox("요청일자", value=True, key="approval_result_date_by_request")
+            with process_check_col:
+                date_by_processed = st.checkbox("처리일자", value=False, key="approval_result_date_by_processed")
 
         requester_label_col, requester_input_col = st.columns([0.12, 0.88])
         with requester_label_col:
@@ -3585,6 +3591,8 @@ def show_approval_result():
     if search_clicked or "_approval_result_query" not in st.session_state:
         st.session_state["_approval_result_query"] = {
             "request_date_range": (request_start_date, request_end_date),
+            "date_by_request": date_by_request,
+            "date_by_processed": date_by_processed,
             "selected_requester": selected_requester,
             "selected_status": selected_status,
             "processed_date_range": processed_date_range,
@@ -3592,6 +3600,8 @@ def show_approval_result():
 
     query = st.session_state.get("_approval_result_query", {})
     request_date_range = query.get("request_date_range", ())
+    date_by_request = query.get("date_by_request", True)
+    date_by_processed = query.get("date_by_processed", False)
     selected_requester = query.get("selected_requester", "전체")
     selected_status = query.get("selected_status", "전체")
     processed_date_range = query.get("processed_date_range", ())
@@ -3605,9 +3615,19 @@ def show_approval_result():
         start, end = date_range
         return start <= parsed.date() <= end
 
+    approvals_data = _load_approvals()
+    docs_by_request_id = {
+        doc.get("ref_request_id"): doc
+        for doc in approvals_data.get("documents", [])
+        if doc.get("ref_request_id") is not None
+    }
+
     filtered = processed
-    if request_date_range:
-        filtered = [row for row in filtered if _date_in_range(row.get("requested_at"), request_date_range)]
+    if request_date_range and (date_by_request or date_by_processed):
+        if date_by_request:
+            filtered = [row for row in filtered if _date_in_range(row.get("requested_at"), request_date_range)]
+        if date_by_processed:
+            filtered = [row for row in filtered if _date_in_range(_processed_at(row), request_date_range)]
     if selected_requester != "전체":
         filtered = [row for row in filtered if row.get("requested_by") == selected_requester]
     if selected_status != "전체":
@@ -3625,8 +3645,14 @@ def show_approval_result():
         if col not in result_df.columns:
             result_df[col] = ""
     result_df["처리일시"] = result_df.apply(_processed_at, axis=1)
+    result_df["문서구분"] = result_df.apply(
+        lambda row: "전도금 사용 결의 보고"
+        if (docs_by_request_id.get(row.get("id"), {}).get("doc_type") == "사용품의서" or row.get("usage_report_id"))
+        else "전도금 요청",
+        axis=1,
+    )
     result_view = result_df[
-        ["requested_at", "workplace_name", "request_amount_won", "requested_by", "status", "처리일시", "reject_reason"]
+        ["문서구분", "requested_at", "workplace_name", "request_amount_won", "requested_by", "status", "처리일시", "reject_reason"]
     ].rename(
         columns={
             "requested_at": "요청일시",
