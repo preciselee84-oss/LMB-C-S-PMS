@@ -2814,6 +2814,80 @@ def _parse_kst_datetime(value):
     return parsed.to_pydatetime().replace(tzinfo=None)
 
 
+def _normalize_account_number(value):
+    return re.sub(r"[^0-9A-Za-z]", "", str(value or ""))
+
+
+def _coerce_int_amount(value):
+    try:
+        cleaned = re.sub(r"[^0-9.-]", "", str(value or "0"))
+        return int(float(cleaned or 0))
+    except Exception:
+        return 0
+
+
+def _history_amount_value(history_row, previous_balance=None):
+    for key in ["amount", "deposit_amount", "transaction_amount", "입금액", "거래금액"]:
+        if key in history_row:
+            amount = _coerce_int_amount(history_row.get(key))
+            if amount:
+                return amount
+    if previous_balance is not None and "balance" in history_row:
+        balance = _coerce_int_amount(history_row.get("balance"))
+        diff = balance - previous_balance
+        if diff > 0:
+            return diff
+    if previous_balance is None and "balance" in history_row:
+        return _coerce_int_amount(history_row.get("balance"))
+    return 0
+
+
+def _deposit_match_label(account, target_amount):
+    history = account.get("balance_history", []) or []
+    if not history:
+        return ""
+
+    sorted_history = sorted(history, key=lambda item: str(item.get("at", "")))
+    previous_balance = None
+    for item in sorted_history:
+        amount = _history_amount_value(item, previous_balance)
+        if "balance" in item:
+            previous_balance = _coerce_int_amount(item.get("balance"))
+        if amount != int(target_amount or 0):
+            continue
+        deposited_at = item.get("at") or item.get("date") or item.get("transaction_at") or ""
+        deposited_date = str(deposited_at).split(" ")[0] if deposited_at else "입금일자 확인"
+        return f"{deposited_date} 입금"
+    return ""
+
+
+def _reconcile_transfer_deposits(pending_rows, bank_accounts):
+    accounts_by_number = {
+        _normalize_account_number(row.get("account_number")): row
+        for row in bank_accounts
+        if row.get("account_number")
+    }
+    matched_count = 0
+    for request_row in pending_rows:
+        account_number = request_row.get("transfer_account_number", "")
+        if not account_number:
+            linked_account = next(
+                (
+                    row for row in bank_accounts
+                    if row.get("linked_workplace_id") == request_row.get("workplace_id")
+                ),
+                {},
+            )
+            account_number = linked_account.get("account_number", "")
+        account = accounts_by_number.get(_normalize_account_number(account_number))
+        label = _deposit_match_label(account or {}, request_row.get("request_amount", 0))
+        request_row["deposit_reconciliation"] = label or "미확인"
+        request_row["deposit_reconciled_at"] = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
+        if label:
+            matched_count += 1
+    return matched_count
+
+
 def _is_recent_request(value, days=7):
     requested_at = _parse_kst_datetime(value)
     if not requested_at:
@@ -4175,6 +4249,11 @@ def show_transfer_file_generation():
                 row["transfer_verified_holder"] = lookup_map.get(row.get("id"), "")
                 row["transfer_deposit_passbook"] = edited_row.get("입금통장표시", "")
                 row["transfer_withdrawal_passbook"] = edited_row.get("출금통장표시", "")
+                row["transfer_bank_name"] = account.get("bank_name", "")
+                row["transfer_account_number"] = account.get("account_number", "")
+                row["transfer_amount"] = row.get("request_amount", 0)
+                row["deposit_reconciliation"] = ""
+                row["deposit_reconciled_at"] = ""
 
         st.session_state["_transfer_holder_lookup"] = {
             row_id: name for row_id, name in lookup_map.items() if row_id not in selected_ids
@@ -4202,31 +4281,51 @@ def show_transfer_result_confirmation():
 
     pending = [row for row in requests if row.get("status") == "이체 대상"]
 
-    st.markdown("#### 이체 대상")
+    title_col, action_col = st.columns([0.78, 0.22])
+    with title_col:
+        st.markdown("#### 이체 대상")
+    with action_col:
+        check_clicked = st.button(
+            "이체 결과 확인",
+            type="primary",
+            disabled=not pending,
+            use_container_width=True,
+            key="transfer_deposit_reconcile",
+        )
+
     if pending:
+        if check_clicked:
+            matched_count = _reconcile_transfer_deposits(pending, bank_data.get("accounts", []))
+            _save_delegated_workplaces(wp_data)
+            st.success(f"입금 대사 완료: {matched_count}건 일치, {len(pending) - matched_count}건 미확인")
+            st.rerun()
+
         pending_sorted = sorted(pending, key=lambda item: item.get("transfer_file_generated_at", ""), reverse=True)
         pending_rows = []
         for row in pending_sorted:
             account = accounts_by_workplace_id.get(row.get("workplace_id"), {})
+            bank_name = row.get("transfer_bank_name") or account.get("bank_name", "")
+            account_number = row.get("transfer_account_number") or account.get("account_number", "")
             pending_rows.append(
                 {
                     "id": row.get("id"),
                     "선택": False,
                     "사업장명": row.get("workplace_name", ""),
-                    "입금은행": account.get("bank_name", ""),
-                    "입금계좌번호": account.get("account_number", ""),
+                    "입금은행": bank_name,
+                    "입금계좌번호": account_number,
                     "입금액": _format_won(row.get("request_amount")),
                     "예상예금주": row.get("transfer_expected_holder", "") or account.get("holder_name", "") or row.get("workplace_name", ""),
                     "조회한예금주": row.get("transfer_verified_holder", ""),
                     "입금통장표시": row.get("transfer_deposit_passbook", ""),
                     "출금통장표시": row.get("transfer_withdrawal_passbook", ""),
+                    "입금 대사": row.get("deposit_reconciliation", ""),
                 }
             )
 
         pending_df = pd.DataFrame(pending_rows)
         column_order = [
             "id", "선택", "사업장명", "입금은행", "입금계좌번호", "입금액",
-            "예상예금주", "조회한예금주", "입금통장표시", "출금통장표시",
+            "예상예금주", "조회한예금주", "입금통장표시", "출금통장표시", "입금 대사",
         ]
         edited_confirm = st.data_editor(
             pending_df[column_order],
@@ -4241,6 +4340,7 @@ def show_transfer_result_confirmation():
                 "조회한예금주": st.column_config.TextColumn("조회한예금주", disabled=True, width="small"),
                 "입금통장표시": st.column_config.TextColumn("입금통장표시", disabled=True, width="small"),
                 "출금통장표시": st.column_config.TextColumn("출금통장표시", disabled=True, width="small"),
+                "입금 대사": st.column_config.TextColumn("입금 대사", disabled=True, width="small"),
             },
             hide_index=True,
             use_container_width=True,
