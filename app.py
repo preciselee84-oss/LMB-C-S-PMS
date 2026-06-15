@@ -14,7 +14,7 @@ from io import BytesIO
 from datetime import datetime, timedelta
 from streamlit_cookies_controller import CookieController
 
-st.set_page_config(page_title="영업관리 시스템", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="위탁사업장 관리 시스템", layout="wide", initial_sidebar_state="expanded")
 
 
 def resolve_template_file(file_name):
@@ -2113,9 +2113,10 @@ def show_auth_page():
         }
         .auth-logo-title {
             color: #1E1A3A;
-            font-size: 50px;
+            font-size: 100px;
             font-weight: 900;
-            letter-spacing: -0.5px;
+            letter-spacing: 0;
+            line-height: 1.05;
             margin-bottom: 5px;
         }
         .auth-logo-sub {
@@ -2243,7 +2244,7 @@ def show_auth_page():
                 flex: 1 1 100% !important;
             }
             .auth-logo-title {
-                font-size: 32px !important;
+                font-size: 64px !important;
             }
             .auth-logo-sub {
                 font-size: 14px !important;
@@ -2265,8 +2266,8 @@ def show_auth_page():
         st.markdown(
             """
             <div class="auth-logo-card">
-                <div class="auth-logo-title">영업관리 시스템</div>
-                <div class="auth-logo-sub">Sales Management System</div>
+                <div class="auth-logo-title">위탁사업장 관리 시스템</div>
+                <div class="auth-logo-sub">Delegated Workplace Management System</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -2456,9 +2457,11 @@ def show_sidebar():
                 line-height: 1.2;
             }
             [data-testid="stSidebar"] .gpt-brand-title {
-                font-size: 15px;
+                font-size: 30px;
                 font-weight: 800;
                 color: #ffffff !important;
+                line-height: 1.1;
+                word-break: keep-all;
             }
             [data-testid="stSidebar"] .gpt-brand-subtitle {
                 margin-top: 2px;
@@ -2597,8 +2600,8 @@ def show_sidebar():
             f"<div class='gpt-brand'>"
             f"<div class='gpt-brand-mark'>S</div>"
             f"<div class='gpt-brand-text'>"
-            f"<div class='gpt-brand-title'>영업관리 시스템</div>"
-            f"<div class='gpt-brand-subtitle'>Sales workspace</div>"
+            f"<div class='gpt-brand-title'>위탁사업장 관리 시스템</div>"
+            f"<div class='gpt-brand-subtitle'>Delegated workplace workspace</div>"
             f"</div></div>"
             f"<div class='gpt-user-card'>"
             f"<div class='gpt-user-name'>{html.escape(st.session_state.user_name)}님</div>"
@@ -4246,7 +4249,7 @@ def render_page_title(menu):
         unsafe_allow_html=True,
     )
     st.markdown('<div class="home-btn">', unsafe_allow_html=True)
-    if st.button("HOME", key=f"home_btn_{menu}", help="영업관리 홈으로 이동"):
+    if st.button("HOME", key=f"home_btn_{menu}", help="위탁사업장 관리 홈으로 이동"):
         st.session_state.current_menu = "전도금 요청"
         persist_current_menu()
         st.rerun()
@@ -11057,7 +11060,7 @@ def _mask_secret(value):
 
 def show_server_connection_info():
     st.markdown("### 서버 접속 정보")
-    st.caption("영업관리 시스템에서 사용할 MSSQL 서버 접속 정보를 관리합니다.")
+    st.caption("위탁사업장 관리 시스템에서 사용할 MSSQL 서버 접속 정보를 관리합니다.")
 
     config = _load_server_connection()
     installed_drivers = _get_installed_odbc_drivers()
