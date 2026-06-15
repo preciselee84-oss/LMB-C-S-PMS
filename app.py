@@ -4250,50 +4250,6 @@ def show_transfer_result_confirmation():
     else:
         st.info("이체 확정 대기 중인 건이 없습니다.")
 
-    st.markdown("#### 이체 결과 엑셀 업로드")
-    st.caption("은행 이체 결과 엑셀(사업장명, 입금계좌번호, 입금액 컬럼 포함)을 업로드하면 일치하는 이체 대상 건을 일괄 '이체 완료' 처리합니다.")
-    uploaded_result = st.file_uploader("이체 결과 엑셀 업로드", type=["xlsx", "xls"], key="transfer_result_upload")
-    if uploaded_result is not None and st.session_state.get("_transfer_result_upload_id") != uploaded_result.file_id:
-        st.session_state["_transfer_result_upload_id"] = uploaded_result.file_id
-        try:
-            upload_df = pd.read_excel(uploaded_result)
-        except Exception:
-            st.error("엑셀 파일을 읽을 수 없습니다.")
-            upload_df = None
-
-        if upload_df is not None:
-            required_cols = {"사업장명", "입금계좌번호", "입금액"}
-            if not required_cols.issubset(set(upload_df.columns)):
-                st.warning(f"엑셀에 다음 컬럼이 필요합니다: {', '.join(sorted(required_cols))}")
-            else:
-                now_str = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
-                matched_count = 0
-                for _, urow in upload_df.iterrows():
-                    u_name = _normalize_name(urow.get("사업장명", ""))
-                    u_account = re.sub(r"\D", "", str(urow.get("입금계좌번호", "")))
-                    u_amount = int(pd.to_numeric(urow.get("입금액", 0), errors="coerce") or 0)
-                    for row in pending:
-                        if row.get("status") != "이체 대상":
-                            continue
-                        account = accounts_by_workplace_id.get(row.get("workplace_id"), {})
-                        r_account = re.sub(r"\D", "", str(account.get("account_number", "")))
-                        if (
-                            _normalize_name(row.get("workplace_name")) == u_name
-                            and r_account == u_account
-                            and int(row.get("request_amount") or 0) == u_amount
-                        ):
-                            row["status"] = "이체 완료"
-                            row["paid_at"] = now_str
-                            matched_count += 1
-                            break
-
-                if matched_count:
-                    _save_delegated_workplaces(wp_data)
-                    st.success(f"{matched_count}건이 매칭되어 이체 완료로 처리되었습니다.")
-                    st.rerun()
-                else:
-                    st.warning("업로드한 엑셀과 일치하는 이체 대상 건이 없습니다.")
-
     st.markdown("#### 이체 완료 이력")
     done = [row for row in requests if row.get("status") == "이체 완료"]
     if done:
@@ -5001,8 +4957,7 @@ MENU_GUIDES = {
         "➡️ '이체 자료 확정' 클릭 시 해당 요청은 '이체 대상' 상태로 전환되어 [지급 결과 확인]에 표시됩니다.",
     ],
     "지급 결과 확인": [
-        "💸 '이체 대상' 건의 이체 완료 여부를 확정합니다.",
-        "📤 은행에서 받은 이체 결과 엑셀을 업로드하면 일치하는 건을 일괄 '이체 완료' 처리합니다.",
+        "💸 '이체 대상' 건을 선택해 이체 완료 여부를 확정합니다.",
         "📜 이체 완료된 지급 이력을 조회할 수 있습니다.",
     ],
     "전도금 요청": [
