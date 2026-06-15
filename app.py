@@ -3515,13 +3515,8 @@ def show_approval_result():
     period_presets = {
         "오늘": (today, today),
         "어제": (today - timedelta(days=1), today - timedelta(days=1)),
-        "2일": (today - timedelta(days=1), today),
-        "3일": (today - timedelta(days=2), today),
         "1주일": (today - timedelta(days=6), today),
         "1개월": (today - timedelta(days=30), today),
-        "3개월": (today - timedelta(days=90), today),
-        "6개월": (today - timedelta(days=180), today),
-        "12개월": (today - timedelta(days=365), today),
     }
 
     with st.container(border=True):
@@ -3529,7 +3524,7 @@ def show_approval_result():
         with request_date_label_col:
             st.markdown("**조회기간**")
         with request_date_input_col:
-            preset_cols = st.columns([0.06, 0.06, 0.06, 0.06, 0.08, 0.08, 0.08, 0.08, 0.09, 0.35])
+            preset_cols = st.columns([0.08, 0.08, 0.1, 0.1, 0.64])
             for index, (label, date_range) in enumerate(period_presets.items()):
                 button_type = "primary" if label == st.session_state.get("approval_result_preset", "1주일") else "secondary"
                 if preset_cols[index].button(label, key=f"approval_result_preset_{label}", type=button_type, use_container_width=True):
@@ -3571,7 +3566,7 @@ def show_approval_result():
             with process_check_col:
                 date_by_processed = st.checkbox("처리일자", value=False, key="approval_result_date_by_processed")
 
-        requester_label_col, requester_input_col = st.columns([0.12, 0.88])
+        requester_label_col, requester_input_col, _ = st.columns([0.12, 0.32, 0.56])
         with requester_label_col:
             st.markdown("**요청자**")
         with requester_input_col:
@@ -3582,7 +3577,7 @@ def show_approval_result():
                 label_visibility="collapsed",
             )
 
-        status_label_col, status_input_col = st.columns([0.12, 0.88])
+        status_label_col, status_input_col, _ = st.columns([0.12, 0.32, 0.56])
         with status_label_col:
             st.markdown("**처리결과**")
         with status_input_col:
@@ -3590,17 +3585,6 @@ def show_approval_result():
                 "처리결과",
                 status_options,
                 key="approval_result_status",
-                label_visibility="collapsed",
-            )
-
-        processed_date_label_col, processed_date_input_col = st.columns([0.12, 0.88])
-        with processed_date_label_col:
-            st.markdown("**처리일시**")
-        with processed_date_input_col:
-            processed_date_range = st.date_input(
-                "처리일시",
-                value=(),
-                key="approval_result_processed_date",
                 label_visibility="collapsed",
             )
 
@@ -3620,7 +3604,6 @@ def show_approval_result():
             "date_by_processed": date_by_processed,
             "selected_requester": selected_requester,
             "selected_status": selected_status,
-            "processed_date_range": processed_date_range,
         }
 
     query = st.session_state.get("_approval_result_query", {})
@@ -3629,7 +3612,6 @@ def show_approval_result():
     date_by_processed = query.get("date_by_processed", False)
     selected_requester = query.get("selected_requester", "전체")
     selected_status = query.get("selected_status", "전체")
-    processed_date_range = query.get("processed_date_range", ())
 
     def _date_in_range(value, date_range):
         if not isinstance(date_range, tuple) or len(date_range) != 2:
@@ -3657,8 +3639,6 @@ def show_approval_result():
         filtered = [row for row in filtered if row.get("requested_by") == selected_requester]
     if selected_status != "전체":
         filtered = [row for row in filtered if row.get("status") == selected_status]
-    if processed_date_range:
-        filtered = [row for row in filtered if _date_in_range(_processed_at(row), processed_date_range)]
 
     if not filtered:
         st.info("조건에 맞는 품의 결과가 없습니다.")
