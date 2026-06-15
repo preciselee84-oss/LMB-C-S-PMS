@@ -14,7 +14,7 @@ from io import BytesIO
 from datetime import datetime, timedelta
 from streamlit_cookies_controller import CookieController
 
-st.set_page_config(page_title="위탁사업장 관리 시스템", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="AX-Wetak 360", layout="wide", initial_sidebar_state="expanded")
 
 
 def resolve_template_file(file_name):
@@ -2302,7 +2302,7 @@ def show_auth_page():
         st.markdown(
             """
             <div class="auth-logo-card">
-                <div class="auth-logo-title">위탁사업장 관리 시스템</div>
+                <div class="auth-logo-title">AX-Wetak 360</div>
                 <div class="auth-logo-sub">Delegated Workplace Management System</div>
             </div>
             """,
@@ -2634,9 +2634,9 @@ def show_sidebar():
         st.markdown(
             f"<div class='gpt-side-shell'>"
             f"<div class='gpt-brand'>"
-            f"<div class='gpt-brand-mark'>S</div>"
+            f"<div class='gpt-brand-mark'>AX</div>"
             f"<div class='gpt-brand-text'>"
-            f"<div class='gpt-brand-title'>위탁사업장 관리 시스템</div>"
+            f"<div class='gpt-brand-title'>AX-Wetak 360</div>"
             f"<div class='gpt-brand-subtitle'>Delegated workplace workspace</div>"
             f"</div></div>"
             f"<div class='gpt-user-card'>"
@@ -5740,7 +5740,7 @@ def _mask_secret(value):
 
 def show_server_connection_info():
     st.markdown("### 서버 접속 정보")
-    st.caption("위탁사업장 관리 시스템에서 사용할 MSSQL 서버 접속 정보를 관리합니다.")
+    st.caption("AX-Wetak 360에서 사용할 MSSQL 서버 접속 정보를 관리합니다.")
 
     config = _load_server_connection()
     installed_drivers = _get_installed_odbc_drivers()
