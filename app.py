@@ -3316,6 +3316,7 @@ def show_company_profile():
     st.caption("당사(우리 회사)의 기본 정보를 관리합니다.")
 
     profile = _load_company_profile()
+    profile.setdefault("withdrawal_accounts", [])
 
     # 등록된 회사 정보 표시
     if profile.get("name"):
@@ -3335,6 +3336,118 @@ def show_company_profile():
             st.caption(f"최종 수정: {profile.get('updated_at')}")
     else:
         st.info("등록된 회사 정보가 없습니다.")
+
+    st.markdown("#### 출금계좌")
+    withdrawal_accounts = profile.get("withdrawal_accounts", [])
+    withdrawal_accounts.sort(key=lambda row: (not row.get("is_main", False), row.get("created_at", "")))
+
+    if withdrawal_accounts:
+        account_df = pd.DataFrame(withdrawal_accounts)
+        for col in ["account_name", "bank_name", "account_number", "holder_name", "is_main", "memo"]:
+            if col not in account_df.columns:
+                account_df[col] = "" if col != "is_main" else False
+        account_df["main_label"] = account_df["is_main"].apply(lambda value: "메인" if value else "")
+        account_view = account_df[
+            ["main_label", "account_name", "bank_name", "account_number", "holder_name", "memo"]
+        ].rename(
+            columns={
+                "main_label": "메인 출금계좌",
+                "account_name": "계좌명",
+                "bank_name": "은행명",
+                "account_number": "계좌번호",
+                "holder_name": "예금주",
+                "memo": "비고",
+            }
+        ).reset_index(drop=True)
+        account_view.insert(0, "순번", range(1, len(account_view) + 1))
+        render_plain_html_table(account_view, center_align=True)
+    else:
+        st.info("등록된 출금계좌가 없습니다.")
+
+    if st.session_state.get("_show_withdrawal_add_form"):
+        with st.form("withdrawal_account_add_form", clear_on_submit=True):
+            col_a, col_b = st.columns(2)
+            account_name = col_a.text_input("계좌명", placeholder="예: 본사 운영계좌")
+            bank_name = col_b.text_input("은행명", placeholder="예: 국민은행")
+            col_c, col_d = st.columns(2)
+            account_number = col_c.text_input("계좌번호")
+            holder_name = col_d.text_input("예금주", value=profile.get("name", ""))
+            is_main = st.checkbox("메인 출금계좌로 설정", value=not bool(withdrawal_accounts))
+            memo = st.text_input("비고")
+            col_submit, col_cancel = st.columns(2)
+            submitted = col_submit.form_submit_button("등록", type="primary", use_container_width=True)
+            cancelled = col_cancel.form_submit_button("취소", use_container_width=True)
+
+        if submitted:
+            if not account_name.strip() or not bank_name.strip() or not account_number.strip():
+                st.warning("계좌명, 은행명, 계좌번호를 입력해주세요.")
+            else:
+                if is_main:
+                    for row in withdrawal_accounts:
+                        row["is_main"] = False
+                withdrawal_accounts.append(
+                    {
+                        "id": int(time.time() * 1000),
+                        "account_name": account_name.strip(),
+                        "bank_name": bank_name.strip(),
+                        "account_number": account_number.strip(),
+                        "holder_name": holder_name.strip(),
+                        "is_main": bool(is_main),
+                        "memo": memo.strip(),
+                        "created_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                )
+                profile["withdrawal_accounts"] = withdrawal_accounts
+                profile["updated_at"] = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
+                _save_company_profile(profile)
+                st.session_state["_show_withdrawal_add_form"] = False
+                st.success("출금계좌가 등록되었습니다.")
+                st.rerun()
+        if cancelled:
+            st.session_state["_show_withdrawal_add_form"] = False
+            st.rerun()
+
+    elif st.session_state.get("_show_withdrawal_manage_form"):
+        if withdrawal_accounts:
+            account_options = {
+                f"{'[메인] ' if row.get('is_main') else ''}{row.get('account_name', '')} ({row.get('bank_name', '')} {row.get('account_number', '')})": row.get("id")
+                for row in withdrawal_accounts
+            }
+            selected_label = st.selectbox("대상 출금계좌", list(account_options.keys()), key="withdrawal_manage_target")
+            selected_id = account_options[selected_label]
+            target = next((row for row in withdrawal_accounts if row.get("id") == selected_id), None)
+
+            col_main, col_delete, col_cancel = st.columns(3)
+            if col_main.button("메인 출금계좌 설정", type="primary", use_container_width=True):
+                for row in withdrawal_accounts:
+                    row["is_main"] = row.get("id") == selected_id
+                profile["withdrawal_accounts"] = withdrawal_accounts
+                profile["updated_at"] = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
+                _save_company_profile(profile)
+                st.session_state["_show_withdrawal_manage_form"] = False
+                st.success("메인 출금계좌가 설정되었습니다.")
+                st.rerun()
+            if col_delete.button("삭제", use_container_width=True, disabled=not target):
+                profile["withdrawal_accounts"] = [row for row in withdrawal_accounts if row.get("id") != selected_id]
+                if profile["withdrawal_accounts"] and not any(row.get("is_main") for row in profile["withdrawal_accounts"]):
+                    profile["withdrawal_accounts"][0]["is_main"] = True
+                profile["updated_at"] = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
+                _save_company_profile(profile)
+                st.session_state["_show_withdrawal_manage_form"] = False
+                st.success("출금계좌가 삭제되었습니다.")
+                st.rerun()
+            if col_cancel.button("취소", use_container_width=True):
+                st.session_state["_show_withdrawal_manage_form"] = False
+                st.rerun()
+
+    else:
+        col_add, col_manage, _ = st.columns([0.18, 0.22, 0.6])
+        if col_add.button("+ 출금계좌 등록", key="show_withdrawal_add_btn", use_container_width=True):
+            st.session_state["_show_withdrawal_add_form"] = True
+            st.rerun()
+        if col_manage.button("메인/삭제 관리", key="show_withdrawal_manage_btn", use_container_width=True, disabled=not withdrawal_accounts):
+            st.session_state["_show_withdrawal_manage_form"] = True
+            st.rerun()
 
     # 수정 폼
     if st.session_state.get("_show_company_edit_form"):
@@ -3581,19 +3694,26 @@ def show_transfer_file_generation():
     requests = wp_data.get("requests", [])
     workplaces_by_id = {site.get("id"): site for site in workplaces}
 
-    bank_data = _load_bank_accounts()
-    accounts = bank_data.get("accounts", [])
+    company_profile = _load_company_profile()
+    withdrawal_accounts = company_profile.get("withdrawal_accounts", [])
+    withdrawal_accounts = sorted(
+        withdrawal_accounts,
+        key=lambda row: (not row.get("is_main", False), row.get("created_at", "")),
+    )
 
     targets = [row for row in requests if row.get("status") == "품의 확정"]
     if not targets:
         st.info("이체 자료를 생성할 품의 확정 건이 없습니다.")
         return
 
-    if not accounts:
-        st.warning("[계좌 관리]에서 계좌를 먼저 등록해주세요.")
+    if not withdrawal_accounts:
+        st.warning("[회사 관리]에서 출금계좌를 먼저 등록해주세요.")
         return
 
-    source_options = {f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row for row in accounts}
+    source_options = {
+        f"{'[메인] ' if row.get('is_main') else ''}{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row
+        for row in withdrawal_accounts
+    }
     source_label = st.selectbox("출금 계좌", list(source_options.keys()))
 
     st.markdown("#### 이체 대상 선택")
@@ -4206,6 +4326,7 @@ MENU_GUIDES = {
     ],
     "회사 관리": [
         "🏬 당사(우리 회사)의 회사명, 사업자번호, 대표자, 연락처, 주소 등 기본 정보를 등록/수정합니다.",
+        "🏦 여러 출금계좌를 등록하고 메인 출금계좌를 지정할 수 있습니다.",
         "💾 저장 시 최종 수정 일시가 자동으로 기록됩니다.",
         "📄 등록된 회사 정보는 문서 출력 및 엑셀 양식 등에서 활용됩니다.",
     ],
@@ -4222,7 +4343,7 @@ MENU_GUIDES = {
     ],
     "이체 자료 생성": [
         "✅ 품의 확정된 전도금 요청을 선택해 이체 자료(엑셀)를 생성합니다.",
-        "🏦 출금 계좌는 [계좌 관리]에 등록된 계좌 중에서 선택합니다.",
+        "🏦 출금 계좌는 [회사 관리]에 등록된 출금계좌 중에서 선택하며, 메인 출금계좌가 먼저 표시됩니다.",
         "➡️ 생성 후 해당 요청은 '이체 대상' 상태로 전환됩니다.",
     ],
     "지급 결과 확인": [
