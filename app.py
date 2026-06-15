@@ -2611,19 +2611,20 @@ def show_sidebar():
             unsafe_allow_html=True,
         )
 
-        for menu_name in ["보고서", "전자결재"]:
-            render_nav_button(menu_name)
-
         if st.session_state.user_role == "관리자":
+            for menu_name in ["보고서", "전자결재"]:
+                render_nav_button(menu_name)
+
             st.markdown("<div class='gpt-section'>관리자 메뉴</div>", unsafe_allow_html=True)
             for menu_name in ["회사 관리", "위탁 사업장 관리", "서버 접속 정보"]:
                 render_nav_button(menu_name)
 
-        st.markdown("<div class='gpt-section'>지급 관리</div>", unsafe_allow_html=True)
-        for menu_name in ["이체 자료 생성", "지급 결과 확인"]:
-            render_nav_button(menu_name)
+            st.markdown("<div class='gpt-section'>지급 관리</div>", unsafe_allow_html=True)
+            for menu_name in ["이체 자료 생성", "지급 결과 확인"]:
+                render_nav_button(menu_name)
 
-        st.markdown("<div class='gpt-section'>위탁 사업장</div>", unsafe_allow_html=True)
+            st.markdown("<div class='gpt-section'>위탁 사업장</div>", unsafe_allow_html=True)
+
         for menu_name in ["전도금 요청", "품의 결과", "계좌 잔고 확인"]:
             render_nav_button(menu_name)
 
@@ -12318,8 +12319,8 @@ def show_main():
         st.session_state.current_menu = "전도금 요청"
         persist_current_menu()
         st.rerun()
-    admin_only_menus = {"회사 관리", "위탁 사업장 관리", "서버 접속 정보"}
-    if menu in admin_only_menus and st.session_state.user_role != "관리자":
+    user_menus = {"전도금 요청", "품의 결과", "계좌 잔고 확인"}
+    if menu not in user_menus and st.session_state.user_role != "관리자":
         st.session_state.current_menu = "전도금 요청"
         persist_current_menu()
         st.rerun()
