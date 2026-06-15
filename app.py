@@ -182,6 +182,37 @@ def _dart_enrich(api_key, corp_map, company_name):
     return bonus, reasons
 
 
+# ── 국세청 사업자등록 상태조회 API ─────────────────────────────────
+
+def _get_nts_api_key():
+    session_key = st.session_state.get("nts_api_key", "")
+    if session_key:
+        return session_key
+    try:
+        return st.secrets.get("NTS_API_KEY", "")
+    except Exception:
+        return os.environ.get("NTS_API_KEY", "")
+
+
+def _check_business_status(api_key, biz_numbers):
+    """사업자등록번호 목록의 휴폐업 상태를 조회. {사업자번호(숫자만): 상태} 반환."""
+    clean_numbers = sorted({re.sub(r"\D", "", str(b)) for b in biz_numbers if str(b).strip()})
+    if not api_key or not clean_numbers:
+        return {}
+    try:
+        resp = _requests.post(
+            f"https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey={api_key}",
+            json={"b_no": clean_numbers},
+            headers={"Content-Type": "application/json"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json().get("data", [])
+        return {item.get("b_no", ""): item.get("b_stt", "") or "조회결과 없음" for item in data}
+    except Exception:
+        return {}
+
+
 def _github_save(file_path, data):
     token = _get_github_token()
     if not token:
@@ -3653,15 +3684,19 @@ def _render_bank_account_management():
                 col_a, col_b = st.columns(2)
                 company_label = col_a.selectbox("회사 선택", list(company_options.keys()))
                 account_name = col_b.text_input("계좌명", placeholder="예: 본사 지급계좌")
-                col_c, col_d = st.columns(2)
+                col_c, col_d, col_e = st.columns([1, 1, 0.4])
                 bank_name = col_c.text_input("은행명", placeholder="예: 하나은행")
                 account_number = col_d.text_input("계좌번호", placeholder="예: 123-456789-01234")
+                col_e.markdown("<div style='height:1.8em'></div>", unsafe_allow_html=True)
+                holder_lookup = col_e.form_submit_button("예금주조회", use_container_width=True)
                 holder_name = st.text_input("예금주", placeholder="예: (주)회사명")
                 memo = st.text_area("메모", placeholder="계좌 관련 특이사항")
                 col_submit, col_cancel = st.columns(2)
                 submitted = col_submit.form_submit_button("등록", type="primary", use_container_width=True)
                 cancelled = col_cancel.form_submit_button("취소", use_container_width=True)
 
+            if holder_lookup:
+                st.info("예금주조회 기능은 준비 중입니다. (API 연동 예정)")
             if submitted:
                 if not account_name.strip() or not account_number.strip():
                     st.warning("계좌명과 계좌번호를 입력해주세요.")
@@ -3815,6 +3850,10 @@ def show_transfer_file_generation():
         key="transfer_target_editor",
     )
     selected_ids = edited_df[edited_df["선택"]]["id"].tolist()
+
+    col_spacer, col_holder_lookup = st.columns([165, 35])
+    if col_holder_lookup.button("예금주조회", key="transfer_holder_lookup_btn", use_container_width=True):
+        st.info("예금주조회 기능은 준비 중입니다. (API 연동 예정)")
 
     if st.button("이체 자료 생성", type="primary", disabled=not selected_ids):
         source = source_options[source_label]
@@ -4086,7 +4125,30 @@ def _render_workplace_info_admin():
             }
         ).reset_index(drop=True)
         site_view.insert(0, "순번", range(1, len(site_view) + 1))
+
+        status_map = st.session_state.get("_biz_status_map", {})
+        if status_map:
+            site_view["휴폐업상태"] = site_df["business_number"].apply(
+                lambda v: status_map.get(re.sub(r"\D", "", str(v)), "")
+            )
+
         render_plain_html_table(site_view, center_align=True)
+
+        col_spacer, col_status_btn = st.columns([165, 35])
+        if col_status_btn.button("휴폐업조회", key="biz_status_check_btn", use_container_width=True):
+            api_key = _get_nts_api_key()
+            biz_numbers = site_df["business_number"].tolist()
+            if not api_key:
+                st.warning("국세청 API 키(NTS_API_KEY)가 설정되지 않았습니다.")
+            elif not any(str(b).strip() for b in biz_numbers):
+                st.warning("조회할 사업자번호가 없습니다.")
+            else:
+                result = _check_business_status(api_key, biz_numbers)
+                if result:
+                    st.session_state["_biz_status_map"] = result
+                    st.rerun()
+                else:
+                    st.warning("휴폐업 조회 결과를 가져오지 못했습니다.")
     else:
         st.info("등록된 사업장이 없습니다.")
 
