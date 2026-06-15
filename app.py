@@ -1946,7 +1946,9 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         return f"ERR: {str(e)}", None, None
 
 
-def render_plain_html_table(df, max_rows=500, center_align=True, merge_cols=None, stretch=True, max_width=None):
+def render_plain_html_table(
+    df, max_rows=500, center_align=True, merge_cols=None, stretch=True, max_width=None, border=True
+):
     """AG Grid 없이 순수 HTML 테이블로 렌더링 — 다크모드 완전 호환."""
     if df is None or df.empty:
         st.info("표시할 데이터가 없습니다.")
@@ -2000,8 +2002,9 @@ def render_plain_html_table(df, max_rows=500, center_align=True, merge_cols=None
     if max_width:
         wrapper_display += f"max-width:{max_width};"
     table_width = "100%" if stretch else "auto"
+    wrapper_border = "border:1px solid #E2E8F0;box-shadow:0 2px 6px rgba(0,0,0,0.05);" if border else "border:none;box-shadow:none;"
     st.markdown(
-        f"""<div class="pms-report-table" style="overflow-x:auto;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.05);margin-bottom:1rem;{wrapper_display}">
+        f"""<div class="pms-report-table" style="overflow-x:auto;{wrapper_border}border-radius:8px;margin-bottom:1rem;{wrapper_display}">
         <table style="width:{table_width};border-collapse:collapse;">
             <thead><tr>{headers}</tr></thead>
             <tbody>{body}</tbody>
@@ -3593,7 +3596,7 @@ def show_approval_result():
                 label_visibility="collapsed",
             )
 
-    button_left, button_center, button_right = st.columns([0.46, 0.08, 0.46])
+    button_left, button_center, button_right = st.columns([0.25, 0.1, 0.65])
     with button_center:
         search_clicked = st.button("조회", key="approval_result_search", type="primary", use_container_width=True)
 
@@ -3694,6 +3697,7 @@ def show_approval_result():
         center_align=True,
         stretch=True,
         max_width="760px",
+        border=False,
     )
 
 
