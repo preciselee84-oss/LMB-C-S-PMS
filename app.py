@@ -4050,17 +4050,23 @@ def show_transfer_file_generation():
         )
 
     target_df = pd.DataFrame(target_rows)
-    info_view = target_df[["사업장명", "입금은행", "입금계좌번호", "입금액", "예상예금주", "조회한예금주"]]
-    render_plain_html_table(info_view, center_align=True)
-
+    column_order = [
+        "id", "선택", "사업장명", "입금은행", "입금계좌번호", "입금액",
+        "예상예금주", "조회한예금주", "입금통장표시", "출금통장표시",
+    ]
     edited_df = st.data_editor(
-        target_df[["id", "사업장명", "선택", "입금통장표시", "출금통장표시"]],
+        target_df[column_order],
         column_config={
             "id": None,
-            "사업장명": st.column_config.TextColumn("사업장명", disabled=True),
-            "선택": st.column_config.CheckboxColumn("선택"),
-            "입금통장표시": st.column_config.TextColumn("입금통장표시"),
-            "출금통장표시": st.column_config.TextColumn("출금통장표시"),
+            "선택": st.column_config.CheckboxColumn("선택", width="small"),
+            "사업장명": st.column_config.TextColumn("사업장명", disabled=True, width="small"),
+            "입금은행": st.column_config.TextColumn("입금은행", disabled=True, width="small"),
+            "입금계좌번호": st.column_config.TextColumn("입금계좌번호", disabled=True, width="small"),
+            "입금액": st.column_config.TextColumn("입금액", disabled=True, width="small"),
+            "예상예금주": st.column_config.TextColumn("예상예금주", disabled=True, width="small"),
+            "조회한예금주": st.column_config.TextColumn("조회한예금주", disabled=True, width="small"),
+            "입금통장표시": st.column_config.TextColumn("입금통장표시", width="small"),
+            "출금통장표시": st.column_config.TextColumn("출금통장표시", width="small"),
         },
         hide_index=True,
         use_container_width=True,
