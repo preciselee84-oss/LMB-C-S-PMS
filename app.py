@@ -660,7 +660,6 @@ def init_state():
     removed_menus = {
         "이력확인 및 작성",
         "은행 이력 업로드",
-        "대시보드",
         "업로드 및 실적 확인",
         "이번달 활동 대상고객 추천",
         "최종 실적 확인",
@@ -678,7 +677,8 @@ def init_state():
 
     RENAMED_MENUS = {
         "사업장 정보 등록": "위탁 사업장 관리",
-        "사업장 예측/보고": "보고서",
+        "사업장 예측/보고": "대시보드",
+        "보고서": "대시보드",
         "직원 및 권한설정": "위탁 사업장 관리",
         "계좌 관리": "위탁 사업장 관리",
         "담당자 관리": "위탁 사업장 관리",
@@ -2646,7 +2646,7 @@ def show_sidebar():
         )
 
         if st.session_state.user_role == "관리자":
-            for menu_name in ["보고서", "전자결재"]:
+            for menu_name in ["대시보드", "전자결재"]:
                 render_nav_button(menu_name)
 
             st.markdown("<div class='gpt-section'>관리자 메뉴</div>", unsafe_allow_html=True)
@@ -4330,8 +4330,24 @@ def _render_workplace_info_admin():
             st.rerun()
 
 
-def show_reports():
-    st.markdown("### 보고서")
+def _dashboard_ai_messages(metrics, forecast_rows):
+    """대시보드 상단에 표시할 AI 인사이트 메시지 목록을 생성."""
+    messages = []
+    if metrics["pending"]:
+        messages.append(("📥", f"결재 대기 중인 전도금 요청이 {metrics['pending']}건 있습니다. [전자결재]에서 확인해주세요."))
+    if metrics["approved"]:
+        messages.append(("💸", f"품의 확정되어 이체 대상인 요청이 {metrics['approved']}건 있습니다. [이체 자료 생성]에서 처리해주세요."))
+    for row in forecast_rows:
+        risk = row.get("리스크", "")
+        if risk and risk != "정상":
+            messages.append(("⚠️", f"{row.get('사업장명', '')}: {risk} (추천 지급액 {row.get('추천 지급액', '')})"))
+    if not messages:
+        messages.append(("✅", "현재 특이사항 없이 정상적으로 운영되고 있습니다."))
+    return messages
+
+
+def show_dashboard():
+    st.markdown("### 대시보드")
     st.caption("위탁 사업장 운영 현황과 전도금 지급 이력, 계좌 잔고 현황을 확인합니다.")
 
     wp_data = _load_delegated_workplaces()
@@ -4340,6 +4356,7 @@ def show_reports():
     metrics = _workplace_request_metrics(requests)
     paid_count = len([row for row in requests if row.get("status") == "이체 완료"])
     total_count = max(len(requests), 1)
+    forecast_rows = _workplace_forecast_rows(workplaces, requests)
 
     _workplace_dashboard_css()
     c1, c2, c3, c4 = st.columns(4)
@@ -4347,6 +4364,16 @@ def show_reports():
     c2.markdown(_donut_card("결재대기", f"{metrics['pending']:,}", "Pending", min(metrics["pending"] * 18, 100)), unsafe_allow_html=True)
     c3.markdown(_donut_card("품의확정", f"{metrics['approved']:,}", "Approved", min(metrics["approved"] * 18, 100)), unsafe_allow_html=True)
     c4.markdown(_donut_card("이체완료", f"{paid_count:,}", "Transfers", int((paid_count / total_count) * 100)), unsafe_allow_html=True)
+
+    ai_messages = _dashboard_ai_messages(metrics, forecast_rows)
+    rows_html = "".join(
+        f"<div class='suggestion-row'><div class='suggestion-icon'>{html.escape(icon)}</div><div>{html.escape(text)}</div></div>"
+        for icon, text in ai_messages
+    )
+    st.markdown(
+        f"<div class='suggestion-panel'><div class='suggestion-title'>🤖 AI 인사이트</div>{rows_html}</div>",
+        unsafe_allow_html=True,
+    )
 
     st.markdown("#### 전도금 지급 이력")
     if requests:
@@ -4373,7 +4400,6 @@ def show_reports():
     else:
         st.info("전도금 지급 이력이 없습니다.")
 
-    forecast_rows = _workplace_forecast_rows(workplaces, requests)
     if forecast_rows:
         st.markdown("#### AI 예측 안내")
         st.caption("현재 MVP는 지급 이력 기반의 규칙형 예측입니다. 충분한 이력이 쌓이면 모델 기반 예측으로 확장할 수 있습니다.")
@@ -4601,7 +4627,8 @@ def apply_global_table_css():
 
 
 MENU_GUIDES = {
-    "보고서": [
+    "대시보드": [
+        "🤖 AI 인사이트에서 결재 대기, 이체 대상, 리스크 사업장 등 주요 알림을 확인합니다.",
         "📊 사업장 현황, 전도금 지급 이력, AI 예측 안내를 한 화면에서 확인합니다.",
         "🏦 계좌별 잔고 현황도 함께 제공합니다.",
     ],
@@ -4714,13 +4741,14 @@ def render_page_title(menu):
         unsafe_allow_html=True,
     )
     st.markdown('<div class="home-btn">', unsafe_allow_html=True)
-    if st.button("HOME", key=f"home_btn_{menu}", help="위탁사업장 관리 홈으로 이동"):
-        st.session_state.current_menu = "전도금 요청"
+    if st.button("HOME", key=f"home_btn_{menu}", help="대시보드로 이동"):
+        st.session_state.current_menu = "대시보드"
         persist_current_menu()
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown(f"## {menu}")
+    if menu != "대시보드":
+        st.markdown(f"## {menu}")
 
     if menu in MENU_GUIDES:
         with st.expander("📌 메뉴 이용 안내", expanded=False):
@@ -6472,7 +6500,7 @@ def show_main():
 
     menu = st.session_state.current_menu
     allowed_menus = {
-        "보고서", "전자결재",
+        "대시보드", "전자결재",
         "회사 관리", "위탁 사업장 관리", "서버 접속 정보",
         "이체 자료 생성", "지급 결과 확인",
         "전도금 요청", "품의 결과", "계좌 잔고 확인",
@@ -6489,8 +6517,8 @@ def show_main():
 
     render_page_title(menu)
 
-    if menu == "보고서":
-        show_reports()
+    if menu == "대시보드":
+        show_dashboard()
     elif menu == "전자결재":
         show_e_approval()
     elif menu == "회사 관리":
