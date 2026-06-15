@@ -1,3 +1,18 @@
 {
-    "accounts": []
+    "accounts": [
+        {
+            "id": 1781490349202,
+            "account_type": "위탁사업장",
+            "account_name": "테스트 계좌",
+            "bank_name": "국민은행",
+            "account_number": "12545121354",
+            "holder_name": "웹케시",
+            "linked_workplace_id": 1781268705510,
+            "balance": 0,
+            "balance_updated_at": "",
+            "balance_history": [],
+            "memo": "",
+            "created_at": "2026-06-15 11:25:49"
+        }
+    ]
 }
