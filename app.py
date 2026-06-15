@@ -2667,11 +2667,11 @@ def show_sidebar():
         )
 
         if st.session_state.user_role == "관리자":
-            for menu_name in ["전자결재", "결재선 설정"]:
+            for menu_name in ["전자결재"]:
                 render_nav_button(menu_name)
 
             st.markdown("<div class='gpt-section'>설정</div>", unsafe_allow_html=True)
-            for menu_name in ["회사 관리", "위탁 사업장 관리", "서버 접속 정보"]:
+            for menu_name in ["결재선 설정", "회사 관리", "위탁 사업장 관리", "서버 접속 정보"]:
                 render_nav_button(menu_name)
 
             st.markdown("<div class='gpt-section'>지급 관리</div>", unsafe_allow_html=True)
