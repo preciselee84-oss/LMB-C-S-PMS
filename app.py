@@ -3761,26 +3761,83 @@ def _render_usage_report_form():
         for row in accounts
     }
 
-    col1, col2 = st.columns(2)
-    with col1:
-        selected_account_label = st.selectbox("계좌 선택", list(account_options.keys()))
-        selected_account = account_options[selected_account_label]
+    with st.container(border=False):
+        # 계좌번호
+        account_label_col, account_input_col = st.columns([0.12, 0.88])
+        with account_label_col:
+            st.markdown("**계좌번호 <span style='color:#008c78'>*</span>**", unsafe_allow_html=True)
+        with account_input_col:
+            account_select_col, _ = st.columns([0.48, 0.52])
+            with account_select_col:
+                selected_account_label = st.selectbox(
+                    "계좌번호",
+                    list(account_options.keys()),
+                    key="usage_report_account",
+                    label_visibility="collapsed"
+                )
+                selected_account = account_options[selected_account_label]
 
-    # 기간 선택
-    today = _current_kst().date()
-    with col2:
-        report_month = st.date_input(
-            "보고 월",
-            value=today.replace(day=1)
-        )
+        # 조회기간
+        today = _current_kst().date()
+        if "usage_report_start_date" not in st.session_state:
+            st.session_state.usage_report_start_date = today.replace(day=1)
+        if "usage_report_end_date" not in st.session_state:
+            st.session_state.usage_report_end_date = today
+
+        period_presets = {
+            "오늘": (today, today),
+            "어제": (today - timedelta(days=1), today - timedelta(days=1)),
+            "1주일": (today - timedelta(days=6), today),
+            "1개월": (today - timedelta(days=30), today),
+        }
+
+        period_label_col, period_input_col = st.columns([0.12, 0.88])
+        with period_label_col:
+            st.markdown("**조회기간**")
+        with period_input_col:
+            preset_cols = st.columns([0.13, 0.13, 0.17, 0.17, 0.40])
+            for index, (label, date_range) in enumerate(period_presets.items()):
+                button_type = "primary" if label == st.session_state.get("usage_report_preset", "1주일") else "secondary"
+                if preset_cols[index].button(label, key=f"usage_report_preset_{label}", type=button_type, use_container_width=True):
+                    st.session_state.usage_report_preset = label
+                    st.session_state.usage_report_start_date = date_range[0]
+                    st.session_state.usage_report_end_date = date_range[1]
+                    st.rerun()
+
+            date_start_col, tilde_col, date_end_col, month_col, _ = st.columns([0.22, 0.03, 0.22, 0.18, 0.35])
+            with date_start_col:
+                start_date = st.date_input("시작일", key="usage_report_start_date", label_visibility="collapsed")
+            with tilde_col:
+                st.markdown("<div style='padding-top:8px;text-align:center;'>~</div>", unsafe_allow_html=True)
+            with date_end_col:
+                end_date = st.date_input("종료일", key="usage_report_end_date", label_visibility="collapsed")
+            with month_col:
+                month_options = ["월별 선택"] + [
+                    (today.replace(day=1) - pd.DateOffset(months=idx)).strftime("%Y-%m")
+                    for idx in range(12)
+                ]
+                selected_month = st.selectbox(
+                    "월별 선택",
+                    month_options,
+                    key="usage_report_month",
+                    label_visibility="collapsed",
+                )
 
     # 조회 버튼
-    if st.button("출금 내역 조회", type="primary"):
-        st.session_state.withdrawal_query_done = True
-        st.rerun()
+    button_left, button_center, button_right = st.columns([0.42, 0.16, 0.42])
+    with button_center:
+        if st.button("조회", key="usage_report_search", type="primary", use_container_width=True):
+            if selected_month != "월별 선택":
+                month_start = pd.to_datetime(f"{selected_month}-01").date()
+                month_end = (pd.to_datetime(f"{selected_month}-01") + pd.offsets.MonthEnd(0)).date()
+                st.session_state.usage_report_start_date = month_start
+                st.session_state.usage_report_end_date = month_end
+
+            st.session_state.withdrawal_query_done = True
+            st.rerun()
 
     if not st.session_state.get("withdrawal_query_done"):
-        st.info("계좌와 보고 월을 선택한 후 '출금 내역 조회' 버튼을 클릭해주세요.")
+        st.info("계좌와 조회기간을 선택한 후 '조회' 버튼을 클릭해주세요.")
         return
 
     st.markdown("---")
@@ -3791,16 +3848,13 @@ def _render_usage_report_form():
     # 임시로 샘플 데이터 또는 balance_history 활용
     transactions = selected_account.get("transactions", [])
 
-    # 보고 월에 해당하는 출금 내역만 필터링
-    start_date = report_month.replace(day=1)
-    if report_month.month == 12:
-        end_date = report_month.replace(year=report_month.year + 1, month=1, day=1)
-    else:
-        end_date = report_month.replace(month=report_month.month + 1, day=1)
+    # 조회기간에 해당하는 출금 내역만 필터링
+    query_start = st.session_state.usage_report_start_date
+    query_end = st.session_state.usage_report_end_date
 
     withdrawals = [
         t for t in transactions
-        if t.get("type") == "출금" and start_date <= pd.to_datetime(t.get("date")).date() < end_date
+        if t.get("type") == "출금" and query_start <= pd.to_datetime(t.get("date")).date() <= query_end
     ]
 
     if not withdrawals:
@@ -3924,12 +3978,15 @@ def _render_usage_report_form():
 
                 workplace_name = workplaces_by_id.get(selected_account.get("linked_workplace_id"), {}).get("workplace_name", "")
 
+                query_start = st.session_state.usage_report_start_date
+                query_end = st.session_state.usage_report_end_date
+
                 usage_data["reports"].append({
                     "id": int(time.time() * 1000),
                     "workplace_id": selected_account.get("linked_workplace_id"),
                     "workplace_name": workplace_name,
                     "account_id": selected_account.get("id"),
-                    "report_month": report_month.strftime("%Y-%m"),
+                    "report_period": f"{query_start.strftime('%Y-%m-%d')} ~ {query_end.strftime('%Y-%m-%d')}",
                     "total_amount": total_amount,
                     "items": list(st.session_state.usage_report_items.values()),
                     "status": "제출완료",
@@ -3968,11 +4025,12 @@ def _render_usage_report_history():
                 reject_line = f"<div class='request-meta'>반려 사유: {html.escape(str(row.get('reject_reason')))}</div>"
 
             items_count = len(row.get("items", []))
+            report_period = row.get('report_period', row.get('report_month', ''))  # 하위 호환성
             st.markdown(
                 (
                     "<div class='request-card'>"
                     f"<div class='request-title'>{html.escape(str(row.get('workplace_name', '')))}</div>"
-                    f"<div class='request-meta'>{html.escape(row.get('report_month', ''))} · {items_count}건</div>"
+                    f"<div class='request-meta'>{html.escape(report_period)} · {items_count}건</div>"
                     f"<div class='request-meta'>{html.escape(_format_won(row.get('total_amount')))} · {html.escape(str(row.get('requested_at', '')))}</div>"
                     f"{reject_line}"
                     f"<span class='status-chip'>{html.escape(str(row.get('status', '')))}</span>"
