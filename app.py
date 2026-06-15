@@ -4429,7 +4429,7 @@ def show_account_balance_check():
     with title_col:
         st.markdown("#### 계좌 리스트")
     with button_col:
-        if st.button("잔액 정보 업데이트", key="show_balance_update_form", use_container_width=True, type="primary"):
+        if st.button("잔액 정보 업데이트", key="open_balance_update_form", use_container_width=True, type="primary"):
             st.session_state.show_balance_update_form = True
             st.rerun()
 
