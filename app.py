@@ -2691,6 +2691,23 @@ def _account_company_label(account, workplaces_by_id):
     return account.get("account_type", "")
 
 
+def _my_workplaces(workplaces):
+    """로그인 사용자가 관리자가 아닐 경우, 본인 담당/소속 사업장만 반환한다."""
+    if st.session_state.user_role == "관리자":
+        return workplaces
+
+    user_name = st.session_state.get("user_name", "")
+    user_dept = ""
+    for info in _real_users(st.session_state.user_db).values():
+        if info.get("name") == user_name:
+            user_dept = info.get("dept_type", "")
+            break
+    return [
+        row for row in workplaces
+        if row.get("manager_name") == user_name or row.get("workplace_name") == user_dept
+    ]
+
+
 def _load_company_profile():
     default_data = {
         "name": "",
@@ -3048,17 +3065,7 @@ def show_advance_payment_request():
     workplaces = data.get("workplaces", [])
     requests = data.get("requests", [])
 
-    if st.session_state.user_role != "관리자":
-        user_name = st.session_state.get("user_name", "")
-        user_dept = ""
-        for info in _real_users(st.session_state.user_db).values():
-            if info.get("name") == user_name:
-                user_dept = info.get("dept_type", "")
-                break
-        workplaces = [
-            row for row in workplaces
-            if row.get("manager_name") == user_name or row.get("workplace_name") == user_dept
-        ]
+    workplaces = _my_workplaces(workplaces)
 
     if not workplaces:
         if st.session_state.user_role != "관리자":
@@ -3282,6 +3289,11 @@ def show_approval_result():
 
     data = _load_delegated_workplaces()
     requests = data.get("requests", [])
+    workplaces = data.get("workplaces", [])
+
+    if st.session_state.user_role != "관리자":
+        my_ids = {row.get("id") for row in _my_workplaces(workplaces)}
+        requests = [row for row in requests if row.get("workplace_id") in my_ids]
 
     processed = [row for row in requests if row.get("status") != "요청"]
     if not processed:
@@ -3866,12 +3878,17 @@ def show_account_balance_check():
     data = _load_bank_accounts()
     accounts = data.get("accounts", [])
 
+    wp_data = _load_delegated_workplaces()
+    workplaces = wp_data.get("workplaces", [])
+    workplaces_by_id = {site.get("id"): site for site in workplaces}
+
+    if st.session_state.user_role != "관리자":
+        my_ids = {row.get("id") for row in _my_workplaces(workplaces)}
+        accounts = [row for row in accounts if row.get("linked_workplace_id") in my_ids]
+
     if not accounts:
         st.info("등록된 계좌가 없습니다. [계좌 관리]에서 계좌를 먼저 등록해주세요.")
         return
-
-    wp_data = _load_delegated_workplaces()
-    workplaces_by_id = {site.get("id"): site for site in wp_data.get("workplaces", [])}
 
     account_df = pd.DataFrame(accounts)
     account_df["balance_won"] = account_df["balance"].apply(_format_won)
