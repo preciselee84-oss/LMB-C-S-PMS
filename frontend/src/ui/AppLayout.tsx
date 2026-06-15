@@ -14,7 +14,7 @@ export function AppLayout() {
     <Layout className="app-shell">
       <Sider width={248} className="app-sidebar">
         <Typography.Title level={4} className="app-logo">
-          위탁사업장 관리
+          AX-Wetak 360
         </Typography.Title>
         <Menu
           mode="inline"
@@ -25,7 +25,7 @@ export function AppLayout() {
       </Sider>
       <Layout>
         <Header className="app-header">
-          <Typography.Text strong>전도금 요청-품의-이체 자동화 MVP</Typography.Text>
+          <Typography.Text strong>Webcash We · 360도 빈틈없는 관리</Typography.Text>
           <Button
             icon={<LogoutOutlined />}
             onClick={() => {

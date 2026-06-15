@@ -333,8 +333,8 @@ export function DashboardPage() {
     <Space className="dashboard-page" direction="vertical" size={18}>
       <div className="page-heading">
         <div>
-          <Typography.Title level={3}>위탁사업장 관리 대시보드</Typography.Title>
-          <Typography.Text type="secondary">사업장 등록부터 전도금 요청, 품의, 이체자료 생성까지 한 화면에서 처리합니다.</Typography.Text>
+          <Typography.Title level={3}>AX-Wetak 360 대시보드</Typography.Title>
+          <Typography.Text type="secondary">Webcash의 We와 360도 빈틈없는 관리로 전도금 요청부터 이체자료 생성까지 처리합니다.</Typography.Text>
         </div>
         <Button icon={<ReloadOutlined />} onClick={loadDashboard} loading={loading}>
           새로고침

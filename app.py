@@ -2303,7 +2303,7 @@ def show_auth_page():
             """
             <div class="auth-logo-card">
                 <div class="auth-logo-title">AX-Wetak 360</div>
-                <div class="auth-logo-sub">Delegated Workplace Management System</div>
+                <div class="auth-logo-sub">Webcash We · 360° Control</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -2637,7 +2637,7 @@ def show_sidebar():
             f"<div class='gpt-brand-mark'>AX</div>"
             f"<div class='gpt-brand-text'>"
             f"<div class='gpt-brand-title'>AX-Wetak 360</div>"
-            f"<div class='gpt-brand-subtitle'>Delegated workplace workspace</div>"
+            f"<div class='gpt-brand-subtitle'>Webcash We · 360° Control</div>"
             f"</div></div>"
             f"<div class='gpt-user-card'>"
             f"<div class='gpt-user-name'>{html.escape(st.session_state.user_name)}님</div>"
@@ -4989,7 +4989,6 @@ def render_page_title(menu):
         """,
         unsafe_allow_html=True,
     )
-
     if menu in MENU_GUIDES:
         with st.expander("📌 메뉴 이용 안내", expanded=False):
             for line in MENU_GUIDES[menu]:
