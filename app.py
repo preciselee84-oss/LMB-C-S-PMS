@@ -5449,31 +5449,14 @@ def render_page_title(menu):
         unsafe_allow_html=True,
     )
 
-    # 메뉴 이용 안내와 밝기 모드 설정을 우측 상단에 배치
-    _, col_guide, col_theme = st.columns([0.70, 0.18, 0.12])
+    # 메뉴 이용 안내를 우측 상단에 배치
+    _, col_guide = st.columns([0.82, 0.18])
 
     with col_guide:
         if menu in MENU_GUIDES:
             with st.expander("📌 메뉴 이용 안내", expanded=False):
                 for line in MENU_GUIDES[menu]:
                     st.markdown(f"- {line}")
-
-    with col_theme:
-        st.markdown(
-            """
-            <div style="display:flex; justify-content:flex-end; align-items:center; height:42px;">
-                <label class='pms-btn' style='cursor:pointer; padding:8px 12px; border-radius:8px; background:#f1f5f9; border:1px solid #e2e8f0;'>
-                    <input type='radio' name='pms-t' id='pms-l' class='pms-theme-radio' checked>
-                    🌞
-                </label>
-                <label class='pms-btn' style='cursor:pointer; padding:8px 12px; border-radius:8px; background:#f1f5f9; border:1px solid #e2e8f0; margin-left:6px;'>
-                    <input type='radio' name='pms-t' id='pms-d' class='pms-theme-radio'>
-                    🌙
-                </label>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
 
     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
