@@ -3519,12 +3519,12 @@ def show_approval_result():
         "1개월": (today - timedelta(days=30), today),
     }
 
-    with st.container(border=True):
-        request_date_label_col, request_date_input_col = st.columns([0.12, 0.88])
+    with st.container():
+        request_date_label_col, request_date_input_col, _ = st.columns([0.11, 0.58, 0.31])
         with request_date_label_col:
             st.markdown("**조회기간**")
         with request_date_input_col:
-            preset_cols = st.columns([0.08, 0.08, 0.1, 0.1, 0.64])
+            preset_cols = st.columns([0.13, 0.13, 0.17, 0.17, 0.40])
             for index, (label, date_range) in enumerate(period_presets.items()):
                 button_type = "primary" if label == st.session_state.get("approval_result_preset", "1주일") else "secondary"
                 if preset_cols[index].button(label, key=f"approval_result_preset_{label}", type=button_type, use_container_width=True):
@@ -3533,8 +3533,8 @@ def show_approval_result():
                     st.session_state.approval_result_end_date = date_range[1]
                     st.rerun()
 
-            date_start_col, tilde_col, date_end_col, month_col, request_check_col, process_check_col, _ = st.columns(
-                [0.18, 0.03, 0.18, 0.16, 0.11, 0.11, 0.23]
+            date_start_col, tilde_col, date_end_col, month_col, request_check_col, process_check_col = st.columns(
+                [0.2, 0.03, 0.2, 0.18, 0.12, 0.12]
             )
             with date_start_col:
                 request_start_date = st.date_input(
@@ -3566,7 +3566,7 @@ def show_approval_result():
             with process_check_col:
                 date_by_processed = st.checkbox("처리일자", value=False, key="approval_result_date_by_processed")
 
-        requester_label_col, requester_input_col, _ = st.columns([0.12, 0.32, 0.56])
+        requester_label_col, requester_input_col, _ = st.columns([0.11, 0.24, 0.65])
         with requester_label_col:
             st.markdown("**요청자**")
         with requester_input_col:
@@ -3577,7 +3577,7 @@ def show_approval_result():
                 label_visibility="collapsed",
             )
 
-        status_label_col, status_input_col, _ = st.columns([0.12, 0.32, 0.56])
+        status_label_col, status_input_col, _ = st.columns([0.11, 0.24, 0.65])
         with status_label_col:
             st.markdown("**처리결과**")
         with status_input_col:
@@ -3588,7 +3588,7 @@ def show_approval_result():
                 label_visibility="collapsed",
             )
 
-    button_left, button_center, button_right = st.columns([0.42, 0.16, 0.42])
+    button_left, button_center, button_right = st.columns([0.44, 0.12, 0.44])
     with button_center:
         search_clicked = st.button("조회", key="approval_result_search", type="primary", use_container_width=True)
 
