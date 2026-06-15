@@ -1946,7 +1946,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         return f"ERR: {str(e)}", None, None
 
 
-def render_plain_html_table(df, max_rows=500, center_align=True, merge_cols=None, stretch=True):
+def render_plain_html_table(df, max_rows=500, center_align=True, merge_cols=None, stretch=True, max_width=None):
     """AG Grid 없이 순수 HTML 테이블로 렌더링 — 다크모드 완전 호환."""
     if df is None or df.empty:
         st.info("표시할 데이터가 없습니다.")
@@ -1997,6 +1997,8 @@ def render_plain_html_table(df, max_rows=500, center_align=True, merge_cols=None
             tds += f"<td{rowspan} style='background:{bg};padding:5px 10px;border-bottom:1px solid #EDF2F7;font-size:12px;color:#2D3748;white-space:nowrap;vertical-align:middle;{td_align}'>{val}</td>"
         body += f"<tr>{tds}</tr>"
     wrapper_display = "display:block;" if stretch else "display:inline-block;max-width:100%;"
+    if max_width:
+        wrapper_display += f"max-width:{max_width};"
     table_width = "100%" if stretch else "auto"
     st.markdown(
         f"""<div class="pms-report-table" style="overflow-x:auto;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.05);margin-bottom:1rem;{wrapper_display}">
@@ -3481,6 +3483,9 @@ def show_approval_result():
         .pms-breadcrumb span {
             color: #008c78;
         }
+        [data-testid="stCheckbox"] label {
+            white-space: nowrap !important;
+        }
         </style>
         <div class="pms-breadcrumb">홈 &gt; 조회 &gt; 품의 결과 &gt; <span>품의 결과</span></div>
         """,
@@ -3520,7 +3525,7 @@ def show_approval_result():
     }
 
     with st.container():
-        request_date_label_col, request_date_input_col, _ = st.columns([0.11, 0.58, 0.31])
+        request_date_label_col, request_date_input_col, _ = st.columns([0.1, 0.54, 0.36])
         with request_date_label_col:
             st.markdown("**조회기간**")
         with request_date_input_col:
@@ -3534,7 +3539,7 @@ def show_approval_result():
                     st.rerun()
 
             date_start_col, tilde_col, date_end_col, month_col, request_check_col, process_check_col = st.columns(
-                [0.2, 0.03, 0.2, 0.18, 0.12, 0.12]
+                [0.18, 0.03, 0.18, 0.17, 0.17, 0.17]
             )
             with date_start_col:
                 request_start_date = st.date_input(
@@ -3566,7 +3571,7 @@ def show_approval_result():
             with process_check_col:
                 date_by_processed = st.checkbox("처리일자", value=False, key="approval_result_date_by_processed")
 
-        requester_label_col, requester_input_col, _ = st.columns([0.11, 0.24, 0.65])
+        requester_label_col, requester_input_col, _ = st.columns([0.1, 0.24, 0.66])
         with requester_label_col:
             st.markdown("**요청자**")
         with requester_input_col:
@@ -3577,7 +3582,7 @@ def show_approval_result():
                 label_visibility="collapsed",
             )
 
-        status_label_col, status_input_col, _ = st.columns([0.11, 0.24, 0.65])
+        status_label_col, status_input_col, _ = st.columns([0.1, 0.24, 0.66])
         with status_label_col:
             st.markdown("**처리결과**")
         with status_input_col:
@@ -3588,7 +3593,7 @@ def show_approval_result():
                 label_visibility="collapsed",
             )
 
-    button_left, button_center, button_right = st.columns([0.44, 0.12, 0.44])
+    button_left, button_center, button_right = st.columns([0.46, 0.08, 0.46])
     with button_center:
         search_clicked = st.button("조회", key="approval_result_search", type="primary", use_container_width=True)
 
@@ -3656,7 +3661,7 @@ def show_approval_result():
         else "전도금 요청",
         axis=1,
     )
-    type_col1, type_col2, _ = st.columns([0.13, 0.18, 0.69])
+    type_col1, type_col2, _ = st.columns([0.13, 0.2, 0.67])
     with type_col1:
         show_advance_requests = st.checkbox("전도금 요청", value=True, key="approval_result_show_advance_requests")
     with type_col2:
@@ -3684,7 +3689,12 @@ def show_approval_result():
             "reject_reason": "반려사유",
         }
     )
-    render_plain_html_table(result_view.sort_values("요청일시", ascending=False), center_align=True, stretch=False)
+    render_plain_html_table(
+        result_view.sort_values("요청일시", ascending=False),
+        center_align=True,
+        stretch=True,
+        max_width="760px",
+    )
 
 
 def show_usage_report():
