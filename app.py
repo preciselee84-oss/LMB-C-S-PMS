@@ -3048,8 +3048,14 @@ def show_advance_payment_request():
     workplaces = data.get("workplaces", [])
     requests = data.get("requests", [])
 
+    if st.session_state.user_role != "관리자":
+        workplaces = [row for row in workplaces if row.get("manager_name") == st.session_state.get("user_name", "")]
+
     if not workplaces:
-        st.info("관리자 메뉴의 [위탁 사업장 관리]에서 사업장을 먼저 등록해주세요.")
+        if st.session_state.user_role != "관리자":
+            st.info("담당으로 등록된 사업장이 없습니다. 관리자에게 문의해주세요.")
+        else:
+            st.info("관리자 메뉴의 [위탁 사업장 관리]에서 사업장을 먼저 등록해주세요.")
     else:
         workplace_options = {row.get("workplace_name", ""): row for row in workplaces}
         with st.form("delegated_fund_request_form", clear_on_submit=True):
@@ -3947,19 +3953,22 @@ def _render_workplace_info_admin():
             site_df["business_alias"] = ""
         if "regular_payment_day" not in site_df.columns:
             site_df["regular_payment_day"] = 0
+        if "manager_name" not in site_df.columns:
+            site_df["manager_name"] = ""
         if "memo" not in site_df.columns:
             site_df["memo"] = ""
         site_df["regular_payment_day_label"] = site_df["regular_payment_day"].apply(
             lambda value: f"매월 {int(float(value or 0))}일" if int(float(value or 0)) else "미등록"
         )
         site_view = site_df[
-            ["workplace_name", "business_number", "business_alias", "regular_payment_day_label", "memo"]
+            ["workplace_name", "business_number", "business_alias", "regular_payment_day_label", "manager_name", "memo"]
         ].rename(
             columns={
                 "workplace_name": "사업장명",
                 "business_number": "사업자번호",
                 "business_alias": "사업자별칭",
                 "regular_payment_day_label": "정기지급일자",
+                "manager_name": "담당자",
                 "memo": "비고",
             }
         ).reset_index(drop=True)
@@ -3968,12 +3977,21 @@ def _render_workplace_info_admin():
     else:
         st.info("등록된 사업장이 없습니다.")
 
+    staff_names = sorted({
+        info.get("name") for info in _real_users(load_user_db()).values()
+        if isinstance(info, dict) and info.get("name")
+    })
+    manager_options = ["미지정"] + staff_names
+
     if st.session_state.get("_show_workplace_edit_form"):
         edit_target_id = st.session_state.get("_workplace_edit_target_id")
         target = next((row for row in workplaces if row.get("id") == edit_target_id), None)
         if target is None:
             st.session_state["_show_workplace_edit_form"] = False
             st.rerun()
+
+        current_manager = target.get("manager_name", "")
+        manager_index = manager_options.index(current_manager) if current_manager in manager_options else 0
 
         with st.form("delegated_workplace_edit_form", clear_on_submit=False):
             workplace_name = st.text_input("사업장명", value=target.get("workplace_name", ""))
@@ -3982,6 +4000,7 @@ def _render_workplace_info_admin():
             regular_payment_day = st.number_input(
                 "정기지급일자", min_value=0, max_value=31, step=1, value=int(target.get("regular_payment_day", 0) or 0)
             )
+            manager_name = st.selectbox("담당자", manager_options, index=manager_index)
             memo = st.text_area("비고", value=target.get("memo", ""))
             col_submit, col_cancel = st.columns(2)
             submitted = col_submit.form_submit_button("수정 완료", type="primary", use_container_width=True)
@@ -4002,6 +4021,7 @@ def _render_workplace_info_admin():
                 target["business_number"] = business_number.strip()
                 target["business_alias"] = business_alias.strip()
                 target["regular_payment_day"] = int(regular_payment_day)
+                target["manager_name"] = "" if manager_name == "미지정" else manager_name
                 target["memo"] = memo.strip()
                 _save_delegated_workplaces(data)
                 st.session_state["_show_workplace_edit_form"] = False
@@ -4016,6 +4036,7 @@ def _render_workplace_info_admin():
             business_number = st.text_input("사업자번호", placeholder="예: 123-45-67890")
             business_alias = st.text_input("사업자별칭", placeholder="예: 강남점")
             regular_payment_day = st.number_input("정기지급일자", min_value=0, max_value=31, step=1, value=0)
+            manager_name = st.selectbox("담당자", manager_options)
             memo = st.text_area("비고", placeholder="사업장 관련 특이사항")
             col_submit, col_cancel = st.columns(2)
             submitted = col_submit.form_submit_button("등록", type="primary", use_container_width=True)
@@ -4038,7 +4059,7 @@ def _render_workplace_info_admin():
                         "bank_name": "",
                         "account_number": "",
                         "regular_payment_day": int(regular_payment_day),
-                        "manager_name": "",
+                        "manager_name": "" if manager_name == "미지정" else manager_name,
                         "manager_contact": "",
                         "memo": memo.strip(),
                         "created_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
