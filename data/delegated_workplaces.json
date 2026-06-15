@@ -35,13 +35,13 @@
             "request_amount": 5000,
             "requested_by": "이성환",
             "request_reason": "테스트 목적",
-            "status": "품의 확정",
+            "status": "이체 대상",
             "requested_at": "2026-06-15 10:54:48",
             "approved_at": "2026-06-15 11:03:46",
             "paid_at": "",
             "approval_doc_id": 1781488488003,
             "reject_reason": "",
-            "transfer_file_generated_at": ""
+            "transfer_file_generated_at": "2026-06-15 15:49:17"
         },
         {
             "id": 1781496100787,
@@ -50,13 +50,13 @@
             "request_amount": 10000,
             "requested_by": "이성환",
             "request_reason": "",
-            "status": "품의 확정",
+            "status": "이체 대상",
             "requested_at": "2026-06-15 13:01:40",
             "approved_at": "2026-06-15 13:02:21",
             "paid_at": "",
             "approval_doc_id": 1781496100787,
             "reject_reason": "",
-            "transfer_file_generated_at": ""
+            "transfer_file_generated_at": "2026-06-15 15:49:17"
         },
         {
             "id": 1781499185150,
@@ -65,13 +65,13 @@
             "request_amount": 20000,
             "requested_by": "장진영",
             "request_reason": "",
-            "status": "품의 확정",
+            "status": "이체 대상",
             "requested_at": "2026-06-15 13:53:05",
             "approved_at": "2026-06-15 13:58:20",
             "paid_at": "",
             "approval_doc_id": 1781499185150,
             "reject_reason": "",
-            "transfer_file_generated_at": ""
+            "transfer_file_generated_at": "2026-06-15 15:49:17"
         }
     ]
 }
