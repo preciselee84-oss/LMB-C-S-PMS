@@ -3771,8 +3771,7 @@ def _render_usage_report_form():
     with col2:
         report_month = st.date_input(
             "보고 월",
-            value=today.replace(day=1),
-            format="YYYY-MM"
+            value=today.replace(day=1)
         )
 
     st.markdown("---")
