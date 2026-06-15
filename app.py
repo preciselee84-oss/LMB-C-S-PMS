@@ -3099,7 +3099,8 @@ def show_advance_payment_request():
             st.info("관리자 메뉴의 [위탁 사업장 관리]에서 사업장을 먼저 등록해주세요.")
     else:
         workplace_options = {row.get("workplace_name", ""): row for row in workplaces}
-        with st.expander("전도금 요청 등록", expanded=False):
+
+        if st.session_state.get("_show_advance_payment_form"):
             with st.form("delegated_fund_request_form", clear_on_submit=True):
                 selected_name = st.selectbox("사업장", list(workplace_options.keys()))
                 requested_by = st.text_input(
@@ -3110,7 +3111,9 @@ def show_advance_payment_request():
                 requester_phone = st.text_input("핸드폰번호", placeholder="010-0000-0000")
                 request_amount = st.number_input("요청 금액", min_value=0, step=100000, format="%d")
                 request_reason = st.text_area("요청 사유", placeholder="전도금 사용 목적 및 필요 사유")
-                requested = st.form_submit_button("전도금 요청 등록", type="primary")
+                col_submit, col_cancel = st.columns(2)
+                requested = col_submit.form_submit_button("전도금 요청 등록", type="primary", use_container_width=True)
+                cancelled = col_cancel.form_submit_button("취소", use_container_width=True)
 
             if requested:
                 site = workplace_options[selected_name]
@@ -3160,8 +3163,17 @@ def show_advance_payment_request():
                     )
                     _save_approvals(approvals)
 
+                    st.session_state["_show_advance_payment_form"] = False
                     st.success("전도금 요청이 등록되었습니다. [전자결재]에서 처리 현황을 확인할 수 있습니다.")
                     st.rerun()
+            if cancelled:
+                st.session_state["_show_advance_payment_form"] = False
+                st.rerun()
+        else:
+            col_add, _ = st.columns([35, 165])
+            if col_add.button("+ 전도금 요청 등록", key="show_advance_payment_form_btn", use_container_width=True):
+                st.session_state["_show_advance_payment_form"] = True
+                st.rerun()
 
 
 def show_e_approval():
