@@ -3730,8 +3730,145 @@ def show_approval_result():
 
 def show_usage_report():
     st.markdown("### 전도금 사용 결의 보고")
-    st.caption("제출된 전도금 사용 결의 보고 내역과 처리 상태를 확인합니다.")
+    st.caption("계좌 거래내역을 기반으로 출금 내역의 사용 사유를 작성하여 본사에 보고합니다.")
 
+    tab1, tab2 = st.tabs(["보고서 작성", "제출 내역"])
+
+    with tab1:
+        _render_usage_report_form()
+
+    with tab2:
+        _render_usage_report_history()
+
+
+def _render_usage_report_form():
+    """전도금 사용 결의 보고서 작성 폼"""
+    st.markdown("#### 보고서 작성")
+
+    # 계좌 선택
+    bank_data = _load_bank_accounts()
+    accounts = bank_data.get("accounts", [])
+
+    if not accounts:
+        st.warning("등록된 계좌가 없습니다. [계좌 관리]에서 계좌를 먼저 등록해주세요.")
+        return
+
+    wp_data = _load_delegated_workplaces()
+    workplaces_by_id = {site.get("id"): site for site in wp_data.get("workplaces", [])}
+
+    account_options = {
+        f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row
+        for row in accounts
+    }
+
+    col1, col2 = st.columns(2)
+    with col1:
+        selected_account_label = st.selectbox("계좌 선택", list(account_options.keys()))
+        selected_account = account_options[selected_account_label]
+
+    # 기간 선택
+    today = _current_kst().date()
+    with col2:
+        report_month = st.date_input(
+            "보고 월",
+            value=today.replace(day=1),
+            format="YYYY-MM"
+        )
+
+    st.markdown("---")
+    st.markdown("#### 출금 내역 및 사용 사유")
+
+    # 출금 내역 입력 (실제로는 계좌 거래내역에서 가져와야 하지만, 여기서는 수동 입력)
+    if "usage_report_items" not in st.session_state:
+        st.session_state.usage_report_items = []
+
+    # 출금 항목 추가
+    with st.expander("➕ 출금 항목 추가", expanded=len(st.session_state.usage_report_items) == 0):
+        with st.form("add_usage_item_form"):
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                usage_date = st.date_input("출금일자")
+            with col_b:
+                usage_amount = st.number_input("출금금액", min_value=0, step=1000, format="%d")
+            with col_c:
+                usage_recipient = st.text_input("거래처")
+
+            usage_reason = st.text_area("사용 사유", placeholder="출금 사용 목적을 상세히 작성해주세요.")
+            usage_file = st.file_uploader("증빙서류 첨부 (선택)", type=["pdf", "jpg", "jpeg", "png"])
+
+            if st.form_submit_button("추가", type="primary", use_container_width=True):
+                if not usage_reason.strip():
+                    st.warning("사용 사유를 입력해주세요.")
+                else:
+                    file_name = ""
+                    if usage_file:
+                        file_name = usage_file.name
+
+                    st.session_state.usage_report_items.append({
+                        "date": usage_date.strftime("%Y-%m-%d"),
+                        "amount": int(usage_amount),
+                        "recipient": usage_recipient.strip(),
+                        "reason": usage_reason.strip(),
+                        "file_name": file_name,
+                    })
+                    st.success("출금 항목이 추가되었습니다.")
+                    st.rerun()
+
+    # 추가된 항목 표시
+    if st.session_state.usage_report_items:
+        st.markdown("**추가된 출금 항목**")
+
+        for idx, item in enumerate(st.session_state.usage_report_items):
+            with st.container():
+                col_info, col_del = st.columns([0.9, 0.1])
+                with col_info:
+                    file_badge = f" 📎 {item['file_name']}" if item['file_name'] else ""
+                    st.markdown(
+                        f"""
+                        **{item['date']}** | {_format_won(item['amount'])} | {item['recipient']}
+                        사유: {item['reason']}{file_badge}
+                        """
+                    )
+                with col_del:
+                    if st.button("🗑️", key=f"del_usage_{idx}"):
+                        st.session_state.usage_report_items.pop(idx)
+                        st.rerun()
+                st.markdown("---")
+
+        # 보고서 제출
+        total_amount = sum(item['amount'] for item in st.session_state.usage_report_items)
+        st.markdown(f"**총 출금액:** {_format_won(total_amount)}")
+
+        if st.button("보고서 제출", type="primary", use_container_width=True):
+            # 보고서 저장
+            usage_data = _load_usage_reports()
+            if "reports" not in usage_data:
+                usage_data["reports"] = []
+
+            workplace_name = workplaces_by_id.get(selected_account.get("linked_workplace_id"), {}).get("workplace_name", "")
+
+            usage_data["reports"].append({
+                "id": int(time.time() * 1000),
+                "workplace_id": selected_account.get("linked_workplace_id"),
+                "workplace_name": workplace_name,
+                "account_id": selected_account.get("id"),
+                "report_month": report_month.strftime("%Y-%m"),
+                "total_amount": total_amount,
+                "items": st.session_state.usage_report_items.copy(),
+                "status": "제출완료",
+                "requested_at": _current_kst().strftime("%Y-%m-%d %H:%M:%S"),
+            })
+
+            _save_usage_reports(usage_data)
+            st.session_state.usage_report_items = []
+            st.success("전도금 사용 결의 보고서가 제출되었습니다.")
+            st.rerun()
+    else:
+        st.info("출금 항목을 추가해주세요.")
+
+
+def _render_usage_report_history():
+    """제출된 전도금 사용 결의 보고 내역"""
     wp_data = _load_delegated_workplaces()
     workplaces = _my_workplaces(wp_data.get("workplaces", []))
     my_ids = {row.get("id") for row in workplaces}
@@ -3741,7 +3878,7 @@ def show_usage_report():
     my_reports = [row for row in usage_reports if row.get("workplace_id") in my_ids]
 
     if not my_reports:
-        st.info("작성된 전도금 사용 결의 보고가 없습니다.")
+        st.info("제출된 전도금 사용 결의 보고가 없습니다.")
         return
 
     _workplace_dashboard_css()
@@ -3751,10 +3888,13 @@ def show_usage_report():
             reject_line = ""
             if row.get("status") == "반려" and row.get("reject_reason"):
                 reject_line = f"<div class='request-meta'>반려 사유: {html.escape(str(row.get('reject_reason')))}</div>"
+
+            items_count = len(row.get("items", []))
             st.markdown(
                 (
                     "<div class='request-card'>"
                     f"<div class='request-title'>{html.escape(str(row.get('workplace_name', '')))}</div>"
+                    f"<div class='request-meta'>{html.escape(row.get('report_month', ''))} · {items_count}건</div>"
                     f"<div class='request-meta'>{html.escape(_format_won(row.get('total_amount')))} · {html.escape(str(row.get('requested_at', '')))}</div>"
                     f"{reject_line}"
                     f"<span class='status-chip'>{html.escape(str(row.get('status', '')))}</span>"
