@@ -658,6 +658,15 @@ def init_state():
     if st.session_state.current_menu == "구글 스트레드시트 연동":
         st.session_state.current_menu = "서버 접속 정보"
 
+    transfer_result_upload_menus = {
+        "이체 결과 엑셀 업로드",
+        "이체결과 엑셀 업로드",
+        "이체 결과 업로드",
+        "지급 결과 엑셀 업로드",
+    }
+    if st.session_state.current_menu in transfer_result_upload_menus:
+        st.session_state.current_menu = "지급 결과 확인"
+
     removed_menus = {
         "이력확인 및 작성",
         "은행 이력 업로드",
