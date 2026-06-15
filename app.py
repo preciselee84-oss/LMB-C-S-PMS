@@ -684,6 +684,7 @@ def init_state():
         "계좌 관리": "위탁 사업장 관리",
         "담당자 관리": "위탁 사업장 관리",
         "사업장 관리": "위탁 사업장 관리",
+        "이체 자료 생성": "이체 자료 확정",
     }
     if st.session_state.current_menu in RENAMED_MENUS:
         st.session_state.current_menu = RENAMED_MENUS[st.session_state.current_menu]
@@ -2655,7 +2656,7 @@ def show_sidebar():
                 render_nav_button(menu_name)
 
             st.markdown("<div class='gpt-section'>지급 관리</div>", unsafe_allow_html=True)
-            for menu_name in ["이체 자료 생성", "지급 결과 확인"]:
+            for menu_name in ["이체 자료 확정", "지급 결과 확인"]:
                 render_nav_button(menu_name)
 
             st.markdown("<div class='gpt-section'>위탁 사업장</div>", unsafe_allow_html=True)
@@ -3988,8 +3989,8 @@ def _render_bank_account_management():
 
 
 def show_transfer_file_generation():
-    st.markdown("### 이체 자료 생성")
-    st.caption("품의가 확정된 전도금 요청을 선택하여 이체 자료를 생성합니다.")
+    st.markdown("### 이체 자료 확정")
+    st.caption("품의가 확정된 전도금 요청을 선택하여 이체 자료를 확정하고 엑셀로 다운로드합니다.")
 
     wp_data = _load_delegated_workplaces()
     requests = wp_data.get("requests", [])
@@ -4084,80 +4085,163 @@ def show_transfer_file_generation():
     lookup_map = st.session_state.get("_transfer_holder_lookup", {})
     lookup_complete = bool(selected_ids) and all(row_id in lookup_map for row_id in selected_ids)
 
-    if st.button("이체 자료 생성", type="primary", disabled=not lookup_complete):
-        source = source_options[source_label]
-        rows = []
+    source = source_options[source_label]
+    edited_by_id = {item["id"]: item for item in edited_df.to_dict("records")}
+    transfer_rows = []
+    for row in targets:
+        if row.get("id") not in selected_ids:
+            continue
+        account = accounts_by_workplace_id.get(row.get("workplace_id"), {})
+        edited_row = edited_by_id.get(row.get("id"), {})
+        transfer_rows.append(
+            {
+                "출금은행": source.get("bank_name", ""),
+                "출금계좌번호": source.get("account_number", ""),
+                "출금통장표시": edited_row.get("출금통장표시", ""),
+                "입금은행": account.get("bank_name", ""),
+                "입금계좌번호": account.get("account_number", ""),
+                "입금액": row.get("request_amount", 0),
+                "예상예금주": lookup_map.get(row.get("id")) or account.get("holder_name", "") or row.get("workplace_name", ""),
+                "입금통장표시": edited_row.get("입금통장표시", ""),
+                "사업장명": row.get("workplace_name", ""),
+            }
+        )
+
+    col_confirm, col_download = st.columns(2)
+    confirm_clicked = col_confirm.button(
+        "이체 자료 확정", type="primary", disabled=not lookup_complete, use_container_width=True
+    )
+    excel_bytes = dataframe_to_excel_bytes({"이체자료": pd.DataFrame(transfer_rows)}) if transfer_rows else b""
+    col_download.download_button(
+        "📥 엑셀 다운로드",
+        data=excel_bytes,
+        file_name=f"이체자료_{_current_kst().strftime('%Y%m%d_%H%M%S')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        disabled=not transfer_rows,
+    )
+
+    if confirm_clicked:
         now_str = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
-        edited_by_id = {item["id"]: item for item in edited_df.to_dict("records")}
         for row in targets:
-            if row.get("id") not in selected_ids:
-                continue
-            account = accounts_by_workplace_id.get(row.get("workplace_id"), {})
-            edited_row = edited_by_id.get(row.get("id"), {})
-            rows.append(
-                {
-                    "출금은행": source.get("bank_name", ""),
-                    "출금계좌번호": source.get("account_number", ""),
-                    "출금통장표시": edited_row.get("출금통장표시", ""),
-                    "입금은행": account.get("bank_name", ""),
-                    "입금계좌번호": account.get("account_number", ""),
-                    "입금액": row.get("request_amount", 0),
-                    "예상예금주": lookup_map.get(row.get("id")) or account.get("holder_name", "") or row.get("workplace_name", ""),
-                    "입금통장표시": edited_row.get("입금통장표시", ""),
-                    "사업장명": row.get("workplace_name", ""),
-                }
-            )
-            row["status"] = "이체 대상"
-            row["transfer_file_generated_at"] = now_str
+            if row.get("id") in selected_ids:
+                row["status"] = "이체 대상"
+                row["transfer_file_generated_at"] = now_str
 
         st.session_state["_transfer_holder_lookup"] = {
             row_id: name for row_id, name in lookup_map.items() if row_id not in selected_ids
         }
         _save_delegated_workplaces(wp_data)
-
-        excel_bytes = dataframe_to_excel_bytes({"이체자료": pd.DataFrame(rows)})
-        st.download_button(
-            "📥 이체 자료 다운로드",
-            data=excel_bytes,
-            file_name=f"이체자료_{_current_kst().strftime('%Y%m%d_%H%M%S')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
-        st.success(f"{len(rows)}건의 이체 자료가 생성되었습니다. [지급 결과 확인]에서 처리 결과를 확정해주세요.")
+        st.success(f"{len(transfer_rows)}건이 이체 대상으로 확정되었습니다. [지급 결과 확인]에서 처리 결과를 확정해주세요.")
+        st.rerun()
 
 
 def show_transfer_result_confirmation():
     st.markdown("### 지급 결과 확인")
-    st.caption("이체 자료가 생성된 건의 이체 완료 여부를 확정하고, 완료 이력을 확인합니다.")
+    st.caption("이체 자료가 확정된 건의 이체 완료 여부를 확인하고, 완료 이력을 관리합니다.")
 
     wp_data = _load_delegated_workplaces()
     requests = wp_data.get("requests", [])
 
+    bank_data = _load_bank_accounts()
+    accounts_by_workplace_id = {
+        row.get("linked_workplace_id"): row
+        for row in bank_data.get("accounts", [])
+        if row.get("linked_workplace_id")
+    }
+
     pending = [row for row in requests if row.get("status") == "이체 대상"]
+
+    st.markdown("#### 이체 대상")
     if pending:
-        st.markdown("#### 이체 확정 대기")
-        _workplace_dashboard_css()
-        cols = st.columns(3)
-        for index, row in enumerate(sorted(pending, key=lambda item: item.get("transfer_file_generated_at", ""), reverse=True)):
-            with cols[index % 3]:
-                st.markdown(
-                    (
-                        "<div class='request-card'>"
-                        f"<div class='request-title'>{html.escape(str(row.get('workplace_name', '')))}</div>"
-                        f"<div class='request-meta'>{html.escape(_format_won(row.get('request_amount')))}</div>"
-                        f"<div class='request-meta'>이체자료 생성 {html.escape(str(row.get('transfer_file_generated_at', '')))}</div>"
-                        f"<span class='status-chip'>{html.escape(str(row.get('status', '')))}</span>"
-                        "</div>"
-                    ),
-                    unsafe_allow_html=True,
-                )
-                if st.button("이체 완료 확인", key=f"confirm_pay_{row.get('id')}", use_container_width=True, type="primary"):
+        pending_sorted = sorted(pending, key=lambda item: item.get("transfer_file_generated_at", ""), reverse=True)
+        pending_view = pd.DataFrame(
+            [
+                {
+                    "사업장명": row.get("workplace_name", ""),
+                    "입금은행": accounts_by_workplace_id.get(row.get("workplace_id"), {}).get("bank_name", ""),
+                    "입금계좌번호": accounts_by_workplace_id.get(row.get("workplace_id"), {}).get("account_number", ""),
+                    "입금액": _format_won(row.get("request_amount")),
+                    "이체자료확정일시": row.get("transfer_file_generated_at", ""),
+                }
+                for row in pending_sorted
+            ]
+        )
+        render_plain_html_table(pending_view, center_align=True)
+
+        confirm_df = pd.DataFrame(
+            [
+                {"id": row.get("id"), "사업장명": row.get("workplace_name", ""), "이체완료확인": False}
+                for row in pending_sorted
+            ]
+        )
+        edited_confirm = st.data_editor(
+            confirm_df,
+            column_config={
+                "id": None,
+                "사업장명": st.column_config.TextColumn("사업장명", disabled=True),
+                "이체완료확인": st.column_config.CheckboxColumn("이체완료확인"),
+            },
+            hide_index=True,
+            use_container_width=True,
+            key="transfer_confirm_editor",
+        )
+        confirm_ids = edited_confirm[edited_confirm["이체완료확인"]]["id"].tolist()
+        if st.button("선택 건 이체 완료 확인", type="primary", disabled=not confirm_ids):
+            now_str = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
+            for row in pending:
+                if row.get("id") in confirm_ids:
                     row["status"] = "이체 완료"
-                    row["paid_at"] = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
-                    _save_delegated_workplaces(wp_data)
-                    st.rerun()
+                    row["paid_at"] = now_str
+            _save_delegated_workplaces(wp_data)
+            st.success(f"{len(confirm_ids)}건을 이체 완료로 처리했습니다.")
+            st.rerun()
     else:
         st.info("이체 확정 대기 중인 건이 없습니다.")
+
+    st.markdown("#### 이체 결과 엑셀 업로드")
+    st.caption("은행 이체 결과 엑셀(사업장명, 입금계좌번호, 입금액 컬럼 포함)을 업로드하면 일치하는 이체 대상 건을 일괄 '이체 완료' 처리합니다.")
+    uploaded_result = st.file_uploader("이체 결과 엑셀 업로드", type=["xlsx", "xls"], key="transfer_result_upload")
+    if uploaded_result is not None and st.session_state.get("_transfer_result_upload_id") != uploaded_result.file_id:
+        st.session_state["_transfer_result_upload_id"] = uploaded_result.file_id
+        try:
+            upload_df = pd.read_excel(uploaded_result)
+        except Exception:
+            st.error("엑셀 파일을 읽을 수 없습니다.")
+            upload_df = None
+
+        if upload_df is not None:
+            required_cols = {"사업장명", "입금계좌번호", "입금액"}
+            if not required_cols.issubset(set(upload_df.columns)):
+                st.warning(f"엑셀에 다음 컬럼이 필요합니다: {', '.join(sorted(required_cols))}")
+            else:
+                now_str = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
+                matched_count = 0
+                for _, urow in upload_df.iterrows():
+                    u_name = _normalize_name(urow.get("사업장명", ""))
+                    u_account = re.sub(r"\D", "", str(urow.get("입금계좌번호", "")))
+                    u_amount = int(pd.to_numeric(urow.get("입금액", 0), errors="coerce") or 0)
+                    for row in pending:
+                        if row.get("status") != "이체 대상":
+                            continue
+                        account = accounts_by_workplace_id.get(row.get("workplace_id"), {})
+                        r_account = re.sub(r"\D", "", str(account.get("account_number", "")))
+                        if (
+                            _normalize_name(row.get("workplace_name")) == u_name
+                            and r_account == u_account
+                            and int(row.get("request_amount") or 0) == u_amount
+                        ):
+                            row["status"] = "이체 완료"
+                            row["paid_at"] = now_str
+                            matched_count += 1
+                            break
+
+                if matched_count:
+                    _save_delegated_workplaces(wp_data)
+                    st.success(f"{matched_count}건이 매칭되어 이체 완료로 처리되었습니다.")
+                    st.rerun()
+                else:
+                    st.warning("업로드한 엑셀과 일치하는 이체 대상 건이 없습니다.")
 
     st.markdown("#### 이체 완료 이력")
     done = [row for row in requests if row.get("status") == "이체 완료"]
@@ -4541,7 +4625,7 @@ def _dashboard_ai_messages(metrics, forecast_rows):
     if metrics["pending"]:
         messages.append(("📥", f"결재 대기 중인 전도금 요청이 {metrics['pending']}건 있습니다. [전자결재]에서 확인해주세요."))
     if metrics["approved"]:
-        messages.append(("💸", f"품의 확정되어 이체 대상인 요청이 {metrics['approved']}건 있습니다. [이체 자료 생성]에서 처리해주세요."))
+        messages.append(("💸", f"품의 확정되어 이체 대상인 요청이 {metrics['approved']}건 있습니다. [이체 자료 확정]에서 처리해주세요."))
     for row in forecast_rows:
         risk = row.get("리스크", "")
         if risk and risk != "정상":
@@ -4860,13 +4944,14 @@ MENU_GUIDES = {
         "🔐 비밀번호는 화면에 마스킹되어 표시됩니다.",
         "⚙️ 운영 환경에 맞게 인증 방식과 암호화 옵션을 설정합니다.",
     ],
-    "이체 자료 생성": [
-        "✅ 품의 확정된 전도금 요청을 선택해 이체 자료(엑셀)를 생성합니다.",
+    "이체 자료 확정": [
+        "✅ 품의 확정된 전도금 요청을 선택해 이체 자료(엑셀)를 다운로드합니다.",
         "🏦 출금 계좌는 [회사 관리]에 등록된 출금계좌 중에서 선택하며, 메인 출금계좌가 먼저 표시됩니다.",
-        "➡️ 생성 후 해당 요청은 '이체 대상' 상태로 전환됩니다.",
+        "➡️ '이체 자료 확정' 클릭 시 해당 요청은 '이체 대상' 상태로 전환되어 [지급 결과 확인]에 표시됩니다.",
     ],
     "지급 결과 확인": [
         "💸 '이체 대상' 건의 이체 완료 여부를 확정합니다.",
+        "📤 은행에서 받은 이체 결과 엑셀을 업로드하면 일치하는 건을 일괄 '이체 완료' 처리합니다.",
         "📜 이체 완료된 지급 이력을 조회할 수 있습니다.",
     ],
     "전도금 요청": [
@@ -6651,7 +6736,7 @@ def show_main():
     allowed_menus = {
         "대시보드", "전자결재",
         "회사 관리", "위탁 사업장 관리", "서버 접속 정보",
-        "이체 자료 생성", "지급 결과 확인",
+        "이체 자료 확정", "지급 결과 확인",
         "전도금 요청", "품의 결과", "사용품의서 보고", "계좌 잔고 확인",
     }
     if menu not in allowed_menus:
@@ -6676,7 +6761,7 @@ def show_main():
         show_workplace_admin()
     elif menu == "서버 접속 정보":
         show_server_connection_info()
-    elif menu == "이체 자료 생성":
+    elif menu == "이체 자료 확정":
         show_transfer_file_generation()
     elif menu == "지급 결과 확인":
         show_transfer_result_confirmation()
