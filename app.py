@@ -7857,6 +7857,10 @@ def _render_staff_admin():
     if st.session_state.pop("reset_staff_edit_sel", False):
         st.session_state.staff_edit_sel = "선택안함"
 
+    if not st.session_state.get("_staff_admin_action_initialized"):
+        st.session_state.staff_admin_action = ""
+        st.session_state["_staff_admin_action_initialized"] = True
+
     workplace_data = _load_delegated_workplaces()
     workplace_names = sorted(
         {
@@ -7961,6 +7965,12 @@ def _render_staff_admin():
                 save_db(DB_FILE, save_data)
                 st.session_state.staff_admin_action = ""
                 st.success(f"직원 '{name_str}({uid_str})'을(를) 추가했습니다.")
+                st.rerun()
+
+        cancel_col, _ = st.columns([0.15, 0.85])
+        with cancel_col:
+            if st.button("취소", key="cancel_add_staff", use_container_width=True):
+                st.session_state.staff_admin_action = ""
                 st.rerun()
 
         return
