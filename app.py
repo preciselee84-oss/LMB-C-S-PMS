@@ -5450,7 +5450,7 @@ def render_page_title(menu):
     )
 
     # 메뉴 이용 안내와 밝기 모드 설정을 우측 상단에 배치
-    _, col_guide, col_theme = st.columns([0.55, 0.30, 0.15])
+    _, col_guide, col_theme = st.columns([0.70, 0.18, 0.12])
 
     with col_guide:
         if menu in MENU_GUIDES:
