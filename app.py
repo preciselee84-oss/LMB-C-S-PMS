@@ -5449,8 +5449,8 @@ def render_page_title(menu):
         unsafe_allow_html=True,
     )
 
-    # 메뉴 이용 안내와 밝기 모드 설정을 나란히 배치
-    col_guide, col_theme = st.columns([0.85, 0.15])
+    # 메뉴 이용 안내와 밝기 모드 설정을 우측 상단에 배치
+    _, col_guide, col_theme = st.columns([0.55, 0.30, 0.15])
 
     with col_guide:
         if menu in MENU_GUIDES:
