@@ -24,10 +24,10 @@
             "reason": "",
             "ref_request_id": 1781496100787,
             "ref_workplace_id": 1781268705510,
-            "status": "결재대기",
+            "status": "승인",
             "requested_at": "2026-06-15 13:01:40",
-            "processed_at": "",
-            "processed_by": "",
+            "processed_at": "2026-06-15 13:02:21",
+            "processed_by": "이성환",
             "reject_reason": ""
         }
     ]
