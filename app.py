@@ -2272,6 +2272,8 @@ def show_auth_page():
             unsafe_allow_html=True,
         )
 
+        st.session_state.auth_mode = "login"
+
         if st.session_state.auth_mode == "login":
             cookie_manager = safe_cookie_controller()
             sid = cookie_get(cookie_manager, "saved_id", "")
@@ -2342,87 +2344,7 @@ def show_auth_page():
                     st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
 
             st.divider()
-            st.markdown("<div class='auth-small'>계정이 없으신가요?</div>", unsafe_allow_html=True)
-
-            if st.button("회원가입", use_container_width=True):
-                st.session_state.auth_mode = "signup"
-                st.rerun()
-
-            if st.button("비밀번호 찾기", use_container_width=True):
-                st.session_state.auth_mode = "find_pw"
-                st.rerun()
-
-        elif st.session_state.auth_mode == "find_pw":
-            st.markdown("#### 비밀번호 찾기")
-            st.markdown("아이디와 가입 시 등록한 메일주소를 입력하세요.")
-
-            with st.form("find_pw_form"):
-                fp_id = st.text_input("아이디", key="fp_id")
-                fp_email = st.text_input("메일주소", key="fp_email")
-                fp_submitted = st.form_submit_button("확인", use_container_width=True, type="primary")
-
-            if fp_submitted:
-                fp_id_str = fp_id.strip() if fp_id else ""
-                fp_email_str = fp_email.strip() if fp_email else ""
-                if not fp_id_str or not fp_email_str:
-                    st.error("아이디와 메일주소를 모두 입력해주세요.")
-                else:
-                    db = st.session_state.user_db
-                    user_info = db.get(fp_id_str)
-                    if user_info and user_info.get("email", "").strip() == fp_email_str:
-                        st.success(f"비밀번호: **{user_info.get('pw', '')}**")
-                    else:
-                        st.error("일치하는 계정 정보가 없습니다.")
-
-            if st.button("로그인으로 돌아가기", use_container_width=True, key="fp_back"):
-                st.session_state.auth_mode = "login"
-                st.rerun()
-
-        else:
-            # 아이디 실시간 중복 확인 (폼 바깥)
-            r_id_check = st.text_input("아이디", key="r_id_check")
-            if r_id_check:
-                if r_id_check in st.session_state.user_db:
-                    st.error("이미 사용 중인 아이디입니다.")
-                else:
-                    st.success("사용 가능한 아이디입니다.")
-
-            with st.form("signup_form"):
-                f_id = st.text_input("아이디 (확인용 재입력)", key="f_id")
-                f_name = st.text_input("성명", key="f_name")
-                f_email = st.text_input("메일주소", key="f_email")
-                f_pw = st.text_input("비밀번호", type="password", key="f_pw")
-                f_pw2 = st.text_input("비밀번호 확인", type="password", key="f_pw2")
-                submitted = st.form_submit_button("회원가입", use_container_width=True, type="primary")
-
-            if submitted:
-                if not f_id or not f_name or not f_email or not f_pw or not f_pw2:
-                    st.error("모든 항목을 입력해주세요.")
-                elif f_pw != f_pw2:
-                    st.error("비밀번호가 일치하지 않습니다.")
-                elif f_id in st.session_state.user_db:
-                    st.error("이미 존재하는 아이디입니다.")
-                else:
-                    st.session_state.user_db[f_id] = {
-                        "pw": f_pw,
-                        "name": f_name,
-                        "email": f_email,
-                        "access": "불가",
-                        "role": "사용자",
-                        "dept_type": "사업부",
-                        "staff_type": "정규직",
-                        "outsource": "아니오",
-                        "outsource_period": "해당없음",
-                    }
-                    save_db(DB_FILE, st.session_state.user_db)
-                    st.success("신청 완료. 관리자 승인 후 로그인 가능합니다.")
-                    time.sleep(1.5)
-                    st.session_state.auth_mode = "login"
-                    st.rerun()
-
-            if st.button("로그인으로 돌아가기", use_container_width=True):
-                st.session_state.auth_mode = "login"
-                st.rerun()
+            st.caption("계정은 관리자가 발급한 ID와 비밀번호로만 로그인할 수 있습니다.")
 
 
 def show_sidebar():

@@ -29,6 +29,9 @@ export function LoginPage() {
       {contextHolder}
       <Card className="login-card">
         <Typography.Title level={3}>위탁사업장 관리</Typography.Title>
+        <Typography.Paragraph type="secondary">
+          관리자가 발급한 ID와 비밀번호로 로그인하세요.
+        </Typography.Paragraph>
         <Form layout="vertical" onFinish={handleFinish}>
           <Form.Item name="username" label="아이디" rules={[{ required: true }]}>
             <Input autoComplete="username" />
