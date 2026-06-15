@@ -3482,18 +3482,63 @@ def show_approval_result():
 
     requester_names = ["전체"] + sorted({row.get("requested_by", "") for row in processed if row.get("requested_by")})
     status_options = ["전체"] + sorted({row.get("status", "") for row in processed if row.get("status")})
+    today = _current_kst().date()
+    if "approval_result_start_date" not in st.session_state:
+        st.session_state.approval_result_start_date = today - timedelta(days=6)
+    if "approval_result_end_date" not in st.session_state:
+        st.session_state.approval_result_end_date = today
+    period_presets = {
+        "오늘": (today, today),
+        "어제": (today - timedelta(days=1), today - timedelta(days=1)),
+        "2일": (today - timedelta(days=1), today),
+        "3일": (today - timedelta(days=2), today),
+        "1주일": (today - timedelta(days=6), today),
+        "1개월": (today - timedelta(days=30), today),
+        "3개월": (today - timedelta(days=90), today),
+        "6개월": (today - timedelta(days=180), today),
+        "12개월": (today - timedelta(days=365), today),
+    }
 
     with st.container(border=True):
         request_date_label_col, request_date_input_col = st.columns([0.12, 0.88])
         with request_date_label_col:
-            st.markdown("**요청일자**")
+            st.markdown("**조회기간**")
         with request_date_input_col:
-            request_date_range = st.date_input(
-                "요청일자",
-                value=(),
-                key="approval_result_request_date",
-                label_visibility="collapsed",
-            )
+            preset_cols = st.columns([0.06, 0.06, 0.06, 0.06, 0.08, 0.08, 0.08, 0.08, 0.09, 0.35])
+            for index, (label, date_range) in enumerate(period_presets.items()):
+                button_type = "primary" if label == st.session_state.get("approval_result_preset", "1주일") else "secondary"
+                if preset_cols[index].button(label, key=f"approval_result_preset_{label}", type=button_type, use_container_width=True):
+                    st.session_state.approval_result_preset = label
+                    st.session_state.approval_result_start_date = date_range[0]
+                    st.session_state.approval_result_end_date = date_range[1]
+                    st.rerun()
+
+            date_start_col, tilde_col, date_end_col, month_col, _ = st.columns([0.22, 0.03, 0.22, 0.18, 0.35])
+            with date_start_col:
+                request_start_date = st.date_input(
+                    "조회 시작일",
+                    key="approval_result_start_date",
+                    label_visibility="collapsed",
+                )
+            with tilde_col:
+                st.markdown("<div style='padding-top:8px;text-align:center;'>~</div>", unsafe_allow_html=True)
+            with date_end_col:
+                request_end_date = st.date_input(
+                    "조회 종료일",
+                    key="approval_result_end_date",
+                    label_visibility="collapsed",
+                )
+            with month_col:
+                month_options = ["월별 선택"] + [
+                    (today.replace(day=1) - pd.DateOffset(months=idx)).strftime("%Y-%m")
+                    for idx in range(12)
+                ]
+                selected_month = st.selectbox(
+                    "월별 선택",
+                    month_options,
+                    key="approval_result_month",
+                    label_visibility="collapsed",
+                )
 
         requester_label_col, requester_input_col = st.columns([0.12, 0.88])
         with requester_label_col:
@@ -3532,9 +3577,14 @@ def show_approval_result():
     with button_center:
         search_clicked = st.button("조회", key="approval_result_search", type="primary", use_container_width=True)
 
+    if selected_month != "월별 선택":
+        month_start = pd.to_datetime(f"{selected_month}-01").date()
+        month_end = (pd.to_datetime(f"{selected_month}-01") + pd.offsets.MonthEnd(0)).date()
+        request_start_date, request_end_date = month_start, month_end
+
     if search_clicked or "_approval_result_query" not in st.session_state:
         st.session_state["_approval_result_query"] = {
-            "request_date_range": request_date_range,
+            "request_date_range": (request_start_date, request_end_date),
             "selected_requester": selected_requester,
             "selected_status": selected_status,
             "processed_date_range": processed_date_range,
