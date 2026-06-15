@@ -3745,6 +3745,19 @@ def _render_usage_report_form():
     """전도금 사용 결의 보고서 작성 폼"""
     st.markdown("#### 보고서 작성")
 
+    # 폼 너비 제한
+    st.markdown(
+        """
+        <style>
+        [data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"] {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
     # 계좌 선택
     bank_data = _load_bank_accounts()
     accounts = bank_data.get("accounts", [])
