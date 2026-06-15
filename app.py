@@ -3988,6 +3988,27 @@ def _render_bank_account_management():
             st.rerun()
 
 
+def _render_transfer_confirmed_section(confirmed_rows, accounts_by_workplace_id):
+    st.markdown("#### 이체 자료 확정 건")
+    if not confirmed_rows:
+        st.info("이체 자료 확정 건이 없습니다.")
+        return
+    st.caption("이체 자료가 확정되어 [지급 결과 확인]에서 처리 대기 중인 건입니다.")
+    confirmed_view = pd.DataFrame(
+        [
+            {
+                "사업장명": row.get("workplace_name", ""),
+                "입금은행": accounts_by_workplace_id.get(row.get("workplace_id"), {}).get("bank_name", ""),
+                "입금계좌번호": accounts_by_workplace_id.get(row.get("workplace_id"), {}).get("account_number", ""),
+                "입금액": _format_won(row.get("request_amount")),
+                "이체자료확정일시": row.get("transfer_file_generated_at", ""),
+            }
+            for row in sorted(confirmed_rows, key=lambda item: item.get("transfer_file_generated_at", ""), reverse=True)
+        ]
+    )
+    render_plain_html_table(confirmed_view, center_align=True)
+
+
 def show_transfer_file_generation():
     st.markdown("### 이체 자료 확정")
     st.caption("품의가 확정된 전도금 요청을 선택하여 이체 자료를 확정하고 엑셀로 다운로드합니다.")
@@ -4010,12 +4031,16 @@ def show_transfer_file_generation():
     )
 
     targets = [row for row in requests if row.get("status") == "품의 확정"]
+    confirmed_rows = [row for row in requests if row.get("status") == "이체 대상"]
+
     if not targets:
         st.info("이체 자료를 생성할 품의 확정 건이 없습니다.")
+        _render_transfer_confirmed_section(confirmed_rows, accounts_by_workplace_id)
         return
 
     if not withdrawal_accounts:
         st.warning("[회사 관리]에서 출금계좌를 먼저 등록해주세요.")
+        _render_transfer_confirmed_section(confirmed_rows, accounts_by_workplace_id)
         return
 
     source_options = {
@@ -4140,6 +4165,8 @@ def show_transfer_file_generation():
         _save_delegated_workplaces(wp_data)
         st.success(f"{len(transfer_rows)}건이 이체 대상으로 확정되었습니다. [지급 결과 확인]에서 처리 결과를 확정해주세요.")
         st.rerun()
+
+    _render_transfer_confirmed_section(confirmed_rows, accounts_by_workplace_id)
 
 
 def show_transfer_result_confirmation():
