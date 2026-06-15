@@ -1946,7 +1946,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         return f"ERR: {str(e)}", None, None
 
 
-def render_plain_html_table(df, max_rows=500, center_align=True, merge_cols=None):
+def render_plain_html_table(df, max_rows=500, center_align=True, merge_cols=None, stretch=True):
     """AG Grid 없이 순수 HTML 테이블로 렌더링 — 다크모드 완전 호환."""
     if df is None or df.empty:
         st.info("표시할 데이터가 없습니다.")
@@ -1996,9 +1996,11 @@ def render_plain_html_table(df, max_rows=500, center_align=True, merge_cols=None
                 rowspan = f" rowspan='{rowspan_map[col][i]}'"
             tds += f"<td{rowspan} style='background:{bg};padding:5px 10px;border-bottom:1px solid #EDF2F7;font-size:12px;color:#2D3748;white-space:nowrap;vertical-align:middle;{td_align}'>{val}</td>"
         body += f"<tr>{tds}</tr>"
+    wrapper_display = "display:block;" if stretch else "display:inline-block;max-width:100%;"
+    table_width = "100%" if stretch else "auto"
     st.markdown(
-        f"""<div class="pms-report-table" style="overflow-x:auto;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.05);margin-bottom:1rem;">
-        <table style="width:100%;border-collapse:collapse;">
+        f"""<div class="pms-report-table" style="overflow-x:auto;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.05);margin-bottom:1rem;{wrapper_display}">
+        <table style="width:{table_width};border-collapse:collapse;">
             <thead><tr>{headers}</tr></thead>
             <tbody>{body}</tbody>
         </table></div>""",
@@ -3461,6 +3463,29 @@ def show_e_approval():
 
 
 def show_approval_result():
+    st.markdown(
+        """
+        <style>
+        .block-container {
+            max-width: 1180px !important;
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
+        }
+        .pms-breadcrumb {
+            text-align: right;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 600;
+            margin: -4px 0 14px;
+        }
+        .pms-breadcrumb span {
+            color: #008c78;
+        }
+        </style>
+        <div class="pms-breadcrumb">홈 &gt; 조회 &gt; 품의 결과 &gt; <span>품의 결과</span></div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.markdown("### 품의 결과")
     st.caption("전도금 요청의 품의(승인/반려) 처리 결과를 조회합니다.")
 
@@ -3679,7 +3704,7 @@ def show_approval_result():
             "reject_reason": "반려사유",
         }
     )
-    render_plain_html_table(result_view.sort_values("요청일시", ascending=False), center_align=True)
+    render_plain_html_table(result_view.sort_values("요청일시", ascending=False), center_align=True, stretch=False)
 
 
 def show_usage_report():
