@@ -7857,6 +7857,15 @@ def _render_staff_admin():
     if st.session_state.pop("reset_staff_edit_sel", False):
         st.session_state.staff_edit_sel = "선택안함"
 
+    workplace_data = _load_delegated_workplaces()
+    workplace_names = sorted(
+        {
+            str(site.get("workplace_name", "")).strip()
+            for site in workplace_data.get("workplaces", [])
+            if str(site.get("workplace_name", "")).strip()
+        }
+    )
+
     staff_rows = []
     for uid, info in st.session_state.user_db.items():
         if uid == "1":
@@ -7899,16 +7908,22 @@ def _render_staff_admin():
 
     if action == "add":
         st.markdown("#### 사용자 추가")
+        if not workplace_names:
+            st.warning("[사업장 정보 관리]에서 사업장을 먼저 등록해주세요.")
+            return
+
         with st.form("add_staff_form"):
-            ac1, ac2 = st.columns(2)
+            ac1, ac2, ac3 = st.columns(3)
             with ac1:
-                new_uid = st.text_input("아이디", key="add_staff_uid")
-                new_name = st.text_input("성명", key="add_staff_name")
-                new_email = st.text_input("메일주소", key="add_staff_email")
-            with ac2:
+                new_uid = st.text_input("ID", key="add_staff_uid")
                 new_pw = st.text_input("비밀번호", type="password", key="add_staff_pw")
-                new_access = st.selectbox("로그인 허용 여부", ["허용", "불가"], key="add_staff_access")
-                new_role = st.selectbox("메뉴 접근 권한", ["사용자 메뉴", "관리자 메뉴"], key="add_staff_role")
+                new_name = st.text_input("성명", key="add_staff_name")
+            with ac2:
+                new_email = st.text_input("메일주소", key="add_staff_email")
+                new_phone = st.text_input("핸드폰", key="add_staff_phone")
+            with ac3:
+                new_business = st.selectbox("사업자 정보", workplace_names, key="add_staff_business")
+                new_role = st.selectbox("마스터 구분", ["관리자", "사용자"], key="add_staff_role")
             add_submitted = st.form_submit_button("추가", use_container_width=True, type="primary")
 
         if add_submitted:
@@ -7924,9 +7939,10 @@ def _render_staff_admin():
                     "pw": pw_str,
                     "name": name_str,
                     "email": new_email.strip(),
-                    "access": new_access,
-                    "role": "관리자" if new_role == "관리자 메뉴" else "사용자",
-                    "dept_type": "사업부",
+                    "phone": new_phone.strip(),
+                    "access": "허용",
+                    "role": new_role,
+                    "dept_type": new_business,
                     "staff_type": "정규직",
                     "outsource": "아니오",
                     "outsource_period": "해당없음",
@@ -7997,48 +8013,43 @@ def _render_staff_admin():
 
     st.markdown(f"**메일주소:** {info.get('email', '—')}")
 
-    c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 1, 1, 1, 1.15, 1.15, 1.2])
+    if not workplace_names:
+        st.warning("[사업장 정보 관리]에서 사업장을 먼저 등록해주세요.")
+        return
+
+    business_opts = workplace_names
+
+    c1, c2, c3, c4, c5 = st.columns([1, 1.3, 1, 1.3, 1])
     with c1:
-        new_rank = st.selectbox("직급", ["부서장", "팀장", "과장", "대리", "주임", "직원"],
-                                index=["부서장", "팀장", "과장", "대리", "주임", "직원"].index(info.get("rank", "직원")),
-                                key="edit_rank")
+        new_name = st.text_input("성명", value=info.get("name", ""), key="edit_staff_name")
     with c2:
-        dept_opts = ["사업부", "C&S"]
-        new_dept_type = st.selectbox("부서구분", dept_opts,
-                                     index=dept_opts.index(info.get("dept_type", "사업부")) if info.get("dept_type", "사업부") in dept_opts else 0,
-                                     key="edit_dept_type")
+        new_email = st.text_input("메일주소", value=info.get("email", ""), key="edit_staff_email")
     with c3:
-        new_staff_type = st.selectbox("직원구분", ["정규직", "계약직", "파견직", "외주"],
-                                      index=["정규직", "계약직", "파견직", "외주"].index(info.get("staff_type", "정규직")),
-                                      key="edit_staff_type")
+        new_phone = st.text_input("핸드폰", value=info.get("phone", ""), key="edit_staff_phone")
     with c4:
-        new_outsource = st.selectbox("외주여부", ["아니오", "예"],
-                                     index=["아니오", "예"].index(info.get("outsource", "아니오")),
-                                     key="edit_outsource")
+        new_dept_type = st.selectbox(
+            "사업자 정보",
+            business_opts,
+            index=business_opts.index(info.get("dept_type", "")) if info.get("dept_type", "") in business_opts else 0,
+            key="edit_dept_type",
+        )
     with c5:
-        period_opts = ["해당없음", "1년 미만", "1년 이상", "2년 이상"]
-        new_period = st.selectbox("외주 근무기간", period_opts,
-                                  index=period_opts.index(info.get("outsource_period", "해당없음")),
-                                  key="edit_period")
-    with c6:
         new_access = st.selectbox("로그인 허용 여부", ["허용", "불가"],
                                   index=["허용", "불가"].index(info.get("access", "불가")),
                                   key="edit_access")
-    with c7:
-        new_role = st.selectbox("메뉴 접근 권한", ["사용자 메뉴", "관리자 메뉴"],
-                                index=0 if info.get("role") != "관리자" else 1,
+        new_role = st.selectbox("마스터 구분", ["관리자", "사용자"],
+                                index=0 if info.get("role") == "관리자" else 1,
                                 key="edit_role")
 
     bc1, bc2, _ = st.columns([0.15, 0.15, 0.7])
     with bc1:
         if st.button("저장", type="primary", use_container_width=True):
-            st.session_state.user_db[sel_uid]["rank"] = new_rank
+            st.session_state.user_db[sel_uid]["name"] = new_name.strip()
+            st.session_state.user_db[sel_uid]["email"] = new_email.strip()
+            st.session_state.user_db[sel_uid]["phone"] = new_phone.strip()
             st.session_state.user_db[sel_uid]["dept_type"] = new_dept_type
-            st.session_state.user_db[sel_uid]["staff_type"] = new_staff_type
-            st.session_state.user_db[sel_uid]["outsource"] = new_outsource
-            st.session_state.user_db[sel_uid]["outsource_period"] = new_period
             st.session_state.user_db[sel_uid]["access"] = new_access
-            st.session_state.user_db[sel_uid]["role"] = "관리자" if new_role == "관리자 메뉴" else "사용자"
+            st.session_state.user_db[sel_uid]["role"] = new_role
             # _deleted 목록 유지
             _cur_file = {}
             if os.path.exists(DB_FILE):
