@@ -681,7 +681,6 @@ def init_state():
         "방문이력 작성",
         "주간보고 취합",
         "운영계획",
-        "사용품의서 보고",
     }
     if st.session_state.current_menu in removed_menus:
         st.session_state.current_menu = "전도금 요청"
@@ -695,6 +694,7 @@ def init_state():
         "담당자 관리": "위탁 사업장 관리",
         "사업장 관리": "위탁 사업장 관리",
         "이체 자료 생성": "이체 자료 확정",
+        "사용품의서 보고": "전도금 사용 결의 보고",
     }
     if st.session_state.current_menu in RENAMED_MENUS:
         st.session_state.current_menu = RENAMED_MENUS[st.session_state.current_menu]
@@ -2673,7 +2673,7 @@ def show_sidebar():
 
             st.markdown("<div class='gpt-section'>위탁 사업장</div>", unsafe_allow_html=True)
 
-        for menu_name in ["전도금 요청", "품의 결과", "계좌 잔고 확인"]:
+        for menu_name in ["전도금 요청", "품의 결과", "전도금 사용 결의 보고", "계좌 잔고 확인"]:
             render_nav_button(menu_name)
 
         st.markdown("<div class='gpt-sidebar-divider'></div><div class='gpt-logout-marker'></div>", unsafe_allow_html=True)
@@ -3531,6 +3531,42 @@ def show_approval_result():
         }
     )
     render_plain_html_table(result_view.sort_values("요청일시", ascending=False), center_align=True)
+
+
+def show_usage_report():
+    st.markdown("### 전도금 사용 결의 보고")
+    st.caption("제출된 전도금 사용 결의 보고 내역과 처리 상태를 확인합니다.")
+
+    wp_data = _load_delegated_workplaces()
+    workplaces = _my_workplaces(wp_data.get("workplaces", []))
+    my_ids = {row.get("id") for row in workplaces}
+
+    usage_data = _load_usage_reports()
+    usage_reports = usage_data.get("reports", [])
+    my_reports = [row for row in usage_reports if row.get("workplace_id") in my_ids]
+
+    if not my_reports:
+        st.info("작성된 전도금 사용 결의 보고가 없습니다.")
+        return
+
+    _workplace_dashboard_css()
+    cols = st.columns(3)
+    for index, row in enumerate(sorted(my_reports, key=lambda item: item.get("requested_at", ""), reverse=True)):
+        with cols[index % 3]:
+            reject_line = ""
+            if row.get("status") == "반려" and row.get("reject_reason"):
+                reject_line = f"<div class='request-meta'>반려 사유: {html.escape(str(row.get('reject_reason')))}</div>"
+            st.markdown(
+                (
+                    "<div class='request-card'>"
+                    f"<div class='request-title'>{html.escape(str(row.get('workplace_name', '')))}</div>"
+                    f"<div class='request-meta'>{html.escape(_format_won(row.get('total_amount')))} · {html.escape(str(row.get('requested_at', '')))}</div>"
+                    f"{reject_line}"
+                    f"<span class='status-chip'>{html.escape(str(row.get('status', '')))}</span>"
+                    "</div>"
+                ),
+                unsafe_allow_html=True,
+            )
 
 
 def show_company_profile():
@@ -4932,6 +4968,9 @@ MENU_GUIDES = {
     "품의 결과": [
         "📊 전도금 요청의 품의(승인/반려) 처리 결과를 조회합니다.",
         "🔍 사업장/처리결과로 필터링할 수 있습니다.",
+    ],
+    "전도금 사용 결의 보고": [
+        "🧾 제출된 전도금 사용 결의 보고 내역과 처리 상태를 확인합니다.",
     ],
     "계좌 잔고 확인": [
         "🏦 등록된 계좌의 현재 잔고를 확인하고 수동으로 업데이트합니다.",
@@ -6702,13 +6741,13 @@ def show_main():
         "대시보드", "전자결재",
         "회사 관리", "위탁 사업장 관리", "서버 접속 정보",
         "이체 자료 확정", "지급 결과 확인",
-        "전도금 요청", "품의 결과", "계좌 잔고 확인",
+        "전도금 요청", "품의 결과", "전도금 사용 결의 보고", "계좌 잔고 확인",
     }
     if menu not in allowed_menus:
         st.session_state.current_menu = "전도금 요청"
         persist_current_menu()
         st.rerun()
-    user_menus = {"전도금 요청", "품의 결과", "계좌 잔고 확인"}
+    user_menus = {"전도금 요청", "품의 결과", "전도금 사용 결의 보고", "계좌 잔고 확인"}
     if menu not in user_menus and st.session_state.user_role != "관리자":
         st.session_state.current_menu = "전도금 요청"
         persist_current_menu()
@@ -6734,6 +6773,8 @@ def show_main():
         show_advance_payment_request()
     elif menu == "품의 결과":
         show_approval_result()
+    elif menu == "전도금 사용 결의 보고":
+        show_usage_report()
     elif menu == "계좌 잔고 확인":
         show_account_balance_check()
     else:
