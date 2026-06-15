@@ -3049,7 +3049,16 @@ def show_advance_payment_request():
     requests = data.get("requests", [])
 
     if st.session_state.user_role != "관리자":
-        workplaces = [row for row in workplaces if row.get("manager_name") == st.session_state.get("user_name", "")]
+        user_name = st.session_state.get("user_name", "")
+        user_dept = ""
+        for info in _real_users(st.session_state.user_db).values():
+            if info.get("name") == user_name:
+                user_dept = info.get("dept_type", "")
+                break
+        workplaces = [
+            row for row in workplaces
+            if row.get("manager_name") == user_name or row.get("workplace_name") == user_dept
+        ]
 
     if not workplaces:
         if st.session_state.user_role != "관리자":
