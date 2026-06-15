@@ -4439,6 +4439,23 @@ def apply_global_table_css():
         body:has(#pms-d:checked) [data-testid="stDownloadButton"] a span {
             color: #ffffff !important;
         }
+        /* 익스팬더(메뉴 이용 안내 등) 헤더 크기 축소 */
+        [data-testid="stExpander"] summary {
+            min-height: 30px !important;
+            padding: 0.25rem 0.75rem !important;
+        }
+        [data-testid="stExpander"] summary p {
+            font-size: 0.85rem !important;
+            margin: 0 !important;
+        }
+        [data-testid="stExpander"] summary svg,
+        [data-testid="stExpander"] [data-testid="stExpanderToggleIcon"] {
+            width: 1rem !important;
+            height: 1rem !important;
+        }
+        [data-testid="stExpanderDetails"] {
+            padding: 0.5rem 0.75rem !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
