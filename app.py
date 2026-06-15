@@ -213,6 +213,15 @@ def _check_business_status(api_key, biz_numbers):
         return {}
 
 
+# ── 예금주조회 (계좌 실명조회 API 연동 전 임시 구현) ────────────────
+
+def _lookup_account_holder_name(bank_name, account_number, expected_holder=""):
+    """계좌 실명조회 API 연동 전까지, 등록된 입금은행/계좌번호가 있으면 예상예금주를 조회 결과로 반환."""
+    if not bank_name or not account_number:
+        return ""
+    return expected_holder
+
+
 def _github_save(file_path, data):
     token = _get_github_token()
     if not token:
@@ -3814,11 +3823,15 @@ def show_transfer_file_generation():
     source_label = st.selectbox("출금 계좌", list(source_options.keys()))
 
     st.markdown("#### 이체 대상 선택")
+    lookup_map = st.session_state.get("_transfer_holder_lookup", {})
     target_rows = []
+    lookup_inputs = {}
     for row in sorted(targets, key=lambda item: item.get("requested_at", "")):
         account = accounts_by_workplace_id.get(row.get("workplace_id"), {})
         workplace_name = row.get("workplace_name", "")
         passbook_label = f"{workplace_name} 전도금"
+        expected_holder = account.get("holder_name", "") or workplace_name
+        lookup_inputs[row.get("id")] = (account.get("bank_name", ""), account.get("account_number", ""), expected_holder)
         target_rows.append(
             {
                 "id": row.get("id"),
@@ -3826,7 +3839,8 @@ def show_transfer_file_generation():
                 "입금은행": account.get("bank_name", ""),
                 "입금계좌번호": account.get("account_number", ""),
                 "입금액": _format_won(row.get("request_amount")),
-                "예상예금주": account.get("holder_name", "") or workplace_name,
+                "예상예금주": expected_holder,
+                "조회한예금주": lookup_map.get(row.get("id"), ""),
                 "입금통장표시": passbook_label,
                 "출금통장표시": passbook_label,
             }
@@ -3842,6 +3856,7 @@ def show_transfer_file_generation():
             "입금계좌번호": st.column_config.TextColumn("입금계좌번호", disabled=True),
             "입금액": st.column_config.TextColumn("입금액", disabled=True),
             "예상예금주": st.column_config.TextColumn("예상예금주", disabled=True),
+            "조회한예금주": st.column_config.TextColumn("조회한예금주", disabled=True),
             "입금통장표시": st.column_config.TextColumn("입금통장표시"),
             "출금통장표시": st.column_config.TextColumn("출금통장표시"),
         },
@@ -3853,9 +3868,22 @@ def show_transfer_file_generation():
 
     col_spacer, col_holder_lookup = st.columns([165, 35])
     if col_holder_lookup.button("예금주조회", key="transfer_holder_lookup_btn", use_container_width=True):
-        st.info("예금주조회 기능은 준비 중입니다. (API 연동 예정)")
+        new_lookup = {}
+        for row_id, (bank_name, account_number, expected_holder) in lookup_inputs.items():
+            holder = _lookup_account_holder_name(bank_name, account_number, expected_holder)
+            if holder:
+                new_lookup[row_id] = holder
+        st.session_state["_transfer_holder_lookup"] = new_lookup
+        if new_lookup:
+            st.success(f"{len(new_lookup)}건의 예금주 정보를 조회했습니다.")
+        else:
+            st.warning("조회 가능한 입금계좌 정보가 없습니다. [계좌 관리]에서 계좌를 먼저 등록해주세요.")
+        st.rerun()
 
-    if st.button("이체 자료 생성", type="primary", disabled=not selected_ids):
+    lookup_map = st.session_state.get("_transfer_holder_lookup", {})
+    lookup_complete = bool(selected_ids) and all(row_id in lookup_map for row_id in selected_ids)
+
+    if st.button("이체 자료 생성", type="primary", disabled=not lookup_complete):
         source = source_options[source_label]
         rows = []
         now_str = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
@@ -3873,7 +3901,7 @@ def show_transfer_file_generation():
                     "입금은행": account.get("bank_name", ""),
                     "입금계좌번호": account.get("account_number", ""),
                     "입금액": row.get("request_amount", 0),
-                    "예상예금주": account.get("holder_name", "") or row.get("workplace_name", ""),
+                    "예상예금주": lookup_map.get(row.get("id")) or account.get("holder_name", "") or row.get("workplace_name", ""),
                     "입금통장표시": edited_row.get("입금통장표시", ""),
                     "사업장명": row.get("workplace_name", ""),
                 }
@@ -3881,6 +3909,9 @@ def show_transfer_file_generation():
             row["status"] = "이체 대상"
             row["transfer_file_generated_at"] = now_str
 
+        st.session_state["_transfer_holder_lookup"] = {
+            row_id: name for row_id, name in lookup_map.items() if row_id not in selected_ids
+        }
         _save_delegated_workplaces(wp_data)
 
         excel_bytes = dataframe_to_excel_bytes({"이체자료": pd.DataFrame(rows)})
