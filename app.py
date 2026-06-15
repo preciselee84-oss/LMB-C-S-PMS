@@ -2968,6 +2968,37 @@ def _workplace_forecast_rows(workplaces, requests):
     return rows
 
 
+def _render_page_chrome(breadcrumb_items):
+    crumbs = " &gt; ".join(html.escape(item) for item in breadcrumb_items[:-1])
+    current = html.escape(breadcrumb_items[-1])
+    st.markdown(
+        f"""
+        <style>
+        .block-container {{
+            max-width: 1180px !important;
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
+        }}
+        .pms-breadcrumb {{
+            text-align: right;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 600;
+            margin: -4px 0 14px;
+        }}
+        .pms-breadcrumb span {{
+            color: #008c78;
+        }}
+        [data-testid="stCheckbox"] label {{
+            white-space: nowrap !important;
+        }}
+        </style>
+        <div class="pms-breadcrumb">{crumbs} &gt; <span>{current}</span></div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _workplace_dashboard_css():
     st.markdown(
         """
@@ -3202,6 +3233,7 @@ def _donut_card(title, value, label, percent):
 
 
 def show_advance_payment_request():
+    _render_page_chrome(["홈", "업무", "전도금 요청", "전도금 요청"])
     st.markdown("### 전도금 요청")
     st.caption("위탁 사업장의 전도금을 요청하고 처리 현황을 확인합니다.")
 
@@ -3468,32 +3500,7 @@ def show_e_approval():
 
 
 def show_approval_result():
-    st.markdown(
-        """
-        <style>
-        .block-container {
-            max-width: 1180px !important;
-            padding-left: 2rem !important;
-            padding-right: 2rem !important;
-        }
-        .pms-breadcrumb {
-            text-align: right;
-            color: #64748b;
-            font-size: 12px;
-            font-weight: 600;
-            margin: -4px 0 14px;
-        }
-        .pms-breadcrumb span {
-            color: #008c78;
-        }
-        [data-testid="stCheckbox"] label {
-            white-space: nowrap !important;
-        }
-        </style>
-        <div class="pms-breadcrumb">홈 &gt; 조회 &gt; 품의 결과 &gt; <span>품의 결과</span></div>
-        """,
-        unsafe_allow_html=True,
-    )
+    _render_page_chrome(["홈", "조회", "품의 결과", "품의 결과"])
     st.markdown("### 품의 결과")
     st.caption("전도금 요청의 품의(승인/반려) 처리 결과를 조회합니다.")
 
@@ -4133,10 +4140,11 @@ def _render_transfer_confirmed_section(confirmed_rows, accounts_by_workplace_id)
             for row in sorted(confirmed_rows, key=lambda item: item.get("transfer_file_generated_at", ""), reverse=True)
         ]
     )
-    render_plain_html_table(confirmed_view, center_align=True)
+    render_plain_html_table(confirmed_view, center_align=True, stretch=True, max_width="760px", border=False)
 
 
 def show_transfer_file_generation():
+    _render_page_chrome(["홈", "지급관리", "이체 자료 확정", "이체 자료 확정"])
     st.markdown("### 이체 자료 확정")
     st.caption("품의가 확정된 전도금 요청을 선택하여 이체 자료를 확정하고 엑셀로 다운로드합니다.")
 
@@ -4310,6 +4318,7 @@ def show_transfer_file_generation():
 
 
 def show_transfer_result_confirmation():
+    _render_page_chrome(["홈", "지급관리", "지급 결과 확인", "지급 결과 확인"])
     st.markdown("### 지급 결과 확인")
     st.caption("이체 자료가 확정된 건의 이체 완료 여부를 확인하고, 완료 이력을 관리합니다.")
 
@@ -4441,12 +4450,19 @@ def show_transfer_result_confirmation():
                 "requested_at": "요청일시",
             }
         )
-        render_plain_html_table(done_view.sort_values("이체완료일시", ascending=False), center_align=True)
+        render_plain_html_table(
+            done_view.sort_values("이체완료일시", ascending=False),
+            center_align=True,
+            stretch=True,
+            max_width="760px",
+            border=False,
+        )
     else:
         st.info("이체 완료 이력이 없습니다.")
 
 
 def show_account_balance_check():
+    _render_page_chrome(["홈", "조회", "계좌 잔고 확인", "계좌 잔고 확인"])
     st.markdown("### 계좌 잔고 확인")
     st.caption("위탁 사업장 계좌의 잔고를 수동으로 관리하고 변동 추이를 확인합니다.")
 
@@ -4493,7 +4509,7 @@ def show_account_balance_check():
             st.session_state.show_balance_update_form = True
             st.rerun()
 
-    render_plain_html_table(account_view, center_align=True)
+    render_plain_html_table(account_view, center_align=True, stretch=True, max_width="760px", border=False)
 
     st.markdown("#### 거래내역조회")
     history_options = {f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row for row in accounts}
@@ -4706,7 +4722,7 @@ def show_account_balance_check():
             history_view = history_df[["at", "거래금액", "잔고", "memo"]].rename(
                 columns={"at": "거래일시", "memo": "적요"}
             )
-            render_plain_html_table(history_view, center_align=True)
+            render_plain_html_table(history_view, center_align=True, stretch=True, max_width="760px", border=False)
         else:
             st.info("조건에 맞는 거래내역이 없습니다.")
 
