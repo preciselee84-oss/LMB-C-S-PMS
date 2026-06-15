@@ -36,6 +36,7 @@ SERVER_CONNECTION_FILE = "server_connection.json"
 DELEGATED_WORKPLACE_FILE = "delegated_workplaces.json"
 APPROVAL_FILE = "approvals.json"
 BANK_ACCOUNT_FILE = "bank_accounts.json"
+USAGE_REPORT_FILE = "usage_reports.json"
 COMPANY_PROFILE_FILE = "company_profile.json"
 EXCEL_SAMPLE_FILE = resolve_template_file("LMB월간 활동실적_000000(샘플).xlsx")
 
@@ -2659,7 +2660,7 @@ def show_sidebar():
 
             st.markdown("<div class='gpt-section'>위탁 사업장</div>", unsafe_allow_html=True)
 
-        for menu_name in ["전도금 요청", "품의 결과", "계좌 잔고 확인"]:
+        for menu_name in ["전도금 요청", "품의 결과", "사용품의서 보고", "계좌 잔고 확인"]:
             render_nav_button(menu_name)
 
         st.markdown("<div class='gpt-sidebar-divider'></div><div class='gpt-logout-marker'></div>", unsafe_allow_html=True)
@@ -2703,6 +2704,20 @@ def _load_approvals():
 def _save_approvals(data):
     data.setdefault("documents", [])
     save_db(APPROVAL_FILE, data, allow_shrink=True)
+
+
+def _load_usage_reports():
+    default_data = {"reports": []}
+    data = load_db(USAGE_REPORT_FILE, default_data)
+    if not isinstance(data, dict):
+        return default_data
+    data.setdefault("reports", [])
+    return data
+
+
+def _save_usage_reports(data):
+    data.setdefault("reports", [])
+    save_db(USAGE_REPORT_FILE, data, allow_shrink=True)
 
 
 def _load_bank_accounts():
@@ -3257,7 +3272,18 @@ def show_e_approval():
                             doc["processed_at"] = now_str
                             doc["processed_by"] = st.session_state.user_name
                             linked = requests_by_id.get(doc.get("ref_request_id"))
-                            if linked:
+                            if doc.get("doc_type") == "사용품의서":
+                                usage_data = _load_usage_reports()
+                                usage_by_id = {row.get("id"): row for row in usage_data.get("reports", [])}
+                                usage_report = usage_by_id.get(doc.get("ref_usage_report_id"))
+                                if usage_report:
+                                    usage_report["status"] = "승인"
+                                    usage_report["processed_at"] = now_str
+                                    usage_report["processed_by"] = st.session_state.user_name
+                                _save_usage_reports(usage_data)
+                                if linked:
+                                    linked["usage_report_status"] = "승인"
+                            elif linked:
                                 linked["status"] = "품의 확정"
                                 linked["approved_at"] = now_str
                             _save_approvals(approvals)
@@ -3273,7 +3299,19 @@ def show_e_approval():
                                 doc["processed_by"] = st.session_state.user_name
                                 doc["reject_reason"] = reason.strip()
                                 linked = requests_by_id.get(doc.get("ref_request_id"))
-                                if linked:
+                                if doc.get("doc_type") == "사용품의서":
+                                    usage_data = _load_usage_reports()
+                                    usage_by_id = {row.get("id"): row for row in usage_data.get("reports", [])}
+                                    usage_report = usage_by_id.get(doc.get("ref_usage_report_id"))
+                                    if usage_report:
+                                        usage_report["status"] = "반려"
+                                        usage_report["processed_at"] = now_str
+                                        usage_report["processed_by"] = st.session_state.user_name
+                                        usage_report["reject_reason"] = reason.strip()
+                                    _save_usage_reports(usage_data)
+                                    if linked:
+                                        linked["usage_report_status"] = "반려"
+                                elif linked:
                                     linked["status"] = "반려"
                                     linked["reject_reason"] = reason.strip()
                                     linked["processed_at"] = now_str
@@ -3406,6 +3444,169 @@ def show_approval_result():
         }
     )
     render_plain_html_table(result_view.sort_values("요청일시", ascending=False), center_align=True)
+
+
+def show_usage_report():
+    st.markdown("### 사용품의서 보고")
+    st.caption("이체 완료된 전도금의 사용 내역을 작성하여 전자결재로 보고합니다.")
+
+    wp_data = _load_delegated_workplaces()
+    workplaces = _my_workplaces(wp_data.get("workplaces", []))
+    requests = wp_data.get("requests", [])
+    my_ids = {row.get("id") for row in workplaces}
+
+    usage_data = _load_usage_reports()
+    usage_reports = usage_data.get("reports", [])
+
+    my_reports = [row for row in usage_reports if row.get("workplace_id") in my_ids]
+    if my_reports:
+        st.markdown("#### 사용품의서 현황")
+        _workplace_dashboard_css()
+        cols = st.columns(3)
+        for index, row in enumerate(sorted(my_reports, key=lambda item: item.get("requested_at", ""), reverse=True)):
+            with cols[index % 3]:
+                reject_line = ""
+                if row.get("status") == "반려" and row.get("reject_reason"):
+                    reject_line = f"<div class='request-meta'>반려 사유: {html.escape(str(row.get('reject_reason')))}</div>"
+                st.markdown(
+                    (
+                        "<div class='request-card'>"
+                        f"<div class='request-title'>{html.escape(str(row.get('workplace_name', '')))}</div>"
+                        f"<div class='request-meta'>{html.escape(_format_won(row.get('total_amount')))} · {html.escape(str(row.get('requested_at', '')))}</div>"
+                        f"{reject_line}"
+                        f"<span class='status-chip'>{html.escape(str(row.get('status', '')))}</span>"
+                        "</div>"
+                    ),
+                    unsafe_allow_html=True,
+                )
+    else:
+        st.info("작성된 사용품의서가 없습니다.")
+
+    st.markdown("#### 사용품의서 작성")
+
+    eligible = [
+        row for row in requests
+        if row.get("workplace_id") in my_ids
+        and row.get("status") == "이체 완료"
+        and row.get("usage_report_status") not in ("결재대기", "승인")
+    ]
+    if not eligible:
+        st.info("사용품의서를 작성할 수 있는 이체 완료 건이 없습니다.")
+        return
+
+    options = {
+        f"{row.get('workplace_name', '')} · {_format_won(row.get('request_amount'))} · {row.get('paid_at', '')}": row
+        for row in sorted(eligible, key=lambda item: item.get("paid_at", ""), reverse=True)
+    }
+    selected_label = st.selectbox("이체 완료 건 선택", list(options.keys()), key="usage_report_target")
+    target = options[selected_label]
+    st.caption(f"전도금 지급액: {_format_won(target.get('request_amount'))}")
+
+    items_key = f"usage_report_items_{target.get('id')}"
+    if items_key not in st.session_state:
+        st.session_state[items_key] = pd.DataFrame(
+            [{"사용일자": _current_kst().strftime("%Y-%m-%d"), "품목명": "", "금액": 0, "비고": ""}]
+        )
+
+    edited_items = st.data_editor(
+        st.session_state[items_key],
+        num_rows="dynamic",
+        use_container_width=True,
+        key=f"usage_report_items_editor_{target.get('id')}",
+        column_config={
+            "사용일자": st.column_config.TextColumn("사용일자"),
+            "품목명": st.column_config.TextColumn("품목명"),
+            "금액": st.column_config.NumberColumn("금액", min_value=0, step=1000, format="%d"),
+            "비고": st.column_config.TextColumn("비고"),
+        },
+    )
+
+    valid_items = edited_items[edited_items["품목명"].astype(str).str.strip() != ""]
+    total_amount = int(pd.to_numeric(valid_items["금액"], errors="coerce").fillna(0).sum())
+    remaining = int(target.get("request_amount") or 0) - total_amount
+    st.markdown(
+        f"**사용 합계: {_format_won(total_amount)}** · 잔액: {_format_won(remaining)}"
+    )
+
+    receipts = st.file_uploader(
+        "영수증/증빙 자료 첨부",
+        accept_multiple_files=True,
+        type=["png", "jpg", "jpeg", "pdf"],
+        key=f"usage_report_receipts_{target.get('id')}",
+    )
+
+    if st.button("사용품의서 제출", type="primary", use_container_width=True, key="submit_usage_report"):
+        if valid_items.empty:
+            st.warning("사용 내역을 1건 이상 입력해주세요.")
+        else:
+            now_str = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
+            report_id = int(time.time() * 1000)
+            items_list = [
+                {
+                    "usage_date": str(item_row.get("사용일자", "")).strip(),
+                    "item_name": str(item_row.get("품목명", "")).strip(),
+                    "amount": int(pd.to_numeric(item_row.get("금액", 0), errors="coerce") or 0),
+                    "memo": str(item_row.get("비고", "")).strip(),
+                }
+                for _, item_row in valid_items.iterrows()
+            ]
+            attachments = [
+                {
+                    "filename": uploaded.name,
+                    "content_type": uploaded.type or "",
+                    "content_b64": base64.b64encode(uploaded.getvalue()).decode(),
+                }
+                for uploaded in (receipts or [])
+            ]
+
+            usage_reports.append(
+                {
+                    "id": report_id,
+                    "workplace_id": target.get("workplace_id"),
+                    "workplace_name": target.get("workplace_name"),
+                    "request_id": target.get("id"),
+                    "requested_by": st.session_state.get("user_name", ""),
+                    "items": items_list,
+                    "total_amount": total_amount,
+                    "attachments": attachments,
+                    "status": "결재대기",
+                    "requested_at": now_str,
+                    "processed_at": "",
+                    "processed_by": "",
+                    "reject_reason": "",
+                }
+            )
+            _save_usage_reports(usage_data)
+
+            approvals = _load_approvals()
+            approvals["documents"].append(
+                {
+                    "id": report_id,
+                    "doc_type": "사용품의서",
+                    "title": f"{target.get('workplace_name', '')} 전도금 사용품의서",
+                    "amount": total_amount,
+                    "requester": st.session_state.get("user_name", ""),
+                    "requester_phone": "",
+                    "reason": f"전도금 지급액 {_format_won(target.get('request_amount'))} 중 {_format_won(total_amount)} 사용 보고",
+                    "ref_request_id": target.get("id"),
+                    "ref_workplace_id": target.get("workplace_id"),
+                    "ref_usage_report_id": report_id,
+                    "status": "결재대기",
+                    "requested_at": now_str,
+                    "processed_at": "",
+                    "processed_by": "",
+                    "reject_reason": "",
+                }
+            )
+            _save_approvals(approvals)
+
+            target["usage_report_id"] = report_id
+            target["usage_report_status"] = "결재대기"
+            _save_delegated_workplaces(wp_data)
+
+            st.session_state.pop(items_key, None)
+            st.success("사용품의서가 제출되었습니다. [전자결재]에서 처리 현황을 확인할 수 있습니다.")
+            st.rerun()
 
 
 def show_company_profile():
@@ -3965,8 +4166,11 @@ def show_transfer_result_confirmation():
         done_df["request_amount_won"] = done_df["request_amount"].apply(_format_won)
         if "paid_at" not in done_df.columns:
             done_df["paid_at"] = ""
+        if "usage_report_status" not in done_df.columns:
+            done_df["usage_report_status"] = ""
+        done_df["usage_report_status"] = done_df["usage_report_status"].replace("", "미작성")
         done_view = done_df[
-            ["paid_at", "workplace_name", "request_amount_won", "requested_by", "requested_at"]
+            ["paid_at", "workplace_name", "request_amount_won", "requested_by", "requested_at", "usage_report_status"]
         ].rename(
             columns={
                 "paid_at": "이체완료일시",
@@ -3974,6 +4178,7 @@ def show_transfer_result_confirmation():
                 "request_amount_won": "이체금액",
                 "requested_by": "요청자",
                 "requested_at": "요청일시",
+                "usage_report_status": "사용품의서",
             }
         )
         render_plain_html_table(done_view.sort_values("이체완료일시", ascending=False), center_align=True)
@@ -4671,6 +4876,11 @@ MENU_GUIDES = {
     "품의 결과": [
         "📊 전도금 요청의 품의(승인/반려) 처리 결과를 조회합니다.",
         "🔍 사업장/처리결과로 필터링할 수 있습니다.",
+    ],
+    "사용품의서 보고": [
+        "🧾 이체 완료된 전도금 건을 선택해 사용 내역(항목별 일자/품목/금액/비고)을 작성합니다.",
+        "📎 영수증 등 증빙 자료를 첨부할 수 있습니다.",
+        "📨 제출 시 [전자결재]로 결재 요청이 전달되며, 처리 결과는 사용품의서 현황에서 확인합니다.",
     ],
     "계좌 잔고 확인": [
         "🏦 등록된 계좌의 현재 잔고를 확인하고 수동으로 업데이트합니다.",
@@ -6442,13 +6652,13 @@ def show_main():
         "대시보드", "전자결재",
         "회사 관리", "위탁 사업장 관리", "서버 접속 정보",
         "이체 자료 생성", "지급 결과 확인",
-        "전도금 요청", "품의 결과", "계좌 잔고 확인",
+        "전도금 요청", "품의 결과", "사용품의서 보고", "계좌 잔고 확인",
     }
     if menu not in allowed_menus:
         st.session_state.current_menu = "전도금 요청"
         persist_current_menu()
         st.rerun()
-    user_menus = {"전도금 요청", "품의 결과", "계좌 잔고 확인"}
+    user_menus = {"전도금 요청", "품의 결과", "사용품의서 보고", "계좌 잔고 확인"}
     if menu not in user_menus and st.session_state.user_role != "관리자":
         st.session_state.current_menu = "전도금 요청"
         persist_current_menu()
@@ -6474,6 +6684,8 @@ def show_main():
         show_advance_payment_request()
     elif menu == "품의 결과":
         show_approval_result()
+    elif menu == "사용품의서 보고":
+        show_usage_report()
     elif menu == "계좌 잔고 확인":
         show_account_balance_check()
     else:
