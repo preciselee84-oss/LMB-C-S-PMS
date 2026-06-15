@@ -4635,7 +4635,7 @@ def show_account_balance_check():
             with search_label_col:
                 st.markdown("**검색조건**")
             with search_input_col:
-                search_type_col, keyword_col = st.columns([0.22, 0.55])
+                search_type_col, keyword_col, _ = st.columns([0.22, 0.40, 0.16])
                 with search_type_col:
                     search_type = st.selectbox(
                         "검색조건",
