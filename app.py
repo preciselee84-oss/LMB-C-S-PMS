@@ -4543,6 +4543,40 @@ def show_transfer_file_generation():
     st.markdown("### 이체 자료 확정")
     st.caption("품의가 확정된 전도금 요청을 선택하여 이체 자료를 확정하고 엑셀로 다운로드합니다.")
 
+    # 다크모드 스타일
+    st.markdown(
+        """
+        <style>
+        /* 이체 대상 선택 data_editor 다크모드 */
+        body:has(#pms-d:checked) [data-testid="stDataEditor"],
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] > div,
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="grid"] {
+            background-color: #1e1e2e !important;
+            color: #ffffff !important;
+            border-color: #45475a !important;
+        }
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] th,
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="columnheader"] {
+            background-color: #252535 !important;
+            color: #ffffff !important;
+            border-color: #45475a !important;
+        }
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] td,
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] [role="gridcell"] {
+            background-color: #1e1e2e !important;
+            color: #ffffff !important;
+            border-color: #313244 !important;
+        }
+        body:has(#pms-d:checked) [data-testid="stDataEditor"] input {
+            background-color: #252535 !important;
+            color: #ffffff !important;
+            border-color: #45475a !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
     wp_data = _load_delegated_workplaces()
     requests = wp_data.get("requests", [])
 
