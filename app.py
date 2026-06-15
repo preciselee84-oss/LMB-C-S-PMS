@@ -3483,11 +3483,68 @@ def show_approval_result():
     requester_names = ["전체"] + sorted({row.get("requested_by", "") for row in processed if row.get("requested_by")})
     status_options = ["전체"] + sorted({row.get("status", "") for row in processed if row.get("status")})
 
-    col_a, col_b, col_c, col_d = st.columns(4)
-    request_date_range = col_a.date_input("요청일자", value=(), key="approval_result_request_date")
-    selected_requester = col_b.selectbox("요청자", requester_names)
-    selected_status = col_c.selectbox("처리결과", status_options)
-    processed_date_range = col_d.date_input("처리일시", value=(), key="approval_result_processed_date")
+    with st.container(border=True):
+        request_date_label_col, request_date_input_col = st.columns([0.12, 0.88])
+        with request_date_label_col:
+            st.markdown("**요청일자**")
+        with request_date_input_col:
+            request_date_range = st.date_input(
+                "요청일자",
+                value=(),
+                key="approval_result_request_date",
+                label_visibility="collapsed",
+            )
+
+        requester_label_col, requester_input_col = st.columns([0.12, 0.88])
+        with requester_label_col:
+            st.markdown("**요청자**")
+        with requester_input_col:
+            selected_requester = st.selectbox(
+                "요청자",
+                requester_names,
+                key="approval_result_requester",
+                label_visibility="collapsed",
+            )
+
+        status_label_col, status_input_col = st.columns([0.12, 0.88])
+        with status_label_col:
+            st.markdown("**처리결과**")
+        with status_input_col:
+            selected_status = st.selectbox(
+                "처리결과",
+                status_options,
+                key="approval_result_status",
+                label_visibility="collapsed",
+            )
+
+        processed_date_label_col, processed_date_input_col = st.columns([0.12, 0.88])
+        with processed_date_label_col:
+            st.markdown("**처리일시**")
+        with processed_date_input_col:
+            processed_date_range = st.date_input(
+                "처리일시",
+                value=(),
+                key="approval_result_processed_date",
+                label_visibility="collapsed",
+            )
+
+    button_left, button_center, button_right = st.columns([0.42, 0.16, 0.42])
+    with button_center:
+        search_clicked = st.button("조회", key="approval_result_search", type="primary", use_container_width=True)
+
+    if search_clicked or "_approval_result_query" not in st.session_state:
+        st.session_state["_approval_result_query"] = {
+            "request_date_range": request_date_range,
+            "selected_requester": selected_requester,
+            "selected_status": selected_status,
+            "processed_date_range": processed_date_range,
+        }
+
+    query = st.session_state.get("_approval_result_query", {})
+    request_date_range = query.get("request_date_range", ())
+    selected_requester = query.get("selected_requester", "전체")
+    selected_status = query.get("selected_status", "전체")
+    processed_date_range = query.get("processed_date_range", ())
 
     def _date_in_range(value, date_range):
         if not isinstance(date_range, tuple) or len(date_range) != 2:
