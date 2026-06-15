@@ -4551,106 +4551,106 @@ def show_account_balance_check():
         )
 
         with st.container(border=False):
-        account_label_col, account_input_col, _ = st.columns([0.12, 0.42, 0.46])
-        with account_label_col:
-            st.markdown("**계좌번호 <span style='color:#008c78'>*</span>**", unsafe_allow_html=True)
-        with account_input_col:
-            history_label = st.selectbox(
-                "계좌번호",
-                list(history_options.keys()),
-                key="balance_history_account",
-                label_visibility="collapsed",
-                placeholder="계좌 선택",
-            )
-
-        period_label_col, period_input_col = st.columns([0.12, 0.88])
-        with period_label_col:
-            st.markdown("**조회기간**")
-        with period_input_col:
-            preset_cols = st.columns([0.13, 0.13, 0.17, 0.17, 0.40])
-            for index, (label, date_range) in enumerate(period_presets.items()):
-                button_type = "primary" if label == st.session_state.get("balance_history_preset", "1주일") else "secondary"
-                if preset_cols[index].button(label, key=f"balance_history_preset_{label}", type=button_type, use_container_width=True):
-                    st.session_state.balance_history_preset = label
-                    st.session_state.balance_history_start_date = date_range[0]
-                    st.session_state.balance_history_end_date = date_range[1]
-                    st.rerun()
-
-            date_start_col, tilde_col, date_end_col, month_col, _ = st.columns([0.22, 0.03, 0.22, 0.18, 0.35])
-            with date_start_col:
-                start_date = st.date_input("시작일", key="balance_history_start_date", label_visibility="collapsed")
-            with tilde_col:
-                st.markdown("<div style='padding-top:8px;text-align:center;'>~</div>", unsafe_allow_html=True)
-            with date_end_col:
-                end_date = st.date_input("종료일", key="balance_history_end_date", label_visibility="collapsed")
-            with month_col:
-                month_options = ["월별 선택"] + [
-                    (today.replace(day=1) - pd.DateOffset(months=idx)).strftime("%Y-%m")
-                    for idx in range(12)
-                ]
-                selected_month = st.selectbox(
-                    "월별 선택",
-                    month_options,
-                    key="balance_history_month",
+            account_label_col, account_input_col, _ = st.columns([0.12, 0.42, 0.46])
+            with account_label_col:
+                st.markdown("**계좌번호 <span style='color:#008c78'>*</span>**", unsafe_allow_html=True)
+            with account_input_col:
+                history_label = st.selectbox(
+                    "계좌번호",
+                    list(history_options.keys()),
+                    key="balance_history_account",
                     label_visibility="collapsed",
+                    placeholder="계좌 선택",
                 )
-            st.markdown("<div class='balance-history-help'>ㆍ 직접입력 예시 : YYYYMMDD</div>", unsafe_allow_html=True)
 
-        content_label_col, content_input_col = st.columns([0.12, 0.88])
-        with content_label_col:
-            st.markdown("**조회내용**")
-        with content_input_col:
-            history_type = st.radio(
-                "조회내용",
-                ["전체(입금+출금)", "입금내역", "출금내역"],
-                horizontal=True,
-                key="balance_history_type",
-                label_visibility="collapsed",
-            )
+            period_label_col, period_input_col = st.columns([0.12, 0.88])
+            with period_label_col:
+                st.markdown("**조회기간**")
+            with period_input_col:
+                preset_cols = st.columns([0.13, 0.13, 0.17, 0.17, 0.40])
+                for index, (label, date_range) in enumerate(period_presets.items()):
+                    button_type = "primary" if label == st.session_state.get("balance_history_preset", "1주일") else "secondary"
+                    if preset_cols[index].button(label, key=f"balance_history_preset_{label}", type=button_type, use_container_width=True):
+                        st.session_state.balance_history_preset = label
+                        st.session_state.balance_history_start_date = date_range[0]
+                        st.session_state.balance_history_end_date = date_range[1]
+                        st.rerun()
 
-        sort_label_col, sort_input_col = st.columns([0.12, 0.88])
-        with sort_label_col:
-            st.markdown("**정렬방식**")
-        with sort_input_col:
-            sort_col, count_col = st.columns([0.22, 0.5])
-            with sort_col:
-                sort_order = st.selectbox(
-                    "정렬방식",
-                    ["최근거래먼저", "과거거래먼저"],
-                    key="balance_history_sort",
-                    label_visibility="collapsed",
-                )
-            with count_col:
-                result_count = st.radio(
-                    "조회건수",
-                    [15, 30, 50, 100],
-                    index=1,
+                date_start_col, tilde_col, date_end_col, month_col, _ = st.columns([0.22, 0.03, 0.22, 0.18, 0.35])
+                with date_start_col:
+                    start_date = st.date_input("시작일", key="balance_history_start_date", label_visibility="collapsed")
+                with tilde_col:
+                    st.markdown("<div style='padding-top:8px;text-align:center;'>~</div>", unsafe_allow_html=True)
+                with date_end_col:
+                    end_date = st.date_input("종료일", key="balance_history_end_date", label_visibility="collapsed")
+                with month_col:
+                    month_options = ["월별 선택"] + [
+                        (today.replace(day=1) - pd.DateOffset(months=idx)).strftime("%Y-%m")
+                        for idx in range(12)
+                    ]
+                    selected_month = st.selectbox(
+                        "월별 선택",
+                        month_options,
+                        key="balance_history_month",
+                        label_visibility="collapsed",
+                    )
+                st.markdown("<div class='balance-history-help'>ㆍ 직접입력 예시 : YYYYMMDD</div>", unsafe_allow_html=True)
+
+            content_label_col, content_input_col = st.columns([0.12, 0.88])
+            with content_label_col:
+                st.markdown("**조회내용**")
+            with content_input_col:
+                history_type = st.radio(
+                    "조회내용",
+                    ["전체(입금+출금)", "입금내역", "출금내역"],
                     horizontal=True,
-                    key="balance_history_limit",
+                    key="balance_history_type",
                     label_visibility="collapsed",
-                    format_func=lambda value: f"{value}건",
                 )
 
-        search_label_col, search_input_col = st.columns([0.12, 0.88])
-        with search_label_col:
-            st.markdown("**검색조건**")
-        with search_input_col:
-            search_type_col, keyword_col = st.columns([0.22, 0.55])
-            with search_type_col:
-                search_type = st.selectbox(
-                    "검색조건",
-                    ["적요"],
-                    key="balance_history_search_type",
-                    label_visibility="collapsed",
-                )
-            with keyword_col:
-                search_keyword = st.text_input(
-                    "검색어",
-                    key="balance_history_keyword",
-                    label_visibility="collapsed",
-                    placeholder="적요(통장 메모) 최대 25자까지 입력가능",
-                    max_chars=25,
-                )
+            sort_label_col, sort_input_col = st.columns([0.12, 0.88])
+            with sort_label_col:
+                st.markdown("**정렬방식**")
+            with sort_input_col:
+                sort_col, count_col = st.columns([0.22, 0.5])
+                with sort_col:
+                    sort_order = st.selectbox(
+                        "정렬방식",
+                        ["최근거래먼저", "과거거래먼저"],
+                        key="balance_history_sort",
+                        label_visibility="collapsed",
+                    )
+                with count_col:
+                    result_count = st.radio(
+                        "조회건수",
+                        [15, 30, 50, 100],
+                        index=1,
+                        horizontal=True,
+                        key="balance_history_limit",
+                        label_visibility="collapsed",
+                        format_func=lambda value: f"{value}건",
+                    )
+
+            search_label_col, search_input_col = st.columns([0.12, 0.88])
+            with search_label_col:
+                st.markdown("**검색조건**")
+            with search_input_col:
+                search_type_col, keyword_col = st.columns([0.22, 0.55])
+                with search_type_col:
+                    search_type = st.selectbox(
+                        "검색조건",
+                        ["적요"],
+                        key="balance_history_search_type",
+                        label_visibility="collapsed",
+                    )
+                with keyword_col:
+                    search_keyword = st.text_input(
+                        "검색어",
+                        key="balance_history_keyword",
+                        label_visibility="collapsed",
+                        placeholder="적요(통장 메모) 최대 25자까지 입력가능",
+                        max_chars=25,
+                    )
 
         button_left, button_center, button_right = st.columns([0.42, 0.16, 0.42])
         with button_center:
