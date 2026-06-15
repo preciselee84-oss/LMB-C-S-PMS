@@ -3651,6 +3651,22 @@ def show_approval_result():
         else "전도금 요청",
         axis=1,
     )
+    type_col1, type_col2, _ = st.columns([0.13, 0.18, 0.69])
+    with type_col1:
+        show_advance_requests = st.checkbox("전도금 요청", value=True, key="approval_result_show_advance_requests")
+    with type_col2:
+        show_usage_reports = st.checkbox("전도금 사용 결의 보고", value=True, key="approval_result_show_usage_reports")
+
+    visible_doc_types = []
+    if show_advance_requests:
+        visible_doc_types.append("전도금 요청")
+    if show_usage_reports:
+        visible_doc_types.append("전도금 사용 결의 보고")
+    result_df = result_df[result_df["문서구분"].isin(visible_doc_types)]
+    if result_df.empty:
+        st.info("선택한 문서구분에 해당하는 품의 결과가 없습니다.")
+        return
+
     result_view = result_df[
         ["문서구분", "requested_at", "workplace_name", "request_amount_won", "requested_by", "status", "처리일시", "reject_reason"]
     ].rename(
