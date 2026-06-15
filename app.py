@@ -3062,73 +3062,6 @@ def show_advance_payment_request():
 
     workplaces = _my_workplaces(workplaces)
 
-    if not workplaces:
-        if st.session_state.user_role != "관리자":
-            st.info("담당으로 등록된 사업장이 없습니다. 관리자에게 문의해주세요.")
-        else:
-            st.info("관리자 메뉴의 [위탁 사업장 관리]에서 사업장을 먼저 등록해주세요.")
-    else:
-        workplace_options = {row.get("workplace_name", ""): row for row in workplaces}
-        with st.form("delegated_fund_request_form", clear_on_submit=True):
-            selected_name = st.selectbox("사업장", list(workplace_options.keys()))
-            request_amount = st.number_input("요청 금액", min_value=0, step=100000, format="%d")
-            requested_by = st.text_input(
-                "요청자",
-                value=st.session_state.get("user_name", ""),
-                placeholder="요청자명",
-            )
-            request_reason = st.text_area("요청 사유", placeholder="전도금 사용 목적 및 필요 사유")
-            requested = st.form_submit_button("전도금 요청 등록", type="primary")
-
-        if requested:
-            site = workplace_options[selected_name]
-            if request_amount <= 0:
-                st.warning("요청 금액을 입력해주세요.")
-            else:
-                now_str = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
-                request_id = int(time.time() * 1000)
-                requests.append(
-                    {
-                        "id": request_id,
-                        "workplace_id": site.get("id"),
-                        "workplace_name": site.get("workplace_name"),
-                        "request_amount": int(request_amount),
-                        "requested_by": requested_by.strip(),
-                        "request_reason": request_reason.strip(),
-                        "status": "요청",
-                        "requested_at": now_str,
-                        "approved_at": "",
-                        "paid_at": "",
-                        "approval_doc_id": request_id,
-                        "reject_reason": "",
-                        "transfer_file_generated_at": "",
-                    }
-                )
-                _save_delegated_workplaces(data)
-
-                approvals = _load_approvals()
-                approvals["documents"].append(
-                    {
-                        "id": request_id,
-                        "doc_type": "전도금요청",
-                        "title": f"{site.get('workplace_name', '')} 전도금 요청",
-                        "amount": int(request_amount),
-                        "requester": requested_by.strip(),
-                        "reason": request_reason.strip(),
-                        "ref_request_id": request_id,
-                        "ref_workplace_id": site.get("id"),
-                        "status": "결재대기",
-                        "requested_at": now_str,
-                        "processed_at": "",
-                        "processed_by": "",
-                        "reject_reason": "",
-                    }
-                )
-                _save_approvals(approvals)
-
-                st.success("전도금 요청이 등록되었습니다. [전자결재]에서 처리 현황을 확인할 수 있습니다.")
-                st.rerun()
-
     my_requests = [
         row
         for row in requests
@@ -3158,6 +3091,77 @@ def show_advance_payment_request():
                 )
     else:
         st.info("최근 7일간 요청한 전도금 내역이 없습니다.")
+
+    if not workplaces:
+        if st.session_state.user_role != "관리자":
+            st.info("담당으로 등록된 사업장이 없습니다. 관리자에게 문의해주세요.")
+        else:
+            st.info("관리자 메뉴의 [위탁 사업장 관리]에서 사업장을 먼저 등록해주세요.")
+    else:
+        workplace_options = {row.get("workplace_name", ""): row for row in workplaces}
+        with st.expander("전도금 요청 등록", expanded=False):
+            with st.form("delegated_fund_request_form", clear_on_submit=True):
+                selected_name = st.selectbox("사업장", list(workplace_options.keys()))
+                requested_by = st.text_input(
+                    "요청자명",
+                    value=st.session_state.get("user_name", ""),
+                    placeholder="요청자명",
+                )
+                requester_phone = st.text_input("핸드폰번호", placeholder="010-0000-0000")
+                request_amount = st.number_input("요청 금액", min_value=0, step=100000, format="%d")
+                request_reason = st.text_area("요청 사유", placeholder="전도금 사용 목적 및 필요 사유")
+                requested = st.form_submit_button("전도금 요청 등록", type="primary")
+
+            if requested:
+                site = workplace_options[selected_name]
+                if request_amount <= 0:
+                    st.warning("요청 금액을 입력해주세요.")
+                else:
+                    now_str = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
+                    request_id = int(time.time() * 1000)
+                    requests.append(
+                        {
+                            "id": request_id,
+                            "workplace_id": site.get("id"),
+                            "workplace_name": site.get("workplace_name"),
+                            "request_amount": int(request_amount),
+                            "requested_by": requested_by.strip(),
+                            "requester_phone": requester_phone.strip(),
+                            "request_reason": request_reason.strip(),
+                            "status": "요청",
+                            "requested_at": now_str,
+                            "approved_at": "",
+                            "paid_at": "",
+                            "approval_doc_id": request_id,
+                            "reject_reason": "",
+                            "transfer_file_generated_at": "",
+                        }
+                    )
+                    _save_delegated_workplaces(data)
+
+                    approvals = _load_approvals()
+                    approvals["documents"].append(
+                        {
+                            "id": request_id,
+                            "doc_type": "전도금요청",
+                            "title": f"{site.get('workplace_name', '')} 전도금 요청",
+                            "amount": int(request_amount),
+                            "requester": requested_by.strip(),
+                            "requester_phone": requester_phone.strip(),
+                            "reason": request_reason.strip(),
+                            "ref_request_id": request_id,
+                            "ref_workplace_id": site.get("id"),
+                            "status": "결재대기",
+                            "requested_at": now_str,
+                            "processed_at": "",
+                            "processed_by": "",
+                            "reject_reason": "",
+                        }
+                    )
+                    _save_approvals(approvals)
+
+                    st.success("전도금 요청이 등록되었습니다. [전자결재]에서 처리 현황을 확인할 수 있습니다.")
+                    st.rerun()
 
 
 def show_e_approval():
@@ -3220,6 +3224,7 @@ def show_e_approval():
                                 if linked:
                                     linked["status"] = "반려"
                                     linked["reject_reason"] = reason.strip()
+                                    linked["processed_at"] = now_str
                                 _save_approvals(approvals)
                                 _save_delegated_workplaces(wp_data)
                                 st.session_state.pop(f"_reject_target_{doc.get('id')}", None)
@@ -3295,18 +3300,36 @@ def show_approval_result():
         st.info("처리된 품의 결과가 없습니다.")
         return
 
-    workplace_names = ["전체"] + sorted({row.get("workplace_name", "") for row in processed if row.get("workplace_name")})
+    def _processed_at(row):
+        return row.get("approved_at") or row.get("paid_at") or row.get("processed_at") or ""
+
+    requester_names = ["전체"] + sorted({row.get("requested_by", "") for row in processed if row.get("requested_by")})
     status_options = ["전체"] + sorted({row.get("status", "") for row in processed if row.get("status")})
 
-    col_a, col_b = st.columns(2)
-    selected_workplace = col_a.selectbox("사업장", workplace_names)
-    selected_status = col_b.selectbox("처리결과", status_options)
+    col_a, col_b, col_c, col_d = st.columns(4)
+    request_date_range = col_a.date_input("요청일자", value=(), key="approval_result_request_date")
+    selected_requester = col_b.selectbox("요청자", requester_names)
+    selected_status = col_c.selectbox("처리결과", status_options)
+    processed_date_range = col_d.date_input("처리일시", value=(), key="approval_result_processed_date")
+
+    def _date_in_range(value, date_range):
+        if not isinstance(date_range, tuple) or len(date_range) != 2:
+            return True
+        parsed = _parse_kst_datetime(value)
+        if not parsed:
+            return False
+        start, end = date_range
+        return start <= parsed.date() <= end
 
     filtered = processed
-    if selected_workplace != "전체":
-        filtered = [row for row in filtered if row.get("workplace_name") == selected_workplace]
+    if request_date_range:
+        filtered = [row for row in filtered if _date_in_range(row.get("requested_at"), request_date_range)]
+    if selected_requester != "전체":
+        filtered = [row for row in filtered if row.get("requested_by") == selected_requester]
     if selected_status != "전체":
         filtered = [row for row in filtered if row.get("status") == selected_status]
+    if processed_date_range:
+        filtered = [row for row in filtered if _date_in_range(_processed_at(row), processed_date_range)]
 
     if not filtered:
         st.info("조건에 맞는 품의 결과가 없습니다.")
@@ -3314,10 +3337,10 @@ def show_approval_result():
 
     result_df = pd.DataFrame(filtered)
     result_df["request_amount_won"] = result_df["request_amount"].apply(_format_won)
-    for col in ["approved_at", "paid_at", "reject_reason"]:
+    for col in ["approved_at", "paid_at", "processed_at", "reject_reason"]:
         if col not in result_df.columns:
             result_df[col] = ""
-    result_df["처리일시"] = result_df.apply(lambda row: row.get("approved_at") or row.get("paid_at") or "", axis=1)
+    result_df["처리일시"] = result_df.apply(_processed_at, axis=1)
     result_view = result_df[
         ["requested_at", "workplace_name", "request_amount_won", "requested_by", "status", "처리일시", "reject_reason"]
     ].rename(
@@ -3910,6 +3933,49 @@ def show_account_balance_check():
             st.rerun()
 
     render_plain_html_table(account_view, center_align=True)
+
+    st.markdown("#### 거래내역조회")
+    history_options = {f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row for row in accounts}
+    history_label = st.selectbox("계좌 선택", list(history_options.keys()), key="balance_history_account")
+
+    today = _current_kst().date()
+    period_col, search_col = st.columns([0.75, 0.25])
+    with period_col:
+        history_period = st.date_input(
+            "조회 기간",
+            value=(today - timedelta(days=30), today),
+            key="balance_history_period",
+        )
+    with search_col:
+        st.markdown("<div style='height:1.8em'></div>", unsafe_allow_html=True)
+        history_clicked = st.button("거래내역조회", key="balance_history_search", use_container_width=True)
+
+    if history_clicked:
+        st.session_state["_balance_history_target"] = history_label
+
+    history_target_label = st.session_state.get("_balance_history_target")
+    if history_target_label and history_target_label in history_options:
+        target_account = history_options[history_target_label]
+        history_rows = target_account.get("balance_history", [])
+        if isinstance(history_period, tuple) and len(history_period) == 2:
+            start_date, end_date = history_period
+            filtered_history = []
+            for item in history_rows:
+                parsed = _parse_kst_datetime(item.get("at"))
+                if parsed and start_date <= parsed.date() <= end_date:
+                    filtered_history.append(item)
+        else:
+            filtered_history = history_rows
+
+        if filtered_history:
+            history_df = pd.DataFrame(filtered_history)
+            history_df["잔고"] = history_df["balance"].apply(_format_won)
+            if "memo" not in history_df.columns:
+                history_df["memo"] = ""
+            history_view = history_df[["at", "잔고", "memo"]].rename(columns={"at": "거래일시", "memo": "메모"})
+            render_plain_html_table(history_view.sort_values("거래일시", ascending=False), center_align=True)
+        else:
+            st.info("선택한 기간에 해당하는 거래내역이 없습니다.")
 
     if not st.session_state.get("show_balance_update_form"):
         return
