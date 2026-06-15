@@ -3700,6 +3700,10 @@ def show_account_balance_check():
     st.markdown("### 계좌 잔고 확인")
     st.caption("위탁 사업장 계좌의 잔고를 수동으로 관리하고 변동 추이를 확인합니다.")
 
+    if not st.session_state.get("_balance_update_form_initialized"):
+        st.session_state.show_balance_update_form = False
+        st.session_state["_balance_update_form_initialized"] = True
+
     data = _load_bank_accounts()
     accounts = data.get("accounts", [])
 
@@ -3726,9 +3730,20 @@ def show_account_balance_check():
             "balance_updated_at": "최종업데이트",
         }
     )
+    title_col, button_col = st.columns([0.78, 0.22])
+    with title_col:
+        st.markdown("#### 계좌 리스트")
+    with button_col:
+        if st.button("잔액 정보 업데이트", key="show_balance_update_form", use_container_width=True, type="primary"):
+            st.session_state.show_balance_update_form = True
+            st.rerun()
+
     st.dataframe(account_view, use_container_width=True)
 
-    st.markdown("#### 잔고 업데이트")
+    if not st.session_state.get("show_balance_update_form"):
+        return
+
+    st.markdown("#### 잔액 정보 업데이트")
     account_options = {f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row for row in accounts}
     selected_label = st.selectbox("계좌 선택", list(account_options.keys()), key="balance_target_account")
     selected_account = account_options[selected_label]
@@ -3738,7 +3753,11 @@ def show_account_balance_check():
             "현재 잔고", min_value=0, step=10000, format="%d", value=int(selected_account.get("balance", 0) or 0)
         )
         memo = st.text_input("메모", placeholder="예: 정기 확인")
-        submitted = st.form_submit_button("잔고 업데이트", type="primary")
+        form_col1, form_col2 = st.columns(2)
+        with form_col1:
+            submitted = st.form_submit_button("업데이트", type="primary", use_container_width=True)
+        with form_col2:
+            cancelled = st.form_submit_button("취소", use_container_width=True)
 
     if submitted:
         now_str = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
@@ -3748,7 +3767,12 @@ def show_account_balance_check():
             {"at": now_str, "balance": int(new_balance), "memo": memo.strip()}
         )
         _save_bank_accounts(data)
+        st.session_state.show_balance_update_form = False
         st.success("잔고가 업데이트되었습니다.")
+        st.rerun()
+
+    if cancelled:
+        st.session_state.show_balance_update_form = False
         st.rerun()
 
     history = selected_account.get("balance_history", [])
