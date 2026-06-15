@@ -3747,9 +3747,14 @@ def show_transfer_file_generation():
     st.caption("품의가 확정된 전도금 요청을 선택하여 이체 자료를 생성합니다.")
 
     wp_data = _load_delegated_workplaces()
-    workplaces = wp_data.get("workplaces", [])
     requests = wp_data.get("requests", [])
-    workplaces_by_id = {site.get("id"): site for site in workplaces}
+
+    bank_data = _load_bank_accounts()
+    accounts_by_workplace_id = {
+        row.get("linked_workplace_id"): row
+        for row in bank_data.get("accounts", [])
+        if row.get("linked_workplace_id")
+    }
 
     company_profile = _load_company_profile()
     withdrawal_accounts = company_profile.get("withdrawal_accounts", [])
@@ -3776,17 +3781,17 @@ def show_transfer_file_generation():
     st.markdown("#### 이체 대상 선택")
     target_rows = []
     for row in sorted(targets, key=lambda item: item.get("requested_at", "")):
-        site = workplaces_by_id.get(row.get("workplace_id"), {})
+        account = accounts_by_workplace_id.get(row.get("workplace_id"), {})
         workplace_name = row.get("workplace_name", "")
         passbook_label = f"{workplace_name} 전도금"
         target_rows.append(
             {
                 "id": row.get("id"),
                 "선택": True,
-                "입금은행": site.get("bank_name", ""),
-                "입금계좌번호": site.get("account_number", ""),
+                "입금은행": account.get("bank_name", ""),
+                "입금계좌번호": account.get("account_number", ""),
                 "입금액": _format_won(row.get("request_amount")),
-                "예상예금주": workplace_name,
+                "예상예금주": account.get("holder_name", "") or workplace_name,
                 "입금통장표시": passbook_label,
                 "출금통장표시": passbook_label,
             }
@@ -3819,17 +3824,17 @@ def show_transfer_file_generation():
         for row in targets:
             if row.get("id") not in selected_ids:
                 continue
-            site = workplaces_by_id.get(row.get("workplace_id"), {})
+            account = accounts_by_workplace_id.get(row.get("workplace_id"), {})
             edited_row = edited_by_id.get(row.get("id"), {})
             rows.append(
                 {
                     "출금은행": source.get("bank_name", ""),
                     "출금계좌번호": source.get("account_number", ""),
                     "출금통장표시": edited_row.get("출금통장표시", ""),
-                    "입금은행": site.get("bank_name", ""),
-                    "입금계좌번호": site.get("account_number", ""),
+                    "입금은행": account.get("bank_name", ""),
+                    "입금계좌번호": account.get("account_number", ""),
                     "입금액": row.get("request_amount", 0),
-                    "예상예금주": site.get("workplace_name", ""),
+                    "예상예금주": account.get("holder_name", "") or row.get("workplace_name", ""),
                     "입금통장표시": edited_row.get("입금통장표시", ""),
                     "사업장명": row.get("workplace_name", ""),
                 }
