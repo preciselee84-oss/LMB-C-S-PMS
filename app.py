@@ -2379,7 +2379,9 @@ def show_auth_page():
                     if report_closed_info:
                         st.session_state.report_closed = report_closed_info.get("time", "")
 
-                    st.session_state.current_menu = "전도금 요청"
+                    st.session_state.current_menu = (
+                        "대시보드" if st.session_state.user_role == "관리자" else "전도금 요청"
+                    )
                     persist_current_menu()
                     st.rerun()
                 elif not u_id_str:
@@ -4327,6 +4329,20 @@ def show_transfer_result_confirmation():
             "id", "선택", "사업장명", "입금은행", "입금계좌번호", "입금액",
             "예상예금주", "조회한예금주", "입금통장표시", "출금통장표시", "입금 대사",
         ]
+        st.markdown(
+            """
+            <style>
+            [data-testid="stDataFrame"] [role="columnheader"],
+            [data-testid="stDataFrame"] [role="gridcell"],
+            [data-testid="stDataEditor"] [role="columnheader"],
+            [data-testid="stDataEditor"] [role="gridcell"] {
+                text-align: center !important;
+                justify-content: center !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
         edited_confirm = st.data_editor(
             pending_df[column_order],
             column_config={
@@ -4340,13 +4356,19 @@ def show_transfer_result_confirmation():
                 "조회한예금주": st.column_config.TextColumn("조회한예금주", disabled=True, width="small"),
                 "입금통장표시": st.column_config.TextColumn("입금통장표시", disabled=True, width="small"),
                 "출금통장표시": st.column_config.TextColumn("출금통장표시", disabled=True, width="small"),
-                "입금 대사": st.column_config.TextColumn("입금 대사", disabled=True, width="small"),
+                "입금 대사": st.column_config.TextColumn(
+                    "입금 대사",
+                    help="계좌번호와 입금액이 일치하는 입금 내역이 확인된 날짜입니다.",
+                    disabled=True,
+                    width="small",
+                ),
             },
             hide_index=True,
             use_container_width=True,
             key="transfer_confirm_editor",
         )
         confirm_ids = edited_confirm[edited_confirm["선택"]]["id"].tolist()
+        st.caption("입금 대사는 이체 대상의 입금계좌번호와 입금액이 실제 입금 내역과 일치하는지 확인한 결과입니다. 일치하면 입금일이 표시되고, 없으면 미확인으로 표시됩니다.")
         if st.button("선택 건 이체 완료 확인", type="primary", disabled=not confirm_ids):
             now_str = _current_kst().strftime("%Y-%m-%d %H:%M:%S")
             for row in pending:
