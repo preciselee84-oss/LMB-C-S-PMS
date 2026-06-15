@@ -4512,41 +4512,45 @@ def show_account_balance_check():
     render_plain_html_table(account_view, center_align=True, stretch=False, max_width="700px", border=False)
 
     st.markdown("#### 거래내역조회")
-    history_options = {f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row for row in accounts}
-    today = _current_kst().date()
-    if "balance_history_start_date" not in st.session_state:
-        st.session_state.balance_history_start_date = today - timedelta(days=6)
-    if "balance_history_end_date" not in st.session_state:
-        st.session_state.balance_history_end_date = today
 
-    period_presets = {
-        "오늘": (today, today),
-        "어제": (today - timedelta(days=1), today - timedelta(days=1)),
-        "1주일": (today - timedelta(days=6), today),
-        "1개월": (today - timedelta(days=30), today),
-    }
+    # 거래내역조회 섹션 너비 제한
+    _, center_col, _ = st.columns([0.1, 0.8, 0.1])
+    with center_col:
+        history_options = {f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row for row in accounts}
+        today = _current_kst().date()
+        if "balance_history_start_date" not in st.session_state:
+            st.session_state.balance_history_start_date = today - timedelta(days=6)
+        if "balance_history_end_date" not in st.session_state:
+            st.session_state.balance_history_end_date = today
 
-    st.markdown(
-        """
-        <style>
-        .balance-history-help {
-            color:#7a8599;
-            font-size:12px;
-            margin-top:-6px;
+        period_presets = {
+            "오늘": (today, today),
+            "어제": (today - timedelta(days=1), today - timedelta(days=1)),
+            "1주일": (today - timedelta(days=6), today),
+            "1개월": (today - timedelta(days=30), today),
         }
-        div[data-testid="stRadio"] > label,
-        div[data-testid="stSelectbox"] > label,
-        div[data-testid="stDateInput"] > label,
-        div[data-testid="stTextInput"] > label {
-            font-weight:700 !important;
-            color:#0f172a !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
-    with st.container(border=True):
+        st.markdown(
+            """
+            <style>
+            .balance-history-help {
+                color:#7a8599;
+                font-size:12px;
+                margin-top:-6px;
+            }
+            div[data-testid="stRadio"] > label,
+            div[data-testid="stSelectbox"] > label,
+            div[data-testid="stDateInput"] > label,
+            div[data-testid="stTextInput"] > label {
+                font-weight:700 !important;
+                color:#0f172a !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        with st.container(border=False):
         account_label_col, account_input_col, _ = st.columns([0.12, 0.42, 0.46])
         with account_label_col:
             st.markdown("**계좌번호 <span style='color:#008c78'>*</span>**", unsafe_allow_html=True)
@@ -4648,9 +4652,9 @@ def show_account_balance_check():
                     max_chars=25,
                 )
 
-    button_left, button_center, button_right = st.columns([0.42, 0.16, 0.42])
-    with button_center:
-        history_clicked = st.button("조회", key="balance_history_search", type="primary", use_container_width=True)
+        button_left, button_center, button_right = st.columns([0.42, 0.16, 0.42])
+        with button_center:
+            history_clicked = st.button("조회", key="balance_history_search", type="primary", use_container_width=True)
 
     if selected_month != "월별 선택":
         month_start = pd.to_datetime(f"{selected_month}-01").date()
