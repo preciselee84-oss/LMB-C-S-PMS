@@ -4511,11 +4511,10 @@ def show_account_balance_check():
 
     render_plain_html_table(account_view, center_align=True, stretch=False, max_width="700px", border=False)
 
-    st.markdown("#### 거래내역조회")
-
     # 거래내역조회 섹션 너비 제한
     _, center_col, _ = st.columns([0.1, 0.8, 0.1])
     with center_col:
+        st.markdown("#### 거래내역조회")
         history_options = {f"{row.get('account_name')} ({row.get('bank_name')} {row.get('account_number')})": row for row in accounts}
         today = _current_kst().date()
         if "balance_history_start_date" not in st.session_state:
