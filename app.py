@@ -2728,6 +2728,23 @@ def _current_kst():
     return datetime.utcnow() + timedelta(hours=9)
 
 
+def _parse_kst_datetime(value):
+    if not value:
+        return None
+    parsed = pd.to_datetime(str(value), errors="coerce")
+    if pd.isna(parsed):
+        return None
+    return parsed.to_pydatetime().replace(tzinfo=None)
+
+
+def _is_recent_request(value, days=7):
+    requested_at = _parse_kst_datetime(value)
+    if not requested_at:
+        return False
+    cutoff = _current_kst() - timedelta(days=days)
+    return requested_at >= cutoff
+
+
 def _month_key(value):
     if not value:
         return ""
@@ -3095,9 +3112,14 @@ def show_advance_payment_request():
                 st.success("전도금 요청이 등록되었습니다. [전자결재]에서 처리 현황을 확인할 수 있습니다.")
                 st.rerun()
 
-    my_requests = [row for row in requests if row.get("requested_by") == st.session_state.get("user_name", "")]
+    my_requests = [
+        row
+        for row in requests
+        if row.get("requested_by") == st.session_state.get("user_name", "")
+        and _is_recent_request(row.get("requested_at"), days=7)
+    ]
     if my_requests:
-        st.markdown("#### 내 요청 현황")
+        st.markdown("#### 최근 요청현황")
         _workplace_dashboard_css()
         request_cols = st.columns(3)
         for index, row in enumerate(sorted(my_requests, key=lambda item: item.get("requested_at", ""), reverse=True)):
@@ -3118,7 +3140,7 @@ def show_advance_payment_request():
                     unsafe_allow_html=True,
                 )
     else:
-        st.info("등록한 전도금 요청이 없습니다.")
+        st.info("최근 7일간 요청한 전도금 내역이 없습니다.")
 
 
 def show_e_approval():
@@ -4174,7 +4196,7 @@ MENU_GUIDES = {
     ],
     "전도금 요청": [
         "🧾 전도금 요청을 등록하면 [전자결재]로 결재 요청이 전달됩니다.",
-        "📋 내 요청 현황에서 처리 상태(요청/품의 확정/반려/이체 완료)를 확인합니다.",
+        "📋 최근 요청현황에서 최근 7일간 요청한 내역과 처리 상태를 확인합니다.",
     ],
     "품의 결과": [
         "📊 전도금 요청의 품의(승인/반려) 처리 결과를 조회합니다.",
