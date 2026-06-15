@@ -2667,10 +2667,10 @@ def show_sidebar():
         )
 
         if st.session_state.user_role == "관리자":
-            for menu_name in ["전자결재"]:
+            for menu_name in ["전자결재", "결재선 설정"]:
                 render_nav_button(menu_name)
 
-            st.markdown("<div class='gpt-section'>관리자 메뉴</div>", unsafe_allow_html=True)
+            st.markdown("<div class='gpt-section'>설정</div>", unsafe_allow_html=True)
             for menu_name in ["회사 관리", "위탁 사업장 관리", "서버 접속 정보"]:
                 render_nav_button(menu_name)
 
@@ -3762,6 +3762,92 @@ def show_usage_report():
                 ),
                 unsafe_allow_html=True,
             )
+
+
+def show_approval_line_settings():
+    st.markdown("### 결재선 설정")
+    st.caption("결재 문서의 승인자와 결재 단계를 관리합니다.")
+
+    # 결재선 데이터 로드 (임시로 세션 스테이트 사용)
+    if "approval_lines" not in st.session_state:
+        st.session_state.approval_lines = []
+
+    approval_lines = st.session_state.approval_lines
+
+    # 등록된 결재선 표시
+    if approval_lines:
+        st.markdown("#### 등록된 결재선")
+        line_df = pd.DataFrame(approval_lines)
+        line_view = line_df[["line_name", "approver1", "approver2", "approver3"]].rename(
+            columns={
+                "line_name": "결재선명",
+                "approver1": "1차 승인자",
+                "approver2": "2차 승인자",
+                "approver3": "3차 승인자",
+            }
+        )
+        st.dataframe(line_view, use_container_width=True, hide_index=True)
+    else:
+        st.info("등록된 결재선이 없습니다.")
+
+    # 결재선 추가 폼
+    if st.session_state.get("_show_approval_line_add_form"):
+        with st.form("approval_line_add_form"):
+            line_name = st.text_input("결재선명", placeholder="예: 전도금 결재선")
+            col1, col2, col3 = st.columns(3)
+            approver1 = col1.text_input("1차 승인자", placeholder="필수")
+            approver2 = col2.text_input("2차 승인자", placeholder="선택")
+            approver3 = col3.text_input("3차 승인자", placeholder="선택")
+
+            col_submit, col_cancel = st.columns(2)
+            submitted = col_submit.form_submit_button("등록", type="primary", use_container_width=True)
+            cancelled = col_cancel.form_submit_button("취소", use_container_width=True)
+
+        if submitted:
+            if not line_name.strip() or not approver1.strip():
+                st.warning("결재선명과 1차 승인자는 필수입니다.")
+            else:
+                approval_lines.append({
+                    "id": int(time.time() * 1000),
+                    "line_name": line_name.strip(),
+                    "approver1": approver1.strip(),
+                    "approver2": approver2.strip(),
+                    "approver3": approver3.strip(),
+                })
+                st.session_state["_show_approval_line_add_form"] = False
+                st.success("결재선이 등록되었습니다.")
+                st.rerun()
+        if cancelled:
+            st.session_state["_show_approval_line_add_form"] = False
+            st.rerun()
+
+    # 결재선 삭제
+    elif st.session_state.get("_show_approval_line_delete_select"):
+        if approval_lines:
+            delete_options = {line.get("line_name"): line.get("id") for line in approval_lines}
+            target_label = st.selectbox("삭제 대상 결재선", list(delete_options.keys()), key="approval_line_delete_target")
+            target_id = delete_options[target_label]
+
+            col_confirm, col_cancel = st.columns(2)
+            if col_confirm.button("삭제 확인", type="primary", use_container_width=True):
+                st.session_state.approval_lines = [line for line in approval_lines if line.get("id") != target_id]
+                st.session_state["_show_approval_line_delete_select"] = False
+                st.success("결재선이 삭제되었습니다.")
+                st.rerun()
+            if col_cancel.button("취소", use_container_width=True):
+                st.session_state["_show_approval_line_delete_select"] = False
+                st.rerun()
+
+    # 버튼들
+    else:
+        col_add, col_delete, _ = st.columns([20, 20, 160])
+        if col_add.button("+ 결재선 추가", key="show_approval_line_add_form_btn", use_container_width=True):
+            st.session_state["_show_approval_line_add_form"] = True
+            st.rerun()
+
+        if col_delete.button("삭제", key="show_approval_line_delete_btn", use_container_width=True, disabled=not approval_lines):
+            st.session_state["_show_approval_line_delete_select"] = True
+            st.rerun()
 
 
 def show_company_profile():
@@ -7133,6 +7219,8 @@ def show_main():
         show_dashboard()
     elif menu == "전자결재":
         show_e_approval()
+    elif menu == "결재선 설정":
+        show_approval_line_settings()
     elif menu == "회사 관리":
         show_company_profile()
     elif menu == "위탁 사업장 관리":
