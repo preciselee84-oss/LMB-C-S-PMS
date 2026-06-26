@@ -7504,10 +7504,10 @@ def read_billing_source_upload(uploaded_file):
     raw = uploaded_file.getvalue()
     if file_name.endswith(".csv"):
         try:
-            return {"업로드 파일": pd.read_csv(BytesIO(raw), dtype=str).fillna("")}
+            return {"업로드 파일": pd.read_csv(BytesIO(raw), dtype=str, header=None).fillna("")}
         except UnicodeDecodeError:
-            return {"업로드 파일": pd.read_csv(BytesIO(raw), dtype=str, encoding="cp949").fillna("")}
-    sheets = pd.read_excel(BytesIO(raw), sheet_name=None, dtype=str)
+            return {"업로드 파일": pd.read_csv(BytesIO(raw), dtype=str, encoding="cp949", header=None).fillna("")}
+    sheets = pd.read_excel(BytesIO(raw), sheet_name=None, dtype=str, header=None)
     return {str(name): df.fillna("") for name, df in sheets.items()}
 
 
@@ -7545,7 +7545,60 @@ def normalize_billing_login_df(df):
     return result.reset_index(drop=True), []
 
 
-def render_billing_source_tables(source_upload=None):
+def normalize_billing_source_sheet(df):
+    source = df.copy().replace({np.nan: ""})
+    header_index = None
+    for idx, row in source.iterrows():
+        values = {str(value).strip() for value in row.tolist() if str(value).strip()}
+        if "고객번호" in values and ("사업자번호" in values or "사업자등록번호" in values):
+            header_index = idx
+            break
+    if header_index is None:
+        return clean_header_logic(source)
+
+    headers = [str(value).strip() or f"빈컬럼{pos + 1}" for pos, value in enumerate(source.loc[header_index].tolist())]
+    data = source.iloc[header_index + 1 :].copy()
+    data.columns = headers
+    data = data.replace({np.nan: ""})
+    data = data.loc[~data.apply(lambda row: all(str(value).strip() == "" for value in row), axis=1)]
+    return clean_header_logic(data.reset_index(drop=True))
+
+
+def pick_billing_source_sheet(source_sheets, kind):
+    normalized = {name: normalize_billing_source_sheet(df) for name, df in source_sheets.items()}
+    if kind == "open":
+        for name, df in normalized.items():
+            if any(token in name for token in ["구축", "5월", "6월"]) or "ERP연계 여부" in df.columns:
+                return df
+    if kind == "erp":
+        for name, df in normalized.items():
+            if any(token in name for token in ["연계", "수령"]) or "연계시작일자" in df.columns:
+                return df
+    return next(iter(normalized.values()), pd.DataFrame())
+
+
+def login_lookup_from_df(login_df):
+    if login_df is None or login_df.empty:
+        return {}
+    return {
+        str(row.get("고객번호", "")).strip(): {
+            "고객명": str(row.get("고객명", "")).strip(),
+            "최근로그인": str(row.get("최근로그인", "")).strip(),
+            "로그인": row.get("로그인", 0),
+        }
+        for _, row in login_df.iterrows()
+        if str(row.get("고객번호", "")).strip()
+    }
+
+
+def billing_value(row, candidates):
+    for candidate in candidates:
+        if candidate in row.index:
+            return str(row.get(candidate, "")).strip()
+    return ""
+
+
+def build_open_billing_table(source_df, login_df=None):
     open_columns = [
         "순번",
         "고객번호",
@@ -7563,6 +7616,38 @@ def render_billing_source_tables(source_upload=None):
         "청구원본 고객명",
         "실적파일 고객명",
     ]
+    if source_df is None or source_df.empty:
+        return pd.DataFrame(columns=open_columns)
+    login_lookup = login_lookup_from_df(login_df)
+    rows = []
+    for idx, row in source_df.iterrows():
+        customer_no = billing_value(row, ["고객번호", "고객번호(당월)"])
+        if not customer_no and not billing_value(row, ["업체명", "고객명"]):
+            continue
+        login_info = login_lookup.get(customer_no, {})
+        rows.append(
+            {
+                "순번": billing_value(row, ["순번"]) or str(idx + 1),
+                "고객번호": customer_no,
+                "사업자번호": billing_value(row, ["사업자번호", "사업자등록번호"]),
+                "업체명": billing_value(row, ["업체명", "고객명"]),
+                "ERP연계 여부": billing_value(row, ["ERP연계 여부", "ERP연계여부"]),
+                "접수일자": billing_value(row, ["접수일자"]),
+                "구축일자": billing_value(row, ["구축일자", "구축일"]),
+                "방문일자": billing_value(row, ["방문일자"]),
+                "담당자": billing_value(row, ["담당자"]),
+                "비고": billing_value(row, ["비고"]),
+                "최초로그인": login_info.get("최근로그인", ""),
+                "최종로그인일자": login_info.get("최근로그인", ""),
+                "로그인횟수": login_info.get("로그인", ""),
+                "청구원본 고객명": billing_value(row, ["업체명", "고객명"]),
+                "실적파일 고객명": login_info.get("고객명", ""),
+            }
+        )
+    return pd.DataFrame(rows, columns=open_columns)
+
+
+def build_erp_billing_table(source_df, login_df=None):
     erp_columns = [
         "순서",
         "고객번호",
@@ -7582,7 +7667,40 @@ def render_billing_source_tables(source_upload=None):
         "청구원본 고객명",
         "실적파일 고객명",
     ]
+    if source_df is None or source_df.empty:
+        return pd.DataFrame(columns=erp_columns)
+    login_lookup = login_lookup_from_df(login_df)
+    rows = []
+    for idx, row in source_df.iterrows():
+        customer_no = billing_value(row, ["고객번호", "고객번호(당월)"])
+        if not customer_no and not billing_value(row, ["업체명", "고객명"]):
+            continue
+        login_info = login_lookup.get(customer_no, {})
+        rows.append(
+            {
+                "순서": billing_value(row, ["순서", "순번"]) or str(idx + 1),
+                "고객번호": customer_no,
+                "사업자번호": billing_value(row, ["사업자번호", "사업자등록번호"]),
+                "업체명": billing_value(row, ["업체명", "고객명"]),
+                "구분": billing_value(row, ["구분"]),
+                "추가연계신청일자": billing_value(row, ["추가연계신청일자"]),
+                "담당자": billing_value(row, ["담당자"]),
+                "구축일": billing_value(row, ["구축일", "구축일자"]),
+                "연계시작일자": billing_value(row, ["연계시작일자"]),
+                "은행연계완료일자": billing_value(row, ["은행연계완료일자"]),
+                "수령여부": billing_value(row, ["수령여부"]),
+                "비고": billing_value(row, ["비고"]),
+                "최초로그인": login_info.get("최근로그인", ""),
+                "최종로그인일자": login_info.get("최근로그인", ""),
+                "로그인횟수": login_info.get("로그인", ""),
+                "청구원본 고객명": billing_value(row, ["업체명", "고객명"]),
+                "실적파일 고객명": login_info.get("고객명", ""),
+            }
+        )
+    return pd.DataFrame(rows, columns=erp_columns)
 
+
+def render_billing_source_tables(source_upload=None, login_df=None):
     st.markdown("#### 청구 원본 표")
     source_file = source_upload or st.file_uploader(
         "구축 및 연계 리스트 업로드",
@@ -7590,37 +7708,28 @@ def render_billing_source_tables(source_upload=None):
         key="billing_source_upload",
         help="2026년 6월 구축 및 연계 리스트_최종본.xlsx 파일을 업로드해주세요.",
     )
+    open_table = build_open_billing_table(pd.DataFrame(), login_df)
+    erp_table = build_erp_billing_table(pd.DataFrame(), login_df)
+
+    if source_file:
+        try:
+            source_sheets = read_billing_source_upload(source_file)
+            open_source = pick_billing_source_sheet(source_sheets, "open")
+            erp_source = pick_billing_source_sheet(source_sheets, "erp")
+            open_table = build_open_billing_table(open_source, login_df)
+            erp_table = build_erp_billing_table(erp_source, login_df)
+        except Exception as exc:
+            st.error(f"구축 및 연계 리스트 파일을 읽을 수 없습니다: {exc}")
+    else:
+        st.warning("구축 및 연계 리스트를 업로드하면 청구원본 표가 Google Sheet 업로드 탭 화면 구조로 채워집니다.")
+
     open_tab, erp_tab = st.tabs(["청구원본(개설업로드)", "청구원본(연계업로드)"])
     with open_tab:
-        st.caption("개설 청구자료 생성 화면 구성입니다. 실제 시트 데이터 연동 없이 표 영역만 표시합니다.")
-        st.dataframe(pd.DataFrame(columns=open_columns), use_container_width=True, hide_index=True)
+        st.caption("개설 청구자료 생성 화면 구성입니다.")
+        st.dataframe(open_table, use_container_width=True, hide_index=True)
     with erp_tab:
-        st.caption("연계 청구자료 생성 화면 구성입니다. 실제 시트 데이터 연동 없이 표 영역만 표시합니다.")
-        st.dataframe(pd.DataFrame(columns=erp_columns), use_container_width=True, hide_index=True)
-
-    if not source_file:
-        st.warning("구축 및 연계 리스트를 업로드하면 아래에 파일 미리보기가 표시됩니다.")
-        return
-
-    try:
-        source_sheets = read_billing_source_upload(source_file)
-    except Exception as exc:
-        st.error(f"구축 및 연계 리스트 파일을 읽을 수 없습니다: {exc}")
-        return
-
-    st.markdown("#### 구축 및 연계 리스트 미리보기")
-    sheet_names = list(source_sheets.keys())
-    if len(sheet_names) == 1:
-        df = clean_header_logic(source_sheets[sheet_names[0]].copy()).replace({np.nan: ""})
-        st.caption(f"{sheet_names[0]} · {len(df):,}행")
-        st.dataframe(df.head(500), use_container_width=True, hide_index=True)
-    else:
-        tabs = st.tabs(sheet_names)
-        for tab, sheet_name in zip(tabs, sheet_names):
-            with tab:
-                df = clean_header_logic(source_sheets[sheet_name].copy()).replace({np.nan: ""})
-                st.caption(f"{sheet_name} · {len(df):,}행")
-                st.dataframe(df.head(500), use_container_width=True, hide_index=True)
+        st.caption("연계 청구자료 생성 화면 구성입니다.")
+        st.dataframe(erp_table, use_container_width=True, hide_index=True)
 
 
 def show_billing_generation():
@@ -7682,7 +7791,7 @@ def show_billing_generation():
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
-    render_billing_source_tables()
+    render_billing_source_tables(login_df=normalized_df)
 
 
 def show_main():
