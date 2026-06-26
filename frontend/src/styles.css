@@ -74,10 +74,6 @@ body {
   margin-top: 16px;
 }
 
-.performance-only-tabs > .ant-tabs-nav {
-  display: none;
-}
-
 .table-action-bar {
   display: flex;
   justify-content: flex-end;

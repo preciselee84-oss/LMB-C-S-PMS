@@ -688,8 +688,8 @@ def init_state():
 
     RENAMED_MENUS = {
         "사업장 정보 등록": "위탁 사업장 관리",
-        "사업장 예측/보고": "대시보드",
-        "보고서": "대시보드",
+        "사업장 예측/보고": PERFORMANCE_MENU,
+        "보고서": PERFORMANCE_MENU,
         "직원 및 권한설정": "위탁 사업장 관리",
         "계좌 관리": "위탁 사업장 관리",
         "담당자 관리": "위탁 사업장 관리",
@@ -2390,9 +2390,7 @@ def show_auth_page():
                     if report_closed_info:
                         st.session_state.report_closed = report_closed_info.get("time", "")
 
-                    st.session_state.current_menu = (
-                        "대시보드" if st.session_state.user_role == "관리자" else "전도금 요청"
-                    )
+                    st.session_state.current_menu = PERFORMANCE_MENU
                     persist_current_menu()
                     st.rerun()
                 elif not u_id_str:
@@ -7523,7 +7521,7 @@ def show_main():
     render_page_title(menu)
 
     if menu == PERFORMANCE_MENU:
-        show_dashboard()
+        return
     else:
         st.session_state.current_menu = PERFORMANCE_MENU
         st.rerun()
