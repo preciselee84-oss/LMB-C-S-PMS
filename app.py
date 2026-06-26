@@ -8040,11 +8040,8 @@ def render_billing_source_tables(source_upload=None, login_df=None):
         st.warning("구축 및 연계 리스트를 업로드하면 청구원본 표가 Google Sheet 업로드 탭 화면 구조로 채워집니다.")
 
     edu_title, edu_df, edu_error = load_education_waiting_section(login_df, reference_lookup)
-    if edu_error:
-        st.warning(f"사용자교육(방문)대기 고객사 데이터를 불러올 수 없습니다: {edu_error}")
-    else:
-        open_sections = [(t, d) for t, d in open_sections if "사용자교육" not in t]
-        open_sections.append((edu_title, edu_df))
+    open_sections = [(t, d) for t, d in open_sections if "사용자교육" not in t]
+    open_sections.append((edu_title, edu_df))
 
     open_tab, erp_tab = st.tabs(["청구원본(개설업로드)", "청구원본(연계업로드)"])
     with open_tab:
@@ -8053,7 +8050,12 @@ def render_billing_source_tables(source_upload=None, login_df=None):
         for tab, (section_title, section_df) in zip(section_tabs, open_sections):
             with tab:
                 st.markdown(f"##### {section_title}")
-                st.dataframe(section_df, use_container_width=True, hide_index=True)
+                if "사용자교육" in section_title and edu_error:
+                    st.warning(f"Google Sheet 데이터를 불러올 수 없습니다: {edu_error}")
+                elif section_df.empty:
+                    st.info("표시할 데이터가 없습니다.")
+                else:
+                    st.dataframe(section_df, use_container_width=True, hide_index=True)
     with erp_tab:
         st.caption("연계 청구자료 생성 화면 구성입니다.")
         for section_title, section_df in erp_sections:
