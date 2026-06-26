@@ -7550,7 +7550,7 @@ def normalize_billing_source_sheet(df):
     header_index = None
     for idx, row in source.iterrows():
         values = {str(value).strip() for value in row.tolist() if str(value).strip()}
-        if "고객번호" in values and ("사업자번호" in values or "사업자등록번호" in values):
+        if is_billing_source_header(values):
             header_index = idx
             break
     if header_index is None:
@@ -7636,6 +7636,57 @@ def login_lookup_from_df(login_df):
     }
 
 
+def billing_display_value(value):
+    if is_blank_value(value):
+        return ""
+    if isinstance(value, (datetime, pd.Timestamp)):
+        return pd.to_datetime(value).strftime("%Y-%m-%d")
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        num = float(value)
+        if 20000 <= num <= 60000:
+            return (datetime(1899, 12, 30) + timedelta(days=int(num))).strftime("%Y-%m-%d")
+        if num.is_integer():
+            return str(int(num))
+    return str(value).strip()
+
+
+def load_billing_customer_reference():
+    try:
+        ref_df = st.session_state.get("billing_customer_reference_df")
+        if ref_df is None or ref_df.empty:
+            ref_df = clean_header_logic(read_google_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2))
+            st.session_state.billing_customer_reference_df = ref_df
+    except Exception as exc:
+        return {}, f"고객원장 참조 시트를 불러올 수 없습니다: {exc}"
+
+    ref_df = clean_header_logic(ref_df.copy()).replace({np.nan: ""})
+    customer_col = find_col(ref_df, ["고객번호", "고개번호", "고객NO", "고객 No", "고객"])
+    if not customer_col or customer_col not in ref_df.columns:
+        return {}, "고객원장 참조 시트에서 고객번호 컬럼을 찾을 수 없습니다."
+
+    col_map = {
+        "사업자번호": find_col(ref_df, ["사업자번호"]),
+        "업체명": find_col(ref_df, ["고객명", "고객사명", "업체명"]),
+        "ERP연계 여부": find_col(ref_df, ["연계상태", "구축형", "ERP연계"]),
+        "접수일자": find_col(ref_df, ["신규접수일", "접수일자"]),
+        "구축일자": find_col(ref_df, ["개설/이행일", "구축일자", "구축일"]),
+        "담당자": find_col(ref_df, ["담당자"]),
+        "청구원본 고객명": find_col(ref_df, ["고객명", "고객사명", "업체명"]),
+    }
+
+    lookup = {}
+    for _, row in ref_df.iterrows():
+        customer_key = normalize_customer_no(row.get(customer_col, ""))
+        if not customer_key or customer_key in lookup:
+            continue
+        lookup[customer_key] = {
+            target_col: billing_display_value(row.get(source_col, ""))
+            for target_col, source_col in col_map.items()
+            if source_col and source_col in ref_df.columns
+        }
+    return lookup, ""
+
+
 def billing_value(row, candidates):
     for candidate in candidates:
         if candidate in row.index:
@@ -7643,7 +7694,12 @@ def billing_value(row, candidates):
     return ""
 
 
-def build_open_billing_table(source_df, login_df=None):
+def billing_fill_blank(value, reference_info, ref_key):
+    text = billing_display_value(value)
+    return text if text else reference_info.get(ref_key, "")
+
+
+def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
     open_columns = [
         "순번",
         "고객번호",
@@ -7664,28 +7720,42 @@ def build_open_billing_table(source_df, login_df=None):
     if source_df is None or source_df.empty:
         return pd.DataFrame(columns=open_columns)
     login_lookup = login_lookup_from_df(login_df)
+    reference_lookup = reference_lookup or {}
     rows = []
     for idx, row in source_df.iterrows():
         customer_no = billing_value(row, ["고객번호", "고객번호(당월)"])
         if not customer_no and not billing_value(row, ["업체명", "고객명"]):
             continue
         login_info = login_lookup.get(customer_no, {})
+        reference_info = reference_lookup.get(normalize_customer_no(customer_no), {})
         rows.append(
             {
                 "순번": billing_value(row, ["순번"]) or str(idx + 1),
                 "고객번호": customer_no,
-                "사업자번호": billing_value(row, ["사업자번호", "사업자등록번호"]),
-                "업체명": billing_value(row, ["업체명", "고객명"]),
-                "ERP연계 여부": billing_value(row, ["ERP연계 여부", "ERP연계여부"]),
-                "접수일자": billing_value(row, ["접수일자"]),
-                "구축일자": billing_value(row, ["구축일자", "구축일"]),
+                "사업자번호": billing_fill_blank(
+                    billing_value(row, ["사업자번호", "사업자등록번호", "사업자번호(당월)", "사업자등록번호(당월)"]),
+                    reference_info,
+                    "사업자번호",
+                ),
+                "업체명": billing_fill_blank(
+                    billing_value(row, ["업체명", "고객명", "업체명(당월)", "고객명(당월)"]),
+                    reference_info,
+                    "업체명",
+                ),
+                "ERP연계 여부": billing_fill_blank(billing_value(row, ["ERP연계 여부", "ERP연계여부"]), reference_info, "ERP연계 여부"),
+                "접수일자": billing_fill_blank(billing_value(row, ["접수일자"]), reference_info, "접수일자"),
+                "구축일자": billing_fill_blank(billing_value(row, ["구축일자", "구축일"]), reference_info, "구축일자"),
                 "방문일자": billing_value(row, ["방문일자"]),
-                "담당자": billing_value(row, ["담당자"]),
+                "담당자": billing_fill_blank(billing_value(row, ["담당자", "담당자(당월)"]), reference_info, "담당자"),
                 "비고": billing_value(row, ["비고"]),
                 "최초로그인": login_info.get("최근로그인", ""),
                 "최종로그인일자": login_info.get("최근로그인", ""),
                 "로그인횟수": login_info.get("로그인", ""),
-                "청구원본 고객명": billing_value(row, ["업체명", "고객명"]),
+                "청구원본 고객명": billing_fill_blank(
+                    billing_value(row, ["업체명", "고객명", "업체명(당월)", "고객명(당월)"]),
+                    reference_info,
+                    "청구원본 고객명",
+                ),
                 "실적파일 고객명": login_info.get("고객명", ""),
             }
         )
@@ -7763,10 +7833,13 @@ def render_billing_source_tables(source_upload=None, login_df=None):
             erp_sheet_name, erp_source = pick_billing_source_sheet(source_sheets, "erp")
             parsed_open_sections = parse_billing_source_sections(source_sheets.get(open_sheet_name, open_source))
             parsed_erp_sections = parse_billing_source_sections(source_sheets.get(erp_sheet_name, erp_source))
+            reference_lookup, reference_error = load_billing_customer_reference()
+            if reference_error:
+                st.warning(reference_error)
             open_sections = [
-                (title, build_open_billing_table(section_df, login_df))
+                (title, build_open_billing_table(section_df, login_df, reference_lookup))
                 for title, section_df in parsed_open_sections
-            ] or [("2026년 6월 구축 실적", build_open_billing_table(open_source, login_df))]
+            ] or [("2026년 6월 구축 실적", build_open_billing_table(open_source, login_df, reference_lookup))]
             erp_sections = [
                 (title, build_erp_billing_table(section_df, login_df))
                 for title, section_df in parsed_erp_sections
