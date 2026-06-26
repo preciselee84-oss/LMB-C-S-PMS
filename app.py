@@ -7564,17 +7564,60 @@ def normalize_billing_source_sheet(df):
     return clean_header_logic(data.reset_index(drop=True))
 
 
+def parse_billing_source_sections(df):
+    source = df.copy().replace({np.nan: ""})
+    sections = []
+    current_title = "업로드 데이터"
+    row_count = len(source)
+    idx = 0
+    while idx < row_count:
+        row_values = [str(value).strip() for value in source.iloc[idx].tolist()]
+        nonempty_values = [value for value in row_values if value]
+        is_header = "고객번호" in nonempty_values and (
+            "사업자번호" in nonempty_values or "사업자등록번호" in nonempty_values
+        )
+        if nonempty_values and not is_header:
+            current_title = nonempty_values[0]
+            idx += 1
+            continue
+        if not is_header:
+            idx += 1
+            continue
+
+        headers = [value or f"빈컬럼{pos + 1}" for pos, value in enumerate(row_values)]
+        data_rows = []
+        idx += 1
+        while idx < row_count:
+            next_values = [str(value).strip() for value in source.iloc[idx].tolist()]
+            next_nonempty = [value for value in next_values if value]
+            next_is_header = "고객번호" in next_nonempty and (
+                "사업자번호" in next_nonempty or "사업자등록번호" in next_nonempty
+            )
+            if next_is_header:
+                break
+            if len(next_nonempty) == 1 and not next_nonempty[0].isdigit():
+                break
+            if next_nonempty:
+                data_rows.append(next_values)
+            idx += 1
+
+        table = pd.DataFrame(data_rows, columns=headers).replace({np.nan: ""})
+        sections.append((current_title, clean_header_logic(table.reset_index(drop=True))))
+    return sections
+
+
 def pick_billing_source_sheet(source_sheets, kind):
     normalized = {name: normalize_billing_source_sheet(df) for name, df in source_sheets.items()}
     if kind == "open":
         for name, df in normalized.items():
             if any(token in name for token in ["구축", "5월", "6월"]) or "ERP연계 여부" in df.columns:
-                return df
+                return name, df
     if kind == "erp":
         for name, df in normalized.items():
             if any(token in name for token in ["연계", "수령"]) or "연계시작일자" in df.columns:
-                return df
-    return next(iter(normalized.values()), pd.DataFrame())
+                return name, df
+    fallback_name = next(iter(source_sheets.keys()), "")
+    return fallback_name, normalized.get(fallback_name, pd.DataFrame())
 
 
 def login_lookup_from_df(login_df):
@@ -7708,16 +7751,24 @@ def render_billing_source_tables(source_upload=None, login_df=None):
         key="billing_source_upload",
         help="2026년 6월 구축 및 연계 리스트_최종본.xlsx 파일을 업로드해주세요.",
     )
-    open_table = build_open_billing_table(pd.DataFrame(), login_df)
-    erp_table = build_erp_billing_table(pd.DataFrame(), login_df)
+    open_sections = [("2026년 6월 구축 실적", build_open_billing_table(pd.DataFrame(), login_df))]
+    erp_sections = [("당월 ERP연계 청구 고객사", build_erp_billing_table(pd.DataFrame(), login_df))]
 
     if source_file:
         try:
             source_sheets = read_billing_source_upload(source_file)
-            open_source = pick_billing_source_sheet(source_sheets, "open")
-            erp_source = pick_billing_source_sheet(source_sheets, "erp")
-            open_table = build_open_billing_table(open_source, login_df)
-            erp_table = build_erp_billing_table(erp_source, login_df)
+            open_sheet_name, open_source = pick_billing_source_sheet(source_sheets, "open")
+            erp_sheet_name, erp_source = pick_billing_source_sheet(source_sheets, "erp")
+            parsed_open_sections = parse_billing_source_sections(source_sheets.get(open_sheet_name, open_source))
+            parsed_erp_sections = parse_billing_source_sections(source_sheets.get(erp_sheet_name, erp_source))
+            open_sections = [
+                (title, build_open_billing_table(section_df, login_df))
+                for title, section_df in parsed_open_sections
+            ] or [("2026년 6월 구축 실적", build_open_billing_table(open_source, login_df))]
+            erp_sections = [
+                (title, build_erp_billing_table(section_df, login_df))
+                for title, section_df in parsed_erp_sections
+            ] or [("당월 ERP연계 청구 고객사", build_erp_billing_table(erp_source, login_df))]
         except Exception as exc:
             st.error(f"구축 및 연계 리스트 파일을 읽을 수 없습니다: {exc}")
     else:
@@ -7726,10 +7777,14 @@ def render_billing_source_tables(source_upload=None, login_df=None):
     open_tab, erp_tab = st.tabs(["청구원본(개설업로드)", "청구원본(연계업로드)"])
     with open_tab:
         st.caption("개설 청구자료 생성 화면 구성입니다.")
-        st.dataframe(open_table, use_container_width=True, hide_index=True)
+        for section_title, section_df in open_sections:
+            st.markdown(f"##### {section_title}")
+            st.dataframe(section_df, use_container_width=True, hide_index=True)
     with erp_tab:
         st.caption("연계 청구자료 생성 화면 구성입니다.")
-        st.dataframe(erp_table, use_container_width=True, hide_index=True)
+        for section_title, section_df in erp_sections:
+            st.markdown(f"##### {section_title}")
+            st.dataframe(section_df, use_container_width=True, hide_index=True)
 
 
 def show_billing_generation():
