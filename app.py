@@ -45,6 +45,7 @@ DEFAULT_URL_SYNC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9F7R7oLA2B
 DEFAULT_URL_HANA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgRHnTZD4eDW2UeODQuGxmxFrflKpbQda3sBsVjj1s3qAFWMKcpke2U58UuT6VEDlkbXveZlaroTCr/pub?gid=0&single=true&output=csv"
 DEFAULT_URL_HANA_BILLING = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgRHnTZD4eDW2UeODQuGxmxFrflKpbQda3sBsVjj1s3qAFWMKcpke2U58UuT6VEDlkbXveZlaroTCr/pub?gid=1172734914&single=true&output=csv"
 DEFAULT_URL_HANA_PERFORMANCE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS2CUE3No1cptBOTehN8r1xoTQyUni07sjbut-f1Teo9mpB-rcJgpE5xfI6dTy0M4IUxSg8Mv5_uT4l/pub?gid=1749034066&single=true&output=csv"
+URL_EDUCATION_WAITING = "https://docs.google.com/spreadsheets/d/1btxxNGPw-SLEnhvWSyyDbSHf-SniXZDS4IJit3wiqXE/export?format=csv&gid=0"
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -7989,6 +7990,19 @@ def build_erp_billing_table(source_df, login_df=None):
     return df
 
 
+def load_education_waiting_section(login_df=None, reference_lookup=None):
+    try:
+        raw_df = clean_header_logic(pd.read_csv(URL_EDUCATION_WAITING).replace({np.nan: ""}))
+    except Exception as exc:
+        return "사용자교육(방문)대기 고객사", pd.DataFrame(), str(exc)
+    status_col = find_col(raw_df, ["개설상태"])
+    if status_col:
+        mask = raw_df[status_col].astype(str).str.strip().isin(["개설대기", "개설진행"])
+        raw_df = raw_df[mask].reset_index(drop=True)
+    table_df = build_open_billing_table(raw_df, login_df, reference_lookup or {})
+    return "사용자교육(방문)대기 고객사", table_df, None
+
+
 def render_billing_source_tables(source_upload=None, login_df=None):
     st.markdown("#### 청구 원본 표")
     source_file = source_upload or st.file_uploader(
@@ -7999,6 +8013,7 @@ def render_billing_source_tables(source_upload=None, login_df=None):
     )
     open_sections = [("2026년 6월 구축 실적", build_open_billing_table(pd.DataFrame(), login_df))]
     erp_sections = [("당월 ERP연계 청구 고객사", build_erp_billing_table(pd.DataFrame(), login_df))]
+    reference_lookup = {}
 
     if source_file:
         try:
@@ -8013,6 +8028,7 @@ def render_billing_source_tables(source_upload=None, login_df=None):
             open_sections = [
                 (title, build_open_billing_table(section_df, login_df, reference_lookup))
                 for title, section_df in parsed_open_sections
+                if "사용자교육" not in title
             ] or [("2026년 6월 구축 실적", build_open_billing_table(open_source, login_df, reference_lookup))]
             erp_sections = [
                 (title, build_erp_billing_table(section_df, login_df))
@@ -8022,6 +8038,13 @@ def render_billing_source_tables(source_upload=None, login_df=None):
             st.error(f"구축 및 연계 리스트 파일을 읽을 수 없습니다: {exc}")
     else:
         st.warning("구축 및 연계 리스트를 업로드하면 청구원본 표가 Google Sheet 업로드 탭 화면 구조로 채워집니다.")
+
+    edu_title, edu_df, edu_error = load_education_waiting_section(login_df, reference_lookup)
+    if edu_error:
+        st.warning(f"사용자교육(방문)대기 고객사 데이터를 불러올 수 없습니다: {edu_error}")
+    else:
+        open_sections = [(t, d) for t, d in open_sections if "사용자교육" not in t]
+        open_sections.append((edu_title, edu_df))
 
     open_tab, erp_tab = st.tabs(["청구원본(개설업로드)", "청구원본(연계업로드)"])
     with open_tab:
