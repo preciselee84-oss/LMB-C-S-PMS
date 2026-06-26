@@ -7533,6 +7533,54 @@ def normalize_billing_login_df(df):
     return result.reset_index(drop=True), []
 
 
+def render_billing_source_tables():
+    open_columns = [
+        "순번",
+        "고객번호",
+        "사업자번호",
+        "업체명",
+        "ERP연계 여부",
+        "접수일자",
+        "구축일자",
+        "방문일자",
+        "담당자",
+        "비고",
+        "최초로그인",
+        "최종로그인일자",
+        "로그인횟수",
+        "청구원본 고객명",
+        "실적파일 고객명",
+    ]
+    erp_columns = [
+        "순서",
+        "고객번호",
+        "사업자번호",
+        "업체명",
+        "구분",
+        "추가연계신청일자",
+        "담당자",
+        "구축일",
+        "연계시작일자",
+        "은행연계완료일자",
+        "수령여부",
+        "비고",
+        "최초로그인",
+        "최종로그인일자",
+        "로그인횟수",
+        "청구원본 고객명",
+        "실적파일 고객명",
+    ]
+
+    st.markdown("#### 청구 원본 표")
+    open_tab, erp_tab = st.tabs(["청구원본(개설업로드)", "청구원본(연계업로드)"])
+    with open_tab:
+        st.caption("개설 청구자료 생성 화면 구성입니다. 실제 시트 데이터 연동 없이 표 영역만 표시합니다.")
+        st.dataframe(pd.DataFrame(columns=open_columns), use_container_width=True, hide_index=True)
+    with erp_tab:
+        st.caption("연계 청구자료 생성 화면 구성입니다. 실제 시트 데이터 연동 없이 표 영역만 표시합니다.")
+        st.dataframe(pd.DataFrame(columns=erp_columns), use_container_width=True, hide_index=True)
+
+
 def show_billing_generation():
     st.markdown("### 청구자료 생성")
     st.caption("청구 원본과 은행 로그인 실적파일을 대사해 청구자료 생성 전 확인 목록을 만듭니다.")
@@ -7552,6 +7600,7 @@ def show_billing_generation():
 
     if not uploaded_login:
         st.warning("은행로그인실적파일(은행)을 업로드하면 청구자료 생성용 실적 데이터를 확인할 수 있습니다.")
+        render_billing_source_tables()
         return
 
     try:
@@ -7565,6 +7614,7 @@ def show_billing_generation():
         st.error(f"필수 컬럼을 찾을 수 없습니다: {', '.join(missing)}")
         st.caption("필요 컬럼: 고객번호, 고객명, 최근로그인, 로그인")
         st.dataframe(raw_df.head(20), use_container_width=True)
+        render_billing_source_tables()
         return
 
     total_login = int(normalized_df["로그인"].sum()) if not normalized_df.empty else 0
@@ -7590,6 +7640,7 @@ def show_billing_generation():
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
+    render_billing_source_tables()
 
 
 def show_main():
