@@ -7488,6 +7488,51 @@ def inject_theme_toggle():
     """, unsafe_allow_html=True)
 
 
+def read_billing_login_upload(uploaded_file):
+    file_name = (uploaded_file.name or "").lower()
+    raw = uploaded_file.getvalue()
+    if file_name.endswith(".csv"):
+        try:
+            return pd.read_csv(BytesIO(raw), dtype=str).fillna("")
+        except UnicodeDecodeError:
+            return pd.read_csv(BytesIO(raw), dtype=str, encoding="cp949").fillna("")
+    return pd.read_excel(BytesIO(raw), dtype=str).fillna("")
+
+
+def normalize_billing_login_df(df):
+    source = clean_header_logic(df.copy()).replace({np.nan: ""})
+    customer_col = find_col(source, ["고객번호"])
+    company_col = find_col(source, ["고객명"])
+    latest_login_col = find_col(source, ["최근로그인", "최종로그인일자", "최종로그인"])
+    login_count_col = find_col(source, ["로그인", "로그인횟수"])
+
+    missing = [
+        label
+        for label, col in {
+            "고객번호": customer_col,
+            "고객명": company_col,
+            "최근로그인": latest_login_col,
+            "로그인": login_count_col,
+        }.items()
+        if not col or col not in source.columns
+    ]
+    if missing:
+        return pd.DataFrame(), missing
+
+    result = pd.DataFrame(
+        {
+            "고객번호": source[customer_col].astype(str).str.strip(),
+            "고객명": source[company_col].astype(str).str.strip(),
+            "최근로그인": source[latest_login_col].astype(str).str.strip(),
+            "로그인": pd.to_numeric(source[login_count_col].astype(str).str.replace(",", "", regex=False), errors="coerce")
+            .fillna(0)
+            .astype(int),
+        }
+    )
+    result = result[result["고객번호"].astype(str).str.strip().ne("")]
+    return result.reset_index(drop=True), []
+
+
 def show_billing_generation():
     st.markdown("### 청구자료 생성")
     st.caption("청구 원본과 은행 로그인 실적파일을 대사해 청구자료 생성 전 확인 목록을 만듭니다.")
@@ -7498,6 +7543,52 @@ def show_billing_generation():
     st.info(
         "FastAPI/React 화면에서는 해당 시트의 개설·연계 청구원본과 은행 실적파일을 대사합니다. "
         "현재 Google Sheet가 비공개이면 CSV export 권한 안내가 표시됩니다."
+    )
+    uploaded_login = st.file_uploader(
+        "은행로그인실적파일(은행) 엑셀 업로드",
+        type=["xlsx", "xls", "csv"],
+        help="고객번호, 고객명, 최근로그인, 로그인 컬럼이 포함된 파일을 업로드해주세요.",
+    )
+
+    if not uploaded_login:
+        st.warning("은행로그인실적파일(은행)을 업로드하면 청구자료 생성용 실적 데이터를 확인할 수 있습니다.")
+        return
+
+    try:
+        raw_df = read_billing_login_upload(uploaded_login)
+        normalized_df, missing = normalize_billing_login_df(raw_df)
+    except Exception as exc:
+        st.error(f"파일을 읽을 수 없습니다: {exc}")
+        return
+
+    if missing:
+        st.error(f"필수 컬럼을 찾을 수 없습니다: {', '.join(missing)}")
+        st.caption("필요 컬럼: 고객번호, 고객명, 최근로그인, 로그인")
+        st.dataframe(raw_df.head(20), use_container_width=True)
+        return
+
+    total_login = int(normalized_df["로그인"].sum()) if not normalized_df.empty else 0
+    latest_login = "-"
+    parsed_dates = pd.to_datetime(normalized_df["최근로그인"], errors="coerce")
+    if parsed_dates.notna().any():
+        latest_login = parsed_dates.max().strftime("%Y-%m-%d")
+
+    col_total, col_customer, col_login, col_latest = st.columns(4)
+    col_total.metric("업로드 행수", f"{len(normalized_df):,}건")
+    col_customer.metric("고객 수", f"{normalized_df['고객번호'].nunique():,}곳")
+    col_login.metric("로그인 합계", f"{total_login:,}회")
+    col_latest.metric("최신 로그인일", latest_login)
+
+    st.markdown("#### 업로드 실적 미리보기")
+    st.dataframe(normalized_df.head(500), use_container_width=True, hide_index=True)
+
+    excel_bytes = dataframe_to_excel_bytes({"은행로그인실적파일": normalized_df})
+    st.download_button(
+        "정규화된 은행로그인실적파일 다운로드",
+        data=excel_bytes,
+        file_name="은행로그인실적파일_정규화.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
     )
 
 
