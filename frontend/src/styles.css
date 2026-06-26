@@ -37,18 +37,6 @@ body {
   padding: 24px;
 }
 
-.login-page {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: #f5f7fb;
-}
-
-.login-card {
-  width: min(420px, 100%);
-}
-
 .dashboard-page,
 .full-width {
   width: 100%;

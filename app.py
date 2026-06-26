@@ -2463,7 +2463,7 @@ def show_sidebar():
             /* ══ Zoho CRM 스타일 네비게이션 팔레트 ══
                배경: #16284A  카드: #1F3358  테두리: #24395E
                강조: #2F6FED  텍스트: #E8EEF8  보조: #9FB3D6
-               섹션: #7689AD  로그아웃 호버: #5A2A38              */
+               섹션: #7689AD  액션 호버: #5A2A38              */
             [data-testid="stSidebar"] {
                 background-color: #16284A !important;
                 border-right: 1px solid #24395E !important;
@@ -2650,7 +2650,6 @@ def show_sidebar():
                 st.session_state["_close_sidebar_mobile"] = True
                 st.rerun()
 
-        _lt = st.session_state.get("login_time", "")
         st.markdown(
             f"<div class='gpt-side-shell'>"
             f"<div class='gpt-brand'>"
@@ -2659,27 +2658,11 @@ def show_sidebar():
             f"<div class='gpt-brand-title'>내부 관리</div>"
             f"<div class='gpt-brand-subtitle'>Webcash We · 360° Control</div>"
             f"</div></div>"
-            f"<div class='gpt-user-card'>"
-            f"<div class='gpt-user-name'>{html.escape(st.session_state.user_name)}님</div>"
-            f"<div class='gpt-user-meta'>반갑습니다.<br>접속 {_lt}</div>"
-            f"</div>"
             f"</div>",
             unsafe_allow_html=True,
         )
 
         render_nav_button(BILLING_MENU)
-
-        st.markdown("<div class='gpt-sidebar-divider'></div><div class='gpt-logout-marker'></div>", unsafe_allow_html=True)
-        if st.button("로그아웃", use_container_width=True, key="nav_logout"):
-            st.session_state.logged_in = False
-            st.session_state.auth_mode = "login"
-            try:
-                _cm_logout = safe_cookie_controller()
-                cookie_remove(_cm_logout, SESSION_UID_COOKIE)
-                cookie_remove(_cm_logout, LAST_MENU_COOKIE)
-            except Exception:
-                pass
-            st.rerun()
 
 
 def _load_delegated_workplaces():
@@ -7541,9 +7524,4 @@ def show_main():
         st.rerun()
 
 
-restore_login_from_cookie()
-
-if st.session_state.logged_in:
-    show_main()
-else:
-    show_auth_page()
+show_main()
