@@ -78,7 +78,7 @@ GITHUB_BRANCH = "main"
 GITHUB_DATA_DIR = "data"
 SESSION_UID_COOKIE = "auto_login_uid"
 LAST_MENU_COOKIE = "last_menu"
-PERFORMANCE_MENU = "실적관리"
+BILLING_MENU = "청구자료 생성"
 
 
 def _get_github_token():
@@ -630,7 +630,7 @@ def init_state():
         "user_role": "사용자",
         "user_name": "",
         "auth_mode": "login",
-        "current_menu": PERFORMANCE_MENU,
+        "current_menu": BILLING_MENU,
         "url_analysis": DEFAULT_URL_ANALYSIS,
         "url_sync": DEFAULT_URL_SYNC,
         "url_hana": DEFAULT_URL_HANA,
@@ -688,8 +688,8 @@ def init_state():
 
     RENAMED_MENUS = {
         "사업장 정보 등록": "위탁 사업장 관리",
-        "사업장 예측/보고": PERFORMANCE_MENU,
-        "보고서": PERFORMANCE_MENU,
+        "사업장 예측/보고": BILLING_MENU,
+        "보고서": BILLING_MENU,
         "직원 및 권한설정": "위탁 사업장 관리",
         "계좌 관리": "위탁 사업장 관리",
         "담당자 관리": "위탁 사업장 관리",
@@ -699,8 +699,8 @@ def init_state():
     }
     if st.session_state.current_menu in RENAMED_MENUS:
         st.session_state.current_menu = RENAMED_MENUS[st.session_state.current_menu]
-    if st.session_state.current_menu != PERFORMANCE_MENU:
-        st.session_state.current_menu = PERFORMANCE_MENU
+    if st.session_state.current_menu != BILLING_MENU:
+        st.session_state.current_menu = BILLING_MENU
 
 
 init_state()
@@ -2390,7 +2390,7 @@ def show_auth_page():
                     if report_closed_info:
                         st.session_state.report_closed = report_closed_info.get("time", "")
 
-                    st.session_state.current_menu = PERFORMANCE_MENU
+                    st.session_state.current_menu = BILLING_MENU
                     persist_current_menu()
                     st.rerun()
                 elif not u_id_str:
@@ -2667,7 +2667,7 @@ def show_sidebar():
             unsafe_allow_html=True,
         )
 
-        render_nav_button(PERFORMANCE_MENU)
+        render_nav_button(BILLING_MENU)
 
         st.markdown("<div class='gpt-sidebar-divider'></div><div class='gpt-logout-marker'></div>", unsafe_allow_html=True)
         if st.button("로그아웃", use_container_width=True, key="nav_logout"):
@@ -7505,6 +7505,19 @@ def inject_theme_toggle():
     """, unsafe_allow_html=True)
 
 
+def show_billing_generation():
+    st.markdown("### 청구자료 생성")
+    st.caption("청구 원본과 은행 로그인 실적파일을 대사해 청구자료 생성 전 확인 목록을 만듭니다.")
+    st.link_button(
+        "원본 Google Sheet 열기",
+        "https://docs.google.com/spreadsheets/d/12BeCTDegUWD-jomaG3WS75Jx1dJ9Lqjxn1hVs3FrpE4/edit?gid=1244892381#gid=1244892381",
+    )
+    st.info(
+        "FastAPI/React 화면에서는 해당 시트의 개설·연계 청구원본과 은행 실적파일을 대사합니다. "
+        "현재 Google Sheet가 비공개이면 CSV export 권한 안내가 표시됩니다."
+    )
+
+
 def show_main():
     apply_global_table_css()
     inject_theme_toggle()
@@ -7512,18 +7525,19 @@ def show_main():
     persist_current_menu()
 
     menu = st.session_state.current_menu
-    allowed_menus = {PERFORMANCE_MENU}
+    allowed_menus = {BILLING_MENU}
     if menu not in allowed_menus:
-        st.session_state.current_menu = PERFORMANCE_MENU
+        st.session_state.current_menu = BILLING_MENU
         persist_current_menu()
         st.rerun()
 
     render_page_title(menu)
 
-    if menu == PERFORMANCE_MENU:
+    if menu == BILLING_MENU:
+        show_billing_generation()
         return
     else:
-        st.session_state.current_menu = PERFORMANCE_MENU
+        st.session_state.current_menu = BILLING_MENU
         st.rerun()
 
 
