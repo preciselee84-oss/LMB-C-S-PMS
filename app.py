@@ -7738,6 +7738,22 @@ def billing_display_value(value):
     return str(value).strip()
 
 
+def billing_format_date(value):
+    if is_blank_value(value):
+        return ""
+    parsed = parse_sheet_date(value)
+    if pd.notna(parsed):
+        return parsed.strftime("%Y-%m-%d")
+    return str(value).strip()
+
+
+_ERP_TYPE_MAP = {"연계형": "O", "기본형": "X"}
+
+
+def _map_erp_type(value):
+    return _ERP_TYPE_MAP.get(str(value).strip(), value)
+
+
 def find_col_by_priority(df, keys):
     for key in keys:
         col = find_col(df, [key])
@@ -7892,7 +7908,7 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
                     reference_info,
                     "업체명",
                 ),
-                "ERP연계 여부": billing_fill_blank(billing_value(row, ["ERP연계 여부", "ERP연계여부"]), reference_info, "ERP연계 여부"),
+                "ERP연계 여부": _map_erp_type(billing_fill_blank(billing_value(row, ["ERP연계 여부", "ERP연계여부"]), reference_info, "ERP연계 여부")),
                 "접수일자": billing_fill_blank(billing_value(row, ["접수일자"]), reference_info, "접수일자"),
                 "최종로그인일자": build_date,
                 "방문일자": visit_date,
@@ -7909,7 +7925,11 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
                 "실적파일 고객명": login_info.get("고객명", ""),
             }
         )
-    return pd.DataFrame(rows, columns=open_columns)
+    df = pd.DataFrame(rows, columns=open_columns)
+    for col in ("접수일자", "최종로그인일자", "방문일자", "최초로그인", "최근로그인일자"):
+        if col in df.columns:
+            df[col] = df[col].apply(billing_format_date)
+    return df
 
 
 def build_erp_billing_table(source_df, login_df=None):
@@ -7962,7 +7982,23 @@ def build_erp_billing_table(source_df, login_df=None):
                 "실적파일 고객명": login_info.get("고객명", ""),
             }
         )
-    return pd.DataFrame(rows, columns=erp_columns)
+    df = pd.DataFrame(rows, columns=erp_columns)
+    for col in ("추가연계신청일자", "구축일", "연계시작일자", "은행연계완료일자", "최초로그인", "최종로그인일자"):
+        if col in df.columns:
+            df[col] = df[col].apply(billing_format_date)
+    return df
+
+
+def _style_open_billing_table(df):
+    def _highlight(row):
+        orig = str(row.get("청구원본 고객명", "")).strip()
+        actual = str(row.get("실적파일 고객명", "")).strip()
+        if orig and actual and orig != actual:
+            return ["background-color: #ffcccc"] * len(row)
+        return [""] * len(row)
+    if "청구원본 고객명" in df.columns and "실적파일 고객명" in df.columns:
+        return df.style.apply(_highlight, axis=1)
+    return df.style
 
 
 def render_billing_source_tables(source_upload=None, login_df=None):
@@ -8006,7 +8042,7 @@ def render_billing_source_tables(source_upload=None, login_df=None):
         for tab, (section_title, section_df) in zip(section_tabs, open_sections):
             with tab:
                 st.markdown(f"##### {section_title}")
-                st.dataframe(section_df, use_container_width=True, hide_index=True)
+                st.dataframe(_style_open_billing_table(section_df), use_container_width=True, hide_index=True)
     with erp_tab:
         st.caption("연계 청구자료 생성 화면 구성입니다.")
         for section_title, section_df in erp_sections:
