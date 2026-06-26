@@ -7499,6 +7499,15 @@ def read_billing_login_upload(uploaded_file):
     return pd.read_excel(BytesIO(raw), dtype=str).fillna("")
 
 
+def find_exact_col(df, names):
+    normalized_names = {str(name).replace(" ", "").replace("　", "").lower() for name in names}
+    for col in df.columns:
+        col_normalized = str(col).replace(" ", "").replace("　", "").lower()
+        if col_normalized in normalized_names:
+            return col
+    return None
+
+
 def read_billing_source_upload(uploaded_file):
     file_name = (uploaded_file.name or "").lower()
     raw = uploaded_file.getvalue()
@@ -7513,10 +7522,16 @@ def read_billing_source_upload(uploaded_file):
 
 def normalize_billing_login_df(df):
     source = clean_header_logic(df.copy()).replace({np.nan: ""})
-    customer_col = find_col(source, ["고객번호"])
-    company_col = find_col(source, ["고객명"])
-    latest_login_col = find_col(source, ["최근로그인", "최종로그인일자", "최종로그인"])
-    login_count_col = find_col(source, ["로그인", "로그인횟수"])
+    customer_col = find_exact_col(source, ["고객번호"]) or find_col(source, ["고객번호"])
+    company_col = find_exact_col(source, ["고객명"]) or find_col(source, ["고객명"])
+    latest_login_col = find_exact_col(source, ["최근로그인", "최종로그인일자", "최종로그인"]) or find_col(
+        source,
+        ["최근로그인", "최종로그인일자", "최종로그인"],
+    )
+    login_count_col = find_exact_col(source, ["로그인", "로그인횟수", "로그인수"]) or find_col(
+        source,
+        ["로그인횟수", "로그인수"],
+    )
 
     missing = [
         label
@@ -7533,7 +7548,7 @@ def normalize_billing_login_df(df):
 
     result = pd.DataFrame(
         {
-            "고객번호": source[customer_col].astype(str).str.strip(),
+            "고객번호": source[customer_col].apply(normalize_customer_no),
             "고객명": source[company_col].astype(str).str.strip(),
             "최근로그인": source[latest_login_col].astype(str).str.strip(),
             "로그인": pd.to_numeric(source[login_count_col].astype(str).str.replace(",", "", regex=False), errors="coerce")
@@ -7625,15 +7640,19 @@ def pick_billing_source_sheet(source_sheets, kind):
 def login_lookup_from_df(login_df):
     if login_df is None or login_df.empty:
         return {}
-    return {
-        str(row.get("고객번호", "")).strip(): {
+    lookup = {}
+    for _, row in login_df.iterrows():
+        customer_keys = billing_customer_keys(row.get("고객번호", ""))
+        if not customer_keys:
+            continue
+        login_info = {
             "고객명": str(row.get("고객명", "")).strip(),
             "최근로그인": str(row.get("최근로그인", "")).strip(),
             "로그인": row.get("로그인", 0),
         }
-        for _, row in login_df.iterrows()
-        if str(row.get("고객번호", "")).strip()
-    }
+        for customer_key in customer_keys:
+            lookup.setdefault(customer_key, login_info)
+    return lookup
 
 
 def billing_display_value(value):
@@ -7755,7 +7774,7 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
         customer_no = billing_value(row, ["고객번호", "고객번호(당월)"])
         if not customer_no and not billing_value(row, ["업체명", "고객명"]):
             continue
-        login_info = login_lookup.get(customer_no, {})
+        login_info = billing_reference_info(login_lookup, customer_no)
         reference_info = billing_reference_info(reference_lookup, customer_no)
         rows.append(
             {
@@ -7819,7 +7838,7 @@ def build_erp_billing_table(source_df, login_df=None):
         customer_no = billing_value(row, ["고객번호", "고객번호(당월)"])
         if not customer_no and not billing_value(row, ["업체명", "고객명"]):
             continue
-        login_info = login_lookup.get(customer_no, {})
+        login_info = billing_reference_info(login_lookup, customer_no)
         rows.append(
             {
                 "순서": billing_value(row, ["순서", "순번"]) or str(idx + 1),
