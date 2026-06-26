@@ -7989,18 +7989,6 @@ def build_erp_billing_table(source_df, login_df=None):
     return df
 
 
-def _style_open_billing_table(df):
-    def _highlight(row):
-        orig = str(row.get("청구원본 고객명", "")).strip()
-        actual = str(row.get("실적파일 고객명", "")).strip()
-        if orig and actual and orig != actual:
-            return ["background-color: #ffcccc"] * len(row)
-        return [""] * len(row)
-    if "청구원본 고객명" in df.columns and "실적파일 고객명" in df.columns:
-        return df.style.apply(_highlight, axis=1)
-    return df.style
-
-
 def render_billing_source_tables(source_upload=None, login_df=None):
     st.markdown("#### 청구 원본 표")
     source_file = source_upload or st.file_uploader(
@@ -8042,7 +8030,7 @@ def render_billing_source_tables(source_upload=None, login_df=None):
         for tab, (section_title, section_df) in zip(section_tabs, open_sections):
             with tab:
                 st.markdown(f"##### {section_title}")
-                st.dataframe(_style_open_billing_table(section_df), use_container_width=True, hide_index=True)
+                st.dataframe(section_df, use_container_width=True, hide_index=True)
     with erp_tab:
         st.caption("연계 청구자료 생성 화면 구성입니다.")
         for section_title, section_df in erp_sections:
