@@ -7549,6 +7549,7 @@ def normalize_billing_login_df(df):
         source,
         ["최근로그인", "최종로그인일자", "최종로그인"],
     )
+    first_login_col = find_exact_col(source, ["신규일자"]) or find_col(source, ["신규일자"])
     login_count_col = find_exact_col(source, ["로그인", "로그인횟수", "로그인수"]) or find_col(
         source,
         ["로그인횟수", "로그인수"],
@@ -7581,6 +7582,7 @@ def normalize_billing_login_df(df):
         {
             "고객번호": source[customer_col].apply(normalize_customer_no),
             "고객명": source[company_col].astype(str).str.strip(),
+            "최초로그인": source[first_login_col].astype(str).str.strip() if first_login_col else "",
             "최근로그인": source[latest_login_col].astype(str).str.strip() if latest_login_col else "",
             "로그인": pd.to_numeric(source[login_count_col].astype(str).str.replace(",", "", regex=False), errors="coerce")
             .fillna(0)
@@ -7595,7 +7597,7 @@ def normalize_billing_login_df(df):
 
 def merge_billing_login_dfs(dfs):
     if not dfs:
-        return pd.DataFrame(columns=["고객번호", "고객명", "최근로그인", "로그인"])
+        return pd.DataFrame(columns=["고객번호", "고객명", "최초로그인", "최근로그인", "로그인"])
 
     merged = pd.concat(dfs, ignore_index=True).replace({np.nan: ""})
     if merged.empty:
@@ -7603,22 +7605,27 @@ def merge_billing_login_dfs(dfs):
 
     merged["_login_num"] = pd.to_numeric(merged["로그인"], errors="coerce").fillna(0).astype(int)
     merged["_login_date"] = pd.to_datetime(merged["최근로그인"], errors="coerce")
+    merged["_first_login_date"] = pd.to_datetime(merged["최초로그인"], errors="coerce")
     rows = []
     for customer_no, group in merged.groupby("고객번호", sort=False):
         with_login = group[group["_login_num"] > 0]
         base = with_login.iloc[-1] if not with_login.empty else group.iloc[-1]
         latest = group["_login_date"].max()
         latest_text = latest.strftime("%Y%m%d") if pd.notna(latest) else str(base.get("최근로그인", "")).strip()
+        first = group["_first_login_date"].max()
+        first_values = [str(value).strip() for value in group["최초로그인"].tolist() if str(value).strip()]
+        first_text = first.strftime("%Y%m%d") if pd.notna(first) else (first_values[-1] if first_values else "")
         name_values = [str(value).strip() for value in group["고객명"].tolist() if str(value).strip()]
         rows.append(
             {
                 "고객번호": customer_no,
                 "고객명": name_values[-1] if name_values else "",
+                "최초로그인": first_text,
                 "최근로그인": latest_text,
                 "로그인": int(group["_login_num"].sum()),
             }
         )
-    return pd.DataFrame(rows, columns=["고객번호", "고객명", "최근로그인", "로그인"])
+    return pd.DataFrame(rows, columns=["고객번호", "고객명", "최초로그인", "최근로그인", "로그인"])
 
 
 def normalize_billing_source_sheet(df):
@@ -7708,6 +7715,7 @@ def login_lookup_from_df(login_df):
             continue
         login_info = {
             "고객명": str(row.get("고객명", "")).strip(),
+            "최초로그인": str(row.get("최초로그인", "")).strip(),
             "최근로그인": str(row.get("최근로그인", "")).strip(),
             "로그인": row.get("로그인", 0),
         }
@@ -7857,7 +7865,7 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
                 "방문일자": billing_fill_blank(billing_value(row, ["방문일자", "방문일"]), reference_info, "방문일자"),
                 "담당자": billing_fill_blank(billing_value(row, ["담당자", "담당자(당월)"]), reference_info, "담당자"),
                 "비고": billing_value(row, ["비고"]),
-                "최초로그인": login_info.get("최근로그인", ""),
+                "최초로그인": login_info.get("최초로그인", ""),
                 "최종로그인일자": login_info.get("최근로그인", ""),
                 "로그인횟수": login_info.get("로그인", ""),
                 "청구원본 고객명": billing_fill_blank(
@@ -7914,7 +7922,7 @@ def build_erp_billing_table(source_df, login_df=None):
                 "은행연계완료일자": billing_value(row, ["은행연계완료일자"]),
                 "수령여부": billing_value(row, ["수령여부"]),
                 "비고": billing_value(row, ["비고"]),
-                "최초로그인": login_info.get("최근로그인", ""),
+                "최초로그인": login_info.get("최초로그인", ""),
                 "최종로그인일자": login_info.get("최근로그인", ""),
                 "로그인횟수": login_info.get("로그인", ""),
                 "청구원본 고객명": billing_value(row, ["업체명", "고객명"]),
