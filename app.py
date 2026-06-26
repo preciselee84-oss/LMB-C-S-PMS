@@ -7686,7 +7686,7 @@ def load_billing_customer_reference():
     col_map = {
         "사업자번호": find_col_by_priority(ref_df, ["사업자번호"]),
         "업체명": find_col_by_priority(ref_df, ["고객명", "고객사명", "업체명"]),
-        "ERP연계 여부": find_col_by_priority(ref_df, ["연계상태", "ERP연계", "구축형"]),
+        "ERP연계 여부": find_col_by_priority(ref_df, ["구축형"]),
         "접수일자": find_col_by_priority(ref_df, ["신규접수일", "접수일자"]),
         "구축일자": find_col_by_priority(ref_df, ["개설/이행일", "구축일자", "구축일"]),
         "방문일자": find_col_by_priority(ref_df, ["개설/이행일", "방문일자", "방문일", "구축일자", "구축일"]),
