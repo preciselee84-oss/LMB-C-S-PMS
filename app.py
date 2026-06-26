@@ -7554,7 +7554,7 @@ def normalize_billing_login_df(df):
         source,
         ["로그인횟수", "로그인수"],
     )
-    is_reference_only = not latest_login_col and not login_count_col
+    is_reference_only = not login_count_col
 
     missing = [
         label
@@ -7583,7 +7583,7 @@ def normalize_billing_login_df(df):
             "고객번호": source[customer_col].apply(normalize_customer_no),
             "고객명": source[company_col].astype(str).str.strip(),
             "최초로그인": source[first_login_col].astype(str).str.strip() if first_login_col else "",
-            "최근로그인": source[latest_login_col].astype(str).str.strip() if latest_login_col else "",
+            "최근로그인": source[latest_login_col].astype(str).str.strip() if latest_login_col and login_count_col else "",
             "로그인": pd.to_numeric(source[login_count_col].astype(str).str.replace(",", "", regex=False), errors="coerce")
             .fillna(0)
             .astype(int)
