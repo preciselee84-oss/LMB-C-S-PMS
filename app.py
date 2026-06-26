@@ -7809,6 +7809,14 @@ def billing_fill_blank(value, reference_info, ref_key):
     return text if text else reference_info.get(ref_key, "")
 
 
+def billing_dates_differ(left, right):
+    left_date = parse_sheet_date(left)
+    right_date = parse_sheet_date(right)
+    if pd.isna(left_date) or pd.isna(right_date):
+        return False
+    return left_date.normalize() != right_date.normalize()
+
+
 def billing_reference_info(reference_lookup, customer_no):
     for customer_key in billing_customer_keys(customer_no):
         if customer_key in reference_lookup:
@@ -7845,6 +7853,10 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
             continue
         login_info = billing_reference_info(login_lookup, customer_no)
         reference_info = billing_reference_info(reference_lookup, customer_no)
+        first_login = login_info.get("최초로그인", "")
+        build_date = billing_fill_blank(billing_value(row, ["구축일자", "구축일"]), reference_info, "구축일자")
+        if first_login and billing_dates_differ(build_date, first_login):
+            build_date = first_login
         rows.append(
             {
                 "순번": billing_value(row, ["순번"]) or str(idx + 1),
@@ -7861,11 +7873,11 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
                 ),
                 "ERP연계 여부": billing_fill_blank(billing_value(row, ["ERP연계 여부", "ERP연계여부"]), reference_info, "ERP연계 여부"),
                 "접수일자": billing_fill_blank(billing_value(row, ["접수일자"]), reference_info, "접수일자"),
-                "구축일자": billing_fill_blank(billing_value(row, ["구축일자", "구축일"]), reference_info, "구축일자"),
+                "구축일자": build_date,
                 "방문일자": billing_fill_blank(billing_value(row, ["방문일자", "방문일"]), reference_info, "방문일자"),
                 "담당자": billing_fill_blank(billing_value(row, ["담당자", "담당자(당월)"]), reference_info, "담당자"),
                 "비고": billing_value(row, ["비고"]),
-                "최초로그인": login_info.get("최초로그인", ""),
+                "최초로그인": first_login,
                 "최종로그인일자": login_info.get("최근로그인", ""),
                 "로그인횟수": login_info.get("로그인", ""),
                 "청구원본 고객명": billing_fill_blank(
