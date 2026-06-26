@@ -7499,6 +7499,27 @@ def read_billing_login_upload(uploaded_file):
     return pd.read_excel(BytesIO(raw), dtype=str).fillna("")
 
 
+def read_billing_login_upload_with_header_scan(uploaded_file):
+    df = read_billing_login_upload(uploaded_file)
+    if find_exact_col(df, ["고객번호"]) or find_col(df, ["고객번호"]):
+        return df
+
+    file_name = (uploaded_file.name or "").lower()
+    raw = uploaded_file.getvalue()
+    if file_name.endswith(".csv"):
+        return df
+
+    raw_df = pd.read_excel(BytesIO(raw), dtype=str, header=None).fillna("")
+    for idx, row in raw_df.iterrows():
+        values = [str(value).strip() for value in row.tolist()]
+        if any(value == "고객번호" for value in values) and any(value in ["고객명", "고객사명"] for value in values):
+            headers = [value or f"빈컬럼{pos + 1}" for pos, value in enumerate(values)]
+            data = raw_df.iloc[idx + 1 :].copy()
+            data.columns = headers
+            return data.replace({np.nan: ""}).reset_index(drop=True)
+    return df
+
+
 def find_exact_col(df, names):
     normalized_names = {str(name).replace(" ", "").replace("　", "").lower() for name in names}
     for col in df.columns:
@@ -7523,7 +7544,7 @@ def read_billing_source_upload(uploaded_file):
 def normalize_billing_login_df(df):
     source = clean_header_logic(df.copy()).replace({np.nan: ""})
     customer_col = find_exact_col(source, ["고객번호"]) or find_col(source, ["고객번호"])
-    company_col = find_exact_col(source, ["고객명"]) or find_col(source, ["고객명"])
+    company_col = find_exact_col(source, ["고객명", "고객사명"]) or find_col(source, ["고객명", "고객사명"])
     latest_login_col = find_exact_col(source, ["최근로그인", "최종로그인일자", "최종로그인"]) or find_col(
         source,
         ["최근로그인", "최종로그인일자", "최종로그인"],
@@ -7532,17 +7553,27 @@ def normalize_billing_login_df(df):
         source,
         ["로그인횟수", "로그인수"],
     )
+    is_reference_only = not latest_login_col and not login_count_col
 
     missing = [
         label
         for label, col in {
             "고객번호": customer_col,
             "고객명": company_col,
-            "최근로그인": latest_login_col,
-            "로그인": login_count_col,
         }.items()
         if not col or col not in source.columns
     ]
+    if not is_reference_only:
+        missing.extend(
+            [
+                label
+                for label, col in {
+                    "최근로그인": latest_login_col,
+                    "로그인": login_count_col,
+                }.items()
+                if not col or col not in source.columns
+            ]
+        )
     if missing:
         return pd.DataFrame(), missing
 
@@ -7550,14 +7581,44 @@ def normalize_billing_login_df(df):
         {
             "고객번호": source[customer_col].apply(normalize_customer_no),
             "고객명": source[company_col].astype(str).str.strip(),
-            "최근로그인": source[latest_login_col].astype(str).str.strip(),
+            "최근로그인": source[latest_login_col].astype(str).str.strip() if latest_login_col else "",
             "로그인": pd.to_numeric(source[login_count_col].astype(str).str.replace(",", "", regex=False), errors="coerce")
             .fillna(0)
-            .astype(int),
+            .astype(int)
+            if login_count_col
+            else 0,
         }
     )
     result = result[result["고객번호"].astype(str).str.strip().ne("")]
     return result.reset_index(drop=True), []
+
+
+def merge_billing_login_dfs(dfs):
+    if not dfs:
+        return pd.DataFrame(columns=["고객번호", "고객명", "최근로그인", "로그인"])
+
+    merged = pd.concat(dfs, ignore_index=True).replace({np.nan: ""})
+    if merged.empty:
+        return merged
+
+    merged["_login_num"] = pd.to_numeric(merged["로그인"], errors="coerce").fillna(0).astype(int)
+    merged["_login_date"] = pd.to_datetime(merged["최근로그인"], errors="coerce")
+    rows = []
+    for customer_no, group in merged.groupby("고객번호", sort=False):
+        with_login = group[group["_login_num"] > 0]
+        base = with_login.iloc[-1] if not with_login.empty else group.iloc[-1]
+        latest = group["_login_date"].max()
+        latest_text = latest.strftime("%Y%m%d") if pd.notna(latest) else str(base.get("최근로그인", "")).strip()
+        name_values = [str(value).strip() for value in group["고객명"].tolist() if str(value).strip()]
+        rows.append(
+            {
+                "고객번호": customer_no,
+                "고객명": name_values[-1] if name_values else "",
+                "최근로그인": latest_text,
+                "로그인": int(group["_login_num"].sum()),
+            }
+        )
+    return pd.DataFrame(rows, columns=["고객번호", "고객명", "최근로그인", "로그인"])
 
 
 def normalize_billing_source_sheet(df):
@@ -7926,7 +7987,8 @@ def show_billing_generation():
     uploaded_login = st.file_uploader(
         "은행로그인실적파일(은행) 엑셀 업로드",
         type=["xlsx", "xls", "csv"],
-        help="고객번호, 고객명, 최근로그인, 로그인 컬럼이 포함된 파일을 업로드해주세요.",
+        accept_multiple_files=True,
+        help="메뉴사용현황 파일과 통합CMS 가입명세 파일을 함께 업로드할 수 있습니다.",
     )
 
     if not uploaded_login:
@@ -7935,17 +7997,23 @@ def show_billing_generation():
         return
 
     try:
-        raw_df = read_billing_login_upload(uploaded_login)
-        normalized_df, missing = normalize_billing_login_df(raw_df)
+        normalized_files = []
+        missing_by_file = []
+        for login_file in uploaded_login:
+            raw_df = read_billing_login_upload_with_header_scan(login_file)
+            file_df, missing = normalize_billing_login_df(raw_df)
+            if missing:
+                missing_by_file.append(f"{login_file.name}: {', '.join(missing)}")
+                continue
+            normalized_files.append(file_df)
+        if missing_by_file:
+            st.error(f"필수 컬럼을 찾을 수 없습니다: {' / '.join(missing_by_file)}")
+            st.caption("필요 컬럼: 고객번호, 고객명. 메뉴사용현황 파일은 최근로그인, 로그인 컬럼도 필요합니다.")
+            render_billing_source_tables()
+            return
+        normalized_df = merge_billing_login_dfs(normalized_files)
     except Exception as exc:
         st.error(f"파일을 읽을 수 없습니다: {exc}")
-        return
-
-    if missing:
-        st.error(f"필수 컬럼을 찾을 수 없습니다: {', '.join(missing)}")
-        st.caption("필요 컬럼: 고객번호, 고객명, 최근로그인, 로그인")
-        st.dataframe(raw_df.head(20), use_container_width=True)
-        render_billing_source_tables()
         return
 
     total_login = int(normalized_df["로그인"].sum()) if not normalized_df.empty else 0
@@ -7959,9 +8027,6 @@ def show_billing_generation():
     col_customer.metric("고객 수", f"{normalized_df['고객번호'].nunique():,}곳")
     col_login.metric("로그인 합계", f"{total_login:,}회")
     col_latest.metric("최신 로그인일", latest_login)
-
-    st.markdown("#### 업로드 실적 미리보기")
-    st.dataframe(normalized_df.head(500), use_container_width=True, hide_index=True)
 
     excel_bytes = dataframe_to_excel_bytes({"은행로그인실적파일": normalized_df})
     st.download_button(
