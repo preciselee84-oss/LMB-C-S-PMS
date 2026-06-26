@@ -3,7 +3,7 @@ import re
 
 import httpx
 import pandas as pd
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 
 from app.schemas.billing import BillingPreview, BillingPreviewRow, BillingPreviewSummary
 
@@ -64,6 +64,28 @@ async def _read_sheet_csv(client: httpx.AsyncClient, gid: str, header: int) -> p
             detail=f"Google Sheet CSV export 실패: HTTP {response.status_code}",
         )
     return pd.read_csv(BytesIO(response.content), header=header, dtype=str).fillna("")
+
+
+async def _read_upload_file(file: UploadFile) -> pd.DataFrame:
+    content = await file.read()
+    file_name = (file.filename or "").lower()
+    try:
+        if file_name.endswith(".csv"):
+            try:
+                return pd.read_csv(BytesIO(content), dtype=str).fillna("")
+            except UnicodeDecodeError:
+                return pd.read_csv(BytesIO(content), dtype=str, encoding="cp949").fillna("")
+        if file_name.endswith((".xlsx", ".xls")):
+            return pd.read_excel(BytesIO(content), dtype=str).fillna("")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="은행 로그인 실적파일을 읽을 수 없습니다. xlsx, xls, csv 형식을 확인해주세요.",
+        ) from exc
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="지원하지 않는 파일 형식입니다. xlsx, xls, csv 파일을 업로드해주세요.",
+    )
 
 
 def _row_value(row: pd.Series, candidates: list[str]) -> str:
@@ -173,14 +195,13 @@ def _billing_rows(
     return rows
 
 
-@router.get("/preview", response_model=BillingPreview)
-async def preview_billing() -> BillingPreview:
-    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-        open_df = await _read_sheet_csv(client, SHEETS["open"]["gid"], SHEETS["open"]["header"])
-        erp_df = await _read_sheet_csv(client, SHEETS["erp"]["gid"], SHEETS["erp"]["header"])
-        login_df = await _read_sheet_csv(client, SHEETS["login"]["gid"], SHEETS["login"]["header"])
-        customer_df = await _read_sheet_csv(client, SHEETS["customer"]["gid"], SHEETS["customer"]["header"])
-
+def _build_preview(
+    open_df: pd.DataFrame,
+    erp_df: pd.DataFrame,
+    login_df: pd.DataFrame,
+    customer_df: pd.DataFrame,
+    login_source_title: str,
+) -> BillingPreview:
     login_by_customer = _build_login_map(login_df)
     customer_by_biz, customer_by_customer = _build_customer_maps(customer_df)
 
@@ -195,7 +216,7 @@ async def preview_billing() -> BillingPreview:
     return BillingPreview(
         spreadsheet_title=SPREADSHEET_TITLE,
         spreadsheet_url=SPREADSHEET_URL,
-        generated_from=[sheet["title"] for sheet in SHEETS.values()],
+        generated_from=[SHEETS["open"]["title"], SHEETS["erp"]["title"], login_source_title, SHEETS["customer"]["title"]],
         rows=rows,
         summary=BillingPreviewSummary(
             total_count=len(rows),
@@ -206,3 +227,29 @@ async def preview_billing() -> BillingPreview:
             erp_count=len(erp_rows),
         ),
     )
+
+
+async def _read_sheet_sources(include_login: bool) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame | None, pd.DataFrame]:
+    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        open_df = await _read_sheet_csv(client, SHEETS["open"]["gid"], SHEETS["open"]["header"])
+        erp_df = await _read_sheet_csv(client, SHEETS["erp"]["gid"], SHEETS["erp"]["header"])
+        login_df = await _read_sheet_csv(client, SHEETS["login"]["gid"], SHEETS["login"]["header"]) if include_login else None
+        customer_df = await _read_sheet_csv(client, SHEETS["customer"]["gid"], SHEETS["customer"]["header"])
+    return open_df, erp_df, login_df, customer_df
+
+
+@router.get("/preview", response_model=BillingPreview)
+async def preview_billing() -> BillingPreview:
+    open_df, erp_df, login_df, customer_df = await _read_sheet_sources(include_login=True)
+    if login_df is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="은행 로그인 실적파일을 불러오지 못했습니다.")
+    return _build_preview(open_df, erp_df, login_df, customer_df, SHEETS["login"]["title"])
+
+
+@router.post("/preview", response_model=BillingPreview)
+async def preview_billing_with_uploaded_login_file(
+    login_file: UploadFile = File(...),
+) -> BillingPreview:
+    login_df = await _read_upload_file(login_file)
+    open_df, erp_df, _, customer_df = await _read_sheet_sources(include_login=False)
+    return _build_preview(open_df, erp_df, login_df, customer_df, f"업로드: {login_file.filename or '은행로그인실적파일'}")

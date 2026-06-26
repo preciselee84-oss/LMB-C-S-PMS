@@ -14,7 +14,7 @@ export function AppLayout() {
     <Layout className="app-shell">
       <Sider width={248} className="app-sidebar">
         <Typography.Title level={4} className="app-logo">
-          AX-Wetak 360
+          내부 관리
         </Typography.Title>
         <Menu
           mode="inline"
@@ -25,7 +25,7 @@ export function AppLayout() {
       </Sider>
       <Layout>
         <Header className="app-header">
-          <Typography.Text strong>Webcash We · 360도 빈틈없는 관리</Typography.Text>
+          <Typography.Text strong>내부 업무 관리</Typography.Text>
           <Button
             icon={<LogoutOutlined />}
             onClick={() => {

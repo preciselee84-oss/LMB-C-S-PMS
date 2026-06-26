@@ -38,3 +38,12 @@ export async function fetchBillingPreview() {
   const response = await apiClient.get<BillingPreview>('/billing/preview');
   return response.data;
 }
+
+export async function uploadBillingLoginFile(file: File) {
+  const formData = new FormData();
+  formData.append('login_file', file);
+  const response = await apiClient.post<BillingPreview>('/billing/preview', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}

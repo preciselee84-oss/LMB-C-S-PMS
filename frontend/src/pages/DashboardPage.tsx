@@ -1,10 +1,11 @@
-import { Alert, Button, Card, Col, Row, Space, Statistic, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Row, Space, Statistic, Table, Tag, Typography, Upload, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { ReloadOutlined } from '@ant-design/icons';
+import type { UploadFile } from 'antd/es/upload/interface';
+import { ReloadOutlined, UploadOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useEffect, useState } from 'react';
 
-import { fetchBillingPreview, type BillingPreview, type BillingPreviewRow } from '../api/billing';
+import { fetchBillingPreview, uploadBillingLoginFile, type BillingPreview, type BillingPreviewRow } from '../api/billing';
 
 const statusColors: Record<string, string> = {
   일치: 'success',
@@ -16,6 +17,8 @@ const statusColors: Record<string, string> = {
 export function DashboardPage() {
   const [preview, setPreview] = useState<BillingPreview | null>(null);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
   const loadPreview = async () => {
@@ -37,6 +40,28 @@ export function DashboardPage() {
   useEffect(() => {
     void loadPreview();
   }, []);
+
+  const handleUploadPreview = async () => {
+    const file = fileList[0]?.originFileObj;
+    if (!file) {
+      message.warning('은행로그인실적파일(은행) 엑셀을 선택해주세요.');
+      return;
+    }
+    setUploading(true);
+    setErrorMessage('');
+    try {
+      const data = await uploadBillingLoginFile(file);
+      setPreview(data);
+      message.success('업로드한 은행 로그인 실적파일로 청구자료를 생성했습니다.');
+    } catch (error: unknown) {
+      const detail = axios.isAxiosError(error) ? error.response?.data?.detail : undefined;
+      const nextMessage = typeof detail === 'string' ? detail : '업로드 파일로 청구자료를 생성하지 못했습니다.';
+      setErrorMessage(nextMessage);
+      message.error(nextMessage);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const columns: ColumnsType<BillingPreviewRow> = [
     { title: '구분', dataIndex: 'source_type', key: 'source_type', width: 80 },
@@ -82,6 +107,26 @@ export function DashboardPage() {
           description={errorMessage}
         />
       ) : null}
+
+      <Card title="은행로그인실적파일(은행) 업로드">
+        <Space wrap>
+          <Upload
+            accept=".xlsx,.xls,.csv"
+            beforeUpload={() => false}
+            fileList={fileList}
+            maxCount={1}
+            onChange={({ fileList: nextFileList }) => setFileList(nextFileList.slice(-1))}
+          >
+            <Button icon={<UploadOutlined />}>엑셀 파일 선택</Button>
+          </Upload>
+          <Button type="primary" onClick={handleUploadPreview} loading={uploading} disabled={!fileList.length}>
+            업로드 파일로 청구자료 생성
+          </Button>
+          <Typography.Text type="secondary">
+            고객번호, 고객명, 최근로그인, 로그인 컬럼을 기준으로 청구원본과 대사합니다.
+          </Typography.Text>
+        </Space>
+      </Card>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} md={8} lg={4}>

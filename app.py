@@ -14,7 +14,7 @@ from io import BytesIO
 from datetime import datetime, timedelta
 from streamlit_cookies_controller import CookieController
 
-st.set_page_config(page_title="AX-Wetak 360", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="내부 관리", layout="wide", initial_sidebar_state="expanded")
 
 
 def resolve_template_file(file_name):
@@ -2322,7 +2322,7 @@ def show_auth_page():
         st.markdown(
             """
             <div class="auth-logo-card">
-                <div class="auth-logo-title">AX-Wetak 360</div>
+                <div class="auth-logo-title">내부 관리</div>
                 <div class="auth-logo-sub">Webcash We · 360° Control</div>
             </div>
             """,
@@ -2656,7 +2656,7 @@ def show_sidebar():
             f"<div class='gpt-brand'>"
             f"<div class='gpt-brand-mark'>AX</div>"
             f"<div class='gpt-brand-text'>"
-            f"<div class='gpt-brand-title'>AX-Wetak 360</div>"
+            f"<div class='gpt-brand-title'>내부 관리</div>"
             f"<div class='gpt-brand-subtitle'>Webcash We · 360° Control</div>"
             f"</div></div>"
             f"<div class='gpt-user-card'>"
@@ -6513,7 +6513,7 @@ def _mask_secret(value):
 
 def show_server_connection_info():
     st.markdown("### 서버 접속 정보")
-    st.caption("AX-Wetak 360에서 사용할 MSSQL 서버 접속 정보를 관리합니다.")
+    st.caption("내부 관리에서 사용할 MSSQL 서버 접속 정보를 관리합니다.")
 
     config = _load_server_connection()
     installed_drivers = _get_installed_odbc_drivers()
