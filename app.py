@@ -7499,6 +7499,18 @@ def read_billing_login_upload(uploaded_file):
     return pd.read_excel(BytesIO(raw), dtype=str).fillna("")
 
 
+def read_billing_source_upload(uploaded_file):
+    file_name = (uploaded_file.name or "").lower()
+    raw = uploaded_file.getvalue()
+    if file_name.endswith(".csv"):
+        try:
+            return {"업로드 파일": pd.read_csv(BytesIO(raw), dtype=str).fillna("")}
+        except UnicodeDecodeError:
+            return {"업로드 파일": pd.read_csv(BytesIO(raw), dtype=str, encoding="cp949").fillna("")}
+    sheets = pd.read_excel(BytesIO(raw), sheet_name=None, dtype=str)
+    return {str(name): df.fillna("") for name, df in sheets.items()}
+
+
 def normalize_billing_login_df(df):
     source = clean_header_logic(df.copy()).replace({np.nan: ""})
     customer_col = find_col(source, ["고객번호"])
@@ -7533,7 +7545,7 @@ def normalize_billing_login_df(df):
     return result.reset_index(drop=True), []
 
 
-def render_billing_source_tables():
+def render_billing_source_tables(source_upload=None):
     open_columns = [
         "순번",
         "고객번호",
@@ -7572,6 +7584,12 @@ def render_billing_source_tables():
     ]
 
     st.markdown("#### 청구 원본 표")
+    source_file = source_upload or st.file_uploader(
+        "구축 및 연계 리스트 업로드",
+        type=["xlsx", "xls", "csv"],
+        key="billing_source_upload",
+        help="2026년 6월 구축 및 연계 리스트_최종본.xlsx 파일을 업로드해주세요.",
+    )
     open_tab, erp_tab = st.tabs(["청구원본(개설업로드)", "청구원본(연계업로드)"])
     with open_tab:
         st.caption("개설 청구자료 생성 화면 구성입니다. 실제 시트 데이터 연동 없이 표 영역만 표시합니다.")
@@ -7579,6 +7597,30 @@ def render_billing_source_tables():
     with erp_tab:
         st.caption("연계 청구자료 생성 화면 구성입니다. 실제 시트 데이터 연동 없이 표 영역만 표시합니다.")
         st.dataframe(pd.DataFrame(columns=erp_columns), use_container_width=True, hide_index=True)
+
+    if not source_file:
+        st.warning("구축 및 연계 리스트를 업로드하면 아래에 파일 미리보기가 표시됩니다.")
+        return
+
+    try:
+        source_sheets = read_billing_source_upload(source_file)
+    except Exception as exc:
+        st.error(f"구축 및 연계 리스트 파일을 읽을 수 없습니다: {exc}")
+        return
+
+    st.markdown("#### 구축 및 연계 리스트 미리보기")
+    sheet_names = list(source_sheets.keys())
+    if len(sheet_names) == 1:
+        df = clean_header_logic(source_sheets[sheet_names[0]].copy()).replace({np.nan: ""})
+        st.caption(f"{sheet_names[0]} · {len(df):,}행")
+        st.dataframe(df.head(500), use_container_width=True, hide_index=True)
+    else:
+        tabs = st.tabs(sheet_names)
+        for tab, sheet_name in zip(tabs, sheet_names):
+            with tab:
+                df = clean_header_logic(source_sheets[sheet_name].copy()).replace({np.nan: ""})
+                st.caption(f"{sheet_name} · {len(df):,}행")
+                st.dataframe(df.head(500), use_container_width=True, hide_index=True)
 
 
 def show_billing_generation():
