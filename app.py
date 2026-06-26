@@ -7564,6 +7564,12 @@ def normalize_billing_source_sheet(df):
     return clean_header_logic(data.reset_index(drop=True))
 
 
+def is_billing_source_header(values):
+    return any("고객번호" in value for value in values) and any(
+        "사업자번호" in value or "사업자등록번호" in value for value in values
+    )
+
+
 def parse_billing_source_sections(df):
     source = df.copy().replace({np.nan: ""})
     sections = []
@@ -7573,9 +7579,7 @@ def parse_billing_source_sections(df):
     while idx < row_count:
         row_values = [str(value).strip() for value in source.iloc[idx].tolist()]
         nonempty_values = [value for value in row_values if value]
-        is_header = "고객번호" in nonempty_values and (
-            "사업자번호" in nonempty_values or "사업자등록번호" in nonempty_values
-        )
+        is_header = is_billing_source_header(nonempty_values)
         if nonempty_values and not is_header:
             current_title = nonempty_values[0]
             idx += 1
@@ -7590,9 +7594,7 @@ def parse_billing_source_sections(df):
         while idx < row_count:
             next_values = [str(value).strip() for value in source.iloc[idx].tolist()]
             next_nonempty = [value for value in next_values if value]
-            next_is_header = "고객번호" in next_nonempty and (
-                "사업자번호" in next_nonempty or "사업자등록번호" in next_nonempty
-            )
+            next_is_header = is_billing_source_header(next_nonempty)
             if next_is_header:
                 break
             if len(next_nonempty) == 1 and not next_nonempty[0].isdigit():
@@ -7777,9 +7779,11 @@ def render_billing_source_tables(source_upload=None, login_df=None):
     open_tab, erp_tab = st.tabs(["청구원본(개설업로드)", "청구원본(연계업로드)"])
     with open_tab:
         st.caption("개설 청구자료 생성 화면 구성입니다.")
-        for section_title, section_df in open_sections:
-            st.markdown(f"##### {section_title}")
-            st.dataframe(section_df, use_container_width=True, hide_index=True)
+        section_tabs = st.tabs([title for title, _ in open_sections])
+        for tab, (section_title, section_df) in zip(section_tabs, open_sections):
+            with tab:
+                st.markdown(f"##### {section_title}")
+                st.dataframe(section_df, use_container_width=True, hide_index=True)
     with erp_tab:
         st.caption("연계 청구자료 생성 화면 구성입니다.")
         for section_title, section_df in erp_sections:
