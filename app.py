@@ -7817,6 +7817,25 @@ def billing_dates_differ(left, right):
     return left_date.normalize() != right_date.normalize()
 
 
+def billing_prelogin_note(build_date, visit_date):
+    build_dt = parse_sheet_date(build_date)
+    visit_dt = parse_sheet_date(visit_date)
+    if pd.isna(build_dt) or pd.isna(visit_dt):
+        return ""
+    build_month = build_dt.to_period("M")
+    visit_month = visit_dt.to_period("M")
+    if build_month >= visit_month:
+        return ""
+    return f"{build_dt.month:02d}월 사전 로그인 후 {visit_dt.month:02d}월 사용자교육 진행"
+
+
+def append_billing_note(remark, note):
+    remark_text = billing_display_value(remark)
+    if not note or note in remark_text:
+        return remark_text
+    return f"{remark_text} / {note}" if remark_text else note
+
+
 def billing_reference_info(reference_lookup, customer_no):
     for customer_key in billing_customer_keys(customer_no):
         if customer_key in reference_lookup:
@@ -7857,6 +7876,8 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
         build_date = billing_fill_blank(billing_value(row, ["구축일자", "구축일"]), reference_info, "구축일자")
         if first_login and billing_dates_differ(build_date, first_login):
             build_date = first_login
+        visit_date = billing_fill_blank(billing_value(row, ["방문일자", "방문일"]), reference_info, "방문일자")
+        remark = append_billing_note(billing_value(row, ["비고"]), billing_prelogin_note(build_date, visit_date))
         rows.append(
             {
                 "순번": billing_value(row, ["순번"]) or str(idx + 1),
@@ -7874,9 +7895,9 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
                 "ERP연계 여부": billing_fill_blank(billing_value(row, ["ERP연계 여부", "ERP연계여부"]), reference_info, "ERP연계 여부"),
                 "접수일자": billing_fill_blank(billing_value(row, ["접수일자"]), reference_info, "접수일자"),
                 "구축일자": build_date,
-                "방문일자": billing_fill_blank(billing_value(row, ["방문일자", "방문일"]), reference_info, "방문일자"),
+                "방문일자": visit_date,
                 "담당자": billing_fill_blank(billing_value(row, ["담당자", "담당자(당월)"]), reference_info, "담당자"),
-                "비고": billing_value(row, ["비고"]),
+                "비고": remark,
                 "최초로그인": first_login,
                 "최종로그인일자": login_info.get("최근로그인", ""),
                 "로그인횟수": login_info.get("로그인", ""),
