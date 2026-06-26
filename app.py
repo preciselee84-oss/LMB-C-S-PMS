@@ -7650,12 +7650,31 @@ def billing_display_value(value):
     return str(value).strip()
 
 
+def find_col_by_priority(df, keys):
+    for key in keys:
+        col = find_col(df, [key])
+        if col and col in df.columns:
+            return col
+    return None
+
+
+def billing_customer_keys(value):
+    normalized = normalize_customer_no(value)
+    keys = [normalized] if normalized else []
+    if normalized:
+        stripped = normalized.lstrip("0")
+        if stripped and stripped not in keys:
+            keys.append(stripped)
+        if len(normalized) == 8:
+            padded = normalized.zfill(9)
+            if padded not in keys:
+                keys.append(padded)
+    return keys
+
+
 def load_billing_customer_reference():
     try:
-        ref_df = st.session_state.get("billing_customer_reference_df")
-        if ref_df is None or ref_df.empty:
-            ref_df = clean_header_logic(read_google_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2))
-            st.session_state.billing_customer_reference_df = ref_df
+        ref_df = clean_header_logic(read_google_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2))
     except Exception as exc:
         return {}, f"고객원장 참조 시트를 불러올 수 없습니다: {exc}"
 
@@ -7665,25 +7684,28 @@ def load_billing_customer_reference():
         return {}, "고객원장 참조 시트에서 고객번호 컬럼을 찾을 수 없습니다."
 
     col_map = {
-        "사업자번호": find_col(ref_df, ["사업자번호"]),
-        "업체명": find_col(ref_df, ["고객명", "고객사명", "업체명"]),
-        "ERP연계 여부": find_col(ref_df, ["연계상태", "구축형", "ERP연계"]),
-        "접수일자": find_col(ref_df, ["신규접수일", "접수일자"]),
-        "구축일자": find_col(ref_df, ["개설/이행일", "구축일자", "구축일"]),
-        "담당자": find_col(ref_df, ["담당자"]),
-        "청구원본 고객명": find_col(ref_df, ["고객명", "고객사명", "업체명"]),
+        "사업자번호": find_col_by_priority(ref_df, ["사업자번호"]),
+        "업체명": find_col_by_priority(ref_df, ["고객명", "고객사명", "업체명"]),
+        "ERP연계 여부": find_col_by_priority(ref_df, ["연계상태", "ERP연계", "구축형"]),
+        "접수일자": find_col_by_priority(ref_df, ["신규접수일", "접수일자"]),
+        "구축일자": find_col_by_priority(ref_df, ["개설/이행일", "구축일자", "구축일"]),
+        "방문일자": find_col_by_priority(ref_df, ["개설/이행일", "방문일자", "방문일", "구축일자", "구축일"]),
+        "담당자": find_col_by_priority(ref_df, ["담당자"]),
+        "청구원본 고객명": find_col_by_priority(ref_df, ["고객명", "고객사명", "업체명"]),
     }
 
     lookup = {}
     for _, row in ref_df.iterrows():
-        customer_key = normalize_customer_no(row.get(customer_col, ""))
-        if not customer_key or customer_key in lookup:
+        customer_keys = billing_customer_keys(row.get(customer_col, ""))
+        if not customer_keys:
             continue
-        lookup[customer_key] = {
+        reference_info = {
             target_col: billing_display_value(row.get(source_col, ""))
             for target_col, source_col in col_map.items()
             if source_col and source_col in ref_df.columns
         }
+        for customer_key in customer_keys:
+            lookup.setdefault(customer_key, reference_info)
     return lookup, ""
 
 
@@ -7697,6 +7719,13 @@ def billing_value(row, candidates):
 def billing_fill_blank(value, reference_info, ref_key):
     text = billing_display_value(value)
     return text if text else reference_info.get(ref_key, "")
+
+
+def billing_reference_info(reference_lookup, customer_no):
+    for customer_key in billing_customer_keys(customer_no):
+        if customer_key in reference_lookup:
+            return reference_lookup[customer_key]
+    return {}
 
 
 def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
@@ -7727,7 +7756,7 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
         if not customer_no and not billing_value(row, ["업체명", "고객명"]):
             continue
         login_info = login_lookup.get(customer_no, {})
-        reference_info = reference_lookup.get(normalize_customer_no(customer_no), {})
+        reference_info = billing_reference_info(reference_lookup, customer_no)
         rows.append(
             {
                 "순번": billing_value(row, ["순번"]) or str(idx + 1),
@@ -7745,7 +7774,7 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
                 "ERP연계 여부": billing_fill_blank(billing_value(row, ["ERP연계 여부", "ERP연계여부"]), reference_info, "ERP연계 여부"),
                 "접수일자": billing_fill_blank(billing_value(row, ["접수일자"]), reference_info, "접수일자"),
                 "구축일자": billing_fill_blank(billing_value(row, ["구축일자", "구축일"]), reference_info, "구축일자"),
-                "방문일자": billing_value(row, ["방문일자"]),
+                "방문일자": billing_fill_blank(billing_value(row, ["방문일자", "방문일"]), reference_info, "방문일자"),
                 "담당자": billing_fill_blank(billing_value(row, ["담당자", "담당자(당월)"]), reference_info, "담당자"),
                 "비고": billing_value(row, ["비고"]),
                 "최초로그인": login_info.get("최근로그인", ""),
