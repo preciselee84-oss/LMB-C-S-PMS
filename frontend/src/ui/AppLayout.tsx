@@ -18,9 +18,9 @@ export function AppLayout() {
         </Typography.Title>
         <Menu
           mode="inline"
-          selectedKeys={['dashboard']}
+          selectedKeys={['performance']}
           onClick={() => navigate('/')}
-          items={[{ key: 'dashboard', icon: <BankOutlined />, label: '관리 대시보드' }]}
+          items={[{ key: 'performance', icon: <BankOutlined />, label: '실적관리' }]}
         />
       </Sider>
       <Layout>

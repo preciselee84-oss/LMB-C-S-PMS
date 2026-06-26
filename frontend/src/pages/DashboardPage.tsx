@@ -333,8 +333,8 @@ export function DashboardPage() {
     <Space className="dashboard-page" direction="vertical" size={18}>
       <div className="page-heading">
         <div>
-          <Typography.Title level={3}>AX-Wetak 360 대시보드</Typography.Title>
-          <Typography.Text type="secondary">Webcash의 We와 360도 빈틈없는 관리로 전도금 요청부터 이체자료 생성까지 처리합니다.</Typography.Text>
+          <Typography.Title level={3}>실적관리</Typography.Title>
+          <Typography.Text type="secondary">AX-Wetak 360의 실적 현황과 예측 지표를 확인합니다.</Typography.Text>
         </div>
         <Button icon={<ReloadOutlined />} onClick={loadDashboard} loading={loading}>
           새로고침
@@ -365,10 +365,11 @@ export function DashboardPage() {
       </Row>
 
       <Tabs
+        className="performance-only-tabs"
         items={[
           {
             key: 'overview',
-            label: '현황/예측',
+            label: '실적관리',
             children: (
               <Row gutter={[16, 16]}>
                 <Col xs={24} lg={16}>
@@ -569,7 +570,7 @@ export function DashboardPage() {
               </Row>
             ),
           },
-        ]}
+        ].slice(0, 1)}
       />
       <Modal
         title="사용자 추가"

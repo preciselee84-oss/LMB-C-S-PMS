@@ -78,6 +78,7 @@ GITHUB_BRANCH = "main"
 GITHUB_DATA_DIR = "data"
 SESSION_UID_COOKIE = "auto_login_uid"
 LAST_MENU_COOKIE = "last_menu"
+PERFORMANCE_MENU = "실적관리"
 
 
 def _get_github_token():
@@ -629,7 +630,7 @@ def init_state():
         "user_role": "사용자",
         "user_name": "",
         "auth_mode": "login",
-        "current_menu": "전도금 요청",
+        "current_menu": PERFORMANCE_MENU,
         "url_analysis": DEFAULT_URL_ANALYSIS,
         "url_sync": DEFAULT_URL_SYNC,
         "url_hana": DEFAULT_URL_HANA,
@@ -698,6 +699,8 @@ def init_state():
     }
     if st.session_state.current_menu in RENAMED_MENUS:
         st.session_state.current_menu = RENAMED_MENUS[st.session_state.current_menu]
+    if st.session_state.current_menu != PERFORMANCE_MENU:
+        st.session_state.current_menu = PERFORMANCE_MENU
 
 
 init_state()
@@ -2666,22 +2669,7 @@ def show_sidebar():
             unsafe_allow_html=True,
         )
 
-        if st.session_state.user_role == "관리자":
-            for menu_name in ["전자결재"]:
-                render_nav_button(menu_name)
-
-            st.markdown("<div class='gpt-section'>설정</div>", unsafe_allow_html=True)
-            for menu_name in ["결재선 설정", "회사 관리", "위탁 사업장 관리", "서버 접속 정보"]:
-                render_nav_button(menu_name)
-
-            st.markdown("<div class='gpt-section'>지급 관리</div>", unsafe_allow_html=True)
-            for menu_name in ["이체 자료 확정", "지급 결과 확인"]:
-                render_nav_button(menu_name)
-
-            st.markdown("<div class='gpt-section'>위탁 사업장</div>", unsafe_allow_html=True)
-
-        for menu_name in ["전도금 요청", "품의 결과", "전도금 사용 결의 보고", "계좌 잔고 확인"]:
-            render_nav_button(menu_name)
+        render_nav_button(PERFORMANCE_MENU)
 
         st.markdown("<div class='gpt-sidebar-divider'></div><div class='gpt-logout-marker'></div>", unsafe_allow_html=True)
         if st.button("로그아웃", use_container_width=True, key="nav_logout"):
@@ -7526,50 +7514,18 @@ def show_main():
     persist_current_menu()
 
     menu = st.session_state.current_menu
-    allowed_menus = {
-        "대시보드", "전자결재",
-        "회사 관리", "위탁 사업장 관리", "서버 접속 정보",
-        "이체 자료 확정", "지급 결과 확인",
-        "전도금 요청", "품의 결과", "전도금 사용 결의 보고", "계좌 잔고 확인",
-    }
+    allowed_menus = {PERFORMANCE_MENU}
     if menu not in allowed_menus:
-        st.session_state.current_menu = "전도금 요청"
-        persist_current_menu()
-        st.rerun()
-    user_menus = {"전도금 요청", "품의 결과", "전도금 사용 결의 보고", "계좌 잔고 확인"}
-    if menu not in user_menus and st.session_state.user_role != "관리자":
-        st.session_state.current_menu = "전도금 요청"
+        st.session_state.current_menu = PERFORMANCE_MENU
         persist_current_menu()
         st.rerun()
 
     render_page_title(menu)
 
-    if menu == "대시보드":
+    if menu == PERFORMANCE_MENU:
         show_dashboard()
-    elif menu == "전자결재":
-        show_e_approval()
-    elif menu == "결재선 설정":
-        show_approval_line_settings()
-    elif menu == "회사 관리":
-        show_company_profile()
-    elif menu == "위탁 사업장 관리":
-        show_workplace_admin()
-    elif menu == "서버 접속 정보":
-        show_server_connection_info()
-    elif menu == "이체 자료 확정":
-        show_transfer_file_generation()
-    elif menu == "지급 결과 확인":
-        show_transfer_result_confirmation()
-    elif menu == "전도금 요청":
-        show_advance_payment_request()
-    elif menu == "품의 결과":
-        show_approval_result()
-    elif menu == "전도금 사용 결의 보고":
-        show_usage_report()
-    elif menu == "계좌 잔고 확인":
-        show_account_balance_check()
     else:
-        st.session_state.current_menu = "전도금 요청"
+        st.session_state.current_menu = PERFORMANCE_MENU
         st.rerun()
 
 
