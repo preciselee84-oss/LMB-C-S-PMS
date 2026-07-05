@@ -9345,15 +9345,27 @@ def show_user_history(is_admin_mode=False):
     df_user = df[df[u_col] == st.session_state.user_name].copy() if u_col in df.columns else df.iloc[0:0].copy()
     df_user = attach_cloud_dates(df_user)
     df_user_visit = filter_visit_rows(df_user)
+    df_visit_all = filter_visit_rows(df)
 
-    st.markdown("### 담당자 기본 활동 수치")
-    res, err, dup = process_performance_analysis(df_user_visit, st.session_state.get("auto_prev_df"))
+    st.markdown("### 담당자별 활동 수치")
+    res, err, dup = process_performance_analysis(df_visit_all, st.session_state.get("auto_prev_df"))
 
     if isinstance(res, pd.DataFrame) and not res.empty:
+        summary_cols = [
+            "담당자", "직급",
+            "개설건수", "개설포인트",
+            "연계건수", "연계포인트",
+            "운영건수 (실제 활동)", "운영포인트 (실제 활동)",
+            "합계포인트", "지급포인트", "지급예상금액",
+        ]
+        summary_display = res[[col for col in summary_cols if col in res.columns]].copy()
+        style_report_logic(summary_display, compact=True)
+
         my_res = res[res["담당자"] == st.session_state.user_name].copy()
 
         # 업로드 전 예상치 계산 (추가 활동 제외)
         if not my_res.empty:
+            st.markdown("#### 내 활동 수치")
             before_res = my_res.copy()
             o_p = int(float(before_res.iloc[0].get("개설포인트", 0)))
             l_p = int(float(before_res.iloc[0].get("연계포인트", 0)))
@@ -9379,7 +9391,7 @@ def show_user_history(is_admin_mode=False):
                         prev_res, _, _ = process_performance_analysis(prev_df)
                         if isinstance(prev_res, pd.DataFrame) and not prev_res.empty:
                             p_map = prev_res.set_index("담당자")["지급예상금액"].to_dict()
-                            prev_pay = p_map.get(name, 0)
+                            prev_pay = p_map.get(st.session_state.user_name, 0)
                             before_res.loc[before_res.index[0], "전월대비"] = int(before_pay - prev_pay)
                     except Exception:
                         pass
@@ -9390,7 +9402,8 @@ def show_user_history(is_admin_mode=False):
             drop_cols = [c for c in my_res.columns if "전월대비" in c]
             my_res_display = my_res.drop(columns=drop_cols, errors="ignore")
 
-        style_report_logic(my_res_display, compact=True)
+        if not my_res_display.empty:
+            style_report_logic(my_res_display, compact=True)
     elif isinstance(res, str):
         st.error(res)
 
