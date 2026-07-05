@@ -2654,7 +2654,11 @@ def show_sidebar():
 
         if st.session_state.user_role == "관리자":
             st.markdown("<div class='gpt-section'>관리자 메뉴</div>", unsafe_allow_html=True)
-            for menu_name in ["대시보드", "관리자용 실적 확인", "실적 분석/계산", "실적 보고서", BILLING_MENU, "청구자료 작성", "주간보고 취합", "운영계획"]:
+            for menu_name in ["대시보드", "관리자용 실적 확인", "실적 분석/계산", "실적 보고서", "주간보고 취합", "운영계획"]:
+                render_nav_button(menu_name)
+
+            st.markdown("<div class='gpt-section'>청구 관리</div>", unsafe_allow_html=True)
+            for menu_name in [BILLING_MENU, "청구자료 작성"]:
                 render_nav_button(menu_name)
 
             st.markdown("<div class='gpt-section'>설정</div>", unsafe_allow_html=True)
