@@ -9397,6 +9397,14 @@ def show_user_history(is_admin_mode=False):
             "합계포인트", "지급포인트", "지급예상금액",
         ]
         summary_display = res[[col for col in summary_cols if col in res.columns]].copy()
+        total_row = {col: "" for col in summary_display.columns}
+        if "담당자" in total_row:
+            total_row["담당자"] = "합계"
+        for col in summary_display.columns:
+            if col in {"담당자", "직급"}:
+                continue
+            total_row[col] = int(pd.to_numeric(summary_display[col], errors="coerce").fillna(0).sum())
+        summary_display = pd.concat([summary_display, pd.DataFrame([total_row])], ignore_index=True)
         style_report_logic(summary_display, compact=True)
 
         my_res = res[res["담당자"] == st.session_state.user_name].copy()
