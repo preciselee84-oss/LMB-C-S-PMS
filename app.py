@@ -9545,11 +9545,7 @@ def show_user_history(is_admin_mode=False):
     # 초과 방문 데이터 계산
     err_filtered = pd.DataFrame()
     if err is not None and not err.empty:
-        if "담당자" in err.columns:
-            err_my = err[err["담당자"].apply(lambda value: re.sub(r"\s+", "", str(value).strip())) == current_user_key].copy()
-        else:
-            err_my = err.copy()
-        err_filtered = err_my[err_my["일방문"] >= 6].copy()
+        err_filtered = err[pd.to_numeric(err["일방문"], errors="coerce").fillna(0) >= 6].copy()
 
     # 기타 오류 데이터 계산
     other_errors_df = build_other_validation_errors(df_user_visit)
@@ -9557,11 +9553,7 @@ def show_user_history(is_admin_mode=False):
     # 중복 이력 데이터
     dup_my = pd.DataFrame()
     if dup is not None and not dup.empty:
-        u_col_dup = find_col(dup, ["등록자", "담당자", "성명"], "담당자")
-        if u_col_dup and u_col_dup in dup.columns:
-            dup_my = dup[dup[u_col_dup].apply(lambda value: re.sub(r"\s+", "", str(value).strip())) == current_user_key]
-        else:
-            dup_my = dup
+        dup_my = dup.copy()
 
     # 개설완료일자 누락
     missing_open = pd.DataFrame()
@@ -9634,7 +9626,9 @@ def show_user_history(is_admin_mode=False):
     if not isinstance(preview_source_df, pd.DataFrame):
         preview_source_df = converted_preview_df if isinstance(converted_preview_df, pd.DataFrame) else df_user_visit
     preview_source_df = normalize_converted_history_df(preview_source_df)
-    search_source_df = preview_source_df if not preview_source_df.empty else df_user_visit
+    search_source_df = df_visit_all if isinstance(df_visit_all, pd.DataFrame) and not df_visit_all.empty else preview_source_df
+    if search_source_df is None or search_source_df.empty:
+        search_source_df = df_user_visit
     search_filters = {
         "company": str(st.session_state.get("history_preview_search_company", "") or "").strip(),
         "staff": st.session_state.get("history_preview_search_staff", "전체"),
