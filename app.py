@@ -9642,7 +9642,7 @@ def show_user_history(is_admin_mode=False):
         "detail": st.session_state.get("history_preview_search_detail", "전체"),
     }
 
-    _render_preview = analysis_df if st.session_state.get("user_excel_source") == "hq" else converted_preview_df
+    _render_preview = None if st.session_state.get("user_excel_source") == "hq" else converted_preview_df
     if (
         st.session_state.get("user_excel_source") != "hq"
         and (_render_preview is None or (isinstance(_render_preview, pd.DataFrame) and _render_preview.empty))
@@ -9650,7 +9650,11 @@ def show_user_history(is_admin_mode=False):
         _sess_prev = st.session_state.get("history_convert_preview_data")
         if isinstance(_sess_prev, pd.DataFrame) and not _sess_prev.empty:
             _render_preview = _sess_prev
-    if (_render_preview is None or (isinstance(_render_preview, pd.DataFrame) and _render_preview.empty)) and isinstance(analysis_df, pd.DataFrame):
+    if (
+        st.session_state.get("user_excel_source") != "hq"
+        and (_render_preview is None or (isinstance(_render_preview, pd.DataFrame) and _render_preview.empty))
+        and isinstance(analysis_df, pd.DataFrame)
+    ):
         _render_preview = analysis_df
 
     if _render_preview is not None and not _render_preview.empty:
