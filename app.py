@@ -9989,7 +9989,42 @@ def show_final_check():
 
     st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
 
-    _, save_col, send_col = st.columns([0.8, 0.1, 0.1])
+    _, ppt_col, save_col, send_col = st.columns([0.7, 0.1, 0.1, 0.1])
+
+    with ppt_col:
+        try:
+            ym = get_uploaded_month(original_df)
+            if ym:
+                year_month = ym.replace("-", "")
+                curr_month_label = f"{int(ym.split('-')[1])}월"
+            else:
+                now_kst = datetime.utcnow() + timedelta(hours=9)
+                year_month = now_kst.strftime("%Y%m")
+                curr_month_label = f"{int(now_kst.strftime('%m'))}월"
+
+            user_sel = st.session_state.get("user_prev_month_sel", "선택안함")
+            if user_sel and user_sel != "선택안함":
+                prev_month_label = f"{int(str(user_sel).split('-')[1])}월"
+            else:
+                prev_month_label = "전월"
+
+            ppt_bytes = build_report_ppt_bytes(
+                display_res.copy(),
+                pd.DataFrame(),
+                curr_month_label,
+                prev_month_label,
+                original_df,
+            )
+            st.download_button(
+                "PPT 다운로드",
+                data=ppt_bytes,
+                file_name=f"LMB활동실적보고서_{year_month}_{st.session_state.user_name}.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                use_container_width=True,
+            )
+        except Exception as e:
+            st.button("PPT 다운로드", use_container_width=True, disabled=True)
+            st.caption(f"PPT 생성 준비 중 오류: {e}")
 
     with save_col:
         st.markdown('<div class="action-btn">', unsafe_allow_html=True)
@@ -10189,7 +10224,10 @@ def cloud_customer_counts(name=None):
         except Exception:
             cloud = None
 
-    ym, year, _ = report_month_info(st.session_state.analysis_result if st.session_state.analysis_result is not None else pd.DataFrame())
+    analysis_source_df = st.session_state.get("analysis_result")
+    if not isinstance(analysis_source_df, pd.DataFrame):
+        analysis_source_df = pd.DataFrame()
+    ym, year, _ = report_month_info(analysis_source_df)
     empty_counts = {
         "manage_total": 0, "manage_link": 0,
         "year_open": 0, "year_link": 0,
