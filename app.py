@@ -2126,6 +2126,46 @@ def build_visit_change_guide_df(matrix_df):
     return result[["담당자", "변경 필요일", "현재 방문횟수", "권장 변경일", "변경 권장건수"]]
 
 
+def render_upload_ppt_download_button(report_df, upload_df, key_suffix="upload"):
+    btn_label = "실적보고서 PPT 다운로드"
+    try:
+        if not isinstance(report_df, pd.DataFrame) or report_df.empty:
+            raise ValueError("PPT로 만들 실적 데이터가 없습니다.")
+        ym = get_uploaded_month(upload_df) if isinstance(upload_df, pd.DataFrame) else ""
+        if ym:
+            year_month = ym.replace("-", "")
+            curr_month_label = f"{int(ym.split('-')[1])}월"
+        else:
+            now_kst = datetime.utcnow() + timedelta(hours=9)
+            year_month = now_kst.strftime("%Y%m")
+            curr_month_label = f"{int(now_kst.strftime('%m'))}월"
+
+        user_sel = st.session_state.get("user_prev_month_sel", "선택안함")
+        if user_sel and user_sel != "선택안함":
+            prev_month_label = f"{int(str(user_sel).split('-')[1])}월"
+        else:
+            prev_month_label = "전월"
+
+        ppt_bytes = build_report_ppt_bytes(
+            report_df.copy(),
+            pd.DataFrame(),
+            curr_month_label,
+            prev_month_label,
+            upload_df,
+        )
+        st.download_button(
+            btn_label,
+            data=ppt_bytes,
+            file_name=f"LMB활동실적보고서_{year_month}_하나지사.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            use_container_width=True,
+            key=f"ppt_download_{key_suffix}",
+        )
+    except Exception as e:
+        st.button(btn_label, use_container_width=True, disabled=True, key=f"ppt_download_disabled_{key_suffix}")
+        st.caption(f"PPT 생성 준비 중 오류: {e}")
+
+
 def render_plain_html_table(
     df, max_rows=500, center_align=True, merge_cols=None, stretch=True, max_width=None, border=True
 ):
@@ -9985,6 +10025,11 @@ def show_user_history(is_admin_mode=False):
 
     st.divider()
     st.markdown("### 최종 실적 확인")
+    _ppt_report_df = res.copy() if isinstance(res, pd.DataFrame) else pd.DataFrame()
+    _, _ppt_download_col = st.columns([0.75, 0.25])
+    with _ppt_download_col:
+        render_upload_ppt_download_button(_ppt_report_df, analysis_df, "upload_bottom")
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
     show_final_check()
 
     # 관리자 모드: user_name 복원
@@ -10220,39 +10265,7 @@ def show_final_check():
     _, ppt_col, save_col, send_col = st.columns([0.45, 0.25, 0.15, 0.15])
 
     with ppt_col:
-        try:
-            ym = get_uploaded_month(original_df)
-            if ym:
-                year_month = ym.replace("-", "")
-                curr_month_label = f"{int(ym.split('-')[1])}월"
-            else:
-                now_kst = datetime.utcnow() + timedelta(hours=9)
-                year_month = now_kst.strftime("%Y%m")
-                curr_month_label = f"{int(now_kst.strftime('%m'))}월"
-
-            user_sel = st.session_state.get("user_prev_month_sel", "선택안함")
-            if user_sel and user_sel != "선택안함":
-                prev_month_label = f"{int(str(user_sel).split('-')[1])}월"
-            else:
-                prev_month_label = "전월"
-
-            ppt_bytes = build_report_ppt_bytes(
-                display_res.copy(),
-                pd.DataFrame(),
-                curr_month_label,
-                prev_month_label,
-                original_df,
-            )
-            st.download_button(
-                "실적보고서 PPT 다운로드",
-                data=ppt_bytes,
-                file_name=f"LMB활동실적보고서_{year_month}_{st.session_state.user_name}.pptx",
-                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                use_container_width=True,
-            )
-        except Exception as e:
-            st.button("실적보고서 PPT 다운로드", use_container_width=True, disabled=True)
-            st.caption(f"PPT 생성 준비 중 오류: {e}")
+        render_upload_ppt_download_button(display_res.copy(), original_df, "final_user")
 
     with save_col:
         st.markdown('<div class="action-btn">', unsafe_allow_html=True)
