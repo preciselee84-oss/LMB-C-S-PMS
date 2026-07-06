@@ -2004,6 +2004,70 @@ def build_upload_over_visit_df(curr_df_raw):
     return result[["업체명", "사업자번호", "담당자", "초과일자", "일방문", "월총방문"]].drop_duplicates()
 
 
+def build_daily_visit_matrix_df(curr_df_raw):
+    if curr_df_raw is None:
+        return pd.DataFrame()
+    df = normalize_converted_history_df(clean_header_logic(curr_df_raw))
+    if df.empty:
+        return pd.DataFrame()
+
+    u_col = find_col(df, ["등록자", "담당자", "성명"])
+    date_col = find_col(df, ["활동일자", "활동일", "일자"])
+    if not u_col or not date_col or u_col not in df.columns or date_col not in df.columns:
+        return pd.DataFrame()
+
+    work = df.dropna(subset=[u_col, date_col]).copy()
+    work[u_col] = work[u_col].astype(str).str.strip()
+    work[date_col] = pd.to_datetime(work[date_col], errors="coerce")
+    work = work.dropna(subset=[date_col])
+    if work.empty:
+        return pd.DataFrame()
+
+    target_ym = get_uploaded_month(work)
+    if not target_ym:
+        target_ym = work[date_col].dt.strftime("%Y-%m").value_counts().idxmax()
+
+    month_start = pd.to_datetime(f"{target_ym}-01", errors="coerce")
+    if pd.isna(month_start):
+        return pd.DataFrame()
+    month_end = month_start + pd.offsets.MonthEnd(0)
+    all_dates = pd.date_range(month_start, month_end, freq="D")
+    work = work[work[date_col].dt.strftime("%Y-%m") == target_ym].copy()
+    if work.empty:
+        return pd.DataFrame()
+
+    work["_visit_date"] = work[date_col].dt.strftime("%Y-%m-%d")
+    grouped = work.groupby([u_col, "_visit_date"]).size().unstack(fill_value=0)
+    date_keys = [d.strftime("%Y-%m-%d") for d in all_dates]
+    grouped = grouped.reindex(columns=date_keys, fill_value=0)
+    grouped = grouped.sort_index()
+    grouped.columns = [f"{d.month}/{d.day}" for d in all_dates]
+    result = grouped.reset_index().rename(columns={u_col: "담당자"})
+    return result
+
+
+def render_daily_visit_matrix(matrix_df):
+    if matrix_df is None or matrix_df.empty:
+        st.info("담당자별 일 방문횟수 데이터가 없습니다.")
+        return
+
+    date_cols = [c for c in matrix_df.columns if c != "담당자"]
+
+    def color_over_limit(value):
+        try:
+            return "background-color:#FEE2E2;color:#B91C1C;font-weight:800;" if int(value) >= 6 else ""
+        except Exception:
+            return ""
+
+    styler = matrix_df.style
+    if hasattr(styler, "map"):
+        styler = styler.map(color_over_limit, subset=date_cols)
+    else:
+        styler = styler.applymap(color_over_limit, subset=date_cols)
+    styler = styler.format({c: "{:.0f}" for c in date_cols})
+    st.dataframe(styler, use_container_width=True, hide_index=True)
+
+
 def render_plain_html_table(
     df, max_rows=500, center_align=True, merge_cols=None, stretch=True, max_width=None, border=True
 ):
@@ -9590,6 +9654,7 @@ def show_user_history(is_admin_mode=False):
     # 탭 데이터 미리 계산 (경고 메시지 표시용)
     # 초과 방문 데이터 계산
     err_filtered = build_upload_over_visit_df(df_visit_all)
+    daily_visit_matrix = build_daily_visit_matrix_df(df_visit_all)
 
     # 기타 오류 데이터 계산
     other_errors_df = build_other_validation_errors(df_visit_all_with_cloud)
@@ -9820,6 +9885,9 @@ def show_user_history(is_admin_mode=False):
                         st.rerun()
         else:
             st.info("초과 방문 데이터가 없습니다.")
+        st.markdown("##### 담당자별 일 방문횟수")
+        st.caption("일 방문횟수가 6회 이상인 날짜는 빨간색으로 표시됩니다.")
+        render_daily_visit_matrix(daily_visit_matrix)
     with t3:
         if not missing_open.empty:
             style_report_logic(missing_open.drop(columns=["본사 ERP연계일자"], errors="ignore"))
