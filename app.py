@@ -2272,6 +2272,9 @@ def build_adjusted_history_download_df(upload_df):
                     break
                 result.at[idx, original_date_col] = spare_slots.pop(0)
 
+    if original_date_col in result.columns:
+        result[original_date_col] = pd.to_datetime(result[original_date_col], errors="coerce").dt.strftime("%Y-%m-%d").fillna("")
+    result = result.drop(columns=["_is_manual"], errors="ignore")
     return result
 
 
