@@ -657,6 +657,10 @@ def init_state():
         if key not in st.session_state:
             st.session_state[key] = value
 
+    if "1yS4gaES-iuzt1NSRTSdj9Ivg1fjbN5mIyX4pGnvEYN0" not in str(st.session_state.get("url_sync", "")):
+        st.session_state.url_sync = DEFAULT_URL_SYNC
+        st.session_state.cloud_sheet_df = None
+
     if st.session_state.current_menu == "구글 스트레드시트 연동":
         st.session_state.current_menu = "서버 접속 정보"
 
@@ -9332,10 +9336,10 @@ def show_user_history(is_admin_mode=False):
     if analysis_df is None or analysis_df.empty:
         return
 
-    if st.session_state.get("cloud_sheet_df") is None:
-        try:
-            load_csv_to_state("url_sync", "cloud_sheet_df")
-        except Exception:
+    try:
+        load_csv_to_state("url_sync", "cloud_sheet_df", force_refresh=True)
+    except Exception:
+        if st.session_state.get("cloud_sheet_df") is None:
             pass
 
     df = analysis_df.copy()
@@ -9351,7 +9355,7 @@ def show_user_history(is_admin_mode=False):
     res, err, dup = process_performance_analysis(df_visit_all, st.session_state.get("auto_prev_df"))
 
     if isinstance(res, pd.DataFrame) and not res.empty:
-        target_year_month = get_uploaded_month(analysis_df) or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m")
+        inferred_year_month = get_uploaded_month(analysis_df) or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m")
         cloud_df = st.session_state.get("cloud_sheet_df")
         if isinstance(cloud_df, pd.DataFrame) and not cloud_df.empty:
             cloud_counts = clean_header_logic(cloud_df.copy())
@@ -9369,20 +9373,48 @@ def show_user_history(is_admin_mode=False):
                 def normalize_staff(value):
                     return re.sub(r"\s+", "", str(value or "").strip())
 
-                def month_mask(series, target_ym):
-                    def value_to_ym(value):
-                        if is_blank_value(value):
-                            return ""
-                        text = str(value).strip()
-                        match = re.search(r"(20\d{2})\D*([01]?\d)", text)
-                        if match:
-                            month = int(match.group(2))
-                            if 1 <= month <= 12:
-                                return f"{match.group(1)}-{month:02d}"
-                        parsed = parse_sheet_date(value)
-                        return parsed.strftime("%Y-%m") if pd.notna(parsed) else ""
+                def value_to_ym(value):
+                    if is_blank_value(value):
+                        return ""
+                    text = str(value).strip()
+                    match = re.search(r"(20\d{2})\D*([01]?\d)", text)
+                    if match:
+                        month = int(match.group(2))
+                        if 1 <= month <= 12:
+                            return f"{match.group(1)}-{month:02d}"
+                    parsed = parse_sheet_date(value)
+                    return parsed.strftime("%Y-%m") if pd.notna(parsed) else ""
 
+                def month_mask(series, target_ym):
                     return series.apply(value_to_ym) == target_ym
+
+                available_months = set()
+                for month_col, date_col in ((cloud_open_month_col, cloud_open_col), (cloud_erp_month_col, cloud_erp_col)):
+                    if month_col and month_col in cloud_counts.columns:
+                        available_months.update([ym for ym in cloud_counts[month_col].apply(value_to_ym).tolist() if ym])
+                    if date_col and date_col in cloud_counts.columns:
+                        available_months.update(
+                            cloud_counts[date_col].dropna().dt.strftime("%Y-%m").dropna().astype(str).tolist()
+                        )
+                month_options = sorted(available_months, reverse=True)
+                if inferred_year_month and inferred_year_month not in month_options:
+                    month_options.insert(0, inferred_year_month)
+                if not month_options:
+                    month_options = [inferred_year_month]
+                now_kst = datetime.utcnow() + timedelta(hours=9)
+                prev_month = (now_kst.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+                default_target_month = prev_month if prev_month in month_options else inferred_year_month
+                if st.session_state.get("upload_perf_target_year_month") not in month_options:
+                    st.session_state["upload_perf_target_year_month"] = default_target_month
+                elif prev_month in month_options and st.session_state.get("upload_perf_target_year_month") == inferred_year_month:
+                    st.session_state["upload_perf_target_year_month"] = prev_month
+                default_month_index = month_options.index(st.session_state.get("upload_perf_target_year_month", default_target_month))
+                target_year_month = st.selectbox(
+                    "개설/연계 집계년월",
+                    month_options,
+                    index=default_month_index,
+                    key="upload_perf_target_year_month",
+                )
 
                 for idx, row in res.iterrows():
                     staff_name = str(row.get("담당자", "")).strip()
