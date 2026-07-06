@@ -2168,6 +2168,82 @@ def render_upload_ppt_download_button(report_df, upload_df, key_suffix="upload")
         st.caption(f"PPT 생성 준비 중 오류: {e}")
 
 
+def build_adjusted_history_download_df(upload_df):
+    if not isinstance(upload_df, pd.DataFrame) or upload_df.empty:
+        return pd.DataFrame()
+
+    result = upload_df.copy()
+    df = normalize_converted_history_df(clean_header_logic(upload_df.copy()))
+    if df.empty or len(df) != len(result):
+        return result
+
+    u_col = find_col(df, ["등록자", "담당자", "성명"])
+    date_col = find_col(df, ["활동일자", "활동일", "일자"])
+    original_date_col = find_col(result, ["활동일자", "활동일", "일자"]) or date_col
+    if not u_col or not date_col or not original_date_col or u_col not in df.columns or date_col not in df.columns:
+        return result
+
+    work = df.dropna(subset=[u_col, date_col]).copy()
+    work[u_col] = work[u_col].astype(str).str.strip()
+    work[date_col] = pd.to_datetime(work[date_col], errors="coerce")
+    work = work.dropna(subset=[date_col])
+    if work.empty:
+        return result
+
+    target_ym = get_uploaded_month(work)
+    if not target_ym:
+        target_ym = work[date_col].dt.strftime("%Y-%m").value_counts().idxmax()
+    month_start = pd.to_datetime(f"{target_ym}-01", errors="coerce")
+    if pd.isna(month_start):
+        return result
+
+    all_dates = [d.strftime("%Y-%m-%d") for d in pd.date_range(month_start, month_start + pd.offsets.MonthEnd(0), freq="D")]
+    work = work[work[date_col].dt.strftime("%Y-%m") == target_ym].copy()
+    work["_visit_date"] = work[date_col].dt.strftime("%Y-%m-%d")
+
+    for staff, staff_df in work.groupby(u_col):
+        counts = staff_df["_visit_date"].value_counts().to_dict()
+        spare_slots = []
+        for day in all_dates:
+            spare_slots.extend([day] * max(0, 5 - int(counts.get(day, 0))))
+
+        for over_day, count in sorted(counts.items()):
+            move_count = max(0, int(count) - 5)
+            if move_count <= 0:
+                continue
+            move_indices = staff_df[staff_df["_visit_date"] == over_day].index.tolist()[5:]
+            for idx in move_indices[:move_count]:
+                while spare_slots and spare_slots[0] == over_day:
+                    spare_slots.pop(0)
+                if not spare_slots:
+                    break
+                result.at[idx, original_date_col] = spare_slots.pop(0)
+
+    return result
+
+
+def render_adjusted_history_download_button(upload_df, key_suffix="upload"):
+    btn_label = "최종 실적 다운로드"
+    try:
+        adjusted_df = build_adjusted_history_download_df(upload_df)
+        if adjusted_df.empty:
+            raise ValueError("다운로드할 이력 데이터가 없습니다.")
+        ym = get_uploaded_month(adjusted_df) or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m")
+        year_month = ym.replace("-", "")
+        excel_bytes = dataframe_to_excel_bytes({"실적파일": adjusted_df})
+        st.download_button(
+            btn_label,
+            data=excel_bytes,
+            file_name=f"LMB월간 활동실적__{year_month}_최종.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key=f"adjusted_history_download_{key_suffix}",
+        )
+    except Exception as e:
+        st.button(btn_label, use_container_width=True, disabled=True, key=f"adjusted_history_download_disabled_{key_suffix}")
+        st.caption(f"최종 실적 파일 생성 준비 중 오류: {e}")
+
+
 def render_plain_html_table(
     df, max_rows=500, center_align=True, merge_cols=None, stretch=True, max_width=None, border=True
 ):
@@ -10028,7 +10104,9 @@ def show_user_history(is_admin_mode=False):
     st.divider()
     st.markdown("### 최종 실적 확인")
     _ppt_report_df = res.copy() if isinstance(res, pd.DataFrame) else pd.DataFrame()
-    _, _ppt_download_col = st.columns([0.75, 0.25])
+    _, _final_excel_col, _ppt_download_col = st.columns([0.5, 0.25, 0.25])
+    with _final_excel_col:
+        render_adjusted_history_download_button(analysis_df, "upload_bottom")
     with _ppt_download_col:
         render_upload_ppt_download_button(_ppt_report_df, analysis_df, "upload_bottom")
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
