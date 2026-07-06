@@ -41,7 +41,7 @@ COMPANY_PROFILE_FILE = "company_profile.json"
 EXCEL_SAMPLE_FILE = resolve_template_file("LMB월간 활동실적_000000(샘플).xlsx")
 
 DEFAULT_URL_ANALYSIS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9XPHqrqcaFf9bCOVya7yHORr-c1R4KCF0eEpdE3ESn8qJELP0BkqTOslur9bsGcVabRUIcyOa877R/pub?output=csv"
-DEFAULT_URL_SYNC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9F7R7oLA2B02H-I25kVv2JeYHFgWQq0CT7TeW61hrNpJLdHWJFhFR_iDQGCFAW044o8rRwBDeovKG/pub?gid=1533424484&single=true&output=csv"
+DEFAULT_URL_SYNC = "https://docs.google.com/spreadsheets/d/1yS4gaES-iuzt1NSRTSdj9Ivg1fjbN5mIyX4pGnvEYN0/export?format=csv&gid=1533424484"
 DEFAULT_URL_HANA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgRHnTZD4eDW2UeODQuGxmxFrflKpbQda3sBsVjj1s3qAFWMKcpke2U58UuT6VEDlkbXveZlaroTCr/pub?gid=0&single=true&output=csv"
 DEFAULT_URL_HANA_BILLING = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgRHnTZD4eDW2UeODQuGxmxFrflKpbQda3sBsVjj1s3qAFWMKcpke2U58UuT6VEDlkbXveZlaroTCr/pub?gid=1172734914&single=true&output=csv"
 DEFAULT_URL_HANA_PERFORMANCE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS2CUE3No1cptBOTehN8r1xoTQyUni07sjbut-f1Teo9mpB-rcJgpE5xfI6dTy0M4IUxSg8Mv5_uT4l/pub?gid=1749034066&single=true&output=csv"
@@ -9351,6 +9351,44 @@ def show_user_history(is_admin_mode=False):
     res, err, dup = process_performance_analysis(df_visit_all, st.session_state.get("auto_prev_df"))
 
     if isinstance(res, pd.DataFrame) and not res.empty:
+        target_year_month = get_uploaded_month(analysis_df) or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m")
+        cloud_df = st.session_state.get("cloud_sheet_df")
+        if isinstance(cloud_df, pd.DataFrame) and not cloud_df.empty:
+            cloud_counts = clean_header_logic(cloud_df.copy())
+            cloud_owner_col = find_col(cloud_counts, ["담당자", "등록자", "성명"])
+            cloud_open_col = find_col(cloud_counts, ["개설완료일자", "개설일"])
+            cloud_erp_col = find_col(cloud_counts, ["ERP연계일자", "연계일자"])
+            if cloud_owner_col and cloud_owner_col in cloud_counts.columns:
+                if cloud_open_col and cloud_open_col in cloud_counts.columns:
+                    cloud_counts[cloud_open_col] = pd.to_datetime(cloud_counts[cloud_open_col], errors="coerce")
+                if cloud_erp_col and cloud_erp_col in cloud_counts.columns:
+                    cloud_counts[cloud_erp_col] = pd.to_datetime(cloud_counts[cloud_erp_col], errors="coerce")
+
+                for idx, row in res.iterrows():
+                    staff_name = str(row.get("담당자", "")).strip()
+                    staff_cloud = cloud_counts[cloud_counts[cloud_owner_col].astype(str).str.strip() == staff_name].copy()
+                    open_count = int(
+                        (
+                            staff_cloud[cloud_open_col].notna()
+                            & (staff_cloud[cloud_open_col].dt.strftime("%Y-%m") == target_year_month)
+                        ).sum()
+                    ) if cloud_open_col and cloud_open_col in staff_cloud.columns else 0
+                    link_count = int(
+                        (
+                            staff_cloud[cloud_erp_col].notna()
+                            & (staff_cloud[cloud_erp_col].dt.strftime("%Y-%m") == target_year_month)
+                        ).sum()
+                    ) if cloud_erp_col and cloud_erp_col in staff_cloud.columns else 0
+
+                    res.at[idx, "개설건수"] = open_count
+                    res.at[idx, "개설포인트"] = open_count * 90
+                    res.at[idx, "연계건수"] = link_count
+                    res.at[idx, "연계포인트"] = link_count * 120
+                    operation_points = int(float(row.get("운영포인트 (실제 활동)", 0) or 0))
+                    manual_points = int(float(row.get("운영포인트(추가 활동)", row.get("운영포인트 (추가 활동)", 0)) or 0))
+                    res.at[idx, "합계포인트"] = min(2800, (open_count * 90) + (link_count * 120) + operation_points + manual_points)
+                res = apply_rs_allowance_formula(res, st.session_state.user_db)
+
         summary_cols = [
             "담당자", "직급",
             "개설건수", "개설포인트",
