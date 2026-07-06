@@ -1963,6 +1963,47 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         return f"ERR: {str(e)}", None, None
 
 
+def build_upload_over_visit_df(curr_df_raw):
+    if curr_df_raw is None:
+        return pd.DataFrame(columns=["업체명", "사업자번호", "담당자", "초과일자", "일방문", "월총방문"])
+    df = normalize_converted_history_df(clean_header_logic(curr_df_raw))
+    if df.empty:
+        return pd.DataFrame(columns=["업체명", "사업자번호", "담당자", "초과일자", "일방문", "월총방문"])
+
+    u_col = find_col(df, ["등록자", "담당자", "성명"])
+    date_col = find_col(df, ["활동일자", "활동일", "일자"])
+    biz_col = find_col(df, ["사업자번호"], "사업자번호")
+    comp_col = find_col(df, ["업체명", "상호", "고객명"], "업체명")
+    if not u_col or not date_col or u_col not in df.columns or date_col not in df.columns:
+        return pd.DataFrame(columns=["업체명", "사업자번호", "담당자", "초과일자", "일방문", "월총방문"])
+
+    work = df.dropna(subset=[u_col, date_col]).copy()
+    work[u_col] = work[u_col].astype(str).str.strip()
+    work[date_col] = pd.to_datetime(work[date_col], errors="coerce")
+    work = work.dropna(subset=[date_col])
+    work[date_col] = work[date_col].dt.strftime("%Y-%m-%d")
+
+    daily_counts = work.groupby([u_col, date_col]).size().reset_index(name="일방문")
+    monthly_counts = work.groupby(u_col).size().reset_index(name="월총방문")
+    over_days = daily_counts[daily_counts["일방문"] >= 6]
+    if over_days.empty:
+        return pd.DataFrame(columns=["업체명", "사업자번호", "담당자", "초과일자", "일방문", "월총방문"])
+
+    detail_cols = [col for col in [u_col, date_col, comp_col, biz_col] if col and col in work.columns]
+    result = over_days.merge(work[detail_cols].drop_duplicates(), on=[u_col, date_col], how="left")
+    result = result.merge(monthly_counts, on=u_col, how="left")
+    rename_map = {u_col: "담당자", date_col: "초과일자"}
+    if comp_col and comp_col in result.columns:
+        rename_map[comp_col] = "업체명"
+    if biz_col and biz_col in result.columns:
+        rename_map[biz_col] = "사업자번호"
+    result = result.rename(columns=rename_map)
+    for col in ["업체명", "사업자번호"]:
+        if col not in result.columns:
+            result[col] = ""
+    return result[["업체명", "사업자번호", "담당자", "초과일자", "일방문", "월총방문"]].drop_duplicates()
+
+
 def render_plain_html_table(
     df, max_rows=500, center_align=True, merge_cols=None, stretch=True, max_width=None, border=True
 ):
@@ -9548,9 +9589,7 @@ def show_user_history(is_admin_mode=False):
 
     # 탭 데이터 미리 계산 (경고 메시지 표시용)
     # 초과 방문 데이터 계산
-    err_filtered = pd.DataFrame()
-    if err is not None and not err.empty:
-        err_filtered = err[pd.to_numeric(err["일방문"], errors="coerce").fillna(0) >= 6].copy()
+    err_filtered = build_upload_over_visit_df(df_visit_all)
 
     # 기타 오류 데이터 계산
     other_errors_df = build_other_validation_errors(df_visit_all_with_cloud)
@@ -9634,6 +9673,17 @@ def show_user_history(is_admin_mode=False):
     search_source_df = df_visit_all if isinstance(df_visit_all, pd.DataFrame) and not df_visit_all.empty else preview_source_df
     if search_source_df is None or search_source_df.empty:
         search_source_df = df_user_visit
+    search_staff_col = find_col(search_source_df, ["등록자", "담당자", "성명"]) if isinstance(search_source_df, pd.DataFrame) else None
+    if search_staff_col and search_staff_col in search_source_df.columns:
+        staff_values = {
+            re.sub(r"\s+", "", str(value).strip())
+            for value in search_source_df[search_staff_col].dropna().tolist()
+            if str(value).strip()
+        }
+        selected_staff_key = re.sub(r"\s+", "", str(st.session_state.get("history_preview_search_staff", "")).strip())
+        current_staff_key = re.sub(r"\s+", "", str(st.session_state.user_name).strip())
+        if len(staff_values) > 1 and selected_staff_key == current_staff_key:
+            st.session_state["history_preview_search_staff"] = "전체"
     search_filters = {
         "company": str(st.session_state.get("history_preview_search_company", "") or "").strip(),
         "staff": st.session_state.get("history_preview_search_staff", "전체"),
