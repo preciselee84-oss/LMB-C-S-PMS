@@ -1493,6 +1493,50 @@ def may_2026_business_dates():
     return [d.strftime("%Y-%m-%d") for d in days if d.weekday() < 5 and d.strftime("%Y-%m-%d") not in holidays]
 
 
+def korean_public_holidays(year):
+    holidays_by_year = {
+        2026: {
+            "2026-01-01",
+            "2026-02-16", "2026-02-17", "2026-02-18",
+            "2026-03-01", "2026-03-02",
+            "2026-05-01", "2026-05-05", "2026-05-24", "2026-05-25",
+            "2026-06-03", "2026-06-06",
+            "2026-08-15", "2026-08-17",
+            "2026-09-24", "2026-09-25", "2026-09-26", "2026-09-27", "2026-09-28",
+            "2026-10-03", "2026-10-05", "2026-10-09",
+            "2026-12-25",
+        }
+    }
+    fixed = {
+        f"{year}-01-01",
+        f"{year}-03-01",
+        f"{year}-05-01",
+        f"{year}-05-05",
+        f"{year}-06-06",
+        f"{year}-08-15",
+        f"{year}-10-03",
+        f"{year}-10-09",
+        f"{year}-12-25",
+    }
+    return fixed | holidays_by_year.get(int(year), set())
+
+
+def is_korean_business_day(value):
+    date_value = pd.to_datetime(value, errors="coerce")
+    if pd.isna(date_value):
+        return False
+    date_text = date_value.strftime("%Y-%m-%d")
+    return date_value.weekday() < 5 and date_text not in korean_public_holidays(date_value.year)
+
+
+def month_business_dates(target_ym):
+    month_start = pd.to_datetime(f"{target_ym}-01", errors="coerce")
+    if pd.isna(month_start):
+        return []
+    days = pd.date_range(month_start, month_start + pd.offsets.MonthEnd(0), freq="D")
+    return [d.strftime("%Y-%m-%d") for d in days if is_korean_business_day(d)]
+
+
 def prepare_random_history_source_df(df):
     if df is None or not isinstance(df, pd.DataFrame) or df.empty:
         return pd.DataFrame()
@@ -2043,8 +2087,10 @@ def build_daily_visit_matrix_df(curr_df_raw):
     date_keys = [d.strftime("%Y-%m-%d") for d in all_dates]
     grouped = grouped.reindex(columns=date_keys, fill_value=0)
     grouped = grouped.sort_index()
-    grouped.columns = [f"{d.month}/{d.day}" for d in all_dates]
+    display_cols = [f"{d.month}/{d.day}" for d in all_dates]
+    grouped.columns = display_cols
     result = grouped.reset_index().rename(columns={u_col: "담당자"})
+    result.attrs["date_map"] = {label: key for label, key in zip(display_cols, date_keys)}
     return result
 
 
@@ -2075,6 +2121,11 @@ def build_visit_change_guide_df(matrix_df):
         return pd.DataFrame()
 
     date_cols = [c for c in matrix_df.columns if c != "담당자"]
+    date_map = matrix_df.attrs.get("date_map", {})
+    business_date_cols = [
+        col for col in date_cols
+        if is_korean_business_day(date_map.get(col, col))
+    ]
     guide_rows = []
     shortage_rows = []
 
@@ -2088,7 +2139,7 @@ def build_visit_change_guide_df(matrix_df):
                 counts[col] = 0
 
         spare_slots = []
-        for col in date_cols:
+        for col in business_date_cols:
             spare = max(0, 5 - counts.get(col, 0))
             spare_slots.extend([col] * spare)
 
@@ -2197,7 +2248,9 @@ def build_adjusted_history_download_df(upload_df):
     if pd.isna(month_start):
         return result
 
-    all_dates = [d.strftime("%Y-%m-%d") for d in pd.date_range(month_start, month_start + pd.offsets.MonthEnd(0), freq="D")]
+    all_dates = month_business_dates(target_ym)
+    if not all_dates:
+        return result
     work = work[work[date_col].dt.strftime("%Y-%m") == target_ym].copy()
     work["_visit_date"] = work[date_col].dt.strftime("%Y-%m-%d")
 
@@ -10069,7 +10122,7 @@ def show_user_history(is_admin_mode=False):
         if visit_change_guide.empty:
             st.info("변경이 필요한 6회 이상 방문일이 없습니다.")
         else:
-            st.caption("현재 방문횟수가 6회 이상인 날짜에서 5회 미만인 날짜로 옮기는 것을 기준으로 추천합니다.")
+            st.caption("현재 방문횟수가 6회 이상인 날짜에서 주말/공휴일을 제외한 5회 미만 영업일로 옮기는 것을 기준으로 추천합니다.")
             st.dataframe(visit_change_guide, use_container_width=True, hide_index=True)
     with t3:
         if not missing_open.empty:
