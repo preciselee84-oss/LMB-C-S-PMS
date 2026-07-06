@@ -786,17 +786,21 @@ def filter_visit_rows(df):
 
 def render_history_search_filters(source_df, key_prefix):
     st.markdown("##### 검색 조건")
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
     with c1:
         company = st.text_input("업체명", key=f"{key_prefix}_company")
 
+    staff_options = ["전체"]
     date_options = ["전체"]
     category_options = ["전체"]
     detail_options = ["전체"]
     if source_df is not None and not source_df.empty:
+        staff_col = find_col(source_df, ["등록자", "담당자", "성명"])
         date_col = find_col(source_df, ["활동일자", "활동일", "초과일자", "일자"])
         category_col = find_col(source_df, ["활동구분", "접수유형"])
         detail_col = find_col(source_df, ["활동상세", "활동내용"])
+        if staff_col and staff_col in source_df.columns:
+            staff_options += sorted(v for v in source_df[staff_col].astype(str).str.strip().unique() if v)
         if date_col and date_col in source_df.columns:
             _dates = pd.to_datetime(source_df[date_col], errors="coerce").dropna().dt.strftime("%Y-%m-%d").unique()
             date_options += sorted(_dates, reverse=True)
@@ -806,14 +810,17 @@ def render_history_search_filters(source_df, key_prefix):
             detail_options += sorted(v for v in source_df[detail_col].astype(str).str.strip().unique() if v)
 
     with c2:
-        activity_date = st.selectbox("활동일자", date_options, key=f"{key_prefix}_date")
+        staff = st.selectbox("담당자", staff_options, key=f"{key_prefix}_staff")
     with c3:
-        activity_category = st.selectbox("활동구분", category_options, key=f"{key_prefix}_category")
+        activity_date = st.selectbox("활동일자", date_options, key=f"{key_prefix}_date")
     with c4:
+        activity_category = st.selectbox("활동구분", category_options, key=f"{key_prefix}_category")
+    with c5:
         activity_detail = st.selectbox("활동상세", detail_options, key=f"{key_prefix}_detail")
 
     return {
         "company": company.strip(),
+        "staff": staff,
         "date": activity_date,
         "category": activity_category,
         "detail": activity_detail,
@@ -827,12 +834,16 @@ def apply_history_search_filters(df, filters):
         return df
     result = df.copy()
     company_col = find_col(result, ["업체명", "상호", "고객명"])
+    staff_col = find_col(result, ["등록자", "담당자", "성명"])
     date_col = find_col(result, ["활동일자", "활동일", "초과일자", "일자"])
     category_col = find_col(result, ["활동구분", "접수유형"])
     detail_col = find_col(result, ["활동상세", "활동내용"])
 
     if filters.get("company") and company_col in result.columns:
         result = result[result[company_col].astype(str).str.contains(filters["company"], case=False, na=False)]
+    if filters.get("staff") and filters["staff"] != "전체" and staff_col in result.columns:
+        target_staff = re.sub(r"\s+", "", str(filters["staff"]).strip())
+        result = result[result[staff_col].apply(lambda value: re.sub(r"\s+", "", str(value).strip())) == target_staff]
     if filters.get("date") and filters["date"] != "전체" and date_col in result.columns:
         _date_values = pd.to_datetime(result[date_col], errors="coerce").dt.strftime("%Y-%m-%d")
         result = result[_date_values == filters["date"]]
@@ -846,13 +857,19 @@ def apply_history_search_filters(df, filters):
 def has_active_history_filters(filters):
     if not filters:
         return False
-    return bool(filters.get("company")) or filters.get("date") != "전체" or filters.get("category") != "전체" or filters.get("detail") != "전체"
+    return (
+        bool(filters.get("company"))
+        or filters.get("staff") != "전체"
+        or filters.get("date") != "전체"
+        or filters.get("category") != "전체"
+        or filters.get("detail") != "전체"
+    )
 
 
 def history_filter_signature(filters):
     if not filters:
         return "all"
-    raw = "|".join(str(filters.get(key, "")) for key in ["company", "date", "category", "detail"])
+    raw = "|".join(str(filters.get(key, "")) for key in ["company", "staff", "date", "category", "detail"])
     return hashlib.md5(raw.encode("utf-8")).hexdigest()[:10]
 
 
@@ -9620,6 +9637,7 @@ def show_user_history(is_admin_mode=False):
     search_source_df = preview_source_df if not preview_source_df.empty else df_user_visit
     search_filters = {
         "company": str(st.session_state.get("history_preview_search_company", "") or "").strip(),
+        "staff": st.session_state.get("history_preview_search_staff", "전체"),
         "date": st.session_state.get("history_preview_search_date", "전체"),
         "category": st.session_state.get("history_preview_search_category", "전체"),
         "detail": st.session_state.get("history_preview_search_detail", "전체"),
