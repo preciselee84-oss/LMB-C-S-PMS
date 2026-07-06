@@ -2068,6 +2068,64 @@ def render_daily_visit_matrix(matrix_df):
     st.dataframe(styler, use_container_width=True, hide_index=True)
 
 
+def build_visit_change_guide_df(matrix_df):
+    if matrix_df is None or matrix_df.empty or "담당자" not in matrix_df.columns:
+        return pd.DataFrame()
+
+    date_cols = [c for c in matrix_df.columns if c != "담당자"]
+    guide_rows = []
+    shortage_rows = []
+
+    for _, row in matrix_df.iterrows():
+        staff = row.get("담당자", "")
+        counts = {}
+        for col in date_cols:
+            try:
+                counts[col] = int(float(row.get(col, 0) or 0))
+            except Exception:
+                counts[col] = 0
+
+        spare_slots = []
+        for col in date_cols:
+            spare = max(0, 5 - counts.get(col, 0))
+            spare_slots.extend([col] * spare)
+
+        for from_date in date_cols:
+            over_count = max(0, counts.get(from_date, 0) - 5)
+            if over_count <= 0:
+                continue
+
+            used_targets = []
+            while over_count > 0 and spare_slots:
+                to_date = spare_slots.pop(0)
+                if to_date == from_date:
+                    continue
+                used_targets.append(to_date)
+                over_count -= 1
+
+            if used_targets:
+                guide_rows.append({
+                    "담당자": staff,
+                    "변경 필요일": from_date,
+                    "현재 방문횟수": counts.get(from_date, 0),
+                    "권장 변경일": ", ".join(used_targets),
+                    "변경 권장건수": len(used_targets),
+                })
+            if over_count > 0:
+                shortage_rows.append({
+                    "담당자": staff,
+                    "변경 필요일": from_date,
+                    "현재 방문횟수": counts.get(from_date, 0),
+                    "권장 변경일": "여유 일자 부족",
+                    "변경 권장건수": over_count,
+                })
+
+    result = pd.DataFrame(guide_rows + shortage_rows)
+    if result.empty:
+        return result
+    return result[["담당자", "변경 필요일", "현재 방문횟수", "권장 변경일", "변경 권장건수"]]
+
+
 def render_plain_html_table(
     df, max_rows=500, center_align=True, merge_cols=None, stretch=True, max_width=None, border=True
 ):
@@ -9888,6 +9946,13 @@ def show_user_history(is_admin_mode=False):
         st.markdown("##### 담당자별 일 방문횟수")
         st.caption("일 방문횟수가 6회 이상인 날짜는 빨간색으로 표시됩니다.")
         render_daily_visit_matrix(daily_visit_matrix)
+        visit_change_guide = build_visit_change_guide_df(daily_visit_matrix)
+        st.markdown("##### 이력 변경 추천 가이드")
+        if visit_change_guide.empty:
+            st.info("변경이 필요한 6회 이상 방문일이 없습니다.")
+        else:
+            st.caption("현재 방문횟수가 6회 이상인 날짜에서 5회 미만인 날짜로 옮기는 것을 기준으로 추천합니다.")
+            st.dataframe(visit_change_guide, use_container_width=True, hide_index=True)
     with t3:
         if not missing_open.empty:
             style_report_logic(missing_open.drop(columns=["본사 ERP연계일자"], errors="ignore"))
