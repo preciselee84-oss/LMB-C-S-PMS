@@ -9356,7 +9356,9 @@ def show_user_history(is_admin_mode=False):
         if isinstance(cloud_df, pd.DataFrame) and not cloud_df.empty:
             cloud_counts = clean_header_logic(cloud_df.copy())
             cloud_owner_col = find_col(cloud_counts, ["담당자", "등록자", "성명"])
+            cloud_open_month_col = find_col(cloud_counts, ["개설년월", "개설월", "개설완료년월", "개설완료월"])
             cloud_open_col = find_col(cloud_counts, ["개설완료일자", "개설일"])
+            cloud_erp_month_col = find_col(cloud_counts, ["연계년월", "연계월", "ERP연계년월", "ERP연계월"])
             cloud_erp_col = find_col(cloud_counts, ["ERP연계일자", "연계일자"])
             if cloud_owner_col and cloud_owner_col in cloud_counts.columns:
                 if cloud_open_col and cloud_open_col in cloud_counts.columns:
@@ -9364,21 +9366,51 @@ def show_user_history(is_admin_mode=False):
                 if cloud_erp_col and cloud_erp_col in cloud_counts.columns:
                     cloud_counts[cloud_erp_col] = pd.to_datetime(cloud_counts[cloud_erp_col], errors="coerce")
 
+                def normalize_staff(value):
+                    return re.sub(r"\s+", "", str(value or "").strip())
+
+                def month_mask(series, target_ym):
+                    def value_to_ym(value):
+                        if is_blank_value(value):
+                            return ""
+                        text = str(value).strip()
+                        match = re.search(r"(20\d{2})\D*([01]?\d)", text)
+                        if match:
+                            month = int(match.group(2))
+                            if 1 <= month <= 12:
+                                return f"{match.group(1)}-{month:02d}"
+                        parsed = parse_sheet_date(value)
+                        return parsed.strftime("%Y-%m") if pd.notna(parsed) else ""
+
+                    return series.apply(value_to_ym) == target_ym
+
                 for idx, row in res.iterrows():
                     staff_name = str(row.get("담당자", "")).strip()
-                    staff_cloud = cloud_counts[cloud_counts[cloud_owner_col].astype(str).str.strip() == staff_name].copy()
-                    open_count = int(
-                        (
-                            staff_cloud[cloud_open_col].notna()
-                            & (staff_cloud[cloud_open_col].dt.strftime("%Y-%m") == target_year_month)
-                        ).sum()
-                    ) if cloud_open_col and cloud_open_col in staff_cloud.columns else 0
-                    link_count = int(
-                        (
-                            staff_cloud[cloud_erp_col].notna()
-                            & (staff_cloud[cloud_erp_col].dt.strftime("%Y-%m") == target_year_month)
-                        ).sum()
-                    ) if cloud_erp_col and cloud_erp_col in staff_cloud.columns else 0
+                    staff_cloud = cloud_counts[
+                        cloud_counts[cloud_owner_col].apply(normalize_staff) == normalize_staff(staff_name)
+                    ].copy()
+                    if cloud_open_month_col and cloud_open_month_col in staff_cloud.columns:
+                        open_count = int(month_mask(staff_cloud[cloud_open_month_col], target_year_month).sum())
+                    elif cloud_open_col and cloud_open_col in staff_cloud.columns:
+                        open_count = int(
+                            (
+                                staff_cloud[cloud_open_col].notna()
+                                & (staff_cloud[cloud_open_col].dt.strftime("%Y-%m") == target_year_month)
+                            ).sum()
+                        )
+                    else:
+                        open_count = 0
+                    if cloud_erp_month_col and cloud_erp_month_col in staff_cloud.columns:
+                        link_count = int(month_mask(staff_cloud[cloud_erp_month_col], target_year_month).sum())
+                    elif cloud_erp_col and cloud_erp_col in staff_cloud.columns:
+                        link_count = int(
+                            (
+                                staff_cloud[cloud_erp_col].notna()
+                                & (staff_cloud[cloud_erp_col].dt.strftime("%Y-%m") == target_year_month)
+                            ).sum()
+                        )
+                    else:
+                        link_count = 0
 
                     res.at[idx, "개설건수"] = open_count
                     res.at[idx, "개설포인트"] = open_count * 90
