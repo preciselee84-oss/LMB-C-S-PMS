@@ -1778,9 +1778,11 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
         }
 
         df_clean = df.dropna(subset=[u_col, date_col]).copy()
+        df_clean[u_col] = df_clean[u_col].astype(str).str.strip()
         _staff = get_staff_names()
         if _staff and u_col in df_clean.columns:
-            df_clean = df_clean[df_clean[u_col].isin(_staff)]
+            staff_keys = {re.sub(r"\s+", "", str(name).strip()) for name in _staff}
+            df_clean = df_clean[df_clean[u_col].apply(lambda value: re.sub(r"\s+", "", str(value).strip())).isin(staff_keys)]
         df_clean[date_col] = pd.to_datetime(df_clean[date_col], errors="coerce")
         df_clean = df_clean.dropna(subset=[date_col])
         df_clean[date_col] = df_clean[date_col].dt.strftime("%Y-%m-%d")
@@ -1810,17 +1812,16 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
             df_real = df
             df_added = pd.DataFrame()
 
-        # 중복 이력: 변환파일 미리보기 기준 사업자번호+등록자+활동일자+활동상세가 모두 같은 행
-        if biz_col in df_clean.columns and u_col in df_clean.columns and date_col in df_clean.columns and d_col in df_clean.columns:
+        # 중복 이력: 업로드 파일 기준 동일일자에 동일사업자번호 방문 이력이 2건 이상인 행
+        if biz_col in df_clean.columns and date_col in df_clean.columns:
             _dup_df = df_clean.copy()
             _dup_df["_dup_biz"] = normalize_biz(_dup_df[biz_col])
-            _dup_df["_dup_user"] = _dup_df[u_col].astype(str).str.strip()
             _dup_df["_dup_date"] = pd.to_datetime(_dup_df[date_col], errors="coerce").dt.strftime("%Y-%m-%d")
-            _dup_df["_dup_detail"] = _dup_df[d_col].astype(str).str.strip()
-            _dup_keys = ["_dup_biz", "_dup_user", "_dup_date", "_dup_detail"]
+            _dup_keys = ["_dup_biz", "_dup_date"]
             _dup_df = _dup_df[(_dup_df[_dup_keys] != "").all(axis=1)]
             dup_biz_df = _dup_df[_dup_df.duplicated(subset=_dup_keys, keep=False)].drop(columns=_dup_keys, errors="ignore")
-            dup_biz_df = dup_biz_df.sort_values(by=[date_col, biz_col, u_col, d_col])
+            sort_cols = [col for col in [date_col, biz_col, u_col, d_col] if col in dup_biz_df.columns]
+            dup_biz_df = dup_biz_df.sort_values(by=sort_cols) if sort_cols else dup_biz_df
         else:
             dup_biz_df = pd.DataFrame()
 
@@ -9346,7 +9347,11 @@ def show_user_history(is_admin_mode=False):
     u_col = find_col(df, ["등록자", "담당자", "성명"], "등록자")
     d_col = find_col(df, ["활동상세", "활동내용"], "활동상세")
 
-    df_user = df[df[u_col] == st.session_state.user_name].copy() if u_col in df.columns else df.iloc[0:0].copy()
+    current_user_key = re.sub(r"\s+", "", str(st.session_state.user_name).strip())
+    if u_col in df.columns:
+        df_user = df[df[u_col].apply(lambda value: re.sub(r"\s+", "", str(value).strip())) == current_user_key].copy()
+    else:
+        df_user = df.iloc[0:0].copy()
     df_user = attach_cloud_dates(df_user)
     df_user_visit = filter_visit_rows(df_user)
     df_visit_all = filter_visit_rows(df)
@@ -9471,7 +9476,9 @@ def show_user_history(is_admin_mode=False):
         summary_display = pd.concat([summary_display, pd.DataFrame([total_row])], ignore_index=True)
         style_report_logic(summary_display, compact=True)
 
-        my_res = res[res["담당자"] == st.session_state.user_name].copy()
+        my_res = res[
+            res["담당자"].apply(lambda value: re.sub(r"\s+", "", str(value).strip())) == current_user_key
+        ].copy()
 
         # 업로드 전 예상치 계산 (추가 활동 제외)
         if not my_res.empty:
@@ -9522,7 +9529,7 @@ def show_user_history(is_admin_mode=False):
     err_filtered = pd.DataFrame()
     if err is not None and not err.empty:
         if "담당자" in err.columns:
-            err_my = err[err["담당자"] == st.session_state.user_name].copy()
+            err_my = err[err["담당자"].apply(lambda value: re.sub(r"\s+", "", str(value).strip())) == current_user_key].copy()
         else:
             err_my = err.copy()
         err_filtered = err_my[err_my["일방문"] >= 6].copy()
@@ -9535,7 +9542,7 @@ def show_user_history(is_admin_mode=False):
     if dup is not None and not dup.empty:
         u_col_dup = find_col(dup, ["등록자", "담당자", "성명"], "담당자")
         if u_col_dup and u_col_dup in dup.columns:
-            dup_my = dup[dup[u_col_dup] == st.session_state.user_name]
+            dup_my = dup[dup[u_col_dup].apply(lambda value: re.sub(r"\s+", "", str(value).strip())) == current_user_key]
         else:
             dup_my = dup
 
@@ -9807,7 +9814,13 @@ def show_final_check():
     df_for_tabs = original_df.copy()
     u_col = find_col(df_for_tabs, ["등록자", "담당자", "성명"], "등록자")
     d_col = find_col(df_for_tabs, ["활동상세", "활동내용"], "활동상세")
-    df_user = df_for_tabs[df_for_tabs[u_col] == st.session_state.user_name].copy() if u_col in df_for_tabs.columns else pd.DataFrame()
+    current_user_key = re.sub(r"\s+", "", str(st.session_state.user_name).strip())
+    if u_col in df_for_tabs.columns:
+        df_user = df_for_tabs[
+            df_for_tabs[u_col].apply(lambda value: re.sub(r"\s+", "", str(value).strip())) == current_user_key
+        ].copy()
+    else:
+        df_user = pd.DataFrame()
     df_user = attach_cloud_dates(df_user)
     df_user_visit = filter_visit_rows(df_user)
 
@@ -9817,7 +9830,9 @@ def show_final_check():
         st.error(res if isinstance(res, str) else "실적을 계산할 수 없습니다.")
         return
 
-    my_res = res[res["담당자"] == st.session_state.user_name]
+    my_res = res[
+        res["담당자"].apply(lambda value: re.sub(r"\s+", "", str(value).strip())) == current_user_key
+    ]
     uname = st.session_state.user_name
 
     # 업로드 전 예상치 계산 (추가 활동 제외)
@@ -9870,7 +9885,9 @@ def show_final_check():
     if dup_check is not None and not dup_check.empty:
         u_col_dup = find_col(dup_check, ["등록자", "담당자", "성명"], "담당자")
         if u_col_dup and u_col_dup in dup_check.columns:
-            dup_my = dup_check[dup_check[u_col_dup] == st.session_state.user_name]
+            dup_my = dup_check[
+                dup_check[u_col_dup].apply(lambda value: re.sub(r"\s+", "", str(value).strip())) == current_user_key
+            ]
         else:
             dup_my = dup_check
 
@@ -9878,7 +9895,9 @@ def show_final_check():
     err_filtered_final = pd.DataFrame()
     if err_check is not None and not err_check.empty:
         if "담당자" in err_check.columns:
-            err_my_final = err_check[err_check["담당자"] == st.session_state.user_name].copy()
+            err_my_final = err_check[
+                err_check["담당자"].apply(lambda value: re.sub(r"\s+", "", str(value).strip())) == current_user_key
+            ].copy()
         else:
             err_my_final = err_check.copy()
         err_filtered_final = err_my_final[err_my_final["일방문"] >= 6].copy()
@@ -9989,7 +10008,7 @@ def show_final_check():
 
     st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
 
-    _, ppt_col, save_col, send_col = st.columns([0.7, 0.1, 0.1, 0.1])
+    _, ppt_col, save_col, send_col = st.columns([0.45, 0.25, 0.15, 0.15])
 
     with ppt_col:
         try:
@@ -10016,14 +10035,14 @@ def show_final_check():
                 original_df,
             )
             st.download_button(
-                "PPT 다운로드",
+                "실적보고서 PPT 다운로드",
                 data=ppt_bytes,
                 file_name=f"LMB활동실적보고서_{year_month}_{st.session_state.user_name}.pptx",
                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 use_container_width=True,
             )
         except Exception as e:
-            st.button("PPT 다운로드", use_container_width=True, disabled=True)
+            st.button("실적보고서 PPT 다운로드", use_container_width=True, disabled=True)
             st.caption(f"PPT 생성 준비 중 오류: {e}")
 
     with save_col:
@@ -10071,7 +10090,9 @@ def show_final_check():
         # 본인 이름에 맞는 이력만 저장
         u_col_send = find_col(original_df, ["등록자", "담당자", "성명"], "등록자")
         if u_col_send and u_col_send in original_df.columns:
-            user_only_df = original_df[original_df[u_col_send] == st.session_state.user_name].copy()
+            user_only_df = original_df[
+                original_df[u_col_send].apply(lambda value: re.sub(r"\s+", "", str(value).strip())) == current_user_key
+            ].copy()
             sent_uploads_db[st.session_state.user_name] = dataframe_to_upload_payload(user_only_df)
         else:
             sent_uploads_db[st.session_state.user_name] = dataframe_to_upload_payload(original_df)
