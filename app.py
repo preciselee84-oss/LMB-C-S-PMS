@@ -39,6 +39,8 @@ BANK_ACCOUNT_FILE = "bank_accounts.json"
 USAGE_REPORT_FILE = "usage_reports.json"
 COMPANY_PROFILE_FILE = "company_profile.json"
 EXCEL_SAMPLE_FILE = resolve_template_file("LMB월간 활동실적_000000(샘플).xlsx")
+PPT_TEMPLATE_FILE = resolve_template_file("LMB활동실적보고서_202605_하나지사.pptx")
+WEEKLY_PPT_TEMPLATE_FILE = resolve_template_file("주간보고_통합CMS고객_개설운영_주간보고_템플릿.pptx")
 
 DEFAULT_URL_ANALYSIS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9XPHqrqcaFf9bCOVya7yHORr-c1R4KCF0eEpdE3ESn8qJELP0BkqTOslur9bsGcVabRUIcyOa877R/pub?output=csv"
 DEFAULT_URL_SYNC = "https://docs.google.com/spreadsheets/d/1yS4gaES-iuzt1NSRTSdj9Ivg1fjbN5mIyX4pGnvEYN0/export?format=csv&gid=1533424484"
