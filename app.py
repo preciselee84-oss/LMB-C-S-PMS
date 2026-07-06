@@ -1715,12 +1715,16 @@ def prepare_history_analysis_df(raw_df):
 
 
 def current_history_analysis_df():
+    excel_df = st.session_state.get("user_excel_data")
+    if st.session_state.get("user_excel_source") == "hq" and isinstance(excel_df, pd.DataFrame):
+        excel_df = prepare_history_analysis_df(excel_df)
+        if has_performance_required_columns(excel_df):
+            return excel_df
     preview_df = st.session_state.get("history_convert_preview_data")
     if isinstance(preview_df, pd.DataFrame):
         preview_df = prepare_history_analysis_df(preview_df)
         if has_performance_required_columns(preview_df):
             return preview_df
-    excel_df = st.session_state.get("user_excel_data")
     if isinstance(excel_df, pd.DataFrame):
         excel_df = prepare_history_analysis_df(excel_df)
         if has_performance_required_columns(excel_df):
@@ -9372,6 +9376,7 @@ def show_user_history(is_admin_mode=False):
     df_user = attach_cloud_dates(df_user)
     df_user_visit = filter_visit_rows(df_user)
     df_visit_all = filter_visit_rows(df)
+    df_visit_all_with_cloud = attach_cloud_dates(df_visit_all)
 
     st.markdown("### 담당자별 활동 수치")
     res, err, dup = process_performance_analysis(df_visit_all, st.session_state.get("auto_prev_df"))
@@ -9548,7 +9553,7 @@ def show_user_history(is_admin_mode=False):
         err_filtered = err[pd.to_numeric(err["일방문"], errors="coerce").fillna(0) >= 6].copy()
 
     # 기타 오류 데이터 계산
-    other_errors_df = build_other_validation_errors(df_user_visit)
+    other_errors_df = build_other_validation_errors(df_visit_all_with_cloud)
 
     # 중복 이력 데이터
     dup_my = pd.DataFrame()
@@ -9557,20 +9562,20 @@ def show_user_history(is_admin_mode=False):
 
     # 개설완료일자 누락
     missing_open = pd.DataFrame()
-    if "본사 개설완료일자" in df_user_visit.columns:
-        missing_open = df_user_visit[
-            pd.isna(df_user_visit["본사 개설완료일자"]) | (df_user_visit["본사 개설완료일자"].astype(str).str.strip() == "")
+    if "본사 개설완료일자" in df_visit_all_with_cloud.columns:
+        missing_open = df_visit_all_with_cloud[
+            pd.isna(df_visit_all_with_cloud["본사 개설완료일자"]) | (df_visit_all_with_cloud["본사 개설완료일자"].astype(str).str.strip() == "")
         ]
         if "본사 신규이행구분" in missing_open.columns:
             missing_open = missing_open[missing_open["본사 신규이행구분"].astype(str).str.strip() != "이행"]
 
     # ERP연계일자 누락
     missing_erp = pd.DataFrame()
-    if "본사 ERP연계일자" in df_user_visit.columns:
-        if d_col and d_col in df_user_visit.columns:
-            target = df_user_visit[df_user_visit[d_col].astype(str).str.contains("연계", na=False)]
+    if "본사 ERP연계일자" in df_visit_all_with_cloud.columns:
+        if d_col and d_col in df_visit_all_with_cloud.columns:
+            target = df_visit_all_with_cloud[df_visit_all_with_cloud[d_col].astype(str).str.contains("연계", na=False)]
         else:
-            target = df_user_visit
+            target = df_visit_all_with_cloud
         missing_erp = target[
             pd.isna(target["본사 ERP연계일자"]) | (target["본사 ERP연계일자"].astype(str).str.strip() == "")
         ]
@@ -9637,11 +9642,16 @@ def show_user_history(is_admin_mode=False):
         "detail": st.session_state.get("history_preview_search_detail", "전체"),
     }
 
-    _render_preview = converted_preview_df
-    if _render_preview is None or (isinstance(_render_preview, pd.DataFrame) and _render_preview.empty):
+    _render_preview = analysis_df if st.session_state.get("user_excel_source") == "hq" else converted_preview_df
+    if (
+        st.session_state.get("user_excel_source") != "hq"
+        and (_render_preview is None or (isinstance(_render_preview, pd.DataFrame) and _render_preview.empty))
+    ):
         _sess_prev = st.session_state.get("history_convert_preview_data")
         if isinstance(_sess_prev, pd.DataFrame) and not _sess_prev.empty:
             _render_preview = _sess_prev
+    if (_render_preview is None or (isinstance(_render_preview, pd.DataFrame) and _render_preview.empty)) and isinstance(analysis_df, pd.DataFrame):
+        _render_preview = analysis_df
 
     if _render_preview is not None and not _render_preview.empty:
         _pre_h = None
@@ -9759,12 +9769,12 @@ def show_user_history(is_admin_mode=False):
     with t3:
         if not missing_open.empty:
             style_report_logic(missing_open.drop(columns=["본사 ERP연계일자"], errors="ignore"))
-        elif "본사 개설완료일자" not in df_user.columns:
+        elif "본사 개설완료일자" not in df_visit_all_with_cloud.columns:
             st.info("본사 구글시트에 개설완료일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
     with t4:
         if not missing_erp.empty:
             style_report_logic(missing_erp.drop(columns=["본사 개설완료일자"], errors="ignore"))
-        elif "본사 ERP연계일자" not in df_user.columns:
+        elif "본사 ERP연계일자" not in df_visit_all_with_cloud.columns:
             st.info("본사 구글시트에 ERP연계일자 또는 사업자번호 컬럼이 없어 확인할 수 없습니다.")
     with t5:
         style_report_logic(other_errors_df, align_overrides={"오류 사유": "left"}, default_align="center")
