@@ -15790,7 +15790,10 @@ def billing_preview_style(df):
     def highlight_termination(value):
         return "background-color: #fde2e2; color: #991b1b; font-weight: 600;" if str(value).strip() else ""
 
-    return df.style.applymap(highlight_termination, subset=["해지체크"])
+    styled = df.style
+    if hasattr(styled, "map"):
+        return styled.map(highlight_termination, subset=["해지체크"])
+    return styled.applymap(highlight_termination, subset=["해지체크"])
 
 
 def render_billing_source_tables(source_upload=None, login_df=None):
