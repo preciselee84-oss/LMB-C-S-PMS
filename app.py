@@ -15381,6 +15381,94 @@ def login_lookup_from_df(login_df):
     return lookup
 
 
+def has_billing_login_history(login_lookup, customer_no):
+    for customer_key in billing_customer_keys(customer_no):
+        info = login_lookup.get(customer_key)
+        if not info:
+            continue
+        try:
+            if int(float(str(info.get("로그인", 0)).replace(",", "") or 0)) > 0:
+                return True
+        except Exception:
+            pass
+        if str(info.get("최근로그인", "")).strip() or str(info.get("최초로그인", "")).strip():
+            return True
+    return False
+
+
+def slice_billing_sections_by_count(sections, target_count):
+    selected = []
+    remaining = []
+    left = max(0, int(target_count or 0))
+    for title, df in sections:
+        if df is None or df.empty:
+            selected.append((title, pd.DataFrame(columns=getattr(df, "columns", []))))
+            continue
+        if left <= 0:
+            selected.append((title, df.iloc[0:0].copy()))
+            remaining.append((title, df.copy()))
+            continue
+        take_count = min(left, len(df))
+        selected.append((title, df.iloc[:take_count].copy()))
+        if take_count < len(df):
+            remaining.append((title, df.iloc[take_count:].copy()))
+        left -= take_count
+    return selected, remaining
+
+
+def append_billing_sections_excel(writer, sheet_name, sections):
+    safe_name = str(sheet_name)[:31] or "Sheet"
+    startrow = 0
+    for title, df in sections:
+        sheet_df = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+        pd.DataFrame([[title]]).to_excel(writer, index=False, header=False, sheet_name=safe_name, startrow=startrow)
+        startrow += 1
+        sheet_df.to_excel(writer, index=False, sheet_name=safe_name, startrow=startrow)
+        startrow += len(sheet_df) + 3
+
+
+def billing_sections_excel_bytes(open_sections, erp_sections):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        append_billing_sections_excel(writer, "청구원본(개설업로드)", open_sections)
+        append_billing_sections_excel(writer, "청구원본(연계업로드)", erp_sections)
+    output.seek(0)
+    return output.getvalue()
+
+
+def build_billing_download_sections(parsed_open_sections, parsed_erp_sections, open_count, link_count, login_df):
+    open_main_sections = [(title, df) for title, df in parsed_open_sections if "사용자교육" not in title]
+    education_sections = [(title, df) for title, df in parsed_open_sections if "사용자교육" in title]
+
+    selected_open, remaining_open = slice_billing_sections_by_count(open_main_sections, open_count)
+    selected_erp, _ = slice_billing_sections_by_count(parsed_erp_sections, link_count)
+
+    login_lookup = login_lookup_from_df(login_df)
+    moved_rows = []
+    edu_columns = None
+    for _, edu_df in education_sections:
+        if isinstance(edu_df, pd.DataFrame) and edu_columns is None:
+            edu_columns = list(edu_df.columns)
+    for _, remain_df in remaining_open:
+        if remain_df is None or remain_df.empty:
+            continue
+        if edu_columns is None:
+            edu_columns = list(remain_df.columns)
+        customer_col = find_col(remain_df, ["고객번호", "고객번호(당월)"])
+        if not customer_col or customer_col not in remain_df.columns:
+            continue
+        for _, row in remain_df.iterrows():
+            if has_billing_login_history(login_lookup, row.get(customer_col, "")):
+                moved_rows.append(row.to_dict())
+
+    moved_df = pd.DataFrame(moved_rows)
+    if edu_columns:
+        moved_df = moved_df.reindex(columns=edu_columns, fill_value="")
+    education_title = education_sections[0][0] if education_sections else "사용자교육(방문)대기 고객사"
+    final_open_sections = selected_open + [(education_title, moved_df)]
+    return final_open_sections, selected_erp
+
+
 def billing_display_value(value):
     if is_blank_value(value):
         return ""
@@ -15670,7 +15758,10 @@ def render_billing_source_tables(source_upload=None, login_df=None):
     open_sections = [("2026년 6월 구축 실적", build_open_billing_table(pd.DataFrame(), login_df))]
     erp_sections = [("당월 ERP연계 청구 고객사", build_erp_billing_table(pd.DataFrame(), login_df))]
     education_sections = [("사용자교육(방문)대기 고객사", pd.DataFrame())]
+    parsed_open_sections = []
+    parsed_erp_sections = []
     reference_lookup = {}
+    source_loaded = False
 
     if source_file:
         try:
@@ -15679,6 +15770,10 @@ def render_billing_source_tables(source_upload=None, login_df=None):
             erp_sheet_name, erp_source = pick_billing_source_sheet(source_sheets, "erp")
             parsed_open_sections = parse_billing_source_sections(source_sheets.get(open_sheet_name, open_source))
             parsed_erp_sections = parse_billing_source_sections(source_sheets.get(erp_sheet_name, erp_source))
+            if not parsed_open_sections:
+                parsed_open_sections = [("2026년 6월 구축 실적", open_source)]
+            if not parsed_erp_sections:
+                parsed_erp_sections = [("당월 ERP연계 청구 고객사", erp_source)]
             reference_lookup, reference_error = load_billing_customer_reference()
             if reference_error:
                 st.warning(reference_error)
@@ -15696,6 +15791,7 @@ def render_billing_source_tables(source_upload=None, login_df=None):
                 (title, build_erp_billing_table(section_df, login_df))
                 for title, section_df in parsed_erp_sections
             ] or [("당월 ERP연계 청구 고객사", build_erp_billing_table(erp_source, login_df))]
+            source_loaded = True
         except Exception as exc:
             st.error(f"구축 및 연계 리스트 파일을 읽을 수 없습니다: {exc}")
     else:
@@ -15722,6 +15818,35 @@ def render_billing_source_tables(source_upload=None, login_df=None):
         for section_title, section_df in erp_sections:
             st.markdown(f"##### {section_title}")
             st.dataframe(section_df, use_container_width=True, hide_index=True)
+
+    st.divider()
+    st.markdown("#### 청구자료 엑셀 다운로드")
+    input_col1, input_col2, download_col = st.columns([0.22, 0.22, 0.24])
+    with input_col1:
+        open_count = st.number_input("개설청구 갯수 입력", min_value=0, step=1, value=0, key="billing_open_count")
+    with input_col2:
+        link_count = st.number_input("연계청구 갯수 입력", min_value=0, step=1, value=0, key="billing_link_count")
+    with download_col:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        if source_loaded:
+            download_open_sections, download_erp_sections = build_billing_download_sections(
+                parsed_open_sections,
+                parsed_erp_sections,
+                open_count,
+                link_count,
+                login_df,
+            )
+            st.download_button(
+                "청구자료 엑셀 다운로드",
+                data=billing_sections_excel_bytes(download_open_sections, download_erp_sections),
+                file_name=f"청구자료_{(datetime.utcnow() + timedelta(hours=9)).strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                key="billing_source_final_download",
+            )
+        else:
+            st.button("청구자료 엑셀 다운로드", use_container_width=True, disabled=True)
+            st.caption("구축 및 연계 리스트를 업로드하면 다운로드할 수 있습니다.")
 
 
 def show_billing_generation():
