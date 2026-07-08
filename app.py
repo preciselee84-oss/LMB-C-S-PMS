@@ -15641,7 +15641,6 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
         "사업자번호",
         "업체명",
         "ERP연계 여부",
-        "해지체크",
         "접수일자",
         "최종로그인일자",
         "방문일자",
@@ -15652,6 +15651,7 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
         "로그인횟수",
         "청구원본 고객명",
         "실적파일 고객명",
+        "해지체크",
     ]
     if source_df is None or source_df.empty:
         return pd.DataFrame(columns=open_columns)
@@ -15715,7 +15715,6 @@ def build_erp_billing_table(source_df, login_df=None, reference_lookup=None):
         "고객번호",
         "사업자번호",
         "업체명",
-        "해지체크",
         "구분",
         "추가연계신청일자",
         "담당자",
@@ -15729,6 +15728,7 @@ def build_erp_billing_table(source_df, login_df=None, reference_lookup=None):
         "로그인횟수",
         "청구원본 고객명",
         "실적파일 고객명",
+        "해지체크",
     ]
     if source_df is None or source_df.empty:
         return pd.DataFrame(columns=erp_columns)
@@ -15781,6 +15781,16 @@ def load_education_waiting_section(login_df=None, reference_lookup=None):
         raw_df = raw_df[mask].reset_index(drop=True)
     table_df = build_open_billing_table(raw_df, login_df, reference_lookup or {})
     return "사용자교육(방문)대기 고객사", table_df, None
+
+
+def billing_preview_style(df):
+    if df is None or df.empty or "해지체크" not in df.columns:
+        return df
+
+    def highlight_termination(value):
+        return "background-color: #fde2e2; color: #991b1b; font-weight: 600;" if str(value).strip() else ""
+
+    return df.style.applymap(highlight_termination, subset=["해지체크"])
 
 
 def render_billing_source_tables(source_upload=None, login_df=None):
@@ -15848,12 +15858,12 @@ def render_billing_source_tables(source_upload=None, login_df=None):
                 if section_df.empty:
                     st.info("표시할 데이터가 없습니다.")
                 else:
-                    st.dataframe(section_df, use_container_width=True, hide_index=True)
+                    st.dataframe(billing_preview_style(section_df), use_container_width=True, hide_index=True)
     with erp_tab:
         st.caption("연계 청구자료 생성 화면 구성입니다.")
         for section_title, section_df in erp_sections:
             st.markdown(f"##### {section_title}")
-            st.dataframe(section_df, use_container_width=True, hide_index=True)
+            st.dataframe(billing_preview_style(section_df), use_container_width=True, hide_index=True)
 
     st.divider()
     st.markdown("#### 청구자료 엑셀 다운로드")
