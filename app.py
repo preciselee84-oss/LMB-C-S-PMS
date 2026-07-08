@@ -15669,6 +15669,7 @@ def render_billing_source_tables(source_upload=None, login_df=None):
     )
     open_sections = [("2026년 6월 구축 실적", build_open_billing_table(pd.DataFrame(), login_df))]
     erp_sections = [("당월 ERP연계 청구 고객사", build_erp_billing_table(pd.DataFrame(), login_df))]
+    education_sections = [("사용자교육(방문)대기 고객사", pd.DataFrame())]
     reference_lookup = {}
 
     if source_file:
@@ -15681,6 +15682,11 @@ def render_billing_source_tables(source_upload=None, login_df=None):
             reference_lookup, reference_error = load_billing_customer_reference()
             if reference_error:
                 st.warning(reference_error)
+            education_sections = [
+                (title, build_open_billing_table(section_df, login_df, reference_lookup))
+                for title, section_df in parsed_open_sections
+                if "사용자교육" in title
+            ] or education_sections
             open_sections = [
                 (title, build_open_billing_table(section_df, login_df, reference_lookup))
                 for title, section_df in parsed_open_sections
@@ -15695,9 +15701,8 @@ def render_billing_source_tables(source_upload=None, login_df=None):
     else:
         st.warning("구축 및 연계 리스트를 업로드하면 청구원본 표가 Google Sheet 업로드 탭 화면 구조로 채워집니다.")
 
-    edu_title, edu_df, edu_error = load_education_waiting_section(login_df, reference_lookup)
     open_sections = [(t, d) for t, d in open_sections if "사용자교육" not in t]
-    open_sections.append((edu_title, edu_df))
+    open_sections.extend(education_sections)
 
     open_tab, erp_tab = st.tabs(["청구원본(개설업로드)", "청구원본(연계업로드)"])
     with open_tab:
@@ -15706,9 +15711,7 @@ def render_billing_source_tables(source_upload=None, login_df=None):
         for tab, (section_title, section_df) in zip(section_tabs, open_sections):
             with tab:
                 st.markdown(f"##### {section_title}")
-                if "사용자교육" in section_title and edu_error:
-                    st.warning(f"Google Sheet 데이터를 불러올 수 없습니다: {edu_error}")
-                elif section_df.empty:
+                if section_df.empty:
                     st.info("표시할 데이터가 없습니다.")
                 else:
                     st.dataframe(section_df, use_container_width=True, hide_index=True)
