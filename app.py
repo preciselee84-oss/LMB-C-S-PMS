@@ -15711,7 +15711,7 @@ def render_billing_source_tables(source_upload=None, login_df=None):
         for tab, (section_title, section_df) in zip(section_tabs, open_sections):
             with tab:
                 st.markdown(f"##### {section_title}")
-                if "구축 실적" in section_title:
+                if "구축 실적" in section_title or "사용자교육" in section_title:
                     section_df = section_df.drop(columns=["최종로그인일자"], errors="ignore")
                 if section_df.empty:
                     st.info("표시할 데이터가 없습니다.")
