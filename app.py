@@ -15536,9 +15536,11 @@ def load_billing_customer_reference():
         "사업자번호": find_col_by_priority(ref_df, ["사업자번호"]),
         "업체명": find_col_by_priority(ref_df, ["고객명", "고객사명", "업체명"]),
         "ERP연계 여부": find_col_by_priority(ref_df, ["구축형"]),
+        "관리구분": find_col_by_priority(ref_df, ["관리구분", "관리 구분"]),
         "접수일자": find_col_by_priority(ref_df, ["신규접수일", "접수일자"]),
         "구축일자": find_col_by_priority(ref_df, ["개설/이행일", "구축일자", "구축일"]),
         "방문일자": find_col_by_priority(ref_df, ["개설/이행일", "방문일자", "방문일", "구축일자", "구축일"]),
+        "해지일자": find_col_by_priority(ref_df, ["해지일자", "해지일", "해약일"]),
         "담당자": find_col_by_priority(ref_df, ["담당자"]),
         "청구원본 고객명": find_col_by_priority(ref_df, ["고객명", "고객사명", "업체명"]),
     }
@@ -15555,6 +15557,9 @@ def load_billing_customer_reference():
         }
         for customer_key in customer_keys:
             lookup.setdefault(customer_key, reference_info)
+        biz_key = normalize_biz_no(reference_info.get("사업자번호", ""))
+        if biz_key:
+            lookup.setdefault(f"biz:{biz_key}", reference_info)
     return lookup, ""
 
 
@@ -15604,6 +15609,31 @@ def billing_reference_info(reference_lookup, customer_no):
     return {}
 
 
+def billing_reference_info_from_row(reference_lookup, row):
+    customer_no = billing_value(row, ["고객번호", "고객번호(당월)"])
+    reference_info = billing_reference_info(reference_lookup, customer_no)
+    if reference_info:
+        return reference_info
+    biz_no = billing_value(row, ["사업자번호", "사업자등록번호", "사업자번호(당월)", "사업자등록번호(당월)"])
+    biz_key = normalize_biz_no(biz_no)
+    if biz_key:
+        return reference_lookup.get(f"biz:{biz_key}", {})
+    return {}
+
+
+def billing_termination_text(reference_info):
+    if not reference_info:
+        return ""
+    manage_text = str(reference_info.get("관리구분", "")).strip()
+    end_text = billing_format_date(reference_info.get("해지일자", ""))
+    has_terminated_status = bool(re.search("해지|취소", manage_text, flags=re.IGNORECASE))
+    if end_text:
+        return f"해지 이력 있음({end_text})"
+    if has_terminated_status:
+        return f"해지 이력 있음({manage_text})" if manage_text else "해지 이력 있음"
+    return ""
+
+
 def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
     open_columns = [
         "순번",
@@ -15611,6 +15641,7 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
         "사업자번호",
         "업체명",
         "ERP연계 여부",
+        "해지체크",
         "접수일자",
         "최종로그인일자",
         "방문일자",
@@ -15632,7 +15663,7 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
         if not customer_no and not billing_value(row, ["업체명", "고객명"]):
             continue
         login_info = billing_reference_info(login_lookup, customer_no)
-        reference_info = billing_reference_info(reference_lookup, customer_no)
+        reference_info = billing_reference_info_from_row(reference_lookup, row)
         first_login = login_info.get("최초로그인", "")
         build_date = billing_fill_blank(billing_value(row, ["구축일자", "구축일"]), reference_info, "구축일자")
         if first_login and billing_dates_differ(build_date, first_login):
@@ -15654,6 +15685,7 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
                     "업체명",
                 ),
                 "ERP연계 여부": _map_erp_type(billing_fill_blank(billing_value(row, ["ERP연계 여부", "ERP연계여부"]), reference_info, "ERP연계 여부")),
+                "해지체크": billing_termination_text(reference_info),
                 "접수일자": billing_fill_blank(billing_value(row, ["접수일자"]), reference_info, "접수일자"),
                 "최종로그인일자": build_date,
                 "방문일자": visit_date,
@@ -15677,12 +15709,13 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
     return df
 
 
-def build_erp_billing_table(source_df, login_df=None):
+def build_erp_billing_table(source_df, login_df=None, reference_lookup=None):
     erp_columns = [
         "순서",
         "고객번호",
         "사업자번호",
         "업체명",
+        "해지체크",
         "구분",
         "추가연계신청일자",
         "담당자",
@@ -15700,18 +15733,21 @@ def build_erp_billing_table(source_df, login_df=None):
     if source_df is None or source_df.empty:
         return pd.DataFrame(columns=erp_columns)
     login_lookup = login_lookup_from_df(login_df)
+    reference_lookup = reference_lookup or {}
     rows = []
     for idx, row in source_df.iterrows():
         customer_no = billing_value(row, ["고객번호", "고객번호(당월)"])
         if not customer_no and not billing_value(row, ["업체명", "고객명"]):
             continue
         login_info = billing_reference_info(login_lookup, customer_no)
+        reference_info = billing_reference_info_from_row(reference_lookup, row)
         rows.append(
             {
                 "순서": billing_value(row, ["순서", "순번"]) or str(idx + 1),
                 "고객번호": customer_no,
                 "사업자번호": billing_value(row, ["사업자번호", "사업자등록번호"]),
                 "업체명": billing_value(row, ["업체명", "고객명"]),
+                "해지체크": billing_termination_text(reference_info),
                 "구분": billing_value(row, ["구분"]),
                 "추가연계신청일자": billing_value(row, ["추가연계신청일자"]),
                 "담당자": billing_value(row, ["담당자"]),
@@ -15788,9 +15824,9 @@ def render_billing_source_tables(source_upload=None, login_df=None):
                 if "사용자교육" not in title
             ] or [("2026년 6월 구축 실적", build_open_billing_table(open_source, login_df, reference_lookup))]
             erp_sections = [
-                (title, build_erp_billing_table(section_df, login_df))
+                (title, build_erp_billing_table(section_df, login_df, reference_lookup))
                 for title, section_df in parsed_erp_sections
-            ] or [("당월 ERP연계 청구 고객사", build_erp_billing_table(erp_source, login_df))]
+            ] or [("당월 ERP연계 청구 고객사", build_erp_billing_table(erp_source, login_df, reference_lookup))]
             source_loaded = True
         except Exception as exc:
             st.error(f"구축 및 연계 리스트 파일을 읽을 수 없습니다: {exc}")
