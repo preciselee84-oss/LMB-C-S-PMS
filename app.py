@@ -1350,31 +1350,11 @@ def _activity_customer_map_from_df(sheet):
 
 @st.cache_data(ttl=600, show_spinner=False)
 def read_activity_google_customer_map():
-    mapping = {}
-    errors = []
-
     try:
-        sheet = pd.read_csv(URL_EDUCATION_WAITING, dtype=str).fillna("")
-        sheet_mapping, sheet_error = _activity_customer_map_from_df(sheet)
-        if sheet_error:
-            errors.append(f"요청 Google Sheet: {sheet_error}")
-        mapping.update(sheet_mapping)
+        hana_sheet = read_google_csv(DEFAULT_URL_HANA, header=2).fillna("")
+        return _activity_customer_map_from_df(hana_sheet)
     except Exception as exc:
-        errors.append(f"요청 Google Sheet 조회 실패: {exc}")
-
-    if not mapping:
-        try:
-            hana_sheet = read_google_csv(DEFAULT_URL_HANA, header=2).fillna("")
-            hana_mapping, hana_error = _activity_customer_map_from_df(hana_sheet)
-            if hana_error:
-                errors.append(f"기본 고객원장: {hana_error}")
-            mapping.update(hana_mapping)
-        except Exception as exc:
-            errors.append(f"기본 고객원장 조회 실패: {exc}")
-
-    if not mapping and errors:
-        return {}, " / ".join(errors)
-    return mapping, ""
+        return {}, f"고객원장 CSV 조회 실패: {exc}"
 
 
 def convert_history_to_activity_template_df(history_df, template_bytes):
