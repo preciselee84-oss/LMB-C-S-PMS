@@ -82,6 +82,7 @@ GITHUB_DATA_DIR = "data"
 SESSION_UID_COOKIE = "auto_login_uid"
 LAST_MENU_COOKIE = "last_menu"
 BILLING_MENU = "청구자료 생성"
+ACTIVITY_TEMPLATE_CONVERT_MENU = "활동이력 템플릿 변환"
 
 
 def _get_github_token():
@@ -1221,6 +1222,277 @@ def sample_format_excel_bytes(df):
         output.write(dataframe_to_excel_bytes({"Sheet0": df}))
     output.seek(0)
     return output.getvalue()
+
+
+def _activity_template_text(value):
+    if pd.isna(value):
+        return ""
+    return str(value).strip()
+
+
+def _activity_template_customer_key(value):
+    text = _activity_template_text(value)
+    digits = re.sub(r"\D", "", text)
+    return digits.zfill(8) if digits else ""
+
+
+def _activity_template_datetime(date_value, time_value):
+    date_digits = re.sub(r"\D", "", _activity_template_text(date_value))
+    time_digits = re.sub(r"\D", "", _activity_template_text(time_value))
+    if len(date_digits) >= 8:
+        date_part = date_digits[:8]
+    else:
+        parsed = pd.to_datetime(date_value, errors="coerce")
+        date_part = parsed.strftime("%Y%m%d") if pd.notna(parsed) else date_digits
+    if len(time_digits) >= 4:
+        return f"{date_part}{time_digits[:4]}"
+    return date_part
+
+
+def _activity_template_type(value):
+    text = _activity_template_text(value)
+    if "원격" in text:
+        return "원격활동"
+    if "유선" in text or "전화" in text or "통화" in text:
+        return "통화"
+    if "메일" in text or "이메일" in text:
+        return "이메일"
+    if "방문" in text or "미팅" in text:
+        return "미팅"
+    return "메모"
+
+
+def _activity_template_title(row, request_col, result_col, work_type_col):
+    request_text = _activity_template_text(row.get(request_col, "")) if request_col else ""
+    result_text = _activity_template_text(row.get(result_col, "")) if result_col else ""
+    work_type = _activity_template_text(row.get(work_type_col, "")) if work_type_col else ""
+    title = request_text or result_text or work_type or "활동이력"
+    first_line = next((line.strip() for line in title.splitlines() if line.strip()), title)
+    return first_line[:250]
+
+
+def _activity_template_purpose(value):
+    text = _activity_template_text(value)
+    if "교육" in text:
+        return "사용자교육"
+    if "ERP" in text.upper() or "연계" in text:
+        return "ERP연계진행"
+    return "운영활동"
+
+
+def _activity_template_issue_type(value):
+    text = _activity_template_text(value)
+    if any(keyword in text for keyword in ["오류", "장애", "에러", "실패"]):
+        return "장애발생"
+    return "단순요청"
+
+
+def _activity_template_hotline_work(value):
+    text = _activity_template_text(value)
+    rules = [
+        ("이체", "이체"),
+        ("B2B", "B2B"),
+        ("ERP", "ERP"),
+        ("외화", "외화무역"),
+        ("무역", "외화무역"),
+        ("설치", "클라이언트설치"),
+        ("인증서", "인증서"),
+        ("결재", "결재함"),
+        ("수수료", "수수료관리"),
+        ("기초", "기초정보"),
+    ]
+    for keyword, result in rules:
+        if keyword in text:
+            return result
+    return "통합자금관리"
+
+
+def _activity_template_hotline_issue(work_type, request_text, result_text):
+    text = f"{_activity_template_text(work_type)} {_activity_template_text(request_text)} {_activity_template_text(result_text)}"
+    if "설치" in text:
+        return "클라이언트 설치"
+    if "ERP" in text.upper() or "연계" in text:
+        return "ERP 관련 문의/오류"
+    if "이체" in text:
+        return "이체 관련 문의/오류"
+    if "집금" in text:
+        return "자금집금 오류/문의"
+    if "보고서" in text:
+        return "보고서 관련 문의/오류"
+    if "수수료" in text:
+        return "수수료 관련 문의/오류"
+    if "인증서" in text:
+        return "인증서 관련 문의/오류"
+    if any(keyword in text for keyword in ["오류", "장애", "에러", "실패"]):
+        return "오류"
+    return "사용자 단순 문의/오류"
+
+
+def read_activity_template_customer_map(template_bytes):
+    try:
+        sheet = pd.read_excel(BytesIO(template_bytes), sheet_name="Sheet1", header=None, dtype=str).fillna("")
+    except Exception:
+        return {}
+
+    mapping = {}
+    for _, row in sheet.iterrows():
+        customer_key = _activity_template_customer_key(row.iloc[0] if len(row) > 0 else "")
+        biz_no = re.sub(r"\D", "", _activity_template_text(row.iloc[1] if len(row) > 1 else ""))
+        company = _activity_template_text(row.iloc[2] if len(row) > 2 else "")
+        if customer_key:
+            mapping[customer_key] = {"biz_no": biz_no, "company": company}
+    return mapping
+
+
+def convert_history_to_activity_template_df(history_df, template_bytes):
+    raw_history_df = history_df.copy()
+    for col in list(raw_history_df.columns):
+        if not str(col).startswith("Unnamed"):
+            continue
+        sample = raw_history_df[col].dropna().astype(str).str.strip()
+        numeric_ratio = sample.str.match(r"^\d+(\.0+)?$").mean() if not sample.empty else 0
+        if numeric_ratio >= 0.7:
+            raw_history_df = raw_history_df.rename(columns={col: "고객번호"})
+            break
+    history_df = clean_header_logic(raw_history_df).replace({np.nan: ""})
+    template_df = pd.read_excel(BytesIO(template_bytes), sheet_name="Activities", nrows=0, dtype=str)
+    template_columns = list(template_df.columns)
+    customer_map = read_activity_template_customer_map(template_bytes)
+
+    date_col = find_col(history_df, ["접수일자", "일자", "날짜"])
+    time_col = find_col(history_df, ["접수시간", "시간"])
+    product_col = find_col(history_df, ["CMS구분", "제품", "상품"])
+    customer_col = find_col(history_df, ["고객번호", "고객NO", "고객 No"])
+    if not customer_col and len(history_df.columns) > 4:
+        customer_col = history_df.columns[4]
+    company_col = find_col(history_df, ["업체명", "회사명", "고객명", "상호"])
+    type_col = find_col(history_df, ["접수유형", "활동유형", "유형"])
+    work_type_col = find_col(history_df, ["업무유형", "처리업무"])
+    receiver_col = find_col(history_df, ["접수자"])
+    owner_col = find_col(history_df, ["담당자", "활동자"])
+    request_col = find_col(history_df, ["요청사항", "문의내용", "접수내용"])
+    result_col = find_col(history_df, ["처리내용", "활동내역", "조치내용"])
+
+    missing = []
+    for label, col in [("접수일자", date_col), ("업체명", company_col), ("담당자", owner_col), ("요청사항 또는 처리내용", request_col or result_col)]:
+        if not col or col not in history_df.columns:
+            missing.append(label)
+    if missing:
+        return pd.DataFrame(columns=template_columns), {"error": f"원본 파일에서 {', '.join(missing)} 컬럼을 찾을 수 없습니다."}
+
+    converted_rows = []
+    unmatched = 0
+    for _, row in history_df.iterrows():
+        if str(row.get("NO", "")).strip().lower() in ["", "nan"]:
+            continue
+        customer_key = _activity_template_customer_key(row.get(customer_col, "")) if customer_col else ""
+        mapped = customer_map.get(customer_key, {})
+        if customer_key and not mapped:
+            unmatched += 1
+
+        company = _activity_template_text(row.get(company_col, ""))
+        if not company and mapped.get("company"):
+            company = mapped["company"]
+        work_type = _activity_template_text(row.get(work_type_col, "")) if work_type_col else ""
+        request_text = _activity_template_text(row.get(request_col, "")) if request_col else ""
+        result_text = _activity_template_text(row.get(result_col, "")) if result_col else ""
+        activity_text = result_text or request_text
+        owner = _activity_template_text(row.get(owner_col, "")) if owner_col else ""
+        if not owner and receiver_col:
+            owner = _activity_template_text(row.get(receiver_col, ""))
+
+        converted_rows.append({
+            "유형(필수: 통화/미팅/원격활동/이메일/메모)": _activity_template_type(row.get(type_col, "")) if type_col else "메모",
+            "제목(필수)": _activity_template_title(row, request_col, result_col, work_type_col),
+            "일시(필수: 202606110930 또는 2026-06-11 09:30)": _activity_template_datetime(row.get(date_col, ""), row.get(time_col, "")) if date_col else "",
+            "활동자(필수: 이름)": owner,
+            "소요시간(분)": "",
+            "회사명": company,
+            "사업자번호": mapped.get("biz_no", ""),
+            "고객": "",
+            "관련제품(코드 또는 이름)": _activity_template_text(row.get(product_col, "")) if product_col else "통합CMS",
+            "활동내역": activity_text,
+            "활동 상세(마케팅/개설/운영/연계/기타)": "운영",
+            "활동 구분(IN/OUT)": "IN",
+            "활동 목적(운영활동/신규구축/사용자교육/ERP연계진행/ERP연계완료/ERP추가연계/상품전환/재구축/사전협의/수수료연체안내)": _activity_template_purpose(work_type),
+            "팀구분(MANAGE/HOTLINE/TECH)": "HOTLINE",
+            "장애 구분(단순요청/장애발생)": _activity_template_issue_type(f"{work_type} {request_text} {result_text}"),
+            "HOTLINE 처리업무(통합자금관리/이체/B2B/부가서비스/기초정보/수수료관리/외화무역/ERP/클라이언트설치/인증서/결재함/기타)": _activity_template_hotline_work(f"{work_type} {request_text} {result_text}"),
+            "HOTLINE 장애유형(사용자 단순 문의/오류/이체 관련 문의/오류/전자확인증 관련 문의/오류/자금집금 오류/문의/시재 관련 문의/오류/보고서 관련 문의/오류/클라이언트 설치/기초정보관련 문의/오류/인증서 관련 문의/오류/보안모듈 관련 문의/오류/ERP 관련 문의/오류/법인카드 관련 문의/오류/Ibase 관련 문의/오류/수수료 관련 문의/오류/접속 관련 문의/오류/서버 관련 문의/오류/서버 재설치/요건 관련 문의/기타 문의/오류)": _activity_template_hotline_issue(work_type, request_text, result_text),
+        })
+
+    converted_df = pd.DataFrame(converted_rows)
+    for col in template_columns:
+        if col not in converted_df.columns:
+            converted_df[col] = ""
+    return converted_df[template_columns], {"total": len(converted_df), "unmatched": unmatched}
+
+
+def activity_template_excel_bytes(converted_df, template_bytes):
+    from openpyxl import load_workbook
+
+    output = BytesIO()
+    wb = load_workbook(BytesIO(template_bytes))
+    ws = wb["Activities"] if "Activities" in wb.sheetnames else wb.worksheets[0]
+    if ws.max_row > 1:
+        ws.delete_rows(2, ws.max_row - 1)
+    header_map = {str(ws.cell(row=1, column=col).value or "").strip(): col for col in range(1, ws.max_column + 1)}
+    for row_idx, (_, row) in enumerate(converted_df.iterrows(), start=2):
+        for header, col_idx in header_map.items():
+            if header in converted_df.columns:
+                ws.cell(row=row_idx, column=col_idx, value=row.get(header, ""))
+    wb.save(output)
+    output.seek(0)
+    return output.getvalue()
+
+
+def show_activity_template_converter():
+    st.markdown("#### 활동이력 템플릿 변환")
+    st.caption("은행/핫라인 활동이력 xls 파일을 activities_template.xlsx의 Activities 시트 형식으로 변환합니다.")
+
+    col_history, col_template = st.columns(2)
+    with col_history:
+        history_file = st.file_uploader("202607활동이력(07-08).xls 파일 업로드", type=["xls", "xlsx"], key="activity_template_history_upload")
+    with col_template:
+        template_file = st.file_uploader("activities_template (8).xlsx 파일 업로드", type=["xlsx"], key="activity_template_template_upload")
+
+    if history_file is None or template_file is None:
+        st.info("원본 활동이력 파일과 변환 기준 템플릿 파일을 모두 업로드해주세요.")
+        return
+
+    try:
+        template_bytes = template_file.getvalue()
+        with st.spinner("활동이력을 템플릿 형식으로 변환하는 중입니다."):
+            history_df = pd.read_excel(history_file, sheet_name=0)
+            converted_df, info = convert_history_to_activity_template_df(history_df, template_bytes)
+        if converted_df.empty:
+            st.warning(info.get("error", "변환할 데이터가 없습니다."))
+            return
+
+        st.success(f"변환 완료: {int(info.get('total', len(converted_df))):,}건")
+        unmatched = int(info.get("unmatched", 0))
+        if unmatched:
+            st.caption(f"템플릿 Sheet1에서 고객번호 매핑을 찾지 못한 {unmatched:,}건은 사업자번호가 빈칸으로 저장됩니다.")
+        st.dataframe(converted_df.head(30), use_container_width=True, hide_index=True)
+
+        output_bytes = activity_template_excel_bytes(converted_df, template_bytes)
+        ym = ""
+        date_col = find_col(converted_df, ["일시"])
+        if date_col:
+            date_digits = converted_df[date_col].astype(str).str.extract(r"(\d{6})", expand=False).dropna()
+            ym = date_digits.iloc[0] if not date_digits.empty else ""
+        file_month = ym or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
+        st.download_button(
+            "변환 파일 다운로드",
+            data=output_bytes,
+            file_name=f"activities_template_converted_{file_month}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+    except ImportError:
+        st.error("xls 파일 변환을 위해 xlrd 패키지가 필요합니다.")
+    except Exception as exc:
+        st.error(f"변환 중 오류가 발생했습니다: {exc}")
 
 
 def criteria_df():
@@ -3025,7 +3297,7 @@ def show_sidebar():
                 render_nav_button(menu_name)
 
             st.markdown("<div class='gpt-section'>설정</div>", unsafe_allow_html=True)
-            for menu_name in ["직원 및 권한설정", "구글 스트레드시트 연동"]:
+            for menu_name in ["직원 및 권한설정", "구글 스트레드시트 연동", ACTIVITY_TEMPLATE_CONVERT_MENU]:
                 render_nav_button(menu_name)
 
         st.markdown("<div class='gpt-section'>사용자 메뉴</div>", unsafe_allow_html=True)
@@ -15986,6 +16258,7 @@ def show_main():
         "운영계획",
         "직원 및 권한설정",
         "구글 스트레드시트 연동",
+        ACTIVITY_TEMPLATE_CONVERT_MENU,
     }
     if menu not in allowed_menus:
         st.session_state.current_menu = "업로드 및 실적 확인"
@@ -16027,6 +16300,8 @@ def show_main():
         show_staff_admin()
     elif menu == "구글 스트레드시트 연동":
         show_google_sync()
+    elif menu == ACTIVITY_TEMPLATE_CONVERT_MENU:
+        show_activity_template_converter()
     else:
         st.session_state.current_menu = "업로드 및 실적 확인"
         st.rerun()
