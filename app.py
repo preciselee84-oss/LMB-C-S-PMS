@@ -3301,7 +3301,7 @@ def show_sidebar():
                 render_nav_button(menu_name)
 
         st.markdown("<div class='gpt-section'>사용자 메뉴</div>", unsafe_allow_html=True)
-        for menu_name in ["업로드 및 실적 확인", "이번달 활동 대상고객 추천", "주간보고 이력 작성", "방문이력 작성"]:
+        for menu_name in ["업로드 및 실적 확인", "이번달 활동 대상고객 추천", "주간보고 이력 작성", "방문이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU]:
             render_nav_button(menu_name)
 
         if st.session_state.user_role != "관리자":
@@ -16264,7 +16264,7 @@ def show_main():
         st.session_state.current_menu = "업로드 및 실적 확인"
         persist_current_menu()
         st.rerun()
-    user_menus = {"업로드 및 실적 확인", "이번달 활동 대상고객 추천", "주간보고 이력 작성", "방문이력 작성", BILLING_MENU}
+    user_menus = {"업로드 및 실적 확인", "이번달 활동 대상고객 추천", "주간보고 이력 작성", "방문이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU, BILLING_MENU}
     if menu not in user_menus and st.session_state.user_role != "관리자":
         st.session_state.current_menu = "업로드 및 실적 확인"
         persist_current_menu()
