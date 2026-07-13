@@ -1289,47 +1289,6 @@ def _activity_template_issue_type(value):
     return "단순요청"
 
 
-def _activity_template_hotline_work(value):
-    text = _activity_template_text(value)
-    rules = [
-        ("이체", "이체"),
-        ("B2B", "B2B"),
-        ("ERP", "ERP"),
-        ("외화", "외화무역"),
-        ("무역", "외화무역"),
-        ("설치", "클라이언트설치"),
-        ("인증서", "인증서"),
-        ("결재", "결재함"),
-        ("수수료", "수수료관리"),
-        ("기초", "기초정보"),
-    ]
-    for keyword, result in rules:
-        if keyword in text:
-            return result
-    return "통합자금관리"
-
-
-def _activity_template_hotline_issue(work_type, request_text, result_text):
-    text = f"{_activity_template_text(work_type)} {_activity_template_text(request_text)} {_activity_template_text(result_text)}"
-    if "설치" in text:
-        return "클라이언트 설치"
-    if "ERP" in text.upper() or "연계" in text:
-        return "ERP 관련 문의/오류"
-    if "이체" in text:
-        return "이체 관련 문의/오류"
-    if "집금" in text:
-        return "자금집금 오류/문의"
-    if "보고서" in text:
-        return "보고서 관련 문의/오류"
-    if "수수료" in text:
-        return "수수료 관련 문의/오류"
-    if "인증서" in text:
-        return "인증서 관련 문의/오류"
-    if any(keyword in text for keyword in ["오류", "장애", "에러", "실패"]):
-        return "오류"
-    return "사용자 단순 문의/오류"
-
-
 def _activity_customer_map_from_df(sheet):
     sheet = clean_header_logic(sheet.copy()).replace({np.nan: ""})
     customer_col = find_col(sheet, ["고객번호", "고객NO", "고객 No", "고객"])
@@ -1431,8 +1390,8 @@ def convert_history_to_activity_template_df(history_df, template_bytes):
             "활동 목적(운영활동/신규구축/사용자교육/ERP연계진행/ERP연계완료/ERP추가연계/상품전환/재구축/사전협의/수수료연체안내)": _activity_template_purpose(work_type),
             "팀구분(MANAGE/HOTLINE/TECH)": "HOTLINE",
             "장애 구분(단순요청/장애발생)": _activity_template_issue_type(f"{work_type} {request_text} {result_text}"),
-            "HOTLINE 처리업무(통합자금관리/이체/B2B/부가서비스/기초정보/수수료관리/외화무역/ERP/클라이언트설치/인증서/결재함/기타)": _activity_template_hotline_work(f"{work_type} {request_text} {result_text}"),
-            "HOTLINE 장애유형(사용자 단순 문의/오류/이체 관련 문의/오류/전자확인증 관련 문의/오류/자금집금 오류/문의/시재 관련 문의/오류/보고서 관련 문의/오류/클라이언트 설치/기초정보관련 문의/오류/인증서 관련 문의/오류/보안모듈 관련 문의/오류/ERP 관련 문의/오류/법인카드 관련 문의/오류/Ibase 관련 문의/오류/수수료 관련 문의/오류/접속 관련 문의/오류/서버 관련 문의/오류/서버 재설치/요건 관련 문의/기타 문의/오류)": _activity_template_hotline_issue(work_type, request_text, result_text),
+            "HOTLINE 처리업무(통합자금관리/이체/B2B/부가서비스/기초정보/수수료관리/외화무역/ERP/클라이언트설치/인증서/결재함/기타)": "",
+            "HOTLINE 장애유형(사용자 단순 문의/오류/이체 관련 문의/오류/전자확인증 관련 문의/오류/자금집금 오류/문의/시재 관련 문의/오류/보고서 관련 문의/오류/클라이언트 설치/기초정보관련 문의/오류/인증서 관련 문의/오류/보안모듈 관련 문의/오류/ERP 관련 문의/오류/법인카드 관련 문의/오류/Ibase 관련 문의/오류/수수료 관련 문의/오류/접속 관련 문의/오류/서버 관련 문의/오류/서버 재설치/요건 관련 문의/기타 문의/오류)": "",
         })
 
     converted_df = pd.DataFrame(converted_rows)
