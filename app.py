@@ -1344,6 +1344,29 @@ def read_activity_template_customer_map(template_bytes):
     return mapping
 
 
+@st.cache_data(ttl=600, show_spinner=False)
+def read_activity_google_customer_map():
+    try:
+        sheet = clean_header_logic(pd.read_csv(URL_EDUCATION_WAITING, dtype=str).fillna(""))
+    except Exception as exc:
+        return {}, f"Google Sheet 고객번호/사업자번호 매핑을 불러오지 못했습니다. 공유 권한 또는 웹 게시 설정을 확인해주세요. ({exc})"
+
+    customer_col = find_col(sheet, ["고객번호", "고객NO", "고객 No", "고객"])
+    biz_col = find_col(sheet, ["사업자번호", "사업자등록번호"])
+    company_col = find_col(sheet, ["업체명", "회사명", "고객명", "상호"])
+    if not customer_col or customer_col not in sheet.columns or not biz_col or biz_col not in sheet.columns:
+        return {}, "Google Sheet에서 고객번호 또는 사업자번호 컬럼을 찾을 수 없습니다."
+
+    mapping = {}
+    for _, row in sheet.iterrows():
+        customer_key = _activity_template_customer_key(row.get(customer_col, ""))
+        biz_no = re.sub(r"\D", "", _activity_template_text(row.get(biz_col, "")))
+        company = _activity_template_text(row.get(company_col, "")) if company_col else ""
+        if customer_key and biz_no:
+            mapping[customer_key] = {"biz_no": biz_no, "company": company, "source": "google"}
+    return mapping, ""
+
+
 def convert_history_to_activity_template_df(history_df, template_bytes):
     raw_history_df = history_df.copy()
     for col in list(raw_history_df.columns):
@@ -1358,6 +1381,7 @@ def convert_history_to_activity_template_df(history_df, template_bytes):
     template_df = pd.read_excel(BytesIO(template_bytes), sheet_name="Activities", nrows=0, dtype=str)
     template_columns = list(template_df.columns)
     customer_map = read_activity_template_customer_map(template_bytes)
+    google_customer_map, google_map_error = read_activity_google_customer_map()
 
     date_col = find_col(history_df, ["접수일자", "일자", "날짜"])
     time_col = find_col(history_df, ["접수시간", "시간"])
@@ -1386,8 +1410,14 @@ def convert_history_to_activity_template_df(history_df, template_bytes):
         if str(row.get("NO", "")).strip().lower() in ["", "nan"]:
             continue
         customer_key = _activity_template_customer_key(row.get(customer_col, "")) if customer_col else ""
-        mapped = customer_map.get(customer_key, {})
-        if customer_key and not mapped:
+        mapped = customer_map.get(customer_key, {}).copy()
+        google_mapped = google_customer_map.get(customer_key, {})
+        if google_mapped:
+            if not mapped.get("biz_no"):
+                mapped["biz_no"] = google_mapped.get("biz_no", "")
+            if not mapped.get("company"):
+                mapped["company"] = google_mapped.get("company", "")
+        if customer_key and not mapped.get("biz_no"):
             unmatched += 1
 
         company = _activity_template_text(row.get(company_col, ""))
@@ -1425,7 +1455,12 @@ def convert_history_to_activity_template_df(history_df, template_bytes):
     for col in template_columns:
         if col not in converted_df.columns:
             converted_df[col] = ""
-    return converted_df[template_columns], {"total": len(converted_df), "unmatched": unmatched}
+    return converted_df[template_columns], {
+        "total": len(converted_df),
+        "unmatched": unmatched,
+        "google_map_error": google_map_error,
+        "google_map_count": len(google_customer_map),
+    }
 
 
 def activity_template_excel_bytes(converted_df, template_bytes):
@@ -1471,8 +1506,14 @@ def show_activity_template_converter():
 
         st.success(f"변환 완료: {int(info.get('total', len(converted_df))):,}건")
         unmatched = int(info.get("unmatched", 0))
+        google_map_error = info.get("google_map_error", "")
+        google_map_count = int(info.get("google_map_count", 0) or 0)
+        if google_map_error:
+            st.warning(google_map_error)
+        elif google_map_count:
+            st.caption(f"Google Sheet 고객번호 매핑 {google_map_count:,}건을 함께 적용했습니다.")
         if unmatched:
-            st.caption(f"템플릿 Sheet1에서 고객번호 매핑을 찾지 못한 {unmatched:,}건은 사업자번호가 빈칸으로 저장됩니다.")
+            st.caption(f"사업자번호 매핑 실패 {unmatched:,}건은 사업자번호가 빈칸으로 저장됩니다.")
         st.dataframe(converted_df.head(30), use_container_width=True, hide_index=True)
 
         output_bytes = activity_template_excel_bytes(converted_df, template_bytes)
