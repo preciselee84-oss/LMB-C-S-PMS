@@ -1232,8 +1232,10 @@ def _activity_template_text(value):
 
 def _activity_template_customer_key(value):
     text = _activity_template_text(value)
+    if re.fullmatch(r"\d+\.0+", text):
+        text = text.split(".", 1)[0]
     digits = re.sub(r"\D", "", text)
-    return digits.zfill(8) if digits else ""
+    return digits.lstrip("0") if digits else ""
 
 
 def _activity_template_datetime(date_value, time_value):
