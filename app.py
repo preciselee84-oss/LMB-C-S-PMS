@@ -1238,16 +1238,73 @@ def _activity_template_customer_key(value):
     return digits.lstrip("0") if digits else ""
 
 
+def _activity_template_valid_hhmm(digits):
+    if not digits or len(digits) != 4:
+        return ""
+    hour = int(digits[:2])
+    minute = int(digits[2:])
+    if 0 <= hour <= 23 and 0 <= minute <= 59:
+        return digits
+    return ""
+
+
+def _activity_template_time(value):
+    if pd.isna(value):
+        return ""
+    if isinstance(value, (datetime, pd.Timestamp)):
+        return pd.to_datetime(value).strftime("%H%M")
+
+    if isinstance(value, (int, float, np.integer, np.floating)) and not pd.isna(value):
+        number = float(value)
+        if 0 <= number < 1:
+            total_minutes = int(round(number * 24 * 60)) % (24 * 60)
+            return f"{total_minutes // 60:02d}{total_minutes % 60:02d}"
+        if number.is_integer():
+            return _activity_template_valid_hhmm(str(int(number)).zfill(4)[-4:])
+
+    text = _activity_template_text(value)
+    if not text:
+        return ""
+
+    time_match = re.search(r"(\d{1,2})\s*:\s*(\d{1,2})", text)
+    if time_match:
+        return _activity_template_valid_hhmm(f"{int(time_match.group(1)):02d}{int(time_match.group(2)):02d}")
+
+    if re.fullmatch(r"\d+\.0+", text):
+        return _activity_template_valid_hhmm(text.split(".", 1)[0].zfill(4)[-4:])
+
+    try:
+        number = float(text)
+        if 0 <= number < 1:
+            total_minutes = int(round(number * 24 * 60)) % (24 * 60)
+            return f"{total_minutes // 60:02d}{total_minutes % 60:02d}"
+    except ValueError:
+        pass
+
+    digits = re.sub(r"\D", "", text)
+    if not digits:
+        return ""
+    if len(digits) in (3, 4):
+        return _activity_template_valid_hhmm(digits.zfill(4))
+    if len(digits) >= 12:
+        return _activity_template_valid_hhmm(digits[8:12])
+    return ""
+
+
 def _activity_template_datetime(date_value, time_value):
     date_digits = re.sub(r"\D", "", _activity_template_text(date_value))
-    time_digits = re.sub(r"\D", "", _activity_template_text(time_value))
     if len(date_digits) >= 8:
         date_part = date_digits[:8]
     else:
         parsed = pd.to_datetime(date_value, errors="coerce")
         date_part = parsed.strftime("%Y%m%d") if pd.notna(parsed) else date_digits
-    if len(time_digits) >= 4:
-        return f"{date_part}{time_digits[:4]}"
+    time_part = _activity_template_time(time_value)
+    if not time_part:
+        parsed = pd.to_datetime(date_value, errors="coerce")
+        if pd.notna(parsed) and (parsed.hour or parsed.minute):
+            time_part = parsed.strftime("%H%M")
+    if time_part:
+        return f"{date_part}{time_part}"
     return date_part
 
 
