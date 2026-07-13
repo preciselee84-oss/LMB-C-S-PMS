@@ -1238,16 +1238,6 @@ def _activity_template_customer_key(value):
     return digits.lstrip("0") if digits else ""
 
 
-def _activity_template_valid_hhmm(digits):
-    if not digits or len(digits) != 4:
-        return ""
-    hour = int(digits[:2])
-    minute = int(digits[2:])
-    if 0 <= hour <= 23 and 0 <= minute <= 59:
-        return digits
-    return ""
-
-
 def _activity_template_time(value):
     if pd.isna(value):
         return ""
@@ -1260,18 +1250,21 @@ def _activity_template_time(value):
             total_minutes = int(round(number * 24 * 60)) % (24 * 60)
             return f"{total_minutes // 60:02d}{total_minutes % 60:02d}"
         if number.is_integer():
-            return _activity_template_valid_hhmm(str(int(number)).zfill(4)[-4:])
+            text = str(int(number))
+        else:
+            text = str(value)
+    else:
+        text = _activity_template_text(value)
 
-    text = _activity_template_text(value)
     if not text:
         return ""
 
     time_match = re.search(r"(\d{1,2})\s*:\s*(\d{1,2})", text)
     if time_match:
-        return _activity_template_valid_hhmm(f"{int(time_match.group(1)):02d}{int(time_match.group(2)):02d}")
+        return f"{int(time_match.group(1)):02d}{int(time_match.group(2)):02d}"[:4]
 
     if re.fullmatch(r"\d+\.0+", text):
-        return _activity_template_valid_hhmm(text.split(".", 1)[0].zfill(4)[-4:])
+        text = text.split(".", 1)[0]
 
     try:
         number = float(text)
@@ -1285,9 +1278,13 @@ def _activity_template_time(value):
     if not digits:
         return ""
     if len(digits) in (3, 4):
-        return _activity_template_valid_hhmm(digits.zfill(4))
+        return digits.zfill(4)[:4]
     if len(digits) >= 12:
-        return _activity_template_valid_hhmm(digits[8:12])
+        return digits[8:12]
+    if len(digits) > 4:
+        return digits[:4]
+    if len(digits) < 3:
+        return digits.zfill(4)
     return ""
 
 
