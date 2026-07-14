@@ -1281,6 +1281,8 @@ def _activity_template_time(value):
         return digits.zfill(4)[:4]
     if len(digits) >= 12:
         return digits[8:12]
+    if len(digits) == 5:
+        return digits.zfill(6)[:4]
     if len(digits) > 4:
         return digits[:4]
     if len(digits) < 3:
