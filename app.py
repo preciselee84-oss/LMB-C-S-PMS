@@ -85,6 +85,25 @@ BILLING_MENU = "청구자료 생성"
 ACTIVITY_TEMPLATE_CONVERT_MENU = "활동이력 템플릿 변환"
 OPERATION_TARGET_MENU = "운영관리 활동고객 선정"
 
+CRM_MENU_LABELS = {
+    "대시보드": "홈 대시보드",
+    "업로드 및 실적 확인": "활동 이력",
+    "이번달 활동 대상고객 추천": "대상 고객 추천",
+    OPERATION_TARGET_MENU: "운영관리 타깃",
+    "주간보고 이력 작성": "주간 리포트",
+    "방문이력 작성": "방문 기록",
+    "관리자용 실적 확인": "성과 관리",
+    "실적 분석/계산": "성과 분석",
+    "실적 보고서": "성과 리포트",
+    "주간보고 취합": "팀 리포트",
+    "운영계획": "운영 플랜",
+    BILLING_MENU: "청구자료 생성",
+    "청구자료 작성": "청구자료 작성",
+    "직원 및 권한설정": "사용자/권한",
+    "구글 스트레드시트 연동": "데이터 연동",
+    ACTIVITY_TEMPLATE_CONVERT_MENU: "이력 템플릿 변환",
+}
+
 
 def _get_github_token():
     try:
@@ -3124,20 +3143,17 @@ def show_sidebar():
             [data-testid="stSidebarCollapsedControl"] {
                 display: none !important;
             }
-            /* ══ Zoho CRM 스타일 네비게이션 팔레트 ══
-               배경: #16284A  카드: #1F3358  테두리: #24395E
-               강조: #2F6FED  텍스트: #E8EEF8  보조: #9FB3D6
-               섹션: #7689AD  액션 호버: #5A2A38              */
+            /* CRM navigation palette */
             [data-testid="stSidebar"] {
-                background-color: #16284A !important;
-                border-right: 1px solid #24395E !important;
+                background-color: #0F172A !important;
+                border-right: 1px solid #1E293B !important;
             }
             [data-testid="stSidebar"] > div:first-child {
                 padding-top: 0 !important;
             }
             [data-testid="stSidebarContent"] {
                 padding: 14px 12px 16px !important;
-                background-color: #16284A !important;
+                background-color: #0F172A !important;
             }
             [data-testid="stSidebar"] * {
                 color: #E8EEF8 !important;
@@ -3145,7 +3161,7 @@ def show_sidebar():
             [data-testid="stSidebar"] .gpt-side-shell {
                 display: flex;
                 flex-direction: column;
-                gap: 12px;
+                gap: 10px;
                 padding: 4px 2px 8px;
             }
             [data-testid="stSidebar"] .gpt-brand {
@@ -3154,22 +3170,24 @@ def show_sidebar():
                 gap: 10px;
                 min-height: 44px;
                 padding: 6px 8px;
-                border-radius: 10px;
+                border-radius: 8px;
+                border: 1px solid #1E293B;
+                background: #111C33;
             }
             [data-testid="stSidebar"] .gpt-brand-mark {
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                width: 48px;
-                height: 48px;
+                width: 40px;
+                height: 40px;
                 border: none;
-                border-radius: 12px;
+                border-radius: 8px;
                 color: #ffffff !important;
-                font-size: 20px;
+                font-size: 16px;
                 font-weight: 900;
                 letter-spacing: 0;
-                background: linear-gradient(135deg, #2F6FED 0%, #1B4FC4 100%);
-                box-shadow: 0 4px 10px rgba(47,111,237,0.35);
+                background: #2563EB;
+                box-shadow: none;
             }
             [data-testid="stSidebar"] .gpt-brand-text {
                 display: flex;
@@ -3177,7 +3195,7 @@ def show_sidebar():
                 line-height: 1.2;
             }
             [data-testid="stSidebar"] .gpt-brand-title {
-                font-size: 30px;
+                font-size: 20px;
                 font-weight: 800;
                 color: #ffffff !important;
                 line-height: 1.1;
@@ -3186,16 +3204,16 @@ def show_sidebar():
             [data-testid="stSidebar"] .gpt-brand-subtitle {
                 margin-top: 2px;
                 font-size: 12px;
-                color: #8FA3C7 !important;
+                color: #94A3B8 !important;
                 font-weight: 500;
             }
             [data-testid="stSidebar"] .gpt-user-card {
                 margin: 2px 2px 8px;
-                padding: 12px 14px;
-                border: 1px solid #29406B;
-                border-radius: 14px;
-                background: #1F3358;
-                box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+                padding: 10px 12px;
+                border: 1px solid #1E293B;
+                border-radius: 8px;
+                background: #111827;
+                box-shadow: none;
             }
             [data-testid="stSidebar"] .gpt-user-name {
                 font-size: 14px;
@@ -3211,11 +3229,11 @@ def show_sidebar():
                 line-height: 1.35;
             }
             [data-testid="stSidebar"] .gpt-section {
-                margin: 4px 8px 1px;
-                font-size: 12px;
-                color: #7689AD !important;
-                font-weight: 700;
-                letter-spacing: 0.02em;
+                margin: 10px 8px 4px;
+                font-size: 11px;
+                color: #64748B !important;
+                font-weight: 800;
+                letter-spacing: 0.08em;
                 text-transform: uppercase;
             }
             [data-testid="stSidebar"] .gpt-section:first-of-type {
@@ -3231,7 +3249,7 @@ def show_sidebar():
             [data-testid="stSidebar"] .gpt-sidebar-divider {
                 height: 1px;
                 margin: 12px 8px;
-                background: #24395E;
+                background: #1E293B;
             }
             [data-testid="stSidebar"] div.stButton {
                 margin: 0 !important;
@@ -3239,7 +3257,7 @@ def show_sidebar():
             }
             [data-testid="stSidebar"] div.stButton > button {
                 margin-bottom: 0 !important;
-                min-height: 34px !important;
+                min-height: 32px !important;
                 height: auto !important;
             }
             [data-testid="stSidebar"] [data-testid="stElementContainer"] {
@@ -3257,12 +3275,12 @@ def show_sidebar():
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
-                color: #C9D6EC !important;
-                font-size: 14px !important;
+                color: #CBD5E1 !important;
+                font-size: 13px !important;
                 font-weight: 600 !important;
                 text-align: left !important;
-                padding: 8px 10px !important;
-                border-radius: 8px !important;
+                padding: 7px 10px !important;
+                border-radius: 6px !important;
                 justify-content: flex-start !important;
                 transition: background 0.12s ease, color 0.12s ease !important;
             }
@@ -3270,21 +3288,21 @@ def show_sidebar():
             [data-testid="stSidebar"] div.stButton > button span,
             [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] p,
             [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span {
-                font-size: 14px !important;
+                font-size: 13px !important;
                 font-weight: 600 !important;
-                color: #C9D6EC !important;
+                color: #CBD5E1 !important;
                 white-space: normal !important;
                 line-height: 1.25 !important;
             }
             [data-testid="stSidebar"] div.stButton > button:hover {
-                background: #233A61 !important;
+                background: #1E293B !important;
                 color: #ffffff !important;
             }
             [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.gpt-nav-active) + div [data-testid="stButton"] button,
             [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.gpt-nav-active) + [data-testid="stElementContainer"] [data-testid="stButton"] button {
-                background: #2F6FED !important;
+                background: #2563EB !important;
                 color: #ffffff !important;
-                box-shadow: 0 4px 12px rgba(47,111,237,0.35);
+                box-shadow: none;
             }
             [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.gpt-nav-active) + div [data-testid="stButton"] button p,
             [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.gpt-nav-active) + [data-testid="stElementContainer"] [data-testid="stButton"] button p {
@@ -3297,7 +3315,7 @@ def show_sidebar():
             }
             [data-testid="stSidebar"] .gpt-logout-marker + div [data-testid="stButton"] button:hover,
             [data-testid="stSidebar"] .gpt-logout-marker + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover {
-                background: #5A2A38 !important;
+                background: #7F1D1D !important;
                 color: #ffffff !important;
             }
             </style>
@@ -3307,8 +3325,9 @@ def show_sidebar():
 
         def render_nav_button(menu_name):
             active_class = " gpt-nav-active" if st.session_state.current_menu == menu_name else ""
+            label = CRM_MENU_LABELS.get(menu_name, menu_name)
             st.markdown(f"<div class='gpt-nav-marker{active_class}'></div>", unsafe_allow_html=True)
-            if st.button(menu_name, use_container_width=True, key=f"nav_{menu_name}"):
+            if st.button(label, use_container_width=True, key=f"nav_{menu_name}"):
                 st.session_state.current_menu = menu_name
                 persist_current_menu()
                 if menu_name == "업로드 및 실적 확인":
@@ -3319,34 +3338,38 @@ def show_sidebar():
         st.markdown(
             f"<div class='gpt-side-shell'>"
             f"<div class='gpt-brand'>"
-            f"<div class='gpt-brand-mark'>AX</div>"
+            f"<div class='gpt-brand-mark'>CRM</div>"
             f"<div class='gpt-brand-text'>"
-            f"<div class='gpt-brand-title'>내부 관리</div>"
-            f"<div class='gpt-brand-subtitle'>Webcash We · 360° Control</div>"
+            f"<div class='gpt-brand-title'>내부관리 CRM</div>"
+            f"<div class='gpt-brand-subtitle'>Customer Operations</div>"
             f"</div></div>"
             f"</div>",
             unsafe_allow_html=True,
         )
 
         if st.session_state.user_role == "관리자":
-            st.markdown("<div class='gpt-section'>관리자 메뉴</div>", unsafe_allow_html=True)
-            for menu_name in ["대시보드", "관리자용 실적 확인", "실적 분석/계산", "실적 보고서", "주간보고 취합", "운영계획"]:
+            st.markdown("<div class='gpt-section'>Workspace</div>", unsafe_allow_html=True)
+            for menu_name in ["대시보드", "운영계획"]:
                 render_nav_button(menu_name)
 
-            st.markdown("<div class='gpt-section'>청구 관리</div>", unsafe_allow_html=True)
+            st.markdown("<div class='gpt-section'>Performance</div>", unsafe_allow_html=True)
+            for menu_name in ["관리자용 실적 확인", "실적 분석/계산", "실적 보고서", "주간보고 취합"]:
+                render_nav_button(menu_name)
+
+            st.markdown("<div class='gpt-section'>Billing</div>", unsafe_allow_html=True)
             for menu_name in [BILLING_MENU, "청구자료 작성"]:
                 render_nav_button(menu_name)
 
-            st.markdown("<div class='gpt-section'>설정</div>", unsafe_allow_html=True)
+            st.markdown("<div class='gpt-section'>Admin</div>", unsafe_allow_html=True)
             for menu_name in ["직원 및 권한설정", "구글 스트레드시트 연동", ACTIVITY_TEMPLATE_CONVERT_MENU]:
                 render_nav_button(menu_name)
 
-        st.markdown("<div class='gpt-section'>사용자 메뉴</div>", unsafe_allow_html=True)
-        for menu_name in ["업로드 및 실적 확인", "이번달 활동 대상고객 추천", OPERATION_TARGET_MENU, "주간보고 이력 작성", "방문이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU]:
+        st.markdown("<div class='gpt-section'>Customer CRM</div>", unsafe_allow_html=True)
+        for menu_name in ["업로드 및 실적 확인", OPERATION_TARGET_MENU, "이번달 활동 대상고객 추천", "방문이력 작성", "주간보고 이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU]:
             render_nav_button(menu_name)
 
         if st.session_state.user_role != "관리자":
-            st.markdown("<div class='gpt-section'>청구 관리</div>", unsafe_allow_html=True)
+            st.markdown("<div class='gpt-section'>Billing</div>", unsafe_allow_html=True)
             render_nav_button(BILLING_MENU)
 
         st.markdown("<div class='gpt-sidebar-divider'></div><div class='gpt-logout-marker'></div>", unsafe_allow_html=True)
@@ -6207,13 +6230,43 @@ def apply_global_table_css():
     st.markdown(
         """
         <style>
+        .stApp {
+            background: #F8FAFC;
+        }
+        .block-container {
+            max-width: 100% !important;
+            padding: 0.9rem 1.2rem 2rem !important;
+        }
+        h1, h2, h3, h4 {
+            letter-spacing: 0 !important;
+            color: #0F172A;
+        }
+        [data-testid="stMetric"] {
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 6px;
+            padding: 10px 12px;
+            box-shadow: none;
+        }
+        [data-testid="stMetricLabel"] p {
+            color: #64748B !important;
+            font-size: 12px !important;
+            font-weight: 700 !important;
+        }
+        [data-testid="stMetricValue"] {
+            color: #0F172A !important;
+            font-size: 22px !important;
+            font-weight: 800 !important;
+        }
         /* 전체 버튼 색상 통일 */
         div.stButton > button,
         [data-testid="stFormSubmitButton"] button,
         [data-testid="stDownloadButton"] button {
-            background-color: #34495E !important;
+            background-color: #2563EB !important;
             color: #FFFFFF !important;
-            border-color: #34495E !important;
+            border: 1px solid #2563EB !important;
+            border-radius: 6px !important;
+            box-shadow: none !important;
         }
         div.stButton > button p, div.stButton > button span,
         [data-testid="stFormSubmitButton"] button p, [data-testid="stFormSubmitButton"] button span,
@@ -6223,8 +6276,8 @@ def apply_global_table_css():
         div.stButton > button:hover,
         [data-testid="stFormSubmitButton"] button:hover,
         [data-testid="stDownloadButton"] button:hover {
-            background-color: #2C3E50 !important;
-            border-color: #2C3E50 !important;
+            background-color: #1D4ED8 !important;
+            border-color: #1D4ED8 !important;
             color: #FFFFFF !important;
         }
         div.stButton > button:disabled,
@@ -6235,6 +6288,13 @@ def apply_global_table_css():
             color: #F1F5F9 !important;
             opacity: 0.7;
         }
+        div[data-testid="stDataFrame"],
+        div[data-testid="stDataEditor"] {
+            border: 1px solid #CBD5E1 !important;
+            border-radius: 6px !important;
+            overflow: hidden !important;
+            background: #FFFFFF !important;
+        }
         div[data-testid="stDataFrame"] th,
         div[data-testid="stDataFrame"] td,
         div[data-testid="stDataFrame"] [role="columnheader"],
@@ -6243,13 +6303,20 @@ def apply_global_table_css():
         div[data-testid="stDataEditor"] [role="gridcell"] {
             white-space: nowrap !important;
             word-break: keep-all !important;
+            font-size: 12px !important;
+            min-height: 28px !important;
+            line-height: 18px !important;
+            border-color: #E2E8F0 !important;
         }
         div[data-testid="stDataFrame"] [role="columnheader"],
         div[data-testid="stDataEditor"] [role="columnheader"] {
-            height: 20px !important;
-            min-height: 20px !important;
-            max-height: 20px !important;
+            height: 30px !important;
+            min-height: 30px !important;
+            max-height: 30px !important;
             line-height: 20px !important;
+            background: #E2E8F0 !important;
+            color: #0F172A !important;
+            font-weight: 800 !important;
         }
         /* 표 전체 가운데 정렬 */
         div[data-testid="stDataFrame"] [role="columnheader"],
@@ -6263,11 +6330,26 @@ def apply_global_table_css():
         div.stButton > button,
         [data-testid="stFormSubmitButton"] button,
         [data-testid="stDownloadButton"] button {
-            min-height: 30px !important;
-            height: 30px !important;
+            min-height: 32px !important;
+            height: 32px !important;
             padding: 0 0.75rem !important;
             font-size: 13px !important;
             line-height: 1.2 !important;
+        }
+        [data-testid="stTextInput"] input,
+        [data-testid="stNumberInput"] input,
+        [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+        [data-testid="stTextArea"] textarea {
+            border-radius: 6px !important;
+            border-color: #CBD5E1 !important;
+            min-height: 32px !important;
+            font-size: 13px !important;
+        }
+        [data-testid="stTabs"] button {
+            min-height: 34px !important;
+            padding: 6px 12px !important;
+            font-size: 13px !important;
+            font-weight: 700 !important;
         }
         .action-btn button p, .action-btn button span {
             font-size: 10px !important;
@@ -6429,17 +6511,80 @@ MENU_GUIDES = {
 
 
 def render_page_title(menu):
+    page_label = CRM_MENU_LABELS.get(menu, menu)
+    role_label = st.session_state.get("user_role", "")
+    user_label = st.session_state.get("user_name", "")
     st.markdown(
-        """
+        f"""
         <style>
-            .block-container { padding-top: 1rem !important; }
+            .crm-page-header {{
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 16px;
+                min-height: 54px;
+                padding: 8px 0 14px;
+                margin-bottom: 2px;
+                border-bottom: 1px solid #E2E8F0;
+            }}
+            .crm-page-kicker {{
+                color: #64748B;
+                font-size: 11px;
+                font-weight: 800;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                margin-bottom: 3px;
+            }}
+            .crm-page-title {{
+                color: #0F172A;
+                font-size: 24px;
+                font-weight: 850;
+                line-height: 1.15;
+            }}
+            .crm-page-meta {{
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                color: #475569;
+                font-size: 12px;
+                font-weight: 700;
+                white-space: nowrap;
+            }}
+            .crm-user-pill {{
+                display: inline-flex;
+                align-items: center;
+                min-height: 28px;
+                padding: 4px 10px;
+                border: 1px solid #CBD5E1;
+                border-radius: 999px;
+                background: #FFFFFF;
+                color: #334155;
+            }}
+            @media (max-width: 768px) {{
+                .crm-page-header {{
+                    align-items: flex-start;
+                    flex-direction: column;
+                }}
+                .crm-page-meta {{
+                    white-space: normal;
+                }}
+            }}
         </style>
+        <div class="crm-page-header">
+            <div>
+                <div class="crm-page-kicker">Internal CRM</div>
+                <div class="crm-page-title">{html.escape(page_label)}</div>
+            </div>
+            <div class="crm-page-meta">
+                <span class="crm-user-pill">{html.escape(str(user_label))}</span>
+                <span class="crm-user-pill">{html.escape(str(role_label))}</span>
+            </div>
+        </div>
         """,
         unsafe_allow_html=True,
     )
 
-    # 메뉴 이용 안내를 우측 상단에 배치
-    _, col_guide = st.columns([0.82, 0.18])
+    _, col_guide = st.columns([0.86, 0.14])
 
     with col_guide:
         if menu in MENU_GUIDES:
