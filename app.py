@@ -91,7 +91,6 @@ CRM_MENU_LABELS = {
     "이번달 활동 대상고객 추천": "대상 고객 추천",
     OPERATION_TARGET_MENU: "운영관리 타깃",
     "주간보고 이력 작성": "주간 리포트",
-    "방문이력 작성": "방문 기록",
     "관리자용 실적 확인": "성과 관리",
     "실적 분석/계산": "성과 분석",
     "실적 보고서": "성과 리포트",
@@ -3365,7 +3364,7 @@ def show_sidebar():
                 render_nav_button(menu_name)
 
         st.markdown("<div class='gpt-section'>Customer CRM</div>", unsafe_allow_html=True)
-        for menu_name in ["업로드 및 실적 확인", OPERATION_TARGET_MENU, "이번달 활동 대상고객 추천", "방문이력 작성", "주간보고 이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU]:
+        for menu_name in ["업로드 및 실적 확인", OPERATION_TARGET_MENU, "이번달 활동 대상고객 추천", "주간보고 이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU]:
             render_nav_button(menu_name)
 
         if st.session_state.user_role != "관리자":
@@ -16844,7 +16843,6 @@ def show_main():
         "이번달 활동 대상고객 추천",
         OPERATION_TARGET_MENU,
         "주간보고 이력 작성",
-        "방문이력 작성",
         "관리자용 실적 확인",
         "실적 분석/계산",
         "실적 보고서",
@@ -16860,7 +16858,7 @@ def show_main():
         st.session_state.current_menu = "업로드 및 실적 확인"
         persist_current_menu()
         st.rerun()
-    user_menus = {"업로드 및 실적 확인", "이번달 활동 대상고객 추천", OPERATION_TARGET_MENU, "주간보고 이력 작성", "방문이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU, BILLING_MENU}
+    user_menus = {"업로드 및 실적 확인", "이번달 활동 대상고객 추천", OPERATION_TARGET_MENU, "주간보고 이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU, BILLING_MENU}
     if menu not in user_menus and st.session_state.user_role != "관리자":
         st.session_state.current_menu = "업로드 및 실적 확인"
         persist_current_menu()
@@ -16878,8 +16876,6 @@ def show_main():
         show_operation_activity_targets()
     elif menu == "주간보고 이력 작성":
         show_weekly_report_user()
-    elif menu == "방문이력 작성":
-        show_visit_history()
     elif menu == "관리자용 실적 확인":
         show_admin_performance()
     elif menu == "실적 분석/계산":
