@@ -16275,8 +16275,12 @@ def _operation_contact_reason(row):
     reasons = []
     if bool(row.get("_is_this_year_build")):
         reasons.append("올해 구축")
+    elif bool(row.get("_is_gap_watch_build")):
+        reasons.append("2025년 이후 구축")
     if bool(row.get("_is_this_year_link")):
         reasons.append("올해 연계")
+    elif bool(row.get("_is_gap_watch_link")):
+        reasons.append("2025년 이후 연계")
     if bool(row.get("_login_stopped")):
         reasons.append("최근 3개월 로그인 없음")
     if bool(row.get("_is_billable")):
@@ -16337,6 +16341,7 @@ def build_operation_activity_targets(
     recent_start = start_month - pd.DateOffset(months=2)
     year_start = pd.Timestamp(year=start_month.year, month=1, day=1)
     year_end = pd.Timestamp(year=start_month.year, month=12, day=31)
+    gap_watch_start = pd.Timestamp(year=max(2025, start_month.year - 1), month=1, day=1)
 
     manage_key = pd.Series([""] * len(manage), index=manage.index, dtype="object")
     if m_customer_col:
@@ -16401,13 +16406,17 @@ def build_operation_activity_targets(
         valid_manage &= merged["_open_dt"].dt.strftime("%Y-%m").fillna("") != reference_month
     this_year_build = merged["_open_dt"].between(year_start, year_end, inclusive="both")
     this_year_link = merged["_link_dt"].between(year_start, year_end, inclusive="both")
+    gap_watch_build = merged["_open_dt"].between(gap_watch_start, year_end, inclusive="both")
+    gap_watch_link = merged["_link_dt"].between(gap_watch_start, year_end, inclusive="both")
     recent_login = last_login.between(recent_start, end_month, inclusive="both")
 
     merged["_is_this_year_build"] = this_year_build
     merged["_is_this_year_link"] = this_year_link
+    merged["_is_gap_watch_build"] = gap_watch_build
+    merged["_is_gap_watch_link"] = gap_watch_link
     merged["_is_billable"] = recent_login
     merged["_has_recent_menu"] = menu_count.gt(0)
-    merged["_login_stopped"] = (this_year_build | this_year_link) & ~recent_login
+    merged["_login_stopped"] = (gap_watch_build | gap_watch_link) & ~recent_login
     merged["_recent_build_dt"] = pd.concat([merged["_open_dt"], merged["_link_dt"]], axis=1).max(axis=1)
     merged["_recent_build_rank_dt"] = merged["_recent_build_dt"].fillna(pd.Timestamp.min)
     merged["_priority_score"] = (
@@ -16417,13 +16426,31 @@ def build_operation_activity_targets(
         + login_count.clip(upper=30)
     )
 
-    if billable_only:
-        target_mask = valid_manage & merged["_is_billable"] & merged["_has_recent_menu"]
-    elif contact_only:
-        target_mask = valid_manage & (merged["_login_stopped"] | (merged["_is_billable"] & merged["_has_recent_menu"]))
+    billable_mask = valid_manage & merged["_is_billable"] & merged["_has_recent_menu"]
+    stopped_mask = valid_manage & merged["_login_stopped"]
+    result_billable = merged[billable_mask].copy()
+    result_stopped = merged[stopped_mask].copy() if contact_only else pd.DataFrame()
+
+    if sort_mode == "recent_login":
+        sort_cols = ["_last_login_dt", "_recent_build_rank_dt", "담당자", "고객사명"]
+        sort_ascending = [False, False, True, True]
+    elif sort_mode == "usage":
+        sort_cols = ["은행메뉴사용", "은행로그인건수", "_recent_build_rank_dt", "담당자", "고객사명"]
+        sort_ascending = [False, False, False, True, True]
     else:
-        target_mask = valid_manage & merged["_is_billable"] & merged["_has_recent_menu"]
-    result = merged[target_mask].copy()
+        sort_cols = ["_recent_build_rank_dt", "_last_login_dt", "담당자", "고객사명"]
+        sort_ascending = [False, False, True, True]
+
+    result_billable = result_billable.sort_values(sort_cols, ascending=sort_ascending)
+    if max_targets:
+        result_billable = result_billable.head(int(max_targets))
+    if not result_stopped.empty:
+        result_stopped = result_stopped.sort_values(["_recent_build_rank_dt", "담당자", "고객사명"], ascending=[False, True, True])
+        result = pd.concat([result_stopped, result_billable], ignore_index=True)
+        result = result.drop_duplicates("_match_key", keep="first")
+    else:
+        result = result_billable
+
     if result.empty:
         return pd.DataFrame(), None
 
@@ -16445,14 +16472,8 @@ def build_operation_activity_targets(
         "은행최종로그인일자", "은행최종이체일자", "은행로그인건수", "은행메뉴사용",
         "청구구분", "최근3개월기준", "선정사유", "활동권장",
     ]
-    if sort_mode == "recent_login":
-        result = result.sort_values(["_last_login_dt", "_recent_build_rank_dt", "담당자", "고객사명"], ascending=[False, False, True, True])
-    elif sort_mode == "usage":
-        result = result.sort_values(["은행메뉴사용", "은행로그인건수", "_recent_build_rank_dt", "담당자", "고객사명"], ascending=[False, False, False, True, True])
-    else:
-        result = result.sort_values(["_recent_build_rank_dt", "_last_login_dt", "담당자", "고객사명"], ascending=[False, False, True, True])
-    if max_targets:
-        result = result.head(int(max_targets))
+    result["_type_order"] = np.where(result["_login_stopped"], 0, 1)
+    result = result.sort_values(["_type_order"] + sort_cols, ascending=[True] + sort_ascending)
     return result[[col for col in display_cols if col in result.columns]].reset_index(drop=True), None
 
 
@@ -16518,9 +16539,8 @@ def show_operation_activity_targets():
         help="직전 3개월 최종로그인 이력이 있는 고객만 선정합니다.",
     )
     include_stopped = st.checkbox(
-        "올해 구축/연계 후 로그인 끊긴 고객도 별도 점검 대상으로 포함",
-        value=False,
-        disabled=billable_only,
+        "2025년 이후 구축/연계 후 로그인 끊긴 고객도 별도 점검 대상으로 포함",
+        value=True,
         key="operation_include_stopped",
     )
     exclude_current_open_month = st.checkbox(
@@ -16555,8 +16575,8 @@ def show_operation_activity_targets():
     stopped_count = int(targets["구분"].astype(str).eq("로그인 끊김 점검").sum()) if "구분" in targets.columns else 0
     billable_count = int(targets["구분"].astype(str).eq("청구 가능 운영관리").sum()) if "구분" in targets.columns else 0
     c1, c2, c3 = st.columns(3)
-    c1.metric("선정 활동고객", f"{len(targets):,}개")
-    c2.metric("청구 가능", f"{billable_count:,}개")
+    c1.metric("전체 표시", f"{len(targets):,}개")
+    c2.metric("청구 가능 활동", f"{billable_count:,}개")
     c3.metric("로그인 공백 점검", f"{stopped_count:,}개")
 
     owner_options = ["전체"] + sorted(v for v in targets.get("담당자", pd.Series(dtype=str)).astype(str).str.strip().unique() if v)
