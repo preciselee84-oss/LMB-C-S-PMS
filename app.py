@@ -16580,24 +16580,40 @@ def show_operation_activity_targets():
     c3.metric("로그인 공백 점검", f"{stopped_count:,}개")
 
     owner_options = ["전체"] + sorted(v for v in targets.get("담당자", pd.Series(dtype=str)).astype(str).str.strip().unique() if v)
-    type_options = ["전체"] + sorted(v for v in targets.get("구분", pd.Series(dtype=str)).astype(str).str.strip().unique() if v)
-    f1, f2, f3 = st.columns([0.25, 0.25, 0.5])
+    f1, f2 = st.columns([0.25, 0.75])
     selected_owner = f1.selectbox("담당자", owner_options, key="operation_target_owner")
-    selected_type = f2.selectbox("구분", type_options, key="operation_target_type")
-    keyword = f3.text_input("고객사 검색", key="operation_target_keyword")
+    keyword = f2.text_input("고객사 검색", key="operation_target_keyword")
 
     view = targets.copy()
     if selected_owner != "전체" and "담당자" in view.columns:
         view = view[view["담당자"].astype(str).str.strip() == selected_owner]
-    if selected_type != "전체" and "구분" in view.columns:
-        view = view[view["구분"].astype(str).str.strip() == selected_type]
     if keyword.strip() and "고객사명" in view.columns:
         view = view[view["고객사명"].astype(str).str.contains(keyword.strip(), case=False, na=False)]
 
-    st.dataframe(view, use_container_width=True, hide_index=True)
+    gap_view = view[view["구분"].astype(str).eq("로그인 끊김 점검")].reset_index(drop=True) if "구분" in view.columns else pd.DataFrame()
+    billable_view = view[view["구분"].astype(str).eq("청구 가능 운영관리")].reset_index(drop=True) if "구분" in view.columns else view
+
+    gap_tab, billable_tab, all_tab = st.tabs([
+        f"로그인 공백 점검 {len(gap_view):,}",
+        f"청구 가능 활동 {len(billable_view):,}",
+        f"전체 {len(view):,}",
+    ])
+    with gap_tab:
+        st.caption("2025년 이후 개설/연계 고객 중 직전 3개월 로그인 이력이 없는 고객입니다.")
+        st.dataframe(gap_view, use_container_width=True, hide_index=True)
+    with billable_tab:
+        st.caption("직전 3개월 로그인 이력이 있어 비용 청구 가능한 고객 중 활동 고객수만큼 선정한 목록입니다.")
+        st.dataframe(billable_view, use_container_width=True, hide_index=True)
+    with all_tab:
+        st.dataframe(view, use_container_width=True, hide_index=True)
+
     st.download_button(
         "활동고객사 엑셀 다운로드",
-        data=dataframe_to_excel_bytes({"활동고객사": view}),
+        data=dataframe_to_excel_bytes({
+            "로그인공백점검": gap_view,
+            "청구가능활동": billable_view,
+            "전체": view,
+        }),
         file_name=f"운영관리_활동고객사_{reference_month.replace('-', '')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
