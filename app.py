@@ -83,6 +83,7 @@ SESSION_UID_COOKIE = "auto_login_uid"
 LAST_MENU_COOKIE = "last_menu"
 BILLING_MENU = "청구자료 생성"
 ACTIVITY_TEMPLATE_CONVERT_MENU = "활동이력 템플릿 변환"
+OPERATION_TARGET_MENU = "운영관리 활동고객 선정"
 
 
 def _get_github_token():
@@ -3341,7 +3342,7 @@ def show_sidebar():
                 render_nav_button(menu_name)
 
         st.markdown("<div class='gpt-section'>사용자 메뉴</div>", unsafe_allow_html=True)
-        for menu_name in ["업로드 및 실적 확인", "이번달 활동 대상고객 추천", "주간보고 이력 작성", "방문이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU]:
+        for menu_name in ["업로드 및 실적 확인", "이번달 활동 대상고객 추천", OPERATION_TARGET_MENU, "주간보고 이력 작성", "방문이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU]:
             render_nav_button(menu_name)
 
         if st.session_state.user_role != "관리자":
@@ -16210,6 +16211,318 @@ def render_billing_source_tables(source_upload=None, login_df=None):
             st.caption("구축 및 연계 리스트를 업로드하면 다운로드할 수 있습니다.")
 
 
+def read_excel_sheet_with_header_scan(file, sheet_name, required_keys=None, max_scan_rows=15):
+    required_keys = required_keys or []
+    raw = pd.read_excel(file, sheet_name=sheet_name, header=None)
+    header_idx = 0
+    for idx in range(min(len(raw), max_scan_rows)):
+        row_values = [str(v).strip() for v in raw.iloc[idx].tolist()]
+        compact_values = [v.replace(" ", "").replace("\n", "") for v in row_values]
+        if all(any(key.replace(" ", "").replace("\n", "") in value for value in compact_values) for key in required_keys):
+            header_idx = idx
+            break
+    df = raw.iloc[header_idx + 1:].copy()
+    df.columns = _dedupe_columns([str(v).strip() for v in raw.iloc[header_idx].tolist()])
+    df = df.loc[:, ~pd.Series(df.columns).astype(str).str.contains("^nan$|^Unnamed", case=False, na=False).values]
+    return df.dropna(how="all").reset_index(drop=True)
+
+
+def _dedupe_columns(columns):
+    seen = {}
+    result = []
+    for col in columns:
+        name = str(col).strip()
+        count = seen.get(name, 0)
+        seen[name] = count + 1
+        result.append(name if count == 0 else f"{name}.{count}")
+    return result
+
+
+def _infer_month_from_name(file_name):
+    match = re.search(r"(20\d{2})[-_ .]?(0[1-9]|1[0-2])", str(file_name or ""))
+    if not match:
+        return None
+    return f"{match.group(1)}-{match.group(2)}"
+
+
+def _infer_month_from_bank_df(bank_df):
+    if bank_df is None or bank_df.empty:
+        return None
+    login_col = find_col(bank_df, ["최종로그인일자", "최근로그인일자", "최종로그인", "최근로그인"])
+    if not login_col:
+        return None
+    dates = bank_df[login_col].apply(parse_sheet_date).dropna()
+    if dates.empty:
+        return None
+    return dates.max().strftime("%Y-%m")
+
+
+def _month_bounds(year_month):
+    start = pd.to_datetime(f"{year_month}-01", errors="coerce")
+    if pd.isna(start):
+        return pd.NaT, pd.NaT
+    return start, start + pd.offsets.MonthEnd(0)
+
+
+def _format_date_for_display(value):
+    parsed = parse_sheet_date(value)
+    if pd.isna(parsed):
+        return ""
+    return parsed.strftime("%Y-%m-%d")
+
+
+def _operation_contact_reason(row):
+    reasons = []
+    if bool(row.get("_is_this_year_build")):
+        reasons.append("올해 구축")
+    if bool(row.get("_is_this_year_link")):
+        reasons.append("올해 연계")
+    if bool(row.get("_login_stopped")):
+        reasons.append("최근 3개월 로그인 없음")
+    if bool(row.get("_is_billable")):
+        reasons.append("최근 3개월 로그인 있음")
+    if bool(row.get("_has_recent_menu")):
+        reasons.append("메뉴사용 이력 있음")
+    return " / ".join(reasons)
+
+
+def build_operation_activity_targets(manage_df, bank_df, reference_month, contact_only=True):
+    if manage_df is None or manage_df.empty:
+        return pd.DataFrame(), "관리 엑셀의 고객원장 데이터를 찾을 수 없습니다."
+    if bank_df is None or bank_df.empty:
+        return pd.DataFrame(), "은행 엑셀의 명단 데이터를 찾을 수 없습니다."
+
+    manage = clean_header_logic(manage_df.copy())
+    bank = bank_df.copy()
+    manage.columns = _dedupe_columns([str(c).strip() for c in manage.columns])
+    bank.columns = _dedupe_columns([str(c).strip() for c in bank.columns])
+
+    m_customer_col = find_col(manage, ["고객번호"])
+    m_biz_col = find_col(manage, ["사업자번호", "사업자등록번호"])
+    m_company_col = find_col(manage, ["고객명", "고객사명", "업체명", "상호"])
+    m_owner_col = find_col(manage, ["담당자"])
+    m_manage_col = find_col(manage, ["관리구분"])
+    m_open_status_col = find_col(manage, ["개설상태"])
+    m_open_date_col = find_col(manage, ["개설/이행일", "개설일", "이행일"])
+    m_link_status_col = find_col(manage, ["연계상태", "ERP연계상태"])
+    m_link_date_col = find_col(manage, ["연계청구일자", "연계일자", "ERP연계일자"])
+    m_cancel_col = find_col(manage, ["해지일자"])
+
+    b_customer_col = find_col(bank, ["고객번호"])
+    b_biz_col = find_col(bank, ["사업자번호", "사업자등록번호"])
+    b_company_col = find_col(bank, ["고객명", "고객사명", "업체명", "상호"])
+    b_last_login_col = find_col(bank, ["최종로그인일자", "최근로그인일자", "최종로그인", "최근로그인"])
+    b_last_transfer_col = find_col(bank, ["최종이체일자", "최근이체일자", "최종이체", "최근이체"])
+    b_login_count_col = find_col(bank, ["로그인건수", "로그인횟수"])
+    b_menu_col = exact_col(bank, ["메뉴사용"]) or find_col(bank, ["메뉴사용", "메뉴클릭수"])
+    b_bill_col = find_col(bank, ["청구구분"])
+
+    if not m_customer_col and not m_biz_col:
+        return pd.DataFrame(), "관리 엑셀에서 고객번호 또는 사업자번호 컬럼을 찾을 수 없습니다."
+    if not b_customer_col and not b_biz_col:
+        return pd.DataFrame(), "은행 엑셀에서 고객번호 또는 사업자번호 컬럼을 찾을 수 없습니다."
+
+    start_month, end_month = _month_bounds(reference_month)
+    if pd.isna(start_month):
+        return pd.DataFrame(), "기준월을 확인할 수 없습니다."
+    recent_start = start_month - pd.DateOffset(months=2)
+    year_start = pd.Timestamp(year=start_month.year, month=1, day=1)
+    year_end = pd.Timestamp(year=start_month.year, month=12, day=31)
+
+    manage_key = pd.Series([""] * len(manage), index=manage.index, dtype="object")
+    if m_customer_col:
+        manage_key = manage[m_customer_col].apply(normalize_billing_customer_no)
+    if m_biz_col:
+        biz_key = manage[m_biz_col].apply(normalize_biz_no)
+        manage_key = manage_key.where(manage_key.astype(str) != "", biz_key)
+
+    bank_key = pd.Series([""] * len(bank), index=bank.index, dtype="object")
+    if b_customer_col:
+        bank_key = bank[b_customer_col].apply(normalize_billing_customer_no)
+    if b_biz_col:
+        bank_biz_key = bank[b_biz_col].apply(normalize_biz_no)
+        bank_key = bank_key.where(bank_key.astype(str) != "", bank_biz_key)
+
+    bank_norm = pd.DataFrame({
+        "_match_key": bank_key,
+        "은행고객명": bank[b_company_col].fillna("").astype(str).str.strip() if b_company_col else "",
+        "은행사업자번호": bank[b_biz_col].apply(normalize_biz_no) if b_biz_col else "",
+        "은행최종로그인일자": bank[b_last_login_col].apply(_format_date_for_display) if b_last_login_col else "",
+        "은행최종이체일자": bank[b_last_transfer_col].apply(_format_date_for_display) if b_last_transfer_col else "",
+        "은행로그인건수": pd.to_numeric(bank[b_login_count_col], errors="coerce").fillna(0).astype(int) if b_login_count_col else 0,
+        "은행메뉴사용": pd.to_numeric(bank[b_menu_col], errors="coerce").fillna(0).astype(int) if b_menu_col else 0,
+        "청구구분": bank[b_bill_col].fillna("").astype(str).str.strip() if b_bill_col else "",
+    })
+    bank_norm["_last_login_dt"] = pd.to_datetime(bank_norm["은행최종로그인일자"], errors="coerce")
+    bank_norm = bank_norm[bank_norm["_match_key"].astype(str) != ""]
+    bank_norm = bank_norm.sort_values(["_last_login_dt", "은행로그인건수", "은행메뉴사용"], ascending=[False, False, False])
+    bank_norm = bank_norm.drop_duplicates("_match_key", keep="first")
+
+    open_dates = manage[m_open_date_col].apply(parse_sheet_date) if m_open_date_col else pd.Series(pd.NaT, index=manage.index)
+    link_dates = manage[m_link_date_col].apply(parse_sheet_date) if m_link_date_col else pd.Series(pd.NaT, index=manage.index)
+    cancel_dates = manage[m_cancel_col].apply(parse_sheet_date) if m_cancel_col else pd.Series(pd.NaT, index=manage.index)
+
+    manage_norm = pd.DataFrame({
+        "_match_key": manage_key,
+        "고객번호": manage[m_customer_col].apply(normalize_billing_customer_no) if m_customer_col else "",
+        "사업자번호": manage[m_biz_col].apply(normalize_biz_no) if m_biz_col else "",
+        "고객사명": manage[m_company_col].fillna("").astype(str).str.strip() if m_company_col else "",
+        "담당자": manage[m_owner_col].fillna("").astype(str).str.strip() if m_owner_col else "",
+        "관리구분": manage[m_manage_col].fillna("").astype(str).str.strip() if m_manage_col else "",
+        "개설상태": manage[m_open_status_col].fillna("").astype(str).str.strip() if m_open_status_col else "",
+        "개설/이행일": open_dates.dt.strftime("%Y-%m-%d").fillna(""),
+        "연계상태": manage[m_link_status_col].fillna("").astype(str).str.strip() if m_link_status_col else "",
+        "연계일자": link_dates.dt.strftime("%Y-%m-%d").fillna(""),
+        "해지일자": cancel_dates.dt.strftime("%Y-%m-%d").fillna(""),
+        "_open_dt": open_dates,
+        "_link_dt": link_dates,
+        "_cancel_dt": cancel_dates,
+    })
+    manage_norm = manage_norm[manage_norm["_match_key"].astype(str) != ""]
+    manage_norm = manage_norm.drop_duplicates("_match_key", keep="first")
+
+    merged = manage_norm.merge(bank_norm, on="_match_key", how="left")
+    last_login = pd.to_datetime(merged.get("은행최종로그인일자", ""), errors="coerce")
+    login_count = pd.to_numeric(merged.get("은행로그인건수", 0), errors="coerce").fillna(0)
+    menu_count = pd.to_numeric(merged.get("은행메뉴사용", 0), errors="coerce").fillna(0)
+
+    valid_manage = ~merged["관리구분"].astype(str).str.contains("해지|취소", na=False)
+    valid_manage &= merged["_cancel_dt"].isna()
+    this_year_build = merged["_open_dt"].between(year_start, year_end, inclusive="both")
+    this_year_link = merged["_link_dt"].between(year_start, year_end, inclusive="both")
+    recent_login = last_login.between(recent_start, end_month, inclusive="both")
+
+    merged["_is_this_year_build"] = this_year_build
+    merged["_is_this_year_link"] = this_year_link
+    merged["_is_billable"] = recent_login
+    merged["_has_recent_menu"] = menu_count.gt(0)
+    merged["_login_stopped"] = (this_year_build | this_year_link) & ~recent_login
+    merged["_priority_score"] = (
+        merged["_login_stopped"].astype(int) * 100
+        + merged["_is_billable"].astype(int) * 20
+        + menu_count.clip(upper=50)
+        + login_count.clip(upper=30)
+    )
+
+    if contact_only:
+        target_mask = valid_manage & (merged["_login_stopped"] | (merged["_is_billable"] & merged["_has_recent_menu"]))
+    else:
+        target_mask = valid_manage
+    result = merged[target_mask].copy()
+    if result.empty:
+        return pd.DataFrame(), None
+
+    result["구분"] = np.where(result["_login_stopped"], "로그인 끊김 점검", "청구 가능 운영관리")
+    result["선정사유"] = result.apply(_operation_contact_reason, axis=1)
+    result["최근3개월기준"] = f"{recent_start.strftime('%Y-%m-%d')} ~ {end_month.strftime('%Y-%m-%d')}"
+    result["활동권장"] = np.where(
+        result["_login_stopped"],
+        "올해 구축/연계 후 로그인 공백 확인 및 사용 재유도",
+        "최근 사용 고객 청구 유지 및 추가 사용 메뉴 점검",
+    )
+    for col in ["은행로그인건수", "은행메뉴사용"]:
+        if col in result.columns:
+            result[col] = pd.to_numeric(result[col], errors="coerce").fillna(0).astype(int)
+    display_cols = [
+        "구분", "담당자", "고객사명", "고객번호", "사업자번호", "관리구분",
+        "개설상태", "개설/이행일", "연계상태", "연계일자",
+        "은행최종로그인일자", "은행최종이체일자", "은행로그인건수", "은행메뉴사용",
+        "청구구분", "최근3개월기준", "선정사유", "활동권장",
+    ]
+    result = result.sort_values(["_priority_score", "담당자", "고객사명"], ascending=[False, True, True])
+    return result[[col for col in display_cols if col in result.columns]].reset_index(drop=True), None
+
+
+def show_operation_activity_targets():
+    st.markdown("### 운영관리 활동고객 선정")
+    st.caption("HANA사업부 고객관리 엑셀과 은행 통합CMS 고객명단을 비교해 청구 가능 고객과 로그인 공백 점검 고객을 추립니다.")
+
+    default_manage_path = r"C:\Users\이성환\Downloads\25년_HANA사업부_고객관리 (1).xlsx"
+    default_bank_path = r"C:\Users\이성환\Downloads\00.(명단)통합CMS고객명단_202606.xlsx"
+    default_files_available = os.path.exists(default_manage_path) and os.path.exists(default_bank_path)
+
+    use_default = st.checkbox(
+        "로컬 Downloads의 기본 엑셀 파일 사용",
+        value=default_files_available,
+        disabled=not default_files_available,
+        key="operation_targets_use_default_files",
+    )
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        manage_upload = st.file_uploader("HANA사업부 고객관리 엑셀", type=["xlsx", "xls"], key="operation_manage_upload")
+    with col_b:
+        bank_upload = st.file_uploader("은행 통합CMS 고객명단 엑셀", type=["xlsx", "xls"], key="operation_bank_upload")
+
+    if use_default:
+        manage_source = default_manage_path
+        bank_source = default_bank_path
+    else:
+        manage_source = manage_upload
+        bank_source = bank_upload
+
+    if not manage_source or not bank_source:
+        st.info("두 엑셀 파일을 업로드하면 활동고객사를 선정합니다.")
+        return
+
+    try:
+        manage_df = read_excel_sheet_with_header_scan(manage_source, "고객원장", required_keys=["고객번호", "사업자번호", "고객명"])
+        bank_df = pd.read_excel(bank_source, sheet_name="명단")
+    except Exception as exc:
+        st.error(f"엑셀을 읽는 중 오류가 발생했습니다: {exc}")
+        return
+
+    bank_file_name = os.path.basename(default_bank_path) if use_default else getattr(bank_upload, "name", "")
+    inferred_month = (
+        _infer_month_from_bank_df(bank_df)
+        or _infer_month_from_name(bank_file_name)
+        or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m")
+    )
+    if "operation_reference_month" not in st.session_state:
+        st.session_state["operation_reference_month"] = inferred_month
+    reference_month = st.text_input("기준월", key="operation_reference_month", help="예: 2026-07")
+    contact_only = st.checkbox("활동 대상만 보기", value=True, key="operation_contact_only")
+
+    targets, error = build_operation_activity_targets(manage_df, bank_df, reference_month, contact_only=contact_only)
+    if error:
+        st.error(error)
+        return
+    if targets.empty:
+        st.info("조건에 맞는 활동고객사가 없습니다.")
+        return
+
+    stopped_count = int(targets["구분"].astype(str).eq("로그인 끊김 점검").sum()) if "구분" in targets.columns else 0
+    billable_count = int(targets["구분"].astype(str).eq("청구 가능 운영관리").sum()) if "구분" in targets.columns else 0
+    c1, c2, c3 = st.columns(3)
+    c1.metric("활동 대상", f"{len(targets):,}개")
+    c2.metric("청구 가능", f"{billable_count:,}개")
+    c3.metric("로그인 공백 점검", f"{stopped_count:,}개")
+
+    owner_options = ["전체"] + sorted(v for v in targets.get("담당자", pd.Series(dtype=str)).astype(str).str.strip().unique() if v)
+    type_options = ["전체"] + sorted(v for v in targets.get("구분", pd.Series(dtype=str)).astype(str).str.strip().unique() if v)
+    f1, f2, f3 = st.columns([0.25, 0.25, 0.5])
+    selected_owner = f1.selectbox("담당자", owner_options, key="operation_target_owner")
+    selected_type = f2.selectbox("구분", type_options, key="operation_target_type")
+    keyword = f3.text_input("고객사 검색", key="operation_target_keyword")
+
+    view = targets.copy()
+    if selected_owner != "전체" and "담당자" in view.columns:
+        view = view[view["담당자"].astype(str).str.strip() == selected_owner]
+    if selected_type != "전체" and "구분" in view.columns:
+        view = view[view["구분"].astype(str).str.strip() == selected_type]
+    if keyword.strip() and "고객사명" in view.columns:
+        view = view[view["고객사명"].astype(str).str.contains(keyword.strip(), case=False, na=False)]
+
+    st.dataframe(view, use_container_width=True, hide_index=True)
+    st.download_button(
+        "활동고객사 엑셀 다운로드",
+        data=dataframe_to_excel_bytes({"활동고객사": view}),
+        file_name=f"운영관리_활동고객사_{reference_month.replace('-', '')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
+
+
 def show_billing_generation():
     st.markdown("### 청구자료 생성")
     st.caption("청구 원본과 은행 로그인 실적파일을 대사해 청구자료 생성 전 확인 목록을 만듭니다.")
@@ -16287,6 +16600,7 @@ def show_main():
         "대시보드",
         "업로드 및 실적 확인",
         "이번달 활동 대상고객 추천",
+        OPERATION_TARGET_MENU,
         "주간보고 이력 작성",
         "방문이력 작성",
         "관리자용 실적 확인",
@@ -16304,7 +16618,7 @@ def show_main():
         st.session_state.current_menu = "업로드 및 실적 확인"
         persist_current_menu()
         st.rerun()
-    user_menus = {"업로드 및 실적 확인", "이번달 활동 대상고객 추천", "주간보고 이력 작성", "방문이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU, BILLING_MENU}
+    user_menus = {"업로드 및 실적 확인", "이번달 활동 대상고객 추천", OPERATION_TARGET_MENU, "주간보고 이력 작성", "방문이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU, BILLING_MENU}
     if menu not in user_menus and st.session_state.user_role != "관리자":
         st.session_state.current_menu = "업로드 및 실적 확인"
         persist_current_menu()
@@ -16318,6 +16632,8 @@ def show_main():
         show_user_history()
     elif menu == "이번달 활동 대상고객 추천":
         show_target_customers()
+    elif menu == OPERATION_TARGET_MENU:
+        show_operation_activity_targets()
     elif menu == "주간보고 이력 작성":
         show_weekly_report_user()
     elif menu == "방문이력 작성":
