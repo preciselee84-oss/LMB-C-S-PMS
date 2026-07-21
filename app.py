@@ -16294,6 +16294,7 @@ def build_operation_activity_targets(
     billable_only=True,
     max_targets=None,
     sort_mode="recent_build",
+    exclude_current_open_month=True,
 ):
     if manage_df is None or manage_df.empty:
         return pd.DataFrame(), "관리 엑셀의 고객원장 데이터를 찾을 수 없습니다."
@@ -16396,6 +16397,8 @@ def build_operation_activity_targets(
 
     valid_manage = ~merged["관리구분"].astype(str).str.contains("해지|취소", na=False)
     valid_manage &= merged["_cancel_dt"].isna()
+    if exclude_current_open_month:
+        valid_manage &= merged["_open_dt"].dt.strftime("%Y-%m").fillna("") != reference_month
     this_year_build = merged["_open_dt"].between(year_start, year_end, inclusive="both")
     this_year_link = merged["_link_dt"].between(year_start, year_end, inclusive="both")
     recent_login = last_login.between(recent_start, end_month, inclusive="both")
@@ -16520,6 +16523,12 @@ def show_operation_activity_targets():
         disabled=billable_only,
         key="operation_include_stopped",
     )
+    exclude_current_open_month = st.checkbox(
+        "당월 개설/이행 고객 제외",
+        value=True,
+        key="operation_exclude_current_open_month",
+        help="기준월과 개설/이행일의 월이 같은 고객은 활동 리스트에서 제외합니다.",
+    )
     sort_mode = {
         "최근 구축/연계순": "recent_build",
         "최근 로그인순": "recent_login",
@@ -16534,6 +16543,7 @@ def show_operation_activity_targets():
         billable_only=billable_only,
         max_targets=max_targets,
         sort_mode=sort_mode,
+        exclude_current_open_month=exclude_current_open_month,
     )
     if error:
         st.error(error)
