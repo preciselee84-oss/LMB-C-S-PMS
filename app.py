@@ -16286,7 +16286,15 @@ def _operation_contact_reason(row):
     return " / ".join(reasons)
 
 
-def build_operation_activity_targets(manage_df, bank_df, reference_month, contact_only=True):
+def build_operation_activity_targets(
+    manage_df,
+    bank_df,
+    reference_month,
+    contact_only=True,
+    billable_only=True,
+    max_targets=None,
+    sort_mode="recent_build",
+):
     if manage_df is None or manage_df.empty:
         return pd.DataFrame(), "관리 엑셀의 고객원장 데이터를 찾을 수 없습니다."
     if bank_df is None or bank_df.empty:
@@ -16397,6 +16405,8 @@ def build_operation_activity_targets(manage_df, bank_df, reference_month, contac
     merged["_is_billable"] = recent_login
     merged["_has_recent_menu"] = menu_count.gt(0)
     merged["_login_stopped"] = (this_year_build | this_year_link) & ~recent_login
+    merged["_recent_build_dt"] = pd.concat([merged["_open_dt"], merged["_link_dt"]], axis=1).max(axis=1)
+    merged["_recent_build_rank_dt"] = merged["_recent_build_dt"].fillna(pd.Timestamp.min)
     merged["_priority_score"] = (
         merged["_login_stopped"].astype(int) * 100
         + merged["_is_billable"].astype(int) * 20
@@ -16404,10 +16414,12 @@ def build_operation_activity_targets(manage_df, bank_df, reference_month, contac
         + login_count.clip(upper=30)
     )
 
-    if contact_only:
+    if billable_only:
+        target_mask = valid_manage & merged["_is_billable"] & merged["_has_recent_menu"]
+    elif contact_only:
         target_mask = valid_manage & (merged["_login_stopped"] | (merged["_is_billable"] & merged["_has_recent_menu"]))
     else:
-        target_mask = valid_manage
+        target_mask = valid_manage & merged["_is_billable"] & merged["_has_recent_menu"]
     result = merged[target_mask].copy()
     if result.empty:
         return pd.DataFrame(), None
@@ -16415,6 +16427,7 @@ def build_operation_activity_targets(manage_df, bank_df, reference_month, contac
     result["구분"] = np.where(result["_login_stopped"], "로그인 끊김 점검", "청구 가능 운영관리")
     result["선정사유"] = result.apply(_operation_contact_reason, axis=1)
     result["최근3개월기준"] = f"{recent_start.strftime('%Y-%m-%d')} ~ {end_month.strftime('%Y-%m-%d')}"
+    result["최근구축/연계일"] = result["_recent_build_dt"].dt.strftime("%Y-%m-%d").fillna("")
     result["활동권장"] = np.where(
         result["_login_stopped"],
         "올해 구축/연계 후 로그인 공백 확인 및 사용 재유도",
@@ -16425,11 +16438,18 @@ def build_operation_activity_targets(manage_df, bank_df, reference_month, contac
             result[col] = pd.to_numeric(result[col], errors="coerce").fillna(0).astype(int)
     display_cols = [
         "구분", "담당자", "고객사명", "고객번호", "사업자번호", "관리구분",
-        "개설상태", "개설/이행일", "연계상태", "연계일자",
+        "개설상태", "개설/이행일", "연계상태", "연계일자", "최근구축/연계일",
         "은행최종로그인일자", "은행최종이체일자", "은행로그인건수", "은행메뉴사용",
         "청구구분", "최근3개월기준", "선정사유", "활동권장",
     ]
-    result = result.sort_values(["_priority_score", "담당자", "고객사명"], ascending=[False, True, True])
+    if sort_mode == "recent_login":
+        result = result.sort_values(["_last_login_dt", "_recent_build_rank_dt", "담당자", "고객사명"], ascending=[False, False, True, True])
+    elif sort_mode == "usage":
+        result = result.sort_values(["은행메뉴사용", "은행로그인건수", "_recent_build_rank_dt", "담당자", "고객사명"], ascending=[False, False, False, True, True])
+    else:
+        result = result.sort_values(["_recent_build_rank_dt", "_last_login_dt", "담당자", "고객사명"], ascending=[False, False, True, True])
+    if max_targets:
+        result = result.head(int(max_targets))
     return result[[col for col in display_cols if col in result.columns]].reset_index(drop=True), None
 
 
@@ -16480,10 +16500,41 @@ def show_operation_activity_targets():
     )
     if "operation_reference_month" not in st.session_state:
         st.session_state["operation_reference_month"] = inferred_month
-    reference_month = st.text_input("기준월", key="operation_reference_month", help="예: 2026-07")
-    contact_only = st.checkbox("활동 대상만 보기", value=True, key="operation_contact_only")
+    ctrl_a, ctrl_b, ctrl_c, ctrl_d = st.columns([0.18, 0.18, 0.24, 0.4])
+    reference_month = ctrl_a.text_input("기준월", key="operation_reference_month", help="예: 2026-07")
+    max_targets = ctrl_b.number_input("활동 고객수", min_value=1, max_value=500, value=50, step=10, key="operation_target_limit")
+    sort_label = ctrl_c.selectbox(
+        "우선순위",
+        ["최근 구축/연계순", "최근 로그인순", "사용량순"],
+        key="operation_target_sort",
+    )
+    billable_only = ctrl_d.checkbox(
+        "비용 청구 가능 고객만",
+        value=True,
+        key="operation_billable_only",
+        help="직전 3개월 최종로그인 이력이 있는 고객만 선정합니다.",
+    )
+    include_stopped = st.checkbox(
+        "올해 구축/연계 후 로그인 끊긴 고객도 별도 점검 대상으로 포함",
+        value=False,
+        disabled=billable_only,
+        key="operation_include_stopped",
+    )
+    sort_mode = {
+        "최근 구축/연계순": "recent_build",
+        "최근 로그인순": "recent_login",
+        "사용량순": "usage",
+    }.get(sort_label, "recent_build")
 
-    targets, error = build_operation_activity_targets(manage_df, bank_df, reference_month, contact_only=contact_only)
+    targets, error = build_operation_activity_targets(
+        manage_df,
+        bank_df,
+        reference_month,
+        contact_only=include_stopped,
+        billable_only=billable_only,
+        max_targets=max_targets,
+        sort_mode=sort_mode,
+    )
     if error:
         st.error(error)
         return
@@ -16494,7 +16545,7 @@ def show_operation_activity_targets():
     stopped_count = int(targets["구분"].astype(str).eq("로그인 끊김 점검").sum()) if "구분" in targets.columns else 0
     billable_count = int(targets["구분"].astype(str).eq("청구 가능 운영관리").sum()) if "구분" in targets.columns else 0
     c1, c2, c3 = st.columns(3)
-    c1.metric("활동 대상", f"{len(targets):,}개")
+    c1.metric("선정 활동고객", f"{len(targets):,}개")
     c2.metric("청구 가능", f"{billable_count:,}개")
     c3.metric("로그인 공백 점검", f"{stopped_count:,}개")
 
