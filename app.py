@@ -82,6 +82,7 @@ GITHUB_DATA_DIR = "data"
 SESSION_UID_COOKIE = "auto_login_uid"
 LAST_MENU_COOKIE = "last_menu"
 BILLING_MENU = "청구자료 생성"
+INTEGRATION_CONFIRM_MENU = "연계확인서 출력"
 ACTIVITY_TEMPLATE_CONVERT_MENU = "활동이력 템플릿 변환"
 OPERATION_TARGET_MENU = "운영관리 활동고객 선정"
 
@@ -98,6 +99,7 @@ CRM_MENU_LABELS = {
     "운영계획": "운영 플랜",
     BILLING_MENU: "청구자료 생성",
     "청구자료 작성": "청구자료 작성",
+    INTEGRATION_CONFIRM_MENU: "연계확인서 출력",
     "직원 및 권한설정": "사용자/권한",
     "구글 스트레드시트 연동": "데이터 연동",
     ACTIVITY_TEMPLATE_CONVERT_MENU: "이력 템플릿 변환",
@@ -3356,7 +3358,7 @@ def show_sidebar():
                 render_nav_button(menu_name)
 
             st.markdown("<div class='gpt-section'>Billing</div>", unsafe_allow_html=True)
-            for menu_name in [BILLING_MENU, "청구자료 작성"]:
+            for menu_name in [BILLING_MENU, "청구자료 작성", INTEGRATION_CONFIRM_MENU]:
                 render_nav_button(menu_name)
 
             st.markdown("<div class='gpt-section'>Admin</div>", unsafe_allow_html=True)
@@ -3370,6 +3372,7 @@ def show_sidebar():
         if st.session_state.user_role != "관리자":
             st.markdown("<div class='gpt-section'>Billing</div>", unsafe_allow_html=True)
             render_nav_button(BILLING_MENU)
+            render_nav_button(INTEGRATION_CONFIRM_MENU)
 
         st.markdown("<div class='gpt-sidebar-divider'></div><div class='gpt-logout-marker'></div>", unsafe_allow_html=True)
         if st.button("로그아웃", use_container_width=True, key="nav_logout"):
@@ -14568,6 +14571,200 @@ def _render_no_login_section(df, year_key, owner_key, label, download_prefix,
     )
 
 
+INTEGRATION_CMS_MANAGER_OPTIONS = [
+    "선택",
+]
+
+INTEGRATION_WORK_OPTIONS = [
+    "선택",
+    "계좌조회",
+    "거래내역",
+    "이체",
+    "대량이체",
+    "법인카드",
+    "세금계산서",
+    "기타",
+]
+
+
+def build_integration_confirmation_doc_bytes(form_data):
+    def v(key):
+        return html.escape(str(form_data.get(key, "") or "")).replace("\n", "<br>")
+
+    today = form_data.get("confirm_date")
+    if hasattr(today, "strftime"):
+        confirm_year = today.strftime("%Y")
+        confirm_month = today.strftime("%m")
+        confirm_day = today.strftime("%d")
+    else:
+        confirm_year = confirm_month = confirm_day = ""
+
+    rows_work = []
+    for item in form_data.get("work_items", []):
+        rows_work.append(
+            "<tr>"
+            f"<td>{html.escape(item.get('work_type', ''))}</td>"
+            f"<td>{'■' if item.get('link_work') else '□'}</td>"
+            f"<td>{'■' if item.get('data_migration') else '□'}</td>"
+            f"<td>{'■' if item.get('test') else '□'}</td>"
+            "</tr>"
+        )
+    if not rows_work:
+        rows_work.append("<tr><td>&nbsp;</td><td>□</td><td>□</td><td>□</td></tr>")
+
+    doc_html = f"""<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body {{ font-family: Malgun Gothic, Arial, sans-serif; font-size: 11pt; color: #111; }}
+h1 {{ text-align: center; font-size: 20pt; margin: 0 0 24px; }}
+table {{ width: 100%; border-collapse: collapse; margin-bottom: 14px; }}
+th, td {{ border: 1px solid #333; padding: 8px; vertical-align: middle; }}
+th {{ background: #f2f2f2; text-align: center; font-weight: 700; }}
+.section {{ background: #e9edf5; font-weight: 700; text-align: left; }}
+.center {{ text-align: center; }}
+.confirm {{ margin-top: 28px; text-align: center; line-height: 2; }}
+</style>
+</head>
+<body>
+<h1>통합CMS ERP연계작업결과서</h1>
+<table>
+<tr><th colspan="6" class="section">고객정보</th></tr>
+<tr><th>고객명</th><td colspan="2">{v('customer_name')}</td><th>사업자번호</th><td colspan="2">{v('business_no')}</td></tr>
+<tr><th>소재지</th><td colspan="5">{v('address')}</td></tr>
+<tr><th rowspan="3">담당자</th><th>고객사</th><td colspan="4">{v('customer_manager')}</td></tr>
+<tr><th>개발사</th><td colspan="4">{v('developer')}</td></tr>
+<tr><th>통합CMS</th><td colspan="4">{v('cms_manager')}</td></tr>
+</table>
+<table>
+<tr><th colspan="6" class="section">연계정보</th></tr>
+<tr><th>ERP종류</th><td>{v('erp_type')}</td><th>ERP DB종류</th><td>{v('erp_db_type')}</td><th>서버 위치</th><td>{v('server_location')}</td></tr>
+<tr><th>서버 IP</th><td>{v('server_ip')}</td><th>연계방식</th><td>{v('link_method')}</td><th>연계일자</th><td>{v('link_date')}</td></tr>
+<tr><th>비고</th><td colspan="5">{v('memo')}</td></tr>
+</table>
+<table>
+<tr><th colspan="4" class="section">연계업무</th></tr>
+<tr><th>업무 구분</th><th>연계 작업</th><th>데이터 이관</th><th>테스트</th></tr>
+{''.join(rows_work)}
+</table>
+<div class="confirm">
+상기 업무의 ERP연계 작업을 확인합니다.<br>
+{confirm_year}년&nbsp;&nbsp;{confirm_month}월&nbsp;&nbsp;{confirm_day}일<br>
+확 인 자 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (인)
+</div>
+</body>
+</html>"""
+    return doc_html.encode("utf-8-sig")
+
+
+def show_integration_confirmation():
+    st.markdown("### 연계확인서 출력")
+    today_kst = (datetime.utcnow() + timedelta(hours=9)).date()
+
+    with st.form("integration_confirmation_form"):
+        st.markdown("#### 고객정보")
+        c1, c2 = st.columns(2)
+        customer_name = c1.text_input("고객명")
+        business_no = c2.text_input("사업자번호")
+        address = st.text_input("소재지")
+
+        m1, m2, m3 = st.columns(3)
+        customer_manager = m1.text_input("담당자 - 고객사")
+        developer = m2.text_input("담당자 - 개발사")
+        cms_manager = m3.selectbox("담당자 - 통합CMS", INTEGRATION_CMS_MANAGER_OPTIONS)
+
+        st.markdown("#### 연계정보")
+        i1, i2, i3 = st.columns(3)
+        erp_type = i1.text_input("ERP종류")
+        erp_db_type = i2.text_input("ERP DB종류")
+        server_location = i3.text_input("서버 위치")
+        i4, i5, i6 = st.columns(3)
+        server_ip = i4.text_input("서버 IP")
+        link_method = i5.text_input("연계방식")
+        link_date = i6.date_input("연계일자", value=today_kst)
+        memo = st.text_area("비고", height=90)
+
+        st.markdown("#### 연계업무")
+        work_items = []
+        for idx in range(1, 4):
+            w1, w2, w3, w4 = st.columns([2, 1, 1, 1])
+            work_type = w1.selectbox("업무 구분", INTEGRATION_WORK_OPTIONS, key=f"integration_work_type_{idx}")
+            link_work = w2.checkbox("연계 작업", key=f"integration_link_work_{idx}")
+            data_migration = w3.checkbox("데이터 이관", key=f"integration_data_migration_{idx}")
+            test = w4.checkbox("테스트", key=f"integration_test_{idx}")
+            if work_type != "선택" or link_work or data_migration or test:
+                work_items.append(
+                    {
+                        "work_type": "" if work_type == "선택" else work_type,
+                        "link_work": link_work,
+                        "data_migration": data_migration,
+                        "test": test,
+                    }
+                )
+
+        submitted = st.form_submit_button("작성 내용 확인", type="primary", use_container_width=True)
+
+    if not submitted:
+        st.info("필수 정보를 입력한 뒤 작성 내용 확인을 누르면 출력 파일을 내려받을 수 있습니다.")
+        return
+
+    form_data = {
+        "customer_name": customer_name,
+        "business_no": business_no,
+        "address": address,
+        "customer_manager": customer_manager,
+        "developer": developer,
+        "cms_manager": "" if cms_manager == "선택" else cms_manager,
+        "erp_type": erp_type,
+        "erp_db_type": erp_db_type,
+        "server_location": server_location,
+        "server_ip": server_ip,
+        "link_method": link_method,
+        "link_date": link_date.strftime("%Y-%m-%d") if hasattr(link_date, "strftime") else str(link_date),
+        "memo": memo,
+        "work_items": work_items,
+        "confirm_date": today_kst,
+    }
+
+    missing = [label for label, value in [("고객명", customer_name), ("개발사", developer)] if not str(value or "").strip()]
+    if missing:
+        st.warning(f"필수 입력값을 확인해주세요: {', '.join(missing)}")
+
+    preview = pd.DataFrame(
+        [
+            {"항목": "고객명", "내용": customer_name},
+            {"항목": "사업자번호", "내용": business_no},
+            {"항목": "소재지", "내용": address},
+            {"항목": "고객사 담당자", "내용": customer_manager},
+            {"항목": "개발사 담당자", "내용": developer},
+            {"항목": "통합CMS 담당자", "내용": form_data["cms_manager"]},
+            {"항목": "ERP종류", "내용": erp_type},
+            {"항목": "ERP DB종류", "내용": erp_db_type},
+            {"항목": "서버 위치", "내용": server_location},
+            {"항목": "서버 IP", "내용": server_ip},
+            {"항목": "연계방식", "내용": link_method},
+            {"항목": "연계일자", "내용": form_data["link_date"]},
+            {"항목": "비고", "내용": memo},
+        ]
+    )
+    st.markdown("#### 출력 미리보기")
+    st.dataframe(preview, use_container_width=True, hide_index=True)
+    if work_items:
+        st.dataframe(pd.DataFrame(work_items), use_container_width=True, hide_index=True)
+    else:
+        st.caption("연계업무 선택 내역이 없습니다.")
+
+    safe_customer = re.sub(r"[^0-9A-Za-z가-힣_-]+", "_", customer_name.strip() or "고객")
+    st.download_button(
+        "연계확인서 다운로드",
+        data=build_integration_confirmation_doc_bytes(form_data),
+        file_name=f"통합CMS_ERP연계작업결과서_{safe_customer}.doc",
+        mime="application/msword",
+        use_container_width=True,
+    )
+
+
 def show_billing_materials():
     title_col, refresh_col = st.columns([5, 1])
     with title_col:
@@ -16848,6 +17045,7 @@ def show_main():
         "실적 보고서",
         BILLING_MENU,
         "청구자료 작성",
+        INTEGRATION_CONFIRM_MENU,
         "주간보고 취합",
         "운영계획",
         "직원 및 권한설정",
@@ -16858,7 +17056,7 @@ def show_main():
         st.session_state.current_menu = "업로드 및 실적 확인"
         persist_current_menu()
         st.rerun()
-    user_menus = {"업로드 및 실적 확인", "이번달 활동 대상고객 추천", OPERATION_TARGET_MENU, "주간보고 이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU, BILLING_MENU}
+    user_menus = {"업로드 및 실적 확인", "이번달 활동 대상고객 추천", OPERATION_TARGET_MENU, "주간보고 이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU, BILLING_MENU, INTEGRATION_CONFIRM_MENU}
     if menu not in user_menus and st.session_state.user_role != "관리자":
         st.session_state.current_menu = "업로드 및 실적 확인"
         persist_current_menu()
@@ -16886,6 +17084,8 @@ def show_main():
         show_billing_generation()
     elif menu == "청구자료 작성":
         show_billing_materials()
+    elif menu == INTEGRATION_CONFIRM_MENU:
+        show_integration_confirmation()
     elif menu == "주간보고 취합":
         show_weekly_report_admin()
     elif menu == "운영계획":
