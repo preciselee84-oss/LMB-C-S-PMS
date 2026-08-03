@@ -14418,6 +14418,9 @@ def build_integration_confirmation_doc_bytes(form_data):
     def v(key):
         return html.escape(str(form_data.get(key, "") or "")).replace("\n", "<br>")
 
+    def mark(value):
+        return "■" if value else "□"
+
     today = form_data.get("confirm_date")
     if hasattr(today, "strftime"):
         confirm_year = today.strftime("%Y")
@@ -14426,59 +14429,187 @@ def build_integration_confirmation_doc_bytes(form_data):
     else:
         confirm_year = confirm_month = confirm_day = ""
 
+    work_items = list(form_data.get("work_items", []))
+    while len(work_items) < 8:
+        work_items.append({})
+
     rows_work = []
-    for item in form_data.get("work_items", []):
+    for item in work_items[:8]:
         rows_work.append(
             "<tr>"
-            f"<td>{html.escape(item.get('work_type', ''))}</td>"
-            f"<td>{'■' if item.get('link_work') else '□'}</td>"
-            f"<td>{'■' if item.get('data_migration') else '□'}</td>"
-            f"<td>{'■' if item.get('test') else '□'}</td>"
+            f"<td class=\"value left\">{html.escape(str(item.get('work_type', '') or ''))}</td>"
+            f"<td class=\"value center mark\">{mark(item.get('link_work'))}</td>"
+            f"<td class=\"value center mark\">{mark(item.get('data_migration'))}</td>"
+            f"<td class=\"value center mark\">{mark(item.get('test'))}</td>"
             "</tr>"
         )
-    if not rows_work:
-        rows_work.append("<tr><td>&nbsp;</td><td>□</td><td>□</td><td>□</td></tr>")
 
     doc_html = f"""<!doctype html>
 <html>
 <head>
-<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <style>
-body {{ font-family: Malgun Gothic, Arial, sans-serif; font-size: 11pt; color: #111; }}
-h1 {{ text-align: center; font-size: 20pt; margin: 0 0 24px; }}
-table {{ width: 100%; border-collapse: collapse; margin-bottom: 14px; }}
-th, td {{ border: 1px solid #333; padding: 8px; vertical-align: middle; }}
-th {{ background: #f2f2f2; text-align: center; font-weight: 700; }}
-.section {{ background: #e9edf5; font-weight: 700; text-align: left; }}
+@page Section1 {{
+    size: 21cm 29.7cm;
+    margin: 1.8cm 1.7cm 1.7cm 1.7cm;
+}}
+div.Section1 {{ page: Section1; }}
+body {{
+    margin: 0;
+    font-family: "Malgun Gothic", "맑은 고딕", Gulim, sans-serif;
+    font-size: 10pt;
+    color: #000;
+}}
+.doc {{
+    width: 17.6cm;
+    margin: 0 auto;
+}}
+.title {{
+    text-align: center;
+    font-size: 22pt;
+    font-weight: 700;
+    letter-spacing: 0;
+    margin: 4px 0 22px 0;
+}}
+table {{
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin: 0 0 12px 0;
+}}
+th, td {{
+    border: 1.2pt solid #000;
+    padding: 4px 6px;
+    height: 26px;
+    vertical-align: middle;
+    word-break: keep-all;
+}}
+.section {{
+    height: 28px;
+    text-align: center;
+    font-weight: 700;
+    background: #fff;
+}}
+.label {{
+    text-align: center;
+    font-weight: 700;
+    background: #f7f7f7;
+}}
+.value {{
+    text-align: left;
+    font-weight: 400;
+}}
+.left {{ text-align: left; }}
 .center {{ text-align: center; }}
-.confirm {{ margin-top: 28px; text-align: center; line-height: 2; }}
+.mark {{ font-family: "Malgun Gothic", "맑은 고딕", sans-serif; font-size: 12pt; }}
+.memo {{ height: 42px; }}
+.confirm {{
+    margin-top: 34px;
+    text-align: center;
+    line-height: 2.1;
+    font-size: 11pt;
+}}
+.sign-line {{
+    display: inline-block;
+    width: 190px;
+}}
 </style>
 </head>
 <body>
-<h1>통합CMS ERP연계작업결과서</h1>
+<div class="Section1">
+<div class="doc">
+<div class="title">통합CMS ERP연계작업결과서</div>
+
 <table>
+<colgroup>
+    <col style="width: 15%">
+    <col style="width: 17%">
+    <col style="width: 18%">
+    <col style="width: 15%">
+    <col style="width: 17%">
+    <col style="width: 18%">
+</colgroup>
 <tr><th colspan="6" class="section">고객정보</th></tr>
-<tr><th>고객명</th><td colspan="2">{v('customer_name')}</td><th>사업자번호</th><td colspan="2">{v('business_no')}</td></tr>
-<tr><th>소재지</th><td colspan="5">{v('address')}</td></tr>
-<tr><th rowspan="3">담당자</th><th>고객사</th><td colspan="4">{v('customer_manager')}</td></tr>
-<tr><th>개발사</th><td colspan="4">{v('developer')}</td></tr>
-<tr><th>통합CMS</th><td colspan="4">{v('cms_manager')}</td></tr>
+<tr>
+    <th class="label">고객명</th>
+    <td colspan="2" class="value">{v('customer_name')}</td>
+    <th class="label">사업자번호</th>
+    <td colspan="2" class="value">{v('business_no')}</td>
+</tr>
+<tr>
+    <th class="label">소재지</th>
+    <td colspan="5" class="value">{v('address')}</td>
+</tr>
+<tr>
+    <th rowspan="3" class="label">담당자</th>
+    <th class="label">고객사</th>
+    <td colspan="4" class="value">{v('customer_manager')}</td>
+</tr>
+<tr>
+    <th class="label">개발사</th>
+    <td colspan="4" class="value">{v('developer')}</td>
+</tr>
+<tr>
+    <th class="label">통합CMS</th>
+    <td colspan="4" class="value">{v('cms_manager')}</td>
+</tr>
 </table>
+
 <table>
+<colgroup>
+    <col style="width: 15%">
+    <col style="width: 17%">
+    <col style="width: 18%">
+    <col style="width: 15%">
+    <col style="width: 17%">
+    <col style="width: 18%">
+</colgroup>
 <tr><th colspan="6" class="section">연계정보</th></tr>
-<tr><th>ERP종류</th><td>{v('erp_type')}</td><th>ERP DB종류</th><td>{v('erp_db_type')}</td><th>서버 위치</th><td>{v('server_location')}</td></tr>
-<tr><th>서버 IP</th><td>{v('server_ip')}</td><th>연계방식</th><td>{v('link_method')}</td><th>연계일자</th><td>{v('link_date')}</td></tr>
-<tr><th>비고</th><td colspan="5">{v('memo')}</td></tr>
+<tr>
+    <th class="label">ERP종류</th>
+    <td class="value">{v('erp_type')}</td>
+    <th class="label">ERP DB종류</th>
+    <td class="value">{v('erp_db_type')}</td>
+    <th class="label">서버 위치</th>
+    <td class="value">{v('server_location')}</td>
+</tr>
+<tr>
+    <th class="label">서버 IP</th>
+    <td class="value">{v('server_ip')}</td>
+    <th class="label">연계방식</th>
+    <td class="value">{v('link_method')}</td>
+    <th class="label">연계일자</th>
+    <td class="value center">{v('link_date')}</td>
+</tr>
+<tr>
+    <th class="label memo">비고</th>
+    <td colspan="5" class="value memo">{v('memo')}</td>
+</tr>
 </table>
+
 <table>
+<colgroup>
+    <col style="width: 46%">
+    <col style="width: 18%">
+    <col style="width: 18%">
+    <col style="width: 18%">
+</colgroup>
 <tr><th colspan="4" class="section">연계업무</th></tr>
-<tr><th>업무 구분</th><th>연계 작업</th><th>데이터 이관</th><th>테스트</th></tr>
+<tr>
+    <th class="label">업무 구분</th>
+    <th class="label">연계 작업</th>
+    <th class="label">데이터 이관</th>
+    <th class="label">테스트</th>
+</tr>
 {''.join(rows_work)}
 </table>
+
 <div class="confirm">
 상기 업무의 ERP연계 작업을 확인합니다.<br>
 {confirm_year}년&nbsp;&nbsp;{confirm_month}월&nbsp;&nbsp;{confirm_day}일<br>
-확 인 자 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (인)
+확 인 자 : <span class="sign-line">&nbsp;</span> (인)
+</div>
+</div>
 </div>
 </body>
 </html>"""
