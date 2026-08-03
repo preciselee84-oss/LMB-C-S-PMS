@@ -1603,11 +1603,14 @@ def apply_rs_allowance_formula(perf_df, user_db, return_debug=False):
     if work_df.empty:
         return (result, {}) if return_debug else result
 
+    def staff_key(value):
+        return re.sub(r"\s+", "", str(value or "").strip())
+
     # 직원 정보 매핑 (이름 -> 정보)
     name_to_info = {}
     for uid, info in user_db.items():
         if isinstance(info, dict) and info.get("name"):
-            name_to_info[info["name"]] = {
+            name_to_info[staff_key(info["name"])] = {
                 "rank": info.get("rank", "직원"),
                 "outsource": info.get("outsource", "아니오"),
                 "staff_type": info.get("staff_type", "정규직"),
@@ -1615,28 +1618,34 @@ def apply_rs_allowance_formula(perf_df, user_db, return_debug=False):
                 "dept_type": info.get("dept_type", "사업부")
             }
 
-    # C&S 부서만 대상
-    cs_staff = []
+    # 담당자별 활동 수치에 표시되는 모든 담당자를 지급 산정 대상으로 처리한다.
+    target_staff = []
     outsource_staff = []
     regular_staff = []
 
     for idx, row in work_df.iterrows():
-        staff_name = str(row.get("담당자", ""))
-        if staff_name in name_to_info:
-            staff_info = name_to_info[staff_name]
-            if staff_info["dept_type"] == "C&S":
-                cs_staff.append((idx, row, staff_info))
-                if staff_info["outsource"] == "예" or staff_info["staff_type"] == "외주":
-                    outsource_staff.append((idx, row, staff_info))
-                else:
-                    regular_staff.append((idx, row, staff_info))
+        staff_name = staff_key(row.get("담당자", ""))
+        if not staff_name:
+            continue
+        staff_info = name_to_info.get(staff_name, {
+            "rank": str(row.get("직급", "직원") or "직원").strip() or "직원",
+            "outsource": "아니오",
+            "staff_type": "정규직",
+            "period": "해당없음",
+            "dept_type": "",
+        })
+        target_staff.append((idx, row, staff_info))
+        if staff_info["outsource"] == "예" or staff_info["staff_type"] == "외주":
+            outsource_staff.append((idx, row, staff_info))
+        else:
+            regular_staff.append((idx, row, staff_info))
 
-    if not cs_staff:
+    if not target_staff:
         return (result, {}) if return_debug else result
 
-    # BU 평균 계산 (C&S 전체 지급 산정 포인트 / C&S 인원)
-    total_bu_points = sum(payable_points(row) for _, row, _ in cs_staff)
-    bu_count = len(cs_staff)
+    # BU 평균 계산 (지급 산정 대상 전체 포인트 / 대상 인원)
+    total_bu_points = sum(payable_points(row) for _, row, _ in target_staff)
+    bu_count = len(target_staff)
     bu_average = total_bu_points / bu_count if bu_count > 0 else 0
 
     # 외주직원 가감포인트 계산
@@ -1677,7 +1686,7 @@ def apply_rs_allowance_formula(perf_df, user_db, return_debug=False):
     }
 
     # 최종 지급액 계산
-    for idx, row, staff_info in cs_staff:
+    for idx, row, staff_info in target_staff:
         total_points = payable_points(row)
 
         # 팀장 여부 확인
