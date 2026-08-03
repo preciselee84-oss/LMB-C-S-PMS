@@ -30,7 +30,6 @@ def resolve_template_file(file_name):
 
 
 DB_FILE = "users.json"
-PERF_FILE = "manual_perf.json"
 SAVED_STATE_FILE = "saved_state.json"
 SERVER_CONNECTION_FILE = "server_connection.json"
 DELEGATED_WORKPLACE_FILE = "delegated_workplaces.json"
@@ -1577,121 +1576,6 @@ def criteria_df():
     return pd.DataFrame(data, columns=["활동구분", "구분", "단위 점수", "월 최대점수"])
 
 
-def render_manual_perf_input_table(base):
-    """표는 보고서 표와 동일하게 렌더링하고, 실적 입력은 표 아래에서 처리한다."""
-    result_df = base.copy()
-    result_df["입력(건)"] = pd.to_numeric(result_df["입력(건)"], errors="coerce").fillna(0).astype(int)
-
-    style_report_logic(result_df.drop(columns=["입력(건)"], errors="ignore"))
-
-    st.markdown("#### 실적 입력")
-    st.info("월 최대점수가 있는 항목은 `월 최대점수 ÷ 단위 점수`까지만 입력할 수 있습니다. 예: 타겟고객선별은 100 ÷ 5 = 최대 20건입니다.")
-    st.markdown(
-        """<style>
-        .manual-input-row {
-            color:#4A5568;
-            font-size:13px;
-            font-weight:700;
-            padding-top:9px;
-            white-space:nowrap;
-        }
-        .manual-input-help {
-            color:#718096;
-            font-size:12px;
-            margin-top:-4px;
-            margin-bottom:4px;
-        }
-        body:has(#pms-d:checked) .manual-input-row,
-        body:has(#pms-d:checked) .manual-input-help {
-            color:#ffffff !important;
-        }
-        </style>""",
-        unsafe_allow_html=True,
-    )
-
-    results = {}
-    for i in range(0, len(result_df), 3):
-        cols = st.columns(3)
-        for col, (_, row) in zip(cols, result_df.iloc[i:i + 3].iterrows()):
-            item = str(row["구분"])
-            unit_score = int(row["단위 점수"])
-            monthly_limit = row["월 최대점수"]
-            max_count = None
-            if str(monthly_limit).strip() != "-":
-                try:
-                    max_count = int(float(monthly_limit) // unit_score)
-                except Exception:
-                    max_count = None
-
-            value = int(row["입력(건)"])
-            if max_count is not None:
-                value = min(value, max_count)
-
-            with col:
-                st.markdown(f"<div class='manual-input-row'>{html.escape(item)}</div>", unsafe_allow_html=True)
-                if max_count is not None:
-                    st.markdown(f"<div class='manual-input-help'>최대 {max_count}건 입력 가능</div>", unsafe_allow_html=True)
-                else:
-                    st.markdown("<div class='manual-input-help'>월 최대점수 제한 없음</div>", unsafe_allow_html=True)
-                widget_key = f"perf_{item}"
-                kwargs = {
-                    "label": "입력(건)",
-                    "min_value": 0,
-                    "value": value,
-                    "key": widget_key,
-                    "label_visibility": "collapsed",
-                    "step": 1,
-                }
-                if max_count is not None:
-                    kwargs["max_value"] = max_count
-                st.number_input(**kwargs)
-                results[item] = int(st.session_state.get(widget_key, value) or 0)
-
-    result_df["입력(건)"] = result_df["구분"].map(results).fillna(0).astype(int)
-    return result_df
-
-
-def manual_points_for_user(name):
-    override_db = st.session_state.get("manual_perf_preview_override", {})
-    saved = override_db.get(name)
-    if saved is None:
-        perf_db = load_db(PERF_FILE, {})
-        saved = perf_db.get(name, {})
-
-    total = 0
-    criteria = criteria_df()
-    criteria["_key"] = criteria["구분"].astype(str).str.strip()
-    point_map = criteria.set_index("_key")["단위 점수"].to_dict()
-    limit_map = criteria.set_index("_key")["월 최대점수"].to_dict()
-    for item, count in saved.items():
-        try:
-            key = str(item).strip()
-            score = int(point_map.get(key, 0)) * int(count)
-            limit_value = limit_map.get(key, "-")
-            if str(limit_value).strip() != "-":
-                score = min(score, int(float(limit_value)))
-            total += score
-        except Exception:
-            pass
-    return total
-
-
-def calculate_manual_perf_total(edited_df):
-    if edited_df is None or edited_df.empty:
-        return 0
-    total = 0
-    for _, row in edited_df.iterrows():
-        try:
-            score = int(float(row.get("단위 점수", 0))) * int(float(row.get("입력(건)", 0)))
-            limit_value = row.get("월 최대점수", "-")
-            if str(limit_value).strip() != "-":
-                score = min(score, int(float(limit_value)))
-            total += score
-        except Exception:
-            pass
-    return int(total)
-
-
 def apply_rs_allowance_formula(perf_df, user_db, return_debug=False):
     if perf_df is None or perf_df.empty or "합계포인트" not in perf_df.columns:
         return (perf_df, {}) if return_debug else perf_df
@@ -2056,15 +1940,6 @@ def build_random_admin_extra_history(source_df, existing_df, target_count):
     return pd.DataFrame(rows), ""
 
 
-def save_manual_perf_override_for_current_user():
-    name = st.session_state.get("user_name")
-    override = st.session_state.get("manual_perf_preview_override", {}).get(name)
-    if name and override is not None:
-        db = load_db(PERF_FILE, {})
-        db[name] = override
-        save_db(PERF_FILE, db)
-
-
 def has_performance_required_columns(df):
     if df is None or not isinstance(df, pd.DataFrame) or df.empty:
         return False
@@ -2266,7 +2141,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
             o_p = int(row["o"]) * 90
             l_p = int(row["l"]) * 120
             v_actual_p = int(row["v"]) * 30
-            manual_p = manual_points_for_user(name) + added_pts_by_name.get(name, 0)
+            manual_p = added_pts_by_name.get(name, 0)
             p_sum = min(2800, o_p + l_p + v_actual_p + manual_p)
 
             member_stats[name] = {
@@ -2309,8 +2184,8 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
                     "연계포인트": stats["l_p"],
                     "운영건수 (실제 활동)": int(row["v"]),
                     "운영포인트 (실제 활동)": stats["v_actual_p"],
-                    "운영건수 (추가 활동)": round(manual_points_for_user(name) / 30),
-                    "운영포인트(추가 활동)": manual_points_for_user(name),
+                    "운영건수 (추가 활동)": round(added_pts_by_name.get(name, 0) / 30),
+                    "운영포인트(추가 활동)": added_pts_by_name.get(name, 0),
                     "합계포인트": stats["p_sum"],
                     "지급포인트": 0,
                     "지급예상금액": 0,
@@ -10408,25 +10283,6 @@ def show_user_history(is_admin_mode=False):
         error_tabs.append("기타 오류")
 
     st.divider()
-    st.markdown("### 추가 실적 표")
-
-    base = criteria_df()
-    saved = load_db(PERF_FILE, {}).get(st.session_state.user_name, {})
-    base["입력(건)"] = base["구분"].map(saved).fillna(0).astype(int)
-
-    edited = render_manual_perf_input_table(base)
-
-    edited["입력(건)"] = pd.to_numeric(edited["입력(건)"], errors="coerce").fillna(0).astype(int).clip(lower=0)
-    edited["계산점수"] = edited["단위 점수"] * edited["입력(건)"]
-    manual_override = st.session_state.setdefault("manual_perf_preview_override", {})
-    manual_override[st.session_state.user_name] = edited.set_index("구분")["입력(건)"].to_dict()
-
-    total = calculate_manual_perf_total(edited)
-    st.session_state["_manual_perf_total"] = total
-
-    st.metric("추가 실적 합산 점수", f"{total:,} PT")
-
-    st.divider()
     preview_source_df = st.session_state.get("history_convert_preview_data", converted_preview_df)
     if not isinstance(preview_source_df, pd.DataFrame):
         preview_source_df = converted_preview_df if isinstance(converted_preview_df, pd.DataFrame) else df_user_visit
@@ -10487,19 +10343,6 @@ def show_user_history(is_admin_mode=False):
                 pass
         if _changed:
             st.rerun()
-
-        # 추가 방문 운영 이력 등록 안내
-        _add_visit_cnt = round(total / 30)
-        if _add_visit_cnt > 0:
-            st.markdown(
-                f"<div style='margin-top:10px;padding:12px 16px;background:#EBF8FF;border-left:4px solid #4299E1;border-radius:6px;font-size:14px;color:#2B6CB0;'>"
-                f"<b>📋 추가 이력 등록 안내</b><br>"
-                f"추가 실적 합산 점수 <b>{total:,} PT</b> 기준으로 "
-                f"<b style='font-size:16px;color:#C05621;'>{_add_visit_cnt}건</b>의 방문 운영 이력을 "
-                f"우측 <b>이력 추가</b> 버튼을 통해 등록해주세요."
-                f"</div>",
-                unsafe_allow_html=True,
-            )
 
     search_filters = render_history_search_filters(search_source_df, "history_preview_search")
 
@@ -10794,34 +10637,13 @@ def show_final_check():
     # 검증 이슈 체크
     has_validation_issues = has_dup_data or has_err_data or has_missing_open or has_missing_erp or has_other_errors
 
-    # 추가 이력 등록건수 불일치 체크
-    total = st.session_state.get("_manual_perf_total", 0)
-    _req_visit_cnt = round(total / 30) if total > 0 else 0
-    _preview_df_check = st.session_state.get("history_convert_preview_data")
-    if _req_visit_cnt > 0 and isinstance(_preview_df_check, pd.DataFrame) and not _preview_df_check.empty:
-        _is_manual_mask = _preview_df_check.get("_is_manual", pd.Series([False] * len(_preview_df_check))).fillna(False).astype(bool)
-        _is_visit_mask = _preview_df_check["활동구분"].astype(str).str.contains("방문", na=False) if "활동구분" in _preview_df_check.columns else pd.Series([False] * len(_preview_df_check))
-        _is_oper_mask = _preview_df_check["활동상세"].astype(str).str.contains("운영", na=False) if "활동상세" in _preview_df_check.columns else pd.Series([False] * len(_preview_df_check))
-        _actual_visit_cnt = int((_is_manual_mask & _is_visit_mask & _is_oper_mask).sum())
-        _visit_count_mismatch = _actual_visit_cnt != _req_visit_cnt
-    else:
-        _actual_visit_cnt = 0
-        _visit_count_mismatch = False
-
     # 전송 가능 여부
-    can_send = not has_validation_issues and not _visit_count_mismatch
+    can_send = not has_validation_issues
 
     if has_validation_issues:
         st.markdown(
             "<div style='margin-top:8px;padding:10px 16px;background:#FFF5F5;border:1px solid #FC8181;border-radius:8px;font-size:13px;color:#C53030;font-weight:700;'>"
             "❌ 검증 오류가 있습니다. 위 탭에서 문제를 해결한 후 실적을 전송해주세요.</div>",
-            unsafe_allow_html=True,
-        )
-    if _visit_count_mismatch:
-        st.markdown(
-            f"<div style='margin-top:8px;padding:10px 16px;background:#FFFAF0;border:1px solid #F6AD55;border-radius:8px;font-size:13px;color:#C05621;font-weight:700;'>"
-            f"⚠️ 추가 이력등록건수 불일치 — 안내 기준 <b>{_req_visit_cnt}건</b> 필요, 현재 등록 <b>{_actual_visit_cnt}건</b>.<br>"
-            f"방문 운영 이력을 <b>{_req_visit_cnt - _actual_visit_cnt}건</b> 추가 등록해주세요.</div>",
             unsafe_allow_html=True,
         )
     if not has_validation_issues and not my_res.empty:
@@ -10853,12 +10675,11 @@ def show_final_check():
             f"{전월대비_text}</div>",
             unsafe_allow_html=True,
         )
-        if not _visit_count_mismatch:
-            st.markdown(
-                "<div style='margin-top:8px;padding:10px 16px;background:#F0FFF4;border:1px solid #9AE6B4;border-radius:8px;font-size:13px;color:#276749;font-weight:700;'>"
-                "✅ 실적 결과를 전송할 수 있습니다.</div>",
-                unsafe_allow_html=True,
-            )
+        st.markdown(
+            "<div style='margin-top:8px;padding:10px 16px;background:#F0FFF4;border:1px solid #9AE6B4;border-radius:8px;font-size:13px;color:#276749;font-weight:700;'>"
+            "✅ 실적 결과를 전송할 수 있습니다.</div>",
+            unsafe_allow_html=True,
+        )
 
     st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
 
@@ -10878,7 +10699,6 @@ def show_final_check():
         st.markdown('</div>', unsafe_allow_html=True)
 
     if do_save:
-        save_manual_perf_override_for_current_user()
         saved_db = load_db(SAVED_STATE_FILE, {})
         user_saved = {
             "user_excel_data": st.session_state.user_excel_data.to_dict() if st.session_state.user_excel_data is not None else None,
@@ -10892,7 +10712,6 @@ def show_final_check():
         st.rerun()
 
     if do_send:
-        save_manual_perf_override_for_current_user()
         sent_db = load_db(SENT_FILE, {})
         sent_uploads_db = load_db(SENT_UPLOADS_FILE, {})
         row_data = my_res.iloc[0].to_dict()
@@ -14134,7 +13953,6 @@ def show_dashboard():
             "- **VOC**: 고객 개선 아이디어 제출 — 건당 10pt, 월 최대 50pt\n\n"
             "위 활동들은 개설·연계 실적 없이도 단독으로 포인트를 적립할 수 있는 가장 현실적인 방법입니다."
         )
-        st.info("💡 위 활동들은 **[업로드 및 실적 확인] 메뉴 → 추가 실적 입력** 표에서 건수를 직접 입력하여 포인트를 적립할 수 있습니다.")
 
 def load_hana_billing_df(force_refresh=False):
     billing_raw = read_google_csv(
