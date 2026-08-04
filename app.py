@@ -1244,6 +1244,175 @@ def sample_format_excel_bytes(df):
     return output.getvalue()
 
 
+MONTHLY_ACTIVITY_COLUMNS = [
+    "지사",
+    "상품",
+    "업체명",
+    "사업자번호",
+    "등록자",
+    "활동일자",
+    "방문장소 (시, 군, 구까지)",
+    "활동구분",
+    "활동상세",
+    "업무번호",
+    "제목",
+    "활동내역",
+]
+
+
+def monthly_activity_format_df(df):
+    if df is None or df.empty:
+        return pd.DataFrame(columns=MONTHLY_ACTIVITY_COLUMNS)
+
+    source = normalize_converted_history_df(clean_header_logic(df.copy()))
+    aliases = {
+        "업체명": ["업체명", "회사", "회사명", "고객명", "상호"],
+        "사업자번호": ["사업자번호", "사업자등록번호", "고객 식별코드", "고객 관리번호"],
+        "등록자": ["등록자", "담당자", "성명", "활동자"],
+        "활동일자": ["활동일자", "활동일", "일자", "방문일자", "일시"],
+        "방문장소 (시, 군, 구까지)": ["방문장소 (시, 군, 구까지)", "방문장소", "주소", "지역"],
+        "활동구분": ["활동구분", "활동 구분", "유형", "상담구분", "접수구분", "접수유형"],
+        "활동상세": ["활동상세", "활동 상세", "처리유형", "진행상태", "활동내용"],
+        "업무번호": ["업무번호", "플로우", "작성번호"],
+        "제목": ["제목", "접수내용", "문의내용"],
+        "활동내역": ["활동내역", "활동내용", "처리내용", "상담내용", "내용"],
+    }
+
+    result = pd.DataFrame(index=source.index)
+    for target_col in MONTHLY_ACTIVITY_COLUMNS:
+        if target_col == "지사":
+            result[target_col] = source[target_col] if target_col in source.columns else ""
+            continue
+        if target_col == "상품":
+            product_col = find_col(source, ["상품", "관련 제품", "관련제품"])
+            result[target_col] = source[product_col] if product_col and product_col in source.columns else ""
+            continue
+        source_col = find_col(source, aliases.get(target_col, [target_col]))
+        result[target_col] = source[source_col] if source_col and source_col in source.columns else ""
+
+    result["지사"] = result["지사"].where(result["지사"].astype(str).str.strip().ne(""), "HANA지사")
+    result["상품"] = result["상품"].where(result["상품"].astype(str).str.strip().ne(""), "통합CMS")
+
+    if "활동일자" in result.columns:
+        parsed_dates = pd.to_datetime(result["활동일자"], errors="coerce")
+        result["활동일자"] = parsed_dates.dt.strftime("%Y-%m-%d").where(parsed_dates.notna(), result["활동일자"].astype(str))
+
+    if "활동상세" in result.columns:
+        result["활동상세"] = result["활동상세"].astype(str).map(
+            lambda v: "연계" if "연계" in v else ("개설" if "개설" in v else "운영")
+        )
+    if "활동구분" in result.columns:
+        result["활동구분"] = result["활동구분"].astype(str).map(
+            lambda v: "방문" if ("방문" in v or "미팅" in v or "OUT" in v) else ("원격" if "원격" in v else ("상담" if ("상담" in v or "IN" in v or "통화" in v or "이메일" in v or "메모" in v) else v))
+        )
+    if "제목" in result.columns:
+        default_titles = result["활동상세"].map(title_from_activity_detail)
+        result["제목"] = result["제목"].where(
+            result["제목"].notna() & result["제목"].astype(str).str.strip().ne(""),
+            default_titles,
+        )
+
+    return result[MONTHLY_ACTIVITY_COLUMNS].replace({np.nan: ""})
+
+
+def is_activities_export_df(df):
+    if df is None or df.empty:
+        return False
+    normalized_cols = {re.sub(r"\s+", "", str(col)) for col in df.columns}
+    required = {"일시", "유형", "제목", "활동자", "회사", "관련제품", "내용", "활동상세", "활동구분"}
+    return len(required & normalized_cols) >= 6
+
+
+def convert_activities_export_df(df):
+    if df is None or df.empty:
+        return pd.DataFrame(columns=MONTHLY_ACTIVITY_COLUMNS)
+
+    source = clean_header_logic(df.copy()).replace({np.nan: ""})
+    if not is_activities_export_df(source):
+        return normalize_converted_history_df(source)
+
+    def pick(row, names, default=""):
+        col = find_col(source, names)
+        return row.get(col, default) if col and col in source.columns else default
+
+    def activity_category(row):
+        value = str(pick(row, ["유형", "활동구분", "활동 구분"], "")).strip()
+        if "원격" in value:
+            return "원격"
+        if any(token in value for token in ["미팅", "방문", "OUT"]):
+            return "방문"
+        if any(token in value for token in ["통화", "상담", "이메일", "메모", "IN"]):
+            return "상담"
+        return value or "상담"
+
+    def activity_detail(row):
+        value = str(pick(row, ["활동 상세", "활동상세", "활동 목적", "제목", "내용"], "")).strip()
+        if "연계" in value:
+            return "연계"
+        if "개설" in value or "신규" in value or "구축" in value:
+            return "개설"
+        return "운영"
+
+    rows = []
+    for _, row in source.iterrows():
+        detail = activity_detail(row)
+        rows.append({
+            "지사": "HANA지사",
+            "상품": pick(row, ["관련 제품", "관련제품", "상품"], "통합CMS") or "통합CMS",
+            "업체명": pick(row, ["회사", "업체명", "회사명", "고객명", "고객"], ""),
+            "사업자번호": pick(row, ["고객 식별코드", "고객 관리번호", "사업자번호", "사업자등록번호"], ""),
+            "등록자": pick(row, ["활동자", "등록자", "담당자", "성명"], ""),
+            "활동일자": pick(row, ["일시", "활동일자", "활동일", "방문일자"], ""),
+            "방문장소 (시, 군, 구까지)": pick(row, ["방문장소 (시, 군, 구까지)", "방문장소", "주소", "지역"], ""),
+            "활동구분": activity_category(row),
+            "활동상세": detail,
+            "업무번호": pick(row, ["업무번호", "플로우", "작성번호"], ""),
+            "제목": pick(row, ["제목"], "") or title_from_activity_detail(detail),
+            "활동내역": pick(row, ["내용", "활동내역", "활동내용", "처리내용"], ""),
+        })
+
+    return normalize_converted_history_df(pd.DataFrame(rows))
+
+
+def monthly_activity_excel_bytes(df):
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    output_df = monthly_activity_format_df(df)
+    output = BytesIO()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "실적파일"
+
+    header_fill = PatternFill("solid", fgColor="FFFF00")
+    header_font = Font(name="맑은 고딕", size=12, bold=False, color="000000")
+    body_font = Font(name="맑은 고딕", size=11)
+    center = Alignment(horizontal="center", vertical="center")
+    default_align = Alignment(vertical="center")
+
+    for col_idx, header in enumerate(MONTHLY_ACTIVITY_COLUMNS, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = center
+
+    for row_idx, (_, row) in enumerate(output_df.iterrows(), start=2):
+        for col_idx, header in enumerate(MONTHLY_ACTIVITY_COLUMNS, start=1):
+            value = row.get(header, "")
+            cell = ws.cell(row=row_idx, column=col_idx, value="" if pd.isna(value) else value)
+            cell.font = body_font
+            cell.alignment = default_align if header in {"등록자", "활동일자", "활동내역"} else center
+
+    widths = [14, 14.375, 28.75, 13.75, 11.25, 17, 22.125, 9, 13, 13, 15.75, 50.625]
+    for col_idx, width in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+    wb.save(output)
+    output.seek(0)
+    return output.getvalue()
+
+
 def _activity_template_text(value):
     if pd.isna(value):
         return ""
@@ -2503,11 +2672,11 @@ def render_adjusted_history_download_button(upload_df, key_suffix="upload"):
             raise ValueError("다운로드할 이력 데이터가 없습니다.")
         ym = get_uploaded_month(adjusted_df) or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m")
         year_month = ym.replace("-", "")
-        excel_bytes = dataframe_to_excel_bytes({"실적파일": adjusted_df})
+        excel_bytes = monthly_activity_excel_bytes(adjusted_df)
         st.download_button(
             btn_label,
             data=excel_bytes,
-            file_name=f"LMB월간 활동실적__{year_month}_최종.xlsx",
+            file_name=f"LMB월간 활동실적__{year_month}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
             key=f"adjusted_history_download_{key_suffix}",
@@ -8935,9 +9104,9 @@ def show_all_staff_summary(staff_names):
         u_file = st.file_uploader("본사이력 업로드 (선택)", type=["xlsx"], key="admin_office_upload", label_visibility="collapsed")
         if u_file is not None:
             try:
-                office_df = pd.read_excel(u_file)
-                st.session_state.admin_uploaded_excel_display = clean_header_logic(office_df.copy())
-                office_df = normalize_converted_history_df(office_df)
+                office_df = pd.read_excel(u_file, sheet_name=0)
+                office_df = convert_activities_export_df(office_df)
+                st.session_state.admin_uploaded_excel_display = office_df.copy()
                 # session_state에 저장하여 운영 카운트에 사용
                 st.session_state.admin_uploaded_excel = office_df
                 st.success("✅ 본사이력 파일이 실적 계산에 반영됩니다.")
@@ -9643,70 +9812,11 @@ def show_all_staff_summary(staff_names):
 
     with dl_excel_col:
         if isinstance(st.session_state.get("admin_uploaded_excel"), pd.DataFrame) and not st.session_state.admin_uploaded_excel.empty:
-            excel_download_df = st.session_state.get("admin_uploaded_excel_display")
-            if not isinstance(excel_download_df, pd.DataFrame) or excel_download_df.empty:
-                excel_download_df = st.session_state.admin_uploaded_excel
-            excel_download_df = prepare_display_dataframe(excel_download_df)
-
-            # 개설고객사 데이터 (2026년 5월 개설 완료)
-            open_companies_df = pd.DataFrame()
-            if open_date_col and open_date_col in cloud_df.columns:
-                open_companies_df = cloud_df[
-                    cloud_df[open_date_col].notna() &
-                    (cloud_df[open_date_col].dt.strftime("%Y-%m") == target_year_month)
-                ].copy()
-
-            # 연계고객사 데이터 (2026년 5월 ERP 연계)
-            erp_companies_df = pd.DataFrame()
-            if erp_date_col and erp_date_col in cloud_df.columns:
-                erp_companies_df = cloud_df[
-                    cloud_df[erp_date_col].notna() &
-                    (cloud_df[erp_date_col].dt.strftime("%Y-%m") == target_year_month)
-                ].copy()
-
-            # 하나의 시트에 모든 데이터 합치기
-            combined_parts = [excel_download_df]
-
-            # 개설고객사 추가
-            if not open_companies_df.empty:
-                # 빈 행 추가
-                empty_row = pd.DataFrame([[""] * len(excel_download_df.columns)], columns=excel_download_df.columns)
-                combined_parts.append(empty_row)
-                combined_parts.append(empty_row)
-
-                # 제목 행 추가
-                title_row = pd.DataFrame([["개설고객사"] + [""] * (len(excel_download_df.columns) - 1)], columns=excel_download_df.columns)
-                combined_parts.append(title_row)
-
-                # 개설고객사 데이터 추가 (컬럼 맞추기)
-                open_companies_aligned = pd.DataFrame(columns=excel_download_df.columns)
-                for col in open_companies_df.columns:
-                    if col in open_companies_aligned.columns:
-                        open_companies_aligned[col] = open_companies_df[col]
-                combined_parts.append(open_companies_df)
-
-            # 연계고객사 추가
-            if not erp_companies_df.empty:
-                # 빈 행 추가
-                empty_row = pd.DataFrame([[""] * len(excel_download_df.columns)], columns=excel_download_df.columns)
-                combined_parts.append(empty_row)
-                combined_parts.append(empty_row)
-
-                # 제목 행 추가
-                title_row = pd.DataFrame([["연계고객사"] + [""] * (len(excel_download_df.columns) - 1)], columns=excel_download_df.columns)
-                combined_parts.append(title_row)
-
-                # 연계고객사 데이터 추가
-                combined_parts.append(erp_companies_df)
-
-            # 모든 데이터 합치기
-            final_df = pd.concat(combined_parts, ignore_index=True, sort=False)
-
-            excel_bytes = dataframe_to_excel_bytes({"실적파일": final_df})
+            excel_bytes = monthly_activity_excel_bytes(st.session_state.admin_uploaded_excel)
             st.download_button(
                 "실적파일 엑셀 다운로드",
                 data=excel_bytes,
-                file_name=f"LMB월간 활동실적__{year_month}_{download_time}.xlsx",
+                file_name=f"LMB월간 활동실적__{year_month}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
             )
@@ -10011,7 +10121,7 @@ def show_user_history(is_admin_mode=False):
                     except Exception as e:
                         st.warning(f"⚠️ 본사 구글시트를 불러오는데 실패했습니다: {str(e)}")
 
-                uploaded_df = clean_header_logic(pd.read_excel(u_file, sheet_name=0))
+                uploaded_df = convert_activities_export_df(pd.read_excel(u_file, sheet_name=0))
 
                 if not uploaded_df.empty:
                     st.session_state.user_excel_data = uploaded_df
