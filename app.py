@@ -939,8 +939,6 @@ def attach_cloud_dates(user_df):
     cloud = st.session_state.get("cloud_sheet_df")
 
     if cloud is None or df.empty:
-        if cloud is None and not df.empty:
-            st.warning("⚠️ 본사 구글시트 데이터를 불러올 수 없습니다. 관리자 > 본사 URL 설정에서 URL을 확인해주세요.")
         return df
 
     cloud = clean_header_logic(cloud.copy())
@@ -9888,7 +9886,6 @@ def show_all_staff_summary(staff_names):
                 style_report_logic(admin_err_df.drop(columns=["월총방문"], errors="ignore"))
             else:
                 st.info("초과 방문 데이터가 없습니다.")
-            render_daily_visit_over_limit_check(admin_daily_visit_matrix)
         with t3:
             if not admin_missing_open.empty:
                 style_report_logic(admin_missing_open.drop(columns=["본사 ERP연계일자"], errors="ignore"))
@@ -10255,8 +10252,8 @@ def show_user_history(is_admin_mode=False):
                 if st.session_state.get("cloud_sheet_df") is None:
                     try:
                         load_csv_to_state("url_sync", "cloud_sheet_df")
-                    except Exception as e:
-                        st.warning(f"⚠️ 본사 구글시트를 불러오는데 실패했습니다: {str(e)}")
+                    except Exception:
+                        pass
 
                 uploaded_df = convert_activities_export_df(pd.read_excel(u_file, sheet_name=0))
 
@@ -10694,7 +10691,6 @@ def show_user_history(is_admin_mode=False):
                         st.rerun()
         else:
             st.info("초과 방문 데이터가 없습니다.")
-        render_daily_visit_over_limit_check(daily_visit_matrix)
         visit_change_guide = build_visit_change_guide_df(daily_visit_matrix)
         st.markdown("##### 이력 변경 추천 가이드")
         if visit_change_guide.empty:
@@ -10772,8 +10768,8 @@ def show_final_check():
     if st.session_state.get("cloud_sheet_df") is None:
         try:
             load_csv_to_state("url_sync", "cloud_sheet_df")
-        except Exception as e:
-            st.warning(f"⚠️ 본사 구글시트를 불러오는데 실패했습니다: {str(e)}")
+        except Exception:
+            pass
 
     # Filter user data and attach cloud dates for tabs
     df_for_tabs = original_df.copy()
