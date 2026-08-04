@@ -1745,6 +1745,55 @@ def criteria_df():
     return pd.DataFrame(data, columns=["활동구분", "구분", "단위 점수", "월 최대점수"])
 
 
+def monthly_webcash_criteria_df():
+    return pd.DataFrame(
+        [
+            ["기본활동", "개설", 90, 1000, "-", "개설/연계 최대활동포인트는 1,000점 (은행 구글시트 실적 반영)"],
+            ["기본활동", "연계", 120, 1000, "-", "개설/연계 통합 상한 적용"],
+            ["기본활동", "방문", 30, 1800, "월 60회", "방문활동은 월 최대 60회 / 일일 최대 방문은 5회 (BMS 방문실적 반영)"],
+        ],
+        columns=["활동구분", "구분", "고객당 점수", "최대점수 (월)", "최대활동(회)", "비고"],
+    )
+
+
+def apply_webcash_monthly_score_caps(df):
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return df
+
+    result = df.copy()
+
+    def num(value):
+        try:
+            if pd.isna(value):
+                return 0
+            return int(float(str(value).replace(",", "").strip() or 0))
+        except Exception:
+            return 0
+
+    for idx, row in result.iterrows():
+        open_count = num(row.get("개설건수", 0))
+        link_count = num(row.get("연계건수", 0))
+        visit_count = num(row.get("방문건수", row.get("운영건수 (실제 활동)", 0)))
+        manual_points = num(row.get("운영포인트(추가 활동)", row.get("운영포인트 (추가 활동)", 0)))
+
+        raw_open_link_points = (open_count * 90) + (link_count * 120)
+        open_link_points = min(raw_open_link_points, 1000)
+        counted_visit_count = min(visit_count, 60)
+        visit_points = min(counted_visit_count * 30, 1800)
+        total_points = open_link_points + visit_points + manual_points
+
+        result.at[idx, "개설포인트"] = open_count * 90
+        result.at[idx, "연계포인트"] = link_count * 120
+        result.at[idx, "개설/연계포인트(최대1000)"] = open_link_points
+        result.at[idx, "방문건수"] = visit_count
+        result.at[idx, "방문반영건수(최대60)"] = counted_visit_count
+        result.at[idx, "방문포인트(최대1800)"] = visit_points
+        result.at[idx, "운영건수 (실제 활동)"] = visit_count
+        result.at[idx, "운영포인트 (실제 활동)"] = visit_points
+        result.at[idx, "합계포인트"] = min(total_points, 2800)
+    return result
+
+
 def apply_rs_allowance_formula(perf_df, user_db, return_debug=False):
     if perf_df is None or perf_df.empty or "합계포인트" not in perf_df.columns:
         return (perf_df, {}) if return_debug else perf_df
@@ -2318,18 +2367,20 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
             name = row[u_col]
             o_p = int(row["o"]) * 90
             l_p = int(row["l"]) * 120
-            v_actual_p = int(row["v"]) * 30
+            v_count = int(row["v"])
+            v_actual_p = min(v_count, 60) * 30
             manual_p = added_pts_by_name.get(name, 0)
-            p_sum = min(2800, o_p + l_p + v_actual_p + manual_p)
+            p_sum = min(o_p + l_p, 1000) + min(v_actual_p, 1800) + manual_p
 
             member_stats[name] = {
                 "o_p": o_p,
                 "l_p": l_p,
+                "v_count": v_count,
                 "v_actual_p": v_actual_p,
                 "manual_p": manual_p,
-                "p_sum": p_sum,
+                "p_sum": min(p_sum, 2800),
             }
-            total_points += p_sum
+            total_points += min(p_sum, 2800)
 
         bu_avg = total_points / len(summary) if len(summary) > 0 else 0
         outsource_adj_pool = 0
@@ -2360,10 +2411,14 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
                     "개설포인트": stats["o_p"],
                     "연계건수": int(row["l"]),
                     "연계포인트": stats["l_p"],
-                    "운영건수 (실제 활동)": int(row["v"]),
+                    "방문건수": stats["v_count"],
+                    "방문반영건수(최대60)": min(stats["v_count"], 60),
+                    "방문포인트(최대1800)": stats["v_actual_p"],
+                    "운영건수 (실제 활동)": stats["v_count"],
                     "운영포인트 (실제 활동)": stats["v_actual_p"],
                     "운영건수 (추가 활동)": round(added_pts_by_name.get(name, 0) / 30),
                     "운영포인트(추가 활동)": added_pts_by_name.get(name, 0),
+                    "개설/연계포인트(최대1000)": min(stats["o_p"] + stats["l_p"], 1000),
                     "합계포인트": stats["p_sum"],
                     "지급포인트": 0,
                     "지급예상금액": 0,
@@ -2372,6 +2427,7 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
             )
 
         res_df = pd.DataFrame(rows)
+        res_df = apply_webcash_monthly_score_caps(res_df)
         res_df = apply_rank_from_user_db(res_df)
         res_df = apply_rs_allowance_formula(res_df, st.session_state.user_db)
         res_df = hide_department_heads(res_df)
@@ -8769,8 +8825,7 @@ def show_all_staff_summary(staff_names):
         open_points = open_count * 90  # 개설 1건당 90포인트
         erp_points = erp_count * 120  # 연계 1건당 120포인트
 
-        # 합계포인트는 개설포인트 + 연계포인트 + 운영포인트 합계이며 최대 2800점이다.
-        total_points = min(2800, open_points + erp_points + operation_points)
+        total_points = min(open_points + erp_points, 1000) + min(operation_points, 1800)
 
         # 직급 정보 가져오기
         staff_rank = "직원"  # 기본값
@@ -8788,6 +8843,10 @@ def show_all_staff_summary(staff_names):
             "연계건수": erp_count,
             "연계고객사": ", ".join(erp_companies) if erp_companies else "",
             "연계포인트": erp_points,
+            "개설/연계포인트(최대1000)": min(open_points + erp_points, 1000),
+            "방문건수": operation_count,
+            "방문반영건수(최대60)": min(operation_count, 60),
+            "방문포인트(최대1800)": min(operation_points, 1800),
             "운영건수 (실제 활동)": operation_count,
             "운영포인트 (실제 활동)": operation_points,
             "운영포인트 (추가 활동)": 0,
@@ -8804,6 +8863,7 @@ def show_all_staff_summary(staff_names):
 
     # DataFrame 생성
     perf_df = pd.DataFrame(performance_data)
+    perf_df = apply_webcash_monthly_score_caps(perf_df)
     perf_df, debug_info = apply_rs_allowance_formula(perf_df, user_db, return_debug=True)
     perf_df = apply_perf_sheet_payouts(perf_df)
 
@@ -8894,10 +8954,15 @@ def show_all_staff_summary(staff_names):
 
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
+    st.markdown("#### 웹케시 월간 실적 기준표")
+    st.dataframe(monthly_webcash_criteria_df(), use_container_width=True, hide_index=True)
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
     # 표시할 컬럼 선택
     display_cols = [
         "담당자", "직급", "개설건수", "개설포인트", "연계건수", "연계포인트",
-        "운영건수 (실제 활동)", "운영포인트 (실제 활동)", "운영포인트 (추가 활동)",
+        "개설/연계포인트(최대1000)", "방문건수", "방문반영건수(최대60)", "방문포인트(최대1800)",
+        "운영포인트 (추가 활동)",
         "합계포인트", "지급포인트", "지급예상금액", "오류건수", "중복건수"
     ]
 
@@ -9524,11 +9589,10 @@ def show_all_staff_summary(staff_names):
 
                 open_points = int(perf_df.at[idx, "개설포인트"]) if "개설포인트" in perf_df.columns else 0
                 link_points = int(perf_df.at[idx, "연계포인트"]) if "연계포인트" in perf_df.columns else 0
-                total_points = min(2800, open_points + link_points + operation_points)
                 perf_df.at[idx, "운영건수 (실제 활동)"] = operation_count
                 perf_df.at[idx, "운영포인트 (실제 활동)"] = operation_points
-                perf_df.at[idx, "합계포인트"] = total_points
 
+            perf_df = apply_webcash_monthly_score_caps(perf_df)
             perf_df = apply_rs_allowance_formula(perf_df, user_db)
             perf_df = apply_perf_sheet_payouts(perf_df)
 
@@ -10183,6 +10247,8 @@ def show_user_history(is_admin_mode=False):
     df_visit_all_with_cloud = attach_cloud_dates(df_visit_all)
 
     st.markdown("### 담당자별 활동 수치")
+    st.markdown("#### 웹케시 월간 실적 기준표")
+    st.dataframe(monthly_webcash_criteria_df(), use_container_width=True, hide_index=True)
     res, err, dup = process_performance_analysis(df_visit_all, st.session_state.get("auto_prev_df"))
 
     if isinstance(res, pd.DataFrame) and not res.empty:
@@ -10279,16 +10345,15 @@ def show_user_history(is_admin_mode=False):
                     res.at[idx, "개설포인트"] = open_count * 90
                     res.at[idx, "연계건수"] = link_count
                     res.at[idx, "연계포인트"] = link_count * 120
-                    operation_points = int(float(row.get("운영포인트 (실제 활동)", 0) or 0))
-                    manual_points = int(float(row.get("운영포인트(추가 활동)", row.get("운영포인트 (추가 활동)", 0)) or 0))
-                    res.at[idx, "합계포인트"] = min(2800, (open_count * 90) + (link_count * 120) + operation_points + manual_points)
+                res = apply_webcash_monthly_score_caps(res)
                 res = apply_rs_allowance_formula(res, st.session_state.user_db)
 
         summary_cols = [
             "담당자", "직급",
             "개설건수", "개설포인트",
             "연계건수", "연계포인트",
-            "운영건수 (실제 활동)", "운영포인트 (실제 활동)",
+            "개설/연계포인트(최대1000)",
+            "방문건수", "방문반영건수(최대60)", "방문포인트(최대1800)",
             "합계포인트", "지급포인트", "지급예상금액",
         ]
         summary_display = res[[col for col in summary_cols if col in res.columns]].copy()
@@ -10312,10 +10377,11 @@ def show_user_history(is_admin_mode=False):
             before_res = my_res.copy()
             o_p = int(float(before_res.iloc[0].get("개설포인트", 0)))
             l_p = int(float(before_res.iloc[0].get("연계포인트", 0)))
-            v_p = int(float(before_res.iloc[0].get("운영포인트 (실제 활동)", 0)))
+            before_res = apply_webcash_monthly_score_caps(before_res)
+            v_p = int(float(before_res.iloc[0].get("방문포인트(최대1800)", before_res.iloc[0].get("운영포인트 (실제 활동)", 0))))
 
             # 합계포인트: 개설 + 연계 + 운영(실제)만
-            before_total = min(2800, o_p + l_p + v_p)
+            before_total = min(o_p + l_p, 1000) + min(v_p, 1800)
             before_res.loc[before_res.index[0], "합계포인트"] = before_total
 
             # 지급포인트
@@ -10664,12 +10730,13 @@ def show_final_check():
     # 업로드 전 예상치 계산 (추가 활동 제외)
     if not my_res.empty:
         before_res = my_res.copy()
+        before_res = apply_webcash_monthly_score_caps(before_res)
         o_p = int(float(before_res.iloc[0].get("개설포인트", 0)))
         l_p = int(float(before_res.iloc[0].get("연계포인트", 0)))
-        v_p = int(float(before_res.iloc[0].get("운영포인트 (실제 활동)", 0)))
+        v_p = int(float(before_res.iloc[0].get("방문포인트(최대1800)", before_res.iloc[0].get("운영포인트 (실제 활동)", 0))))
 
         # 합계포인트: 개설 + 연계 + 운영(실제)만
-        before_total = min(2800, o_p + l_p + v_p)
+        before_total = min(o_p + l_p, 1000) + min(v_p, 1800)
         before_res.loc[before_res.index[0], "합계포인트"] = before_total
 
         # 지급포인트
