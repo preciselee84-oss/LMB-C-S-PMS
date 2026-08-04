@@ -2106,6 +2106,53 @@ def is_korean_business_day(value):
     return date_value.weekday() < 5 and date_text not in korean_public_holidays(date_value.year)
 
 
+WEEKDAY_KO = ["월", "화", "수", "목", "금", "토", "일"]
+OVER_VISIT_COLUMNS = ["업체명", "사업자번호", "담당자", "초과일자", "요일", "공휴일", "일방문", "월총방문"]
+
+
+def visit_date_weekday(value):
+    date_value = pd.to_datetime(value, errors="coerce")
+    if pd.isna(date_value):
+        return ""
+    return WEEKDAY_KO[int(date_value.weekday())]
+
+
+def visit_date_holiday_label(value):
+    date_value = pd.to_datetime(value, errors="coerce")
+    if pd.isna(date_value):
+        return ""
+    return "공휴일" if date_value.strftime("%Y-%m-%d") in korean_public_holidays(date_value.year) else ""
+
+
+def daily_visit_date_header(value):
+    date_value = pd.to_datetime(value, errors="coerce")
+    if pd.isna(date_value):
+        return str(value)
+    weekday = visit_date_weekday(date_value)
+    holiday = visit_date_holiday_label(date_value)
+    suffix = f"{weekday}/공휴일" if holiday else weekday
+    return f"{date_value.month}/{date_value.day}({suffix})"
+
+
+def add_over_visit_date_context(df):
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame(columns=OVER_VISIT_COLUMNS)
+
+    result = df.copy()
+    if "초과일자" in result.columns:
+        result["요일"] = result["초과일자"].map(visit_date_weekday)
+        result["공휴일"] = result["초과일자"].map(visit_date_holiday_label)
+    else:
+        result["초과일자"] = ""
+        result["요일"] = ""
+        result["공휴일"] = ""
+
+    for col in OVER_VISIT_COLUMNS:
+        if col not in result.columns:
+            result[col] = ""
+    return result[OVER_VISIT_COLUMNS]
+
+
 def month_business_dates(target_ym):
     month_start = pd.to_datetime(f"{target_ym}-01", errors="coerce")
     if pd.isna(month_start):
@@ -2435,8 +2482,9 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
             error_df = pd.merge(error_raw, monthly_counts, on=u_col, how="left")
             error_df = error_df[[comp_col, biz_col, u_col, date_col, "일방문횟수", "월총방문"]].drop_duplicates()
             error_df.columns = ["업체명", "사업자번호", "담당자", "초과일자", "일방문", "월총방문"]
+            error_df = add_over_visit_date_context(error_df)
         else:
-            error_df = pd.DataFrame(columns=["업체명", "사업자번호", "담당자", "초과일자", "일방문", "월총방문"])
+            error_df = pd.DataFrame(columns=OVER_VISIT_COLUMNS)
 
         # 은행 이력(실제 활동)과 이력 추가(추가 활동) 분리
         _flag = "_is_manual"
@@ -2586,17 +2634,17 @@ def process_performance_analysis(curr_df_raw, prev_df_raw=None):
 
 def build_upload_over_visit_df(curr_df_raw):
     if curr_df_raw is None:
-        return pd.DataFrame(columns=["업체명", "사업자번호", "담당자", "초과일자", "일방문", "월총방문"])
+        return pd.DataFrame(columns=OVER_VISIT_COLUMNS)
     df = normalize_converted_history_df(clean_header_logic(curr_df_raw))
     if df.empty:
-        return pd.DataFrame(columns=["업체명", "사업자번호", "담당자", "초과일자", "일방문", "월총방문"])
+        return pd.DataFrame(columns=OVER_VISIT_COLUMNS)
 
     u_col = find_col(df, ["등록자", "담당자", "성명"])
     date_col = find_col(df, ["활동일자", "활동일", "일자"])
     biz_col = find_col(df, ["사업자번호"], "사업자번호")
     comp_col = find_col(df, ["업체명", "상호", "고객명"], "업체명")
     if not u_col or not date_col or u_col not in df.columns or date_col not in df.columns:
-        return pd.DataFrame(columns=["업체명", "사업자번호", "담당자", "초과일자", "일방문", "월총방문"])
+        return pd.DataFrame(columns=OVER_VISIT_COLUMNS)
 
     work = df.dropna(subset=[u_col, date_col]).copy()
     work[u_col] = work[u_col].astype(str).str.strip()
@@ -2608,7 +2656,7 @@ def build_upload_over_visit_df(curr_df_raw):
     monthly_counts = work.groupby(u_col).size().reset_index(name="월총방문")
     over_days = daily_counts[daily_counts["일방문"] >= 6]
     if over_days.empty:
-        return pd.DataFrame(columns=["업체명", "사업자번호", "담당자", "초과일자", "일방문", "월총방문"])
+        return pd.DataFrame(columns=OVER_VISIT_COLUMNS)
 
     detail_cols = [col for col in [u_col, date_col, comp_col, biz_col] if col and col in work.columns]
     result = over_days.merge(work[detail_cols].drop_duplicates(), on=[u_col, date_col], how="left")
@@ -2622,7 +2670,7 @@ def build_upload_over_visit_df(curr_df_raw):
     for col in ["업체명", "사업자번호"]:
         if col not in result.columns:
             result[col] = ""
-    return result[["업체명", "사업자번호", "담당자", "초과일자", "일방문", "월총방문"]].drop_duplicates()
+    return add_over_visit_date_context(result).drop_duplicates()
 
 
 def build_daily_visit_matrix_df(curr_df_raw):
@@ -2662,7 +2710,7 @@ def build_daily_visit_matrix_df(curr_df_raw):
     date_keys = [d.strftime("%Y-%m-%d") for d in all_dates]
     grouped = grouped.reindex(columns=date_keys, fill_value=0)
     grouped = grouped.sort_index()
-    display_cols = [f"{d.month}/{d.day}" for d in all_dates]
+    display_cols = [daily_visit_date_header(d) for d in all_dates]
     grouped.columns = display_cols
     result = grouped.reset_index().rename(columns={u_col: "담당자"})
     result.attrs["date_map"] = {label: key for label, key in zip(display_cols, date_keys)}
@@ -9211,6 +9259,7 @@ def show_all_staff_summary(staff_names):
                     company_map = uploaded_clean.groupby(biz_col)[company_col].first().to_dict()
                     over_visit[company_col] = over_visit[biz_col].map(company_map)
                     over_visit_df = over_visit[[company_col, biz_col, u_col, date_col, "일방문", "월총방문"]].rename(columns={date_col: "초과일자"})
+                    over_visit_df = add_over_visit_date_context(over_visit_df)
 
             # 운영 60회 초과 체크
             over_operation_df = pd.DataFrame()
