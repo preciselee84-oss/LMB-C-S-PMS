@@ -2070,32 +2070,50 @@ def may_2026_business_dates():
     return [d.strftime("%Y-%m-%d") for d in days if d.weekday() < 5 and d.strftime("%Y-%m-%d") not in holidays]
 
 
-def korean_public_holidays(year):
-    holidays_by_year = {
+def korean_public_holiday_names(year):
+    names_by_year = {
         2026: {
-            "2026-01-01",
-            "2026-02-16", "2026-02-17", "2026-02-18",
-            "2026-03-01", "2026-03-02",
-            "2026-05-01", "2026-05-05", "2026-05-24", "2026-05-25",
-            "2026-06-03", "2026-06-06",
-            "2026-08-15", "2026-08-17",
-            "2026-09-24", "2026-09-25", "2026-09-26", "2026-09-27", "2026-09-28",
-            "2026-10-03", "2026-10-05", "2026-10-09",
-            "2026-12-25",
+            "2026-01-01": "신정",
+            "2026-02-16": "설날 연휴",
+            "2026-02-17": "설날",
+            "2026-02-18": "설날 연휴",
+            "2026-03-01": "삼일절",
+            "2026-03-02": "삼일절 대체공휴일",
+            "2026-05-01": "근로자의 날",
+            "2026-05-05": "어린이날",
+            "2026-05-24": "부처님오신날",
+            "2026-05-25": "부처님오신날 대체공휴일",
+            "2026-06-03": "전국동시지방선거",
+            "2026-06-06": "현충일",
+            "2026-08-15": "광복절",
+            "2026-08-17": "광복절 대체공휴일",
+            "2026-09-24": "추석 연휴",
+            "2026-09-25": "추석",
+            "2026-09-26": "추석 연휴",
+            "2026-09-27": "추석 연휴",
+            "2026-09-28": "추석 대체공휴일",
+            "2026-10-03": "개천절",
+            "2026-10-05": "개천절 대체공휴일",
+            "2026-10-09": "한글날",
+            "2026-12-25": "성탄절",
         }
     }
     fixed = {
-        f"{year}-01-01",
-        f"{year}-03-01",
-        f"{year}-05-01",
-        f"{year}-05-05",
-        f"{year}-06-06",
-        f"{year}-08-15",
-        f"{year}-10-03",
-        f"{year}-10-09",
-        f"{year}-12-25",
+        f"{year}-01-01": "신정",
+        f"{year}-03-01": "삼일절",
+        f"{year}-05-01": "근로자의 날",
+        f"{year}-05-05": "어린이날",
+        f"{year}-06-06": "현충일",
+        f"{year}-08-15": "광복절",
+        f"{year}-10-03": "개천절",
+        f"{year}-10-09": "한글날",
+        f"{year}-12-25": "성탄절",
     }
-    return fixed | holidays_by_year.get(int(year), set())
+    return fixed | names_by_year.get(int(year), {})
+
+
+def korean_public_holidays(year):
+    return set(korean_public_holiday_names(year).keys())
 
 
 def is_korean_business_day(value):
@@ -2121,7 +2139,7 @@ def visit_date_holiday_label(value):
     date_value = pd.to_datetime(value, errors="coerce")
     if pd.isna(date_value):
         return ""
-    return "공휴일" if date_value.strftime("%Y-%m-%d") in korean_public_holidays(date_value.year) else ""
+    return korean_public_holiday_names(date_value.year).get(date_value.strftime("%Y-%m-%d"), "")
 
 
 def daily_visit_date_header(value):
@@ -2130,7 +2148,7 @@ def daily_visit_date_header(value):
         return str(value)
     weekday = visit_date_weekday(date_value)
     holiday = visit_date_holiday_label(date_value)
-    suffix = f"{weekday}/공휴일" if holiday else weekday
+    suffix = f"{weekday}/{holiday}" if holiday else weekday
     return f"{date_value.month}/{date_value.day}({suffix})"
 
 
@@ -2723,6 +2741,7 @@ def render_daily_visit_matrix(matrix_df):
         return
 
     date_cols = [c for c in matrix_df.columns if c != "담당자"]
+    date_map = matrix_df.attrs.get("date_map", {})
 
     def color_over_limit(value):
         try:
@@ -2730,7 +2749,21 @@ def render_daily_visit_matrix(matrix_df):
         except Exception:
             return ""
 
+    def shade_weekend_holiday(data):
+        styles = pd.DataFrame("", index=data.index, columns=data.columns)
+        for col in date_cols:
+            date_value = pd.to_datetime(date_map.get(col, col), errors="coerce")
+            if pd.isna(date_value):
+                continue
+            date_text = date_value.strftime("%Y-%m-%d")
+            if date_text in korean_public_holidays(date_value.year):
+                styles[col] = "background-color:#FEF3C7;color:#92400E;"
+            elif date_value.weekday() >= 5:
+                styles[col] = "background-color:#F3F4F6;color:#6B7280;"
+        return styles
+
     styler = matrix_df.style
+    styler = styler.apply(shade_weekend_holiday, axis=None)
     if hasattr(styler, "map"):
         styler = styler.map(color_over_limit, subset=date_cols)
     else:
@@ -2741,7 +2774,7 @@ def render_daily_visit_matrix(matrix_df):
 
 def render_daily_visit_over_limit_check(matrix_df):
     st.markdown("##### 일별 5회 방문 초과 체크")
-    st.caption("담당자별 일 방문횟수가 6회 이상인 날짜는 빨간색으로 표시됩니다.")
+    st.caption("담당자별 일 방문횟수가 6회 이상인 날짜는 빨간색, 토/일요일은 회색, 공휴일은 노란색으로 표시됩니다.")
     render_daily_visit_matrix(matrix_df)
 
 
