@@ -9547,7 +9547,7 @@ def show_all_staff_summary(staff_names):
                     total_row[col] = ""
             perf_df_with_total = pd.concat([perf_df[display_cols], pd.DataFrame([total_row])], ignore_index=True)
 
-        admin_uploaded_df = prepare_display_dataframe(monthly_activity_format_df(admin_uploaded_df))
+        admin_uploaded_df = monthly_activity_format_df(admin_uploaded_df)
         title_col, add_history_col = st.columns([0.82, 0.18])
         with title_col:
             st.markdown("#### 본사이력 업로드 데이터")
@@ -10147,7 +10147,7 @@ def show_user_history(is_admin_mode=False):
         and isinstance(st.session_state.get("user_excel_data"), pd.DataFrame)
         and not st.session_state.user_excel_data.empty
     ):
-        hq_uploaded_df = prepare_display_dataframe(monthly_activity_format_df(st.session_state.user_excel_data))
+        hq_uploaded_df = monthly_activity_format_df(st.session_state.user_excel_data)
         st.markdown("#### 본사이력 업로드 데이터")
         st.caption(f"업로드 데이터 건수: {len(hq_uploaded_df):,}건")
         st.dataframe(hq_uploaded_df, use_container_width=True, hide_index=True)
