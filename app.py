@@ -6986,35 +6986,8 @@ def validation_tabs_with_refresh(key):
 
 
 def select_prev_month(state_key, widget_key):
-    # 초기 로드 시 구글시트 자동 조회
-    prev_sel_key = f"{widget_key}_prev"
-
-    if st.session_state.analysis_lookup_df is None:
-        try:
-            load_csv_to_state("url_analysis", "analysis_lookup_df")
-        except Exception:
-            pass
-
-    if st.session_state.analysis_lookup_df is not None:
-        c_df = st.session_state.analysis_lookup_df.copy()
-        d_col = find_col(c_df, ["활동일", "일자"])
-        if d_col and d_col in c_df.columns:
-            c_df[d_col] = pd.to_datetime(c_df[d_col], errors="coerce")
-            opts = sorted(c_df[d_col].dropna().dt.strftime("%Y-%m").unique(), reverse=True)
-            sel = st.selectbox("비교할 전월 선택", ["선택안함"] + list(opts), key=widget_key)
-
-            # 선택값이 변경되었을 때 구글시트 재조회
-            prev_sel = st.session_state.get(prev_sel_key)
-            if prev_sel != sel and prev_sel is not None:
-                try:
-                    load_csv_to_state("url_analysis", "analysis_lookup_df")
-                    c_df = st.session_state.analysis_lookup_df.copy()
-                    c_df[d_col] = pd.to_datetime(c_df[d_col], errors="coerce")
-                except Exception:
-                    pass
-
-            st.session_state[prev_sel_key] = sel
-            st.session_state[state_key] = c_df[c_df[d_col].dt.strftime("%Y-%m") == sel] if sel != "선택안함" else None
+    st.session_state[state_key] = None
+    st.session_state[widget_key] = "선택안함"
 
 
 def convert_bank_excel_to_activity(bank_df):
@@ -11799,7 +11772,6 @@ def show_report():
     prev_df = st.session_state.get("auto_prev_df")
 
     if prev_df is None or prev_df.empty:
-        st.info("실적 분석/계산 메뉴에서 비교할 전월을 선택하면 비교 리포트가 표시됩니다.")
         return
 
     prev_res, _, _ = process_performance_analysis(prev_df)
