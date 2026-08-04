@@ -700,7 +700,6 @@ def init_state():
     removed_menus = {
         "이력확인 및 작성",
         "은행 이력 업로드",
-        "최종 실적 확인",
     }
     if st.session_state.current_menu in removed_menus:
         st.session_state.current_menu = "전도금 요청"
@@ -10828,7 +10827,6 @@ def show_user_history(is_admin_mode=False):
         )
 
     st.divider()
-    st.markdown("### 최종 실적 확인")
     _ppt_report_df = res.copy() if isinstance(res, pd.DataFrame) else pd.DataFrame()
     _, _final_excel_col, _ppt_download_col = st.columns([0.5, 0.25, 0.25])
     with _final_excel_col:
@@ -11035,7 +11033,7 @@ def show_final_check():
 
         st.markdown(
             f"<div style='margin-top:8px;padding:10px 16px;background:#EBF8FF;border-radius:8px;font-size:13px;color:#2B6CB0;'>"
-            f"<b>{html.escape(uname)}</b>님의 최종 실적은 개설 <b>{개설건수}</b>개, 연계 <b>{연계건수}</b>개, 운영 <b>{운영건수}</b>개 에 금액은 <b>{지급예상금액:,}</b>원 입니다."
+            f"<b>{html.escape(uname)}</b>님의 실적은 개설 <b>{개설건수}</b>개, 연계 <b>{연계건수}</b>개, 운영 <b>{운영건수}</b>개 에 금액은 <b>{지급예상금액:,}</b>원 입니다."
             f"{전월대비_text}</div>",
             unsafe_allow_html=True,
         )
