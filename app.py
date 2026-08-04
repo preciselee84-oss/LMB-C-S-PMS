@@ -1786,8 +1786,32 @@ def monthly_staff_count_matrix_df(perf_df):
     return pd.DataFrame(rows)
 
 
-def render_monthly_staff_count_matrix(perf_df):
+def monthly_staff_count_matrix_from_history_df(history_df):
+    if history_df is None or not isinstance(history_df, pd.DataFrame) or history_df.empty:
+        return pd.DataFrame()
+
+    work = monthly_activity_format_df(history_df)
+    if work.empty or "등록자" not in work.columns or "활동상세" not in work.columns:
+        return pd.DataFrame()
+
+    staff_names = [str(name).strip() for name in work["등록자"].dropna().unique().tolist() if str(name).strip()]
+    if not staff_names:
+        return pd.DataFrame()
+
+    rows = []
+    for label in ["개설", "연계", "운영"]:
+        item = {"구분": label}
+        for staff in staff_names:
+            staff_df = work[work["등록자"].astype(str).str.strip() == staff]
+            item[staff] = int(staff_df["활동상세"].astype(str).str.contains(label, na=False).sum())
+        rows.append(item)
+    return pd.DataFrame(rows)
+
+
+def render_monthly_staff_count_matrix(perf_df=None, history_df=None):
     matrix_df = monthly_staff_count_matrix_df(perf_df)
+    if matrix_df.empty:
+        matrix_df = monthly_staff_count_matrix_from_history_df(history_df)
     if matrix_df.empty:
         st.info("담당자별 실적 데이터가 없습니다.")
         return
@@ -10390,7 +10414,7 @@ def show_user_history(is_admin_mode=False):
                 res = apply_rs_allowance_formula(res, st.session_state.user_db)
 
         with staff_count_matrix_slot.container():
-            render_monthly_staff_count_matrix(res)
+            render_monthly_staff_count_matrix(res, df_visit_all)
 
         summary_cols = [
             "담당자", "직급",
@@ -10458,7 +10482,12 @@ def show_user_history(is_admin_mode=False):
         if not my_res_display.empty:
             style_report_logic(my_res_display, compact=True)
     elif isinstance(res, str):
+        with staff_count_matrix_slot.container():
+            render_monthly_staff_count_matrix(None, df_visit_all)
         st.error(res)
+    else:
+        with staff_count_matrix_slot.container():
+            render_monthly_staff_count_matrix(None, df_visit_all)
 
     # 탭 데이터 미리 계산 (경고 메시지 표시용)
     # 초과 방문 데이터 계산
