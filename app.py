@@ -1330,7 +1330,11 @@ def convert_activities_export_df(df):
         return normalize_converted_history_df(source)
 
     def pick(row, names, default=""):
-        col = find_col(source, names)
+        col = None
+        for name in names:
+            col = find_col(source, [name])
+            if col and col in source.columns:
+                break
         return row.get(col, default) if col and col in source.columns else default
 
     def activity_category(row):
