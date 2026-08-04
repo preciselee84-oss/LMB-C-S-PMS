@@ -1756,6 +1756,45 @@ def monthly_webcash_criteria_df():
     )
 
 
+def monthly_staff_count_matrix_df(perf_df):
+    if perf_df is None or not isinstance(perf_df, pd.DataFrame) or perf_df.empty or "담당자" not in perf_df.columns:
+        return pd.DataFrame()
+
+    work = perf_df.copy()
+    work = work[work["담당자"].astype(str).str.strip().ne("합계")]
+    if work.empty:
+        return pd.DataFrame()
+
+    rows = []
+    metrics = [
+        ("개설", "개설건수"),
+        ("연계", "연계건수"),
+        ("운영", "방문건수" if "방문건수" in work.columns else "운영건수 (실제 활동)"),
+    ]
+    for label, col in metrics:
+        item = {"구분": label}
+        for _, row in work.iterrows():
+            staff = str(row.get("담당자", "")).strip()
+            if not staff:
+                continue
+            try:
+                value = int(float(str(row.get(col, 0) or 0).replace(",", "")))
+            except Exception:
+                value = 0
+            item[staff] = value
+        rows.append(item)
+    return pd.DataFrame(rows)
+
+
+def render_monthly_staff_count_matrix(perf_df):
+    matrix_df = monthly_staff_count_matrix_df(perf_df)
+    if matrix_df.empty:
+        st.info("담당자별 실적 데이터가 없습니다.")
+        return
+    st.markdown("#### 담당자별 실적")
+    st.dataframe(matrix_df, use_container_width=True, hide_index=True)
+
+
 def apply_webcash_monthly_score_caps(df):
     if df is None or not isinstance(df, pd.DataFrame) or df.empty:
         return df
@@ -8956,6 +8995,7 @@ def show_all_staff_summary(staff_names):
 
     st.markdown("#### 웹케시 월간 실적 기준표")
     st.dataframe(monthly_webcash_criteria_df(), use_container_width=True, hide_index=True)
+    render_monthly_staff_count_matrix(perf_df)
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
     # 표시할 컬럼 선택
@@ -10249,6 +10289,7 @@ def show_user_history(is_admin_mode=False):
     st.markdown("### 담당자별 활동 수치")
     st.markdown("#### 웹케시 월간 실적 기준표")
     st.dataframe(monthly_webcash_criteria_df(), use_container_width=True, hide_index=True)
+    staff_count_matrix_slot = st.empty()
     res, err, dup = process_performance_analysis(df_visit_all, st.session_state.get("auto_prev_df"))
 
     if isinstance(res, pd.DataFrame) and not res.empty:
@@ -10347,6 +10388,9 @@ def show_user_history(is_admin_mode=False):
                     res.at[idx, "연계포인트"] = link_count * 120
                 res = apply_webcash_monthly_score_caps(res)
                 res = apply_rs_allowance_formula(res, st.session_state.user_db)
+
+        with staff_count_matrix_slot.container():
+            render_monthly_staff_count_matrix(res)
 
         summary_cols = [
             "담당자", "직급",
