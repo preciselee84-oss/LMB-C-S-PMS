@@ -2502,6 +2502,12 @@ def render_daily_visit_matrix(matrix_df):
     st.dataframe(styler, use_container_width=True, hide_index=True)
 
 
+def render_daily_visit_over_limit_check(matrix_df):
+    st.markdown("##### 일별 5회 방문 초과 체크")
+    st.caption("담당자별 일 방문횟수가 6회 이상인 날짜는 빨간색으로 표시됩니다.")
+    render_daily_visit_matrix(matrix_df)
+
+
 def build_visit_change_guide_df(matrix_df):
     if matrix_df is None or matrix_df.empty or "담당자" not in matrix_df.columns:
         return pd.DataFrame()
@@ -9541,7 +9547,7 @@ def show_all_staff_summary(staff_names):
                     total_row[col] = ""
             perf_df_with_total = pd.concat([perf_df[display_cols], pd.DataFrame([total_row])], ignore_index=True)
 
-        admin_uploaded_df = prepare_display_dataframe(admin_uploaded_df)
+        admin_uploaded_df = prepare_display_dataframe(monthly_activity_format_df(admin_uploaded_df))
         title_col, add_history_col = st.columns([0.82, 0.18])
         with title_col:
             st.markdown("#### 본사이력 업로드 데이터")
@@ -9685,6 +9691,8 @@ def show_all_staff_summary(staff_names):
         st.dataframe(admin_uploaded_df, use_container_width=True, hide_index=True)
 
         admin_check_df = attach_cloud_dates(filter_visit_rows(clean_header_logic(filtered_analysis_df.copy())))
+        admin_daily_visit_matrix = build_daily_visit_matrix_df(admin_check_df)
+        render_daily_visit_over_limit_check(admin_daily_visit_matrix)
         _, admin_err, admin_dup = process_performance_analysis(admin_check_df, st.session_state.get("auto_prev_df"))
 
         admin_dup_df = pd.DataFrame()
@@ -9752,6 +9760,7 @@ def show_all_staff_summary(staff_names):
                 style_report_logic(admin_err_df.drop(columns=["월총방문"], errors="ignore"))
             else:
                 st.info("초과 방문 데이터가 없습니다.")
+            render_daily_visit_over_limit_check(admin_daily_visit_matrix)
         with t3:
             if not admin_missing_open.empty:
                 style_report_logic(admin_missing_open.drop(columns=["본사 ERP연계일자"], errors="ignore"))
@@ -10138,7 +10147,7 @@ def show_user_history(is_admin_mode=False):
         and isinstance(st.session_state.get("user_excel_data"), pd.DataFrame)
         and not st.session_state.user_excel_data.empty
     ):
-        hq_uploaded_df = prepare_display_dataframe(st.session_state.user_excel_data)
+        hq_uploaded_df = prepare_display_dataframe(monthly_activity_format_df(st.session_state.user_excel_data))
         st.markdown("#### 본사이력 업로드 데이터")
         st.caption(f"업로드 데이터 건수: {len(hq_uploaded_df):,}건")
         st.dataframe(hq_uploaded_df, use_container_width=True, hide_index=True)
@@ -10465,6 +10474,9 @@ def show_user_history(is_admin_mode=False):
 
     search_filters = render_history_search_filters(search_source_df, "history_preview_search")
 
+    if st.session_state.get("user_excel_source") == "hq":
+        render_daily_visit_over_limit_check(daily_visit_matrix)
+
     dup_my = apply_history_search_filters(dup_my, search_filters)
     err_filtered = apply_history_search_filters(err_filtered, search_filters)
     missing_open = apply_history_search_filters(missing_open, search_filters)
@@ -10543,9 +10555,7 @@ def show_user_history(is_admin_mode=False):
                         st.rerun()
         else:
             st.info("초과 방문 데이터가 없습니다.")
-        st.markdown("##### 담당자별 일 방문횟수")
-        st.caption("일 방문횟수가 6회 이상인 날짜는 빨간색으로 표시됩니다.")
-        render_daily_visit_matrix(daily_visit_matrix)
+        render_daily_visit_over_limit_check(daily_visit_matrix)
         visit_change_guide = build_visit_change_guide_df(daily_visit_matrix)
         st.markdown("##### 이력 변경 추천 가이드")
         if visit_change_guide.empty:
