@@ -9,6 +9,7 @@ import html
 import re
 import base64
 import hashlib
+import unicodedata
 import requests as _requests
 from io import BytesIO
 from datetime import datetime, timedelta
@@ -934,6 +935,66 @@ def get_uploaded_month(df):
     return ""
 
 
+def normalize_company_match_key(value):
+    if value is None or pd.isna(value):
+        return ""
+    text = unicodedata.normalize("NFKC", str(value)).strip().lower()
+    for token in ["주식회사", "(주)", "㈜", "주)", "[주]", "(유)", "(사)", "(재)"]:
+        text = text.replace(token, "")
+    return re.sub(r"[\s\-\_\.\,\(\)\[\]\/\\]+", "", text)
+
+
+def build_subscription_biz_map(df):
+    if df is None or df.empty:
+        return {}, {"error": "구독정보 파일에 데이터가 없습니다."}
+
+    source = clean_header_logic(df.copy()).replace({np.nan: ""})
+    company_col = find_col(source, ["고객사명", "회사", "회사명", "업체명", "고객명", "상호"])
+    biz_col = find_col(source, ["사업자번호", "사업자등록번호", "사업자 등록번호"])
+
+    if not company_col or not biz_col:
+        return {}, {"error": "구독정보 파일에서 고객사명 또는 사업자번호 컬럼을 찾을 수 없습니다."}
+
+    mapping = {}
+    for _, row in source.iterrows():
+        key = normalize_company_match_key(row.get(company_col, ""))
+        biz_no = normalize_biz(row.get(biz_col, ""))
+        if key and biz_no and key not in mapping:
+            mapping[key] = biz_no
+
+    return mapping, {
+        "company_col": company_col,
+        "biz_col": biz_col,
+        "mapped": len(mapping),
+    }
+
+
+def fill_activity_biz_from_subscription_map(df, subscription_biz_map=None):
+    if df is None or df.empty or not subscription_biz_map:
+        return df
+
+    result = df.copy()
+    company_col = find_col(result, ["업체명", "회사", "회사명", "고객사명", "고객명", "고객"])
+    biz_col = find_col(result, ["사업자번호", "사업자등록번호"])
+
+    if not company_col:
+        return result
+    if not biz_col:
+        biz_col = "사업자번호"
+        result[biz_col] = ""
+
+    for idx, row in result.iterrows():
+        current_biz = normalize_biz(row.get(biz_col, ""))
+        if current_biz:
+            continue
+        key = normalize_company_match_key(row.get(company_col, ""))
+        mapped_biz = subscription_biz_map.get(key, "")
+        if mapped_biz:
+            result.at[idx, biz_col] = mapped_biz
+
+    return result
+
+
 def attach_cloud_dates(user_df):
     df = user_df.copy()
     cloud = st.session_state.get("cloud_sheet_df")
@@ -1321,13 +1382,16 @@ def is_activities_export_df(df):
     return len(required & normalized_cols) >= 6
 
 
-def convert_activities_export_df(df):
+def convert_activities_export_df(df, subscription_biz_map=None):
     if df is None or df.empty:
         return pd.DataFrame(columns=MONTHLY_ACTIVITY_COLUMNS)
 
     source = clean_header_logic(df.copy()).replace({np.nan: ""})
     if not is_activities_export_df(source):
-        return normalize_converted_history_df(source)
+        return fill_activity_biz_from_subscription_map(
+            normalize_converted_history_df(source),
+            subscription_biz_map,
+        )
 
     def pick(row, names, default=""):
         col = None
@@ -1358,11 +1422,15 @@ def convert_activities_export_df(df):
     rows = []
     for _, row in source.iterrows():
         detail = activity_detail(row)
+        company_name = pick(row, ["회사", "업체명", "회사명", "고객명", "고객"], "")
+        biz_no = pick(row, ["고객 식별코드", "고객 관리번호", "사업자번호", "사업자등록번호"], "")
+        if not normalize_biz(biz_no) and subscription_biz_map:
+            biz_no = subscription_biz_map.get(normalize_company_match_key(company_name), "")
         rows.append({
             "지사": "HANA지사",
             "상품": pick(row, ["관련 제품", "관련제품", "상품"], "통합CMS") or "통합CMS",
-            "업체명": pick(row, ["회사", "업체명", "회사명", "고객명", "고객"], ""),
-            "사업자번호": pick(row, ["고객 식별코드", "고객 관리번호", "사업자번호", "사업자등록번호"], ""),
+            "업체명": company_name,
+            "사업자번호": biz_no,
             "등록자": pick(row, ["활동자", "등록자", "담당자", "성명"], ""),
             "활동일자": pick(row, ["일시", "활동일자", "활동일", "방문일자"], ""),
             "방문장소 (시, 군, 구까지)": pick(row, ["방문장소 (시, 군, 구까지)", "방문장소", "주소", "지역"], ""),
@@ -9190,51 +9258,39 @@ def show_all_staff_summary(staff_names):
 
     col1, col_convert, col_upload, col_sample, _ = st.columns([1, 1, 1, 1, 2])
     with col1:
-        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>은행 이력 업로드</div>", unsafe_allow_html=True)
-        history_file = st.file_uploader("은행 이력 업로드", type=["xls", "xlsx"], key="admin_history_upload", label_visibility="collapsed")
-        st.caption("은행에서 반출해준 이력파일 그대로 업로드 해주세요.")
+        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>구독정보 업로드</div>", unsafe_allow_html=True)
+        history_file = st.file_uploader("구독정보 업로드", type=["xlsx"], key="admin_history_upload", label_visibility="collapsed")
+        st.caption("subscriptions_export 파일을 업로드하면 회사명 기준으로 사업자번호가 매핑됩니다.")
 
     with col_convert:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
         if history_file is not None:
             try:
-                with st.spinner("은행 이력을 샘플 양식으로 변환 중입니다."):
-                    history_df = read_excel_history_file(history_file)
-                    # 관리자 모드에서는 담당자명이 없으므로 빈 문자열 사용
-                    converted_df, convert_info = convert_history_to_sample_df(history_df, "")
-                if converted_df.empty:
-                    st.button("변환파일 다운로드", use_container_width=True, disabled=True)
-                    st.warning(convert_info.get("error", "변환할 데이터가 없습니다."))
+                with st.spinner("구독정보에서 사업자번호 매핑을 준비 중입니다."):
+                    subscription_df = pd.read_excel(history_file, sheet_name=0)
+                    subscription_map, subscription_info = build_subscription_biz_map(subscription_df)
+                if not subscription_map:
+                    st.button("사업자번호 매핑", use_container_width=True, disabled=True)
+                    st.warning(subscription_info.get("error", "매핑할 사업자번호가 없습니다."))
                 else:
-                    converted_df = normalize_converted_history_df(converted_df)
-                    # session_state에 저장하여 운영 카운트에 사용
-                    st.session_state.admin_uploaded_excel = converted_df
-                    st.session_state.admin_uploaded_excel_display = converted_df.copy()
-                    converted_bytes = sample_format_excel_bytes(converted_df)
-                    converted_ym = get_uploaded_month(converted_df).replace("-", "") or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
-                    st.download_button(
-                        "변환파일 다운로드",
-                        data=converted_bytes,
-                        file_name=f"LMB월간 활동실적_{converted_ym}_관리자.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True,
-                    )
-                    unmatched = int(convert_info.get("unmatched", 0))
-                    if unmatched:
-                        st.caption(f"고객번호 매핑 실패 {unmatched}건은 사업자번호가 공란으로 저장됩니다.")
-                    st.success("✅ 업로드한 파일이 실적 계산에 반영됩니다.")
+                    st.session_state.admin_subscription_biz_map = subscription_map
                     history_file_key = f"{history_file.name}_{history_file.size}"
                     if st.session_state.get("admin_history_upload_key") != history_file_key:
                         st.session_state.admin_history_upload_key = history_file_key
+                        if isinstance(st.session_state.get("admin_uploaded_excel"), pd.DataFrame):
+                            st.session_state.admin_uploaded_excel = fill_activity_biz_from_subscription_map(
+                                st.session_state.admin_uploaded_excel,
+                                subscription_map,
+                            )
+                            st.session_state.admin_uploaded_excel_display = st.session_state.admin_uploaded_excel.copy()
                         st.rerun()
-            except ImportError:
-                st.button("변환파일 다운로드", use_container_width=True, disabled=True)
-                st.error("xls 파일 변환을 위해 xlrd 패키지가 필요합니다.")
+                    st.success(f"사업자번호 매핑 {len(subscription_map):,}건 준비")
             except Exception as e:
-                st.button("변환파일 다운로드", use_container_width=True, disabled=True)
-                st.error(f"은행 이력 업로드 실패: {e}")
+                st.button("사업자번호 매핑", use_container_width=True, disabled=True)
+                st.error(f"구독정보 업로드 실패: {e}")
         else:
-            st.button("변환파일 다운로드", use_container_width=True, disabled=True)
+            st.button("사업자번호 매핑", use_container_width=True, disabled=True)
+            st.session_state.admin_subscription_biz_map = {}
 
     with col_upload:
         st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>본사이력 업로드 (선택)</div>", unsafe_allow_html=True)
@@ -9242,7 +9298,10 @@ def show_all_staff_summary(staff_names):
         if u_file is not None:
             try:
                 office_df = pd.read_excel(u_file, sheet_name=0)
-                office_df = convert_activities_export_df(office_df)
+                office_df = convert_activities_export_df(
+                    office_df,
+                    st.session_state.get("admin_subscription_biz_map", {}),
+                )
                 st.session_state.admin_uploaded_excel_display = office_df.copy()
                 # session_state에 저장하여 운영 카운트에 사용
                 st.session_state.admin_uploaded_excel = office_df
@@ -10030,59 +10089,36 @@ def show_user_history(is_admin_mode=False):
     convert_info = {}
     col1, col_convert, col_upload, col_sample, _ = st.columns([1, 1, 1, 1, 2])
     with col1:
-        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>은행 이력 업로드</div>", unsafe_allow_html=True)
-        history_file = st.file_uploader("은행 이력 업로드", type=["xls", "xlsx"], key="history_convert_upload", label_visibility="collapsed")
-        st.caption("은행에서 반출해준 이력파일 그대로 업로드 해주세요.")
+        st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>구독정보 업로드</div>", unsafe_allow_html=True)
+        history_file = st.file_uploader("구독정보 업로드", type=["xlsx"], key="history_convert_upload", label_visibility="collapsed")
+        st.caption("subscriptions_export 파일을 업로드하면 회사명 기준으로 사업자번호가 매핑됩니다.")
     with col_convert:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
         if history_file is not None:
             try:
-                with st.spinner("은행 이력을 샘플 양식으로 변환 중입니다."):
-                    history_df = read_excel_history_file(history_file)
-                    converted_df, convert_info = convert_history_to_sample_df(history_df, st.session_state.user_name)
-                if converted_df.empty:
-                    st.button("변환파일 다운로드", use_container_width=True, disabled=True)
-                    st.warning(convert_info.get("error", "변환할 데이터가 없습니다."))
+                with st.spinner("구독정보에서 사업자번호 매핑을 준비 중입니다."):
+                    subscription_df = pd.read_excel(history_file, sheet_name=0)
+                    subscription_map, subscription_info = build_subscription_biz_map(subscription_df)
+                if not subscription_map:
+                    st.button("사업자번호 매핑", use_container_width=True, disabled=True)
+                    st.warning(subscription_info.get("error", "매핑할 사업자번호가 없습니다."))
                 else:
-                    converted_df = normalize_converted_history_df(converted_df)
-                    converted_preview_df = converted_df
-                    edited_key = "history_convert_preview_editor"
-                    data_key = "history_convert_preview_data"
-                    # 새 파일 업로드 여부 확인 → 파일이 바뀌면 preview 초기화
+                    st.session_state.activity_subscription_biz_map = subscription_map
                     _file_id = f"{history_file.name}_{history_file.size}"
-                    if st.session_state.get("_bank_file_id") != _file_id:
-                        st.session_state["_bank_file_id"] = _file_id
-                        st.session_state[data_key] = converted_df
-                        edited_df = converted_df
-                    else:
-                        edited_df = st.session_state.get(data_key, converted_df)
-                        if not isinstance(edited_df, pd.DataFrame) or list(edited_df.columns) != list(converted_df.columns):
-                            edited_df = converted_df
-                    edited_df = normalize_converted_history_df(edited_df)
-                    st.session_state[data_key] = edited_df
-                    st.session_state.user_excel_data = edited_df
-                    st.session_state.user_excel_source = "bank"
-                    analysis_df = edited_df
-                    converted_bytes = sample_format_excel_bytes(edited_df)
-                    converted_ym = get_uploaded_month(edited_df).replace("-", "") or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m")
-                    st.download_button(
-                        "변환파일 다운로드",
-                        data=converted_bytes,
-                        file_name=f"LMB월간 활동실적_{converted_ym}_{st.session_state.user_name}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True,
-                    )
-                    unmatched = int(convert_info.get("unmatched", 0))
-                    if unmatched:
-                        st.caption(f"고객번호 매핑 실패 {unmatched}건은 사업자번호가 공란으로 저장됩니다.")
-            except ImportError:
-                st.button("변환파일 다운로드", use_container_width=True, disabled=True)
-                st.error("xls 파일 변환을 위해 xlrd 패키지가 필요합니다. 배포 후 requirements.txt 반영을 확인해주세요.")
+                    if st.session_state.get("_subscription_file_id") != _file_id:
+                        st.session_state["_subscription_file_id"] = _file_id
+                        if st.session_state.get("user_excel_source") == "hq" and isinstance(st.session_state.get("user_excel_data"), pd.DataFrame):
+                            st.session_state.user_excel_data = fill_activity_biz_from_subscription_map(
+                                st.session_state.user_excel_data,
+                                subscription_map,
+                            )
+                    st.success(f"사업자번호 매핑 {len(subscription_map):,}건 준비")
             except Exception as e:
-                st.button("변환파일 다운로드", use_container_width=True, disabled=True)
-                st.error(f"은행 이력 업로드 실패: {e}")
+                st.button("사업자번호 매핑", use_container_width=True, disabled=True)
+                st.error(f"구독정보 업로드 실패: {e}")
         else:
-            st.button("변환파일 다운로드", use_container_width=True, disabled=True)
+            st.button("사업자번호 매핑", use_container_width=True, disabled=True)
+            st.session_state.activity_subscription_biz_map = {}
     with col_upload:
         st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>본사이력 업로드 (선택)</div>", unsafe_allow_html=True)
         u_file = st.file_uploader("본사이력 업로드 (선택)", type=["xlsx"], label_visibility="collapsed")
@@ -10259,7 +10295,10 @@ def show_user_history(is_admin_mode=False):
                     except Exception:
                         pass
 
-                uploaded_df = convert_activities_export_df(pd.read_excel(u_file, sheet_name=0))
+                uploaded_df = convert_activities_export_df(
+                    pd.read_excel(u_file, sheet_name=0),
+                    st.session_state.get("activity_subscription_biz_map", {}),
+                )
 
                 if not uploaded_df.empty:
                     st.session_state.user_excel_data = uploaded_df
