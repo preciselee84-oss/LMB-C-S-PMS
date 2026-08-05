@@ -16936,17 +16936,47 @@ def load_education_waiting_section(login_df=None, reference_lookup=None):
     return "사용자교육(방문)대기 고객사", table_df, None
 
 
+def billing_first_login_before_build(row):
+    first_login = parse_sheet_date(row.get("최초로그인", ""))
+    build_value = row.get("구축일자", row.get("구축일", ""))
+    build_date = parse_sheet_date(build_value)
+    if pd.isna(first_login) or pd.isna(build_date):
+        return False
+    return first_login.to_period("M") < build_date.to_period("M")
+
+
+def billing_display_df(df):
+    if df is None or df.empty:
+        return df
+    display = df.copy()
+    if "업체명" in display.columns:
+        if "실적파일 고객명" in display.columns:
+            perf_name = display["실적파일 고객명"].fillna("").astype(str).str.strip()
+            source_name = display["업체명"].fillna("").astype(str)
+            display["업체명"] = np.where(perf_name.ne(""), perf_name, source_name)
+            display = display.drop(columns=["실적파일 고객명"])
+        display = display.rename(columns={"업체명": "실적파일 고객명"})
+    return display
+
+
 def billing_preview_style(df):
-    if df is None or df.empty or "해지체크" not in df.columns:
+    if df is None or df.empty:
         return df
 
     def highlight_termination(value):
         return "background-color: #fde2e2; color: #991b1b; font-weight: 600;" if str(value).strip() else ""
 
-    styled = df.style
-    if hasattr(styled, "map"):
-        return styled.map(highlight_termination, subset=["해지체크"])
-    return styled.applymap(highlight_termination, subset=["해지체크"])
+    def highlight_prelogin(row):
+        if billing_first_login_before_build(row):
+            return ["background-color: #fff4cc;" for _ in row]
+        return ["" for _ in row]
+
+    styled = df.style.apply(highlight_prelogin, axis=1)
+    if "해지체크" in df.columns:
+        if hasattr(styled, "map"):
+            return styled.map(highlight_termination, subset=["해지체크"])
+        return styled.applymap(highlight_termination, subset=["해지체크"])
+    return styled
 
 
 def render_billing_source_tables(source_upload=None, login_df=None):
@@ -17035,12 +17065,14 @@ def render_billing_source_tables(source_upload=None, login_df=None):
                 if section_df.empty:
                     st.info("표시할 데이터가 없습니다.")
                 else:
-                    st.dataframe(billing_preview_style(section_df), use_container_width=True, hide_index=True)
+                    display_df = billing_display_df(section_df)
+                    st.dataframe(billing_preview_style(display_df), use_container_width=True, hide_index=True)
     with erp_tab:
         st.caption("연계 청구자료 생성 화면 구성입니다.")
         for section_title, section_df in erp_sections:
             st.markdown(f"##### {section_title}")
-            st.dataframe(billing_preview_style(section_df), use_container_width=True, hide_index=True)
+            display_df = billing_display_df(section_df)
+            st.dataframe(billing_preview_style(display_df), use_container_width=True, hide_index=True)
 
     st.divider()
     st.markdown("#### 청구자료 엑셀 다운로드")
