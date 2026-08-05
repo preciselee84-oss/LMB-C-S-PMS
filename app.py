@@ -16410,8 +16410,8 @@ def apply_billing_reference_to_source_df(df, reference_lookup):
             customer_no = billing_display_value(reference_info.get("고객번호", ""))
             if customer_no:
                 work.at[idx, customer_col] = customer_no
-        if biz_col and biz_col in work.columns and not billing_display_value(work.at[idx, biz_col]):
-            biz_no = billing_display_value(reference_info.get("사업자번호", ""))
+        if biz_col and biz_col in work.columns:
+            biz_no = normalize_biz_no(work.at[idx, biz_col]) or normalize_biz_no(reference_info.get("사업자번호", ""))
             if biz_no:
                 work.at[idx, biz_col] = biz_no
         if company_col and company_col in work.columns and not billing_display_value(work.at[idx, company_col]):
@@ -16593,6 +16593,13 @@ def billing_customer_keys(value):
     return keys
 
 
+def billing_company_key(value):
+    text = billing_display_value(value)
+    if not text:
+        return ""
+    return re.sub(r"[\s\(\)\[\]{}㈜（）、,./\\_-]+", "", text).lower()
+
+
 def load_billing_customer_reference():
     try:
         ref_df = clean_header_logic(read_google_csv(st.session_state.get("url_hana", DEFAULT_URL_HANA), header=2))
@@ -16633,6 +16640,9 @@ def load_billing_customer_reference():
         biz_key = normalize_biz_no(reference_info.get("사업자번호", ""))
         if biz_key:
             lookup.setdefault(f"biz:{biz_key}", reference_info)
+        company_key = billing_company_key(reference_info.get("업체명", "") or reference_info.get("청구원본 고객명", ""))
+        if company_key:
+            lookup.setdefault(f"company:{company_key}", reference_info)
     return lookup, ""
 
 
@@ -16712,6 +16722,9 @@ def build_billing_crm_reference(crm_df):
         for customer_key in billing_customer_keys(customer_no):
             lookup.setdefault(customer_key, info)
         lookup.setdefault(f"biz:{biz_key}", info)
+        company_key = billing_company_key(company)
+        if company_key:
+            lookup.setdefault(f"company:{company_key}", info)
         mapped += 1
     return lookup, {"total": len(crm), "mapped": mapped}
 
@@ -16800,7 +16813,13 @@ def billing_reference_info_from_row(reference_lookup, row):
     biz_no = billing_value(row, ["사업자번호", "사업자등록번호", "사업자번호(당월)", "사업자등록번호(당월)"])
     biz_key = normalize_biz_no(biz_no)
     if biz_key:
-        return reference_lookup.get(f"biz:{biz_key}", {})
+        reference_info = reference_lookup.get(f"biz:{biz_key}", {})
+        if reference_info:
+            return reference_info
+    company = billing_value(row, ["업체명", "고객명", "업체명(당월)", "고객명(당월)", "청구원본 고객명"])
+    company_key = billing_company_key(company)
+    if company_key:
+        return reference_lookup.get(f"company:{company_key}", {})
     return {}
 
 
@@ -16848,7 +16867,7 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
             continue
         reference_info = billing_reference_info_from_row(reference_lookup, row)
         customer_no = billing_fill_blank(customer_no, reference_info, "고객번호")
-        biz_no = billing_fill_blank(raw_biz_no, reference_info, "사업자번호")
+        biz_no = normalize_biz_no(billing_fill_blank(raw_biz_no, reference_info, "사업자번호"))
         login_info = billing_login_info_from_row(login_lookup, customer_no, biz_no)
         if not customer_no:
             customer_no = login_info.get("고객번호", "")
@@ -16927,7 +16946,7 @@ def build_erp_billing_table(source_df, login_df=None, reference_lookup=None):
             continue
         reference_info = billing_reference_info_from_row(reference_lookup, row)
         customer_no = billing_fill_blank(customer_no, reference_info, "고객번호")
-        biz_no = billing_fill_blank(raw_biz_no, reference_info, "사업자번호")
+        biz_no = normalize_biz_no(billing_fill_blank(raw_biz_no, reference_info, "사업자번호"))
         login_info = billing_login_info_from_row(login_lookup, customer_no, biz_no)
         if not customer_no:
             customer_no = login_info.get("고객번호", "")
