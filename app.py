@@ -16401,6 +16401,10 @@ def apply_billing_reference_to_source_df(df, reference_lookup):
     build_col = find_col(work, ["구축일", "구축일자"])
     link_start_col = find_col(work, ["연계시작일자"])
     extra_link_col = find_col(work, ["추가연계신청일자"])
+    billing_type_col = find_col(work, ["청구구분", "청구 구분"])
+    if not billing_type_col:
+        billing_type_col = "청구구분"
+        work[billing_type_col] = ""
 
     for idx, row in work.iterrows():
         reference_info = billing_reference_info_from_row(reference_lookup, row)
@@ -16451,6 +16455,10 @@ def apply_billing_reference_to_source_df(df, reference_lookup):
                 work.at[idx, extra_link_col] = erp_receipt_date
             else:
                 work.at[idx, extra_link_col] = ""
+        if billing_type_col and billing_type_col in work.columns and not billing_display_value(work.at[idx, billing_type_col]):
+            billing_type = billing_display_value(reference_info.get("청구구분", ""))
+            if billing_type:
+                work.at[idx, billing_type_col] = billing_type
     return work
 
 
@@ -16745,6 +16753,73 @@ def read_billing_crm_upload(uploaded_file):
     return pd.read_excel(BytesIO(raw), dtype=str).fillna("")
 
 
+def read_billing_cms_customer_upload(uploaded_file):
+    file_name = (uploaded_file.name or "").lower()
+    raw = uploaded_file.getvalue()
+    if file_name.endswith(".csv"):
+        try:
+            return pd.read_csv(BytesIO(raw), dtype=str).fillna("")
+        except UnicodeDecodeError:
+            return pd.read_csv(BytesIO(raw), dtype=str, encoding="cp949").fillna("")
+    sheets = pd.read_excel(BytesIO(raw), sheet_name=None, dtype=str)
+    if "명단" in sheets:
+        return sheets["명단"].fillna("")
+    for _, sheet_df in sheets.items():
+        normalized = clean_header_logic(sheet_df.fillna(""))
+        if find_col_by_priority(normalized, ["고객번호"]) and find_col_by_priority(normalized, ["사업자번호", "사업자등록번호"]):
+            return normalized.fillna("")
+    return next(iter(sheets.values())).fillna("") if sheets else pd.DataFrame()
+
+
+def build_billing_cms_customer_reference(cms_df):
+    if cms_df is None or cms_df.empty:
+        return {}, {"total": 0, "mapped": 0}
+    cms = clean_header_logic(cms_df.copy()).replace({np.nan: ""})
+    customer_col = find_col_by_priority(cms, ["고객번호", "고객NO", "고객 No"])
+    biz_col = find_col_by_priority(cms, ["사업자번호", "사업자등록번호"])
+    company_col = find_col_by_priority(cms, ["고객명", "고객사명", "업체명", "상호"])
+    billing_type_col = find_col_by_priority(cms, ["청구구분", "청구 구분"])
+    if not customer_col and not biz_col:
+        return {}, {
+            "total": len(cms),
+            "mapped": 0,
+            "error": "통합CMS 고객명단에서 고객번호 또는 사업자번호 컬럼을 찾을 수 없습니다.",
+        }
+    if not billing_type_col:
+        return {}, {
+            "total": len(cms),
+            "mapped": 0,
+            "error": "통합CMS 고객명단에서 청구구분 컬럼을 찾을 수 없습니다.",
+        }
+
+    lookup = {}
+    mapped = 0
+    for _, row in cms.iterrows():
+        customer_no = normalize_customer_no(row.get(customer_col, "")) if customer_col else ""
+        biz_key = normalize_biz_no(row.get(biz_col, "")) if biz_col else ""
+        billing_type = billing_display_value(row.get(billing_type_col, ""))
+        if (not customer_no and not biz_key) or not billing_type:
+            continue
+        info = {"청구구분": billing_type}
+        if customer_no:
+            info["고객번호"] = customer_no
+        if biz_key:
+            info["사업자번호"] = biz_key
+        company = billing_display_value(row.get(company_col, "")) if company_col else ""
+        if company:
+            info["업체명"] = company
+            info["청구원본 고객명"] = company
+        for customer_key in billing_customer_keys(customer_no):
+            lookup.setdefault(customer_key, info)
+        if biz_key:
+            lookup.setdefault(f"biz:{biz_key}", info)
+        company_key = billing_company_key(company)
+        if company_key:
+            lookup.setdefault(f"company:{company_key}", info)
+        mapped += 1
+    return lookup, {"total": len(cms), "mapped": mapped}
+
+
 def billing_value(row, candidates):
     for candidate in candidates:
         if candidate in row.index:
@@ -16859,6 +16934,7 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
         "청구원본 고객명",
         "실적파일 고객명",
         "해지체크",
+        "청구구분",
     ]
     if source_df is None or source_df.empty:
         return pd.DataFrame(columns=open_columns)
@@ -16909,6 +16985,7 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
                     "청구원본 고객명",
                 ),
                 "실적파일 고객명": login_info.get("고객명", ""),
+                "청구구분": billing_fill_blank(billing_value(row, ["청구구분", "청구 구분"]), reference_info, "청구구분"),
             }
         )
     df = pd.DataFrame(rows, columns=open_columns)
@@ -16938,6 +17015,7 @@ def build_erp_billing_table(source_df, login_df=None, reference_lookup=None):
         "청구원본 고객명",
         "실적파일 고객명",
         "해지체크",
+        "청구구분",
     ]
     if source_df is None or source_df.empty:
         return pd.DataFrame(columns=erp_columns)
@@ -16987,6 +17065,7 @@ def build_erp_billing_table(source_df, login_df=None, reference_lookup=None):
                 "로그인횟수": login_info.get("로그인", ""),
                 "청구원본 고객명": billing_value(row, ["업체명", "고객명"]),
                 "실적파일 고객명": login_info.get("고객명", ""),
+                "청구구분": billing_fill_blank(billing_value(row, ["청구구분", "청구 구분"]), reference_info, "청구구분"),
             }
         )
     df = pd.DataFrame(rows, columns=erp_columns)
@@ -17078,6 +17157,12 @@ def render_billing_source_tables(source_upload=None, login_df=None):
         key="billing_crm_upload",
         help="subscriptions_export 파일을 업로드하면 사업자번호 기준으로 고객번호를 한 번 더 대사합니다.",
     )
+    cms_customer_file = st.file_uploader(
+        "통합CMS 고객명단 파일 업로드",
+        type=["xlsx", "xls", "csv"],
+        key="billing_cms_customer_upload",
+        help="00.(명단)통합CMS고객명단 파일을 업로드하면 고객번호/사업자번호 기준으로 청구구분을 대사합니다.",
+    )
     crm_reference_lookup = {}
     if crm_file:
         try:
@@ -17092,6 +17177,20 @@ def render_billing_source_tables(source_upload=None, login_df=None):
                 )
         except Exception as exc:
             st.error(f"CRM 구독정보 파일을 읽을 수 없습니다: {exc}")
+    cms_customer_reference_lookup = {}
+    if cms_customer_file:
+        try:
+            cms_customer_df = read_billing_cms_customer_upload(cms_customer_file)
+            cms_customer_reference_lookup, cms_customer_info = build_billing_cms_customer_reference(cms_customer_df)
+            if cms_customer_info.get("error"):
+                st.warning(cms_customer_info["error"])
+            else:
+                st.success(
+                    f"통합CMS 고객명단 청구구분 대사 {cms_customer_info.get('mapped', 0):,}건 준비"
+                    f" / 전체 {cms_customer_info.get('total', 0):,}건"
+                )
+        except Exception as exc:
+            st.error(f"통합CMS 고객명단 파일을 읽을 수 없습니다: {exc}")
     open_sections = [("2026년 6월 구축 실적", build_open_billing_table(pd.DataFrame(), login_df))]
     erp_sections = [("당월 ERP연계 청구 고객사", build_erp_billing_table(pd.DataFrame(), login_df))]
     education_sections = [("사용자교육(방문)대기 고객사", pd.DataFrame())]
@@ -17115,6 +17214,7 @@ def render_billing_source_tables(source_upload=None, login_df=None):
             if reference_error:
                 st.warning(reference_error)
             reference_lookup = merge_billing_reference_lookup(reference_lookup, crm_reference_lookup)
+            reference_lookup = merge_billing_reference_lookup(reference_lookup, cms_customer_reference_lookup)
             education_sections = [
                 (title, build_open_billing_table(section_df, login_df, reference_lookup))
                 for title, section_df in parsed_open_sections
