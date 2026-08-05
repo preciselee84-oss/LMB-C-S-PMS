@@ -11303,11 +11303,23 @@ def latest_local_subscription_export_df():
 
 
 def ppt_subscription_export_df():
+    candidates = []
     for key in ["report_subscription_df", "admin_subscription_df", "activity_subscription_df"]:
         df = st.session_state.get(key)
         if isinstance(df, pd.DataFrame) and not df.empty:
-            return df
-    return latest_local_subscription_export_df()
+            candidates.append(df)
+    local_df = latest_local_subscription_export_df()
+    if isinstance(local_df, pd.DataFrame) and not local_df.empty:
+        candidates.append(local_df)
+    if not candidates:
+        return pd.DataFrame()
+
+    def score_subscription_df(df):
+        cols = set(map(str, df.columns))
+        core_score = len({"운영담당자", "상태", "ERP연계여부"}.intersection(cols))
+        return (core_score, len(df))
+
+    return max(candidates, key=score_subscription_df)
 
 
 def subscription_customer_counts(name=None):
@@ -11794,9 +11806,9 @@ def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_m
     is_closed = bool(st.session_state.get("report_closed"))
 
     report_subscription_file = st.file_uploader(
-        "실적보고서 CRM 구독정보 업로드 (subscriptions_export)",
+        "실적보고서 CRM 전체 구독정보 업로드 (subscriptions_export)",
         type=["xlsx", "xls", "csv"],
-        help="PPT 고객 실적의 관리고객/2026년 실적 집계에 사용할 subscriptions_export 파일을 업로드해주세요.",
+        help="PPT 고객 실적의 관리고객/2026년 실적 집계에 사용할 전체 subscriptions_export 파일을 업로드해주세요.",
         key="report_subscription_file",
     )
     if report_subscription_file is not None:
@@ -11816,6 +11828,8 @@ def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_m
     subscription_df_for_report = ppt_subscription_export_df()
     if subscription_df_for_report.empty:
         st.warning("CRM 구독정보가 없어 PPT 고객 실적의 관리고객/2026년 실적이 0으로 표시됩니다.")
+    elif len(subscription_df_for_report) < 100:
+        st.warning("CRM 구독정보가 일부만 포함된 파일로 보입니다. 관리고객 전체 집계를 위해 전체 subscriptions_export 파일을 업로드해주세요.")
 
     dc1, dc2 = st.columns([0.85, 0.15])
     with dc2:
