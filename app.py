@@ -1103,8 +1103,8 @@ def normalize_customer_no(value):
     if re.fullmatch(r"\d+\.0+", text):
         text = text.split(".", 1)[0]
     digits = re.sub(r"[^0-9]", "", text)
-    if digits and len(digits) < 8:
-        digits = digits.zfill(8)
+    if digits and len(digits) < 9:
+        digits = digits.zfill(9)
     return digits
 
 
@@ -16395,6 +16395,9 @@ def apply_billing_reference_to_source_df(df, reference_lookup):
         work.insert(0, customer_col, "")
     company_col = find_col(work, ["업체명", "고객명", "업체명(당월)", "고객명(당월)"])
     biz_col = find_col(work, ["사업자번호", "사업자등록번호", "사업자번호(당월)", "사업자등록번호(당월)"])
+    erp_col = find_col(work, ["ERP연계 여부", "ERP연계여부"])
+    receipt_col = find_col(work, ["접수일자"])
+    owner_col = find_col(work, ["담당자", "담당자(당월)"])
 
     for idx, row in work.iterrows():
         reference_info = billing_reference_info_from_row(reference_lookup, row)
@@ -16412,6 +16415,18 @@ def apply_billing_reference_to_source_df(df, reference_lookup):
             company = billing_display_value(reference_info.get("업체명", ""))
             if company:
                 work.at[idx, company_col] = company
+        if erp_col and erp_col in work.columns and not billing_display_value(work.at[idx, erp_col]):
+            erp_text = billing_display_value(reference_info.get("ERP연계 여부", ""))
+            if erp_text:
+                work.at[idx, erp_col] = _map_erp_type(erp_text)
+        if receipt_col and receipt_col in work.columns and not billing_display_value(work.at[idx, receipt_col]):
+            receipt = billing_display_value(reference_info.get("접수일자", ""))
+            if receipt:
+                work.at[idx, receipt_col] = receipt
+        if owner_col and owner_col in work.columns and not billing_display_value(work.at[idx, owner_col]):
+            owner = billing_display_value(reference_info.get("담당자", ""))
+            if owner:
+                work.at[idx, owner_col] = owner
     return work
 
 
@@ -16527,7 +16542,13 @@ _ERP_TYPE_MAP = {"연계형": "O", "기본형": "X"}
 
 
 def _map_erp_type(value):
-    return _ERP_TYPE_MAP.get(str(value).strip(), value)
+    text = str(value).strip()
+    upper_text = text.upper()
+    if text in ["예", "Y", "YES", "O", "연계", "연계형"] or upper_text in ["Y", "YES", "O"]:
+        return "O"
+    if text in ["아니오", "N", "NO", "X", "미연계", "기본형"] or upper_text in ["N", "NO", "X"]:
+        return "X"
+    return _ERP_TYPE_MAP.get(text, value)
 
 
 def find_col_by_priority(df, keys):
@@ -16624,6 +16645,9 @@ def build_billing_crm_reference(crm_df):
         ["고객번호", "고개관리번호", "고객관리번호", "고객 관리번호", "고객 식별코드", "고객NO", "고객 No"],
     )
     company_col = find_col_by_priority(crm, ["고객사명", "고객명", "업체명", "상호"])
+    erp_col = find_col_by_priority(crm, ["ERP연계여부", "ERP연계 여부", "ERP 연계 여부"])
+    start_col = find_col_by_priority(crm, ["시작일"])
+    owner_col = find_col_by_priority(crm, ["운영담당자", "운영 담당자", "담당자"])
     if not biz_col or not customer_col:
         return {}, {
             "total": len(crm),
@@ -16646,6 +16670,15 @@ def build_billing_crm_reference(crm_df):
         if company:
             info["업체명"] = company
             info["청구원본 고객명"] = company
+        erp_text = billing_display_value(row.get(erp_col, "")) if erp_col else ""
+        if erp_text:
+            info["ERP연계 여부"] = _map_erp_type(erp_text)
+        start_text = billing_display_value(row.get(start_col, "")) if start_col else ""
+        if start_text:
+            info["접수일자"] = start_text
+        owner_text = billing_display_value(row.get(owner_col, "")) if owner_col else ""
+        if owner_text:
+            info["담당자"] = owner_text
         for customer_key in billing_customer_keys(customer_no):
             lookup.setdefault(customer_key, info)
         lookup.setdefault(f"biz:{biz_key}", info)
@@ -16781,6 +16814,7 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
         login_info = billing_login_info_from_row(login_lookup, customer_no, biz_no)
         if not customer_no:
             customer_no = login_info.get("고객번호", "")
+        customer_no = normalize_customer_no(customer_no)
         first_login = login_info.get("최초로그인", "")
         build_date = billing_fill_blank(billing_value(row, ["구축일자", "구축일"]), reference_info, "구축일자")
         if first_login and billing_dates_differ(build_date, first_login):
@@ -16859,6 +16893,7 @@ def build_erp_billing_table(source_df, login_df=None, reference_lookup=None):
         login_info = billing_login_info_from_row(login_lookup, customer_no, biz_no)
         if not customer_no:
             customer_no = login_info.get("고객번호", "")
+        customer_no = normalize_customer_no(customer_no)
         rows.append(
             {
                 "순서": billing_value(row, ["순서", "순번"]) or str(idx + 1),
