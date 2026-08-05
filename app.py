@@ -1350,6 +1350,7 @@ def monthly_activity_format_df(df):
 
     result["지사"] = result["지사"].where(result["지사"].astype(str).str.strip().ne(""), "HANA지사")
     result["상품"] = result["상품"].where(result["상품"].astype(str).str.strip().ne(""), "통합CMS")
+    result["사업자번호"] = normalize_biz(result["사업자번호"])
 
     if "활동일자" in result.columns:
         parsed_dates = pd.to_datetime(result["활동일자"], errors="coerce")
