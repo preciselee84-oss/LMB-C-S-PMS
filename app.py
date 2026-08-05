@@ -9357,6 +9357,7 @@ def show_all_staff_summary(staff_names):
                     st.warning(subscription_info.get("error", "매핑할 사업자번호가 없습니다."))
                 else:
                     st.session_state.admin_subscription_biz_map = subscription_map
+                    st.session_state.admin_subscription_df = subscription_df.copy()
                     history_file_key = f"{history_file.name}_{history_file.size}"
                     if st.session_state.get("admin_history_upload_key") != history_file_key:
                         st.session_state.admin_history_upload_key = history_file_key
@@ -9374,6 +9375,7 @@ def show_all_staff_summary(staff_names):
         else:
             st.button("사업자번호 매핑", use_container_width=True, disabled=True)
             st.session_state.admin_subscription_biz_map = {}
+            st.session_state.admin_subscription_df = pd.DataFrame()
 
     with col_upload:
         st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>본사이력 업로드 (선택)</div>", unsafe_allow_html=True)
@@ -10188,6 +10190,7 @@ def show_user_history(is_admin_mode=False):
                     st.warning(subscription_info.get("error", "매핑할 사업자번호가 없습니다."))
                 else:
                     st.session_state.activity_subscription_biz_map = subscription_map
+                    st.session_state.activity_subscription_df = subscription_df.copy()
                     _file_id = f"{history_file.name}_{history_file.size}"
                     if st.session_state.get("_subscription_file_id") != _file_id:
                         st.session_state["_subscription_file_id"] = _file_id
@@ -10203,6 +10206,7 @@ def show_user_history(is_admin_mode=False):
         else:
             st.button("사업자번호 매핑", use_container_width=True, disabled=True)
             st.session_state.activity_subscription_biz_map = {}
+            st.session_state.activity_subscription_df = pd.DataFrame()
     with col_upload:
         st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>본사이력 업로드 (선택)</div>", unsafe_allow_html=True)
         u_file = st.file_uploader("본사이력 업로드 (선택)", type=["xlsx"], label_visibility="collapsed")
@@ -11268,7 +11272,133 @@ def as_date_series(series):
     return pd.to_datetime(series, errors="coerce")
 
 
+def latest_local_subscription_export_df():
+    downloads_dir = os.path.join(os.path.expanduser("~"), "Downloads")
+    if not os.path.isdir(downloads_dir):
+        return pd.DataFrame()
+    candidates = []
+    for file_name in os.listdir(downloads_dir):
+        lower_name = file_name.lower()
+        if lower_name.startswith("subscriptions_export") and lower_name.endswith((".xlsx", ".xls", ".csv")):
+            path = os.path.join(downloads_dir, file_name)
+            try:
+                candidates.append((os.path.getmtime(path), path))
+            except OSError:
+                continue
+    if not candidates:
+        return pd.DataFrame()
+    fallback_df = pd.DataFrame()
+    for _, path in sorted(candidates, key=lambda item: item[0], reverse=True):
+        try:
+            if path.lower().endswith(".csv"):
+                df = pd.read_csv(path, dtype=str).fillna("")
+            else:
+                df = pd.read_excel(path, dtype=str).fillna("")
+        except Exception:
+            continue
+        if fallback_df.empty:
+            fallback_df = df
+        expected_cols = {"운영담당자", "상태", "ERP연계여부"}
+        if len(df) >= 100 and expected_cols.issubset(set(map(str, df.columns))):
+            return df
+    return fallback_df
+
+
+def ppt_subscription_export_df():
+    for key in ["admin_subscription_df", "activity_subscription_df"]:
+        df = st.session_state.get(key)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return df
+    return latest_local_subscription_export_df()
+
+
+def subscription_customer_counts(name=None):
+    source = ppt_subscription_export_df()
+    empty_counts = {
+        "manage_total": 0, "manage_link": 0,
+        "year_open": 0, "year_link": 0,
+        "month_open": 0, "month_link": 0,
+    }
+    if source is None or source.empty:
+        return empty_counts
+
+    analysis_source_df = st.session_state.get("analysis_result")
+    if not isinstance(analysis_source_df, pd.DataFrame):
+        analysis_source_df = pd.DataFrame()
+    _, year, _ = report_month_info(analysis_source_df)
+
+    df = clean_header_logic(source.copy()).replace({np.nan: ""})
+
+    def pick_subscription_col(keys):
+        normalized_cols = {
+            str(col).replace(" ", "").replace("　", "").lower(): col
+            for col in df.columns
+        }
+        for key in keys:
+            normalized_key = str(key).replace(" ", "").replace("　", "").lower()
+            if normalized_key in normalized_cols:
+                return normalized_cols[normalized_key]
+        for key in keys:
+            normalized_key = str(key).replace(" ", "").replace("　", "").lower()
+            for normalized_col, col in normalized_cols.items():
+                if normalized_key in normalized_col:
+                    return col
+        return None
+
+    owner_col = pick_subscription_col(["운영담당자", "운영 담당자", "담당자"])
+    status_col = pick_subscription_col(["상태", "상태항목"])
+    erp_flag_col = pick_subscription_col(["ERP연계여부", "ERP연계 여부", "ERP 연계 여부"])
+    open_col = pick_subscription_col(["개설일", "실제 개설일(설치일)", "시작일"])
+    link_col = pick_subscription_col(["연계일", "ERP연계접수일자", "ERP 연계 접수일자"])
+    biz_col = pick_subscription_col(["사업자번호", "사업자등록번호"])
+    customer_col = pick_subscription_col(["고객 관리번호", "고개관리번호", "고객번호", "고객 식별코드"])
+    company_col = pick_subscription_col(["고객사명", "업체명", "고객명", "상호"])
+
+    if name and owner_col and owner_col in df.columns:
+        df = df[df[owner_col].astype(str).str.strip() == str(name).strip()].copy()
+    if df.empty:
+        return empty_counts
+
+    if biz_col and biz_col in df.columns:
+        key = normalize_biz(df[biz_col])
+    elif customer_col and customer_col in df.columns:
+        key = df[customer_col].astype(str).str.strip()
+    elif company_col and company_col in df.columns:
+        key = df[company_col].map(normalize_company_match_key)
+    else:
+        key = pd.Series([""] * len(df), index=df.index)
+    df["_customer_key"] = key.where(key.astype(str).str.strip().ne(""), df.index.astype(str))
+
+    active_mask = pd.Series(True, index=df.index)
+    if status_col and status_col in df.columns:
+        active_mask = df[status_col].astype(str).str.strip().str.lower().eq("active")
+
+    erp_mask = pd.Series(False, index=df.index)
+    if erp_flag_col and erp_flag_col in df.columns:
+        erp_text = df[erp_flag_col].astype(str).str.strip().str.lower()
+        erp_mask = erp_text.isin(["예", "y", "yes", "o", "true", "1"])
+
+    open_dates = as_date_series(df[open_col]) if open_col and open_col in df.columns else pd.Series(pd.NaT, index=df.index)
+    link_dates = as_date_series(df[link_col]) if link_col and link_col in df.columns else pd.Series(pd.NaT, index=df.index)
+
+    def unique_count(mask):
+        return int(df.loc[mask.fillna(False), "_customer_key"].astype(str).str.strip().replace("", np.nan).dropna().nunique())
+
+    return {
+        "manage_total": unique_count(active_mask),
+        "manage_link": unique_count(active_mask & erp_mask),
+        "year_open": unique_count(open_dates.dt.year == year),
+        "year_link": unique_count(link_dates.dt.year == year),
+        "month_open": 0,
+        "month_link": 0,
+    }
+
+
 def cloud_customer_counts(name=None):
+    subscription_counts = subscription_customer_counts(name)
+    if any(subscription_counts.get(key, 0) for key in ["manage_total", "manage_link", "year_open", "year_link"]):
+        return subscription_counts
+
     cloud = st.session_state.get("cloud_sheet_df")
     if cloud is None:
         try:
@@ -11553,8 +11683,8 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
             cloud_counts["year_open"],
             cloud_counts["year_link"],
             "-",
-            cloud_counts["month_open"],
-            cloud_counts["month_link"],
+            counts["open"],
+            counts["link"],
         ])
 
     def fill_major_slide(slide, rows):
