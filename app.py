@@ -16398,6 +16398,9 @@ def apply_billing_reference_to_source_df(df, reference_lookup):
     erp_col = find_col(work, ["ERP연계 여부", "ERP연계여부"])
     receipt_col = find_col(work, ["접수일자"])
     owner_col = find_col(work, ["담당자", "담당자(당월)"])
+    build_col = find_col(work, ["구축일", "구축일자"])
+    link_start_col = find_col(work, ["연계시작일자"])
+    extra_link_col = find_col(work, ["추가연계신청일자"])
 
     for idx, row in work.iterrows():
         reference_info = billing_reference_info_from_row(reference_lookup, row)
@@ -16423,10 +16426,26 @@ def apply_billing_reference_to_source_df(df, reference_lookup):
             receipt = billing_display_value(reference_info.get("접수일자", ""))
             if receipt:
                 work.at[idx, receipt_col] = receipt
-        if owner_col and owner_col in work.columns and not billing_display_value(work.at[idx, owner_col]):
-            owner = billing_display_value(reference_info.get("담당자", ""))
-            if owner:
+        if owner_col and owner_col in work.columns:
+            crm_owner = billing_display_value(reference_info.get("CRM 운영담당자", ""))
+            owner = crm_owner or billing_display_value(reference_info.get("담당자", ""))
+            if crm_owner or (owner and not billing_display_value(work.at[idx, owner_col])):
                 work.at[idx, owner_col] = owner
+        if build_col and build_col in work.columns:
+            build_date = billing_display_value(reference_info.get("CRM 개설일", ""))
+            if build_date:
+                work.at[idx, build_col] = build_date
+        if link_start_col and link_start_col in work.columns:
+            link_start_date = billing_display_value(reference_info.get("CRM ERP연계접수일자", ""))
+            if link_start_date:
+                work.at[idx, link_start_col] = link_start_date
+        if extra_link_col and extra_link_col in work.columns:
+            build_value = work.at[idx, build_col] if build_col and build_col in work.columns else ""
+            link_value = work.at[idx, link_start_col] if link_start_col and link_start_col in work.columns else ""
+            if billing_date_after(link_value, build_value):
+                work.at[idx, extra_link_col] = link_value
+            elif not billing_display_value(work.at[idx, extra_link_col]):
+                work.at[idx, extra_link_col] = ""
     return work
 
 
@@ -16512,6 +16531,7 @@ def build_billing_download_sections(parsed_open_sections, parsed_erp_sections, o
         moved_df = moved_df.reindex(columns=edu_columns, fill_value="")
     education_title = education_sections[0][0] if education_sections else "사용자교육(방문)대기 고객사"
     final_open_sections = selected_open + [(education_title, moved_df)]
+    final_open_sections = clear_education_visit_dates(final_open_sections)
     return final_open_sections, selected_erp
 
 
@@ -16647,6 +16667,8 @@ def build_billing_crm_reference(crm_df):
     company_col = find_col_by_priority(crm, ["고객사명", "고객명", "업체명", "상호"])
     erp_col = find_col_by_priority(crm, ["ERP연계여부", "ERP연계 여부", "ERP 연계 여부"])
     start_col = find_col_by_priority(crm, ["시작일"])
+    open_col = find_col_by_priority(crm, ["개설일"])
+    erp_receipt_col = find_col_by_priority(crm, ["ERP연계접수일자", "ERP 연계 접수일자"])
     owner_col = find_col_by_priority(crm, ["운영담당자", "운영 담당자", "담당자"])
     if not biz_col or not customer_col:
         return {}, {
@@ -16676,9 +16698,17 @@ def build_billing_crm_reference(crm_df):
         start_text = billing_display_value(row.get(start_col, "")) if start_col else ""
         if start_text:
             info["접수일자"] = start_text
+            info["CRM 시작일"] = start_text
+        open_text = billing_display_value(row.get(open_col, "")) if open_col else ""
+        if open_text:
+            info["CRM 개설일"] = open_text
+        erp_receipt_text = billing_display_value(row.get(erp_receipt_col, "")) if erp_receipt_col else ""
+        if erp_receipt_text:
+            info["CRM ERP연계접수일자"] = erp_receipt_text
         owner_text = billing_display_value(row.get(owner_col, "")) if owner_col else ""
         if owner_text:
             info["담당자"] = owner_text
+            info["CRM 운영담당자"] = owner_text
         for customer_key in billing_customer_keys(customer_no):
             lookup.setdefault(customer_key, info)
         lookup.setdefault(f"biz:{biz_key}", info)
@@ -16715,6 +16745,14 @@ def billing_dates_differ(left, right):
     if pd.isna(left_date) or pd.isna(right_date):
         return False
     return left_date.normalize() != right_date.normalize()
+
+
+def billing_date_after(left, right):
+    left_date = parse_sheet_date(left)
+    right_date = parse_sheet_date(right)
+    if pd.isna(left_date) or pd.isna(right_date):
+        return False
+    return left_date.normalize() > right_date.normalize()
 
 
 def billing_prelogin_note(build_date, visit_date):
@@ -16894,6 +16932,14 @@ def build_erp_billing_table(source_df, login_df=None, reference_lookup=None):
         if not customer_no:
             customer_no = login_info.get("고객번호", "")
         customer_no = normalize_customer_no(customer_no)
+        build_date = billing_display_value(reference_info.get("CRM 개설일", "")) or billing_value(row, ["구축일", "구축일자"])
+        link_start_date = billing_display_value(reference_info.get("CRM ERP연계접수일자", "")) or billing_value(row, ["연계시작일자"])
+        extra_link_date = link_start_date if billing_date_after(link_start_date, build_date) else ""
+        owner = billing_display_value(reference_info.get("CRM 운영담당자", "")) or billing_fill_blank(
+            billing_value(row, ["담당자", "담당자(당월)"]),
+            reference_info,
+            "담당자",
+        )
         rows.append(
             {
                 "순서": billing_value(row, ["순서", "순번"]) or str(idx + 1),
@@ -16902,10 +16948,10 @@ def build_erp_billing_table(source_df, login_df=None, reference_lookup=None):
                 "업체명": billing_fill_blank(billing_value(row, ["업체명", "고객명"]), reference_info, "업체명"),
                 "해지체크": billing_termination_text(reference_info),
                 "구분": billing_value(row, ["구분"]),
-                "추가연계신청일자": billing_value(row, ["추가연계신청일자"]),
-                "담당자": billing_value(row, ["담당자"]),
-                "구축일": billing_value(row, ["구축일", "구축일자"]),
-                "연계시작일자": billing_value(row, ["연계시작일자"]),
+                "추가연계신청일자": extra_link_date,
+                "담당자": owner,
+                "구축일": build_date,
+                "연계시작일자": link_start_date,
                 "은행연계완료일자": billing_value(row, ["은행연계완료일자"]),
                 "수령여부": billing_value(row, ["수령여부"]),
                 "비고": billing_value(row, ["비고"]),
@@ -16933,7 +16979,19 @@ def load_education_waiting_section(login_df=None, reference_lookup=None):
         mask = raw_df[status_col].astype(str).str.strip().isin(["개설대기", "개설진행"])
         raw_df = raw_df[mask].reset_index(drop=True)
     table_df = build_open_billing_table(raw_df, login_df, reference_lookup or {})
+    if "방문일자" in table_df.columns:
+        table_df["방문일자"] = ""
     return "사용자교육(방문)대기 고객사", table_df, None
+
+
+def clear_education_visit_dates(sections):
+    cleaned = []
+    for title, df in sections:
+        if "사용자교육" in str(title) and isinstance(df, pd.DataFrame) and "방문일자" in df.columns:
+            df = df.copy()
+            df["방문일자"] = ""
+        cleaned.append((title, df))
+    return cleaned
 
 
 def billing_first_login_before_build(row):
@@ -17052,6 +17110,7 @@ def render_billing_source_tables(source_upload=None, login_df=None):
 
     open_sections = [(t, d) for t, d in open_sections if "사용자교육" not in t]
     open_sections.extend(education_sections)
+    open_sections = clear_education_visit_dates(open_sections)
 
     open_tab, erp_tab = st.tabs(["청구원본(개설업로드)", "청구원본(연계업로드)"])
     with open_tab:
