@@ -9375,7 +9375,6 @@ def show_all_staff_summary(staff_names):
         else:
             st.button("사업자번호 매핑", use_container_width=True, disabled=True)
             st.session_state.admin_subscription_biz_map = {}
-            st.session_state.admin_subscription_df = pd.DataFrame()
 
     with col_upload:
         st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>본사이력 업로드 (선택)</div>", unsafe_allow_html=True)
@@ -10206,7 +10205,6 @@ def show_user_history(is_admin_mode=False):
         else:
             st.button("사업자번호 매핑", use_container_width=True, disabled=True)
             st.session_state.activity_subscription_biz_map = {}
-            st.session_state.activity_subscription_df = pd.DataFrame()
     with col_upload:
         st.markdown("<div style='text-align:center;font-weight:700;margin-bottom:4px;'>본사이력 업로드 (선택)</div>", unsafe_allow_html=True)
         u_file = st.file_uploader("본사이력 업로드 (선택)", type=["xlsx"], label_visibility="collapsed")
@@ -11305,7 +11303,7 @@ def latest_local_subscription_export_df():
 
 
 def ppt_subscription_export_df():
-    for key in ["admin_subscription_df", "activity_subscription_df"]:
+    for key in ["report_subscription_df", "admin_subscription_df", "activity_subscription_df"]:
         df = st.session_state.get(key)
         if isinstance(df, pd.DataFrame) and not df.empty:
             return df
@@ -11794,6 +11792,30 @@ def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_m
     st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
 
     is_closed = bool(st.session_state.get("report_closed"))
+
+    report_subscription_file = st.file_uploader(
+        "실적보고서 CRM 구독정보 업로드 (subscriptions_export)",
+        type=["xlsx", "xls", "csv"],
+        help="PPT 고객 실적의 관리고객/2026년 실적 집계에 사용할 subscriptions_export 파일을 업로드해주세요.",
+        key="report_subscription_file",
+    )
+    if report_subscription_file is not None:
+        try:
+            if report_subscription_file.name.lower().endswith(".csv"):
+                report_subscription_df = pd.read_csv(report_subscription_file, dtype=str).fillna("")
+            else:
+                report_subscription_df = pd.read_excel(report_subscription_file, dtype=str).fillna("")
+            st.session_state.report_subscription_df = report_subscription_df
+            st.success(f"CRM 구독정보 {len(report_subscription_df):,}건 준비 완료")
+        except Exception as exc:
+            st.session_state.report_subscription_df = pd.DataFrame()
+            st.error(f"CRM 구독정보 파일을 읽을 수 없습니다: {exc}")
+    elif not isinstance(st.session_state.get("report_subscription_df"), pd.DataFrame):
+        st.session_state.report_subscription_df = pd.DataFrame()
+
+    subscription_df_for_report = ppt_subscription_export_df()
+    if subscription_df_for_report.empty:
+        st.warning("CRM 구독정보가 없어 PPT 고객 실적의 관리고객/2026년 실적이 0으로 표시됩니다.")
 
     dc1, dc2 = st.columns([0.85, 0.15])
     with dc2:
