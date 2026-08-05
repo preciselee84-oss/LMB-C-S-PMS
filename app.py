@@ -16385,6 +16385,36 @@ def has_billing_login_history(login_lookup, customer_no, biz_no=""):
     return False
 
 
+def apply_billing_reference_to_source_df(df, reference_lookup):
+    if df is None or df.empty or not reference_lookup:
+        return df
+    work = df.copy()
+    customer_col = find_col(work, ["고객번호", "고객번호(당월)"])
+    if not customer_col or customer_col not in work.columns:
+        customer_col = "고객번호"
+        work.insert(0, customer_col, "")
+    company_col = find_col(work, ["업체명", "고객명", "업체명(당월)", "고객명(당월)"])
+    biz_col = find_col(work, ["사업자번호", "사업자등록번호", "사업자번호(당월)", "사업자등록번호(당월)"])
+
+    for idx, row in work.iterrows():
+        reference_info = billing_reference_info_from_row(reference_lookup, row)
+        if not reference_info:
+            continue
+        if not billing_display_value(work.at[idx, customer_col]):
+            customer_no = billing_display_value(reference_info.get("고객번호", ""))
+            if customer_no:
+                work.at[idx, customer_col] = customer_no
+        if biz_col and biz_col in work.columns and not billing_display_value(work.at[idx, biz_col]):
+            biz_no = billing_display_value(reference_info.get("사업자번호", ""))
+            if biz_no:
+                work.at[idx, biz_col] = biz_no
+        if company_col and company_col in work.columns and not billing_display_value(work.at[idx, company_col]):
+            company = billing_display_value(reference_info.get("업체명", ""))
+            if company:
+                work.at[idx, company_col] = company
+    return work
+
+
 def slice_billing_sections_by_count(sections, target_count):
     selected = []
     remaining = []
@@ -16425,12 +16455,21 @@ def billing_sections_excel_bytes(open_sections, erp_sections):
     return output.getvalue()
 
 
-def build_billing_download_sections(parsed_open_sections, parsed_erp_sections, open_count, link_count, login_df):
-    open_main_sections = [(title, df) for title, df in parsed_open_sections if "사용자교육" not in title]
-    education_sections = [(title, df) for title, df in parsed_open_sections if "사용자교육" in title]
+def build_billing_download_sections(parsed_open_sections, parsed_erp_sections, open_count, link_count, login_df, reference_lookup=None):
+    reference_lookup = reference_lookup or {}
+    prepared_open_sections = [
+        (title, apply_billing_reference_to_source_df(df, reference_lookup))
+        for title, df in parsed_open_sections
+    ]
+    prepared_erp_sections = [
+        (title, apply_billing_reference_to_source_df(df, reference_lookup))
+        for title, df in parsed_erp_sections
+    ]
+    open_main_sections = [(title, df) for title, df in prepared_open_sections if "사용자교육" not in title]
+    education_sections = [(title, df) for title, df in prepared_open_sections if "사용자교육" in title]
 
     selected_open, remaining_open = slice_billing_sections_by_count(open_main_sections, open_count)
-    selected_erp, _ = slice_billing_sections_by_count(parsed_erp_sections, link_count)
+    selected_erp, _ = slice_billing_sections_by_count(prepared_erp_sections, link_count)
 
     login_lookup = login_lookup_from_df(login_df)
     moved_rows = []
@@ -16554,6 +16593,75 @@ def load_billing_customer_reference():
         if biz_key:
             lookup.setdefault(f"biz:{biz_key}", reference_info)
     return lookup, ""
+
+
+def merge_billing_reference_lookup(base_lookup, extra_lookup):
+    merged = dict(base_lookup or {})
+    for key, extra_info in (extra_lookup or {}).items():
+        if not key or not extra_info:
+            continue
+        if key not in merged:
+            merged[key] = extra_info
+            continue
+        current = dict(merged.get(key, {}))
+        for info_key, info_value in extra_info.items():
+            if billing_display_value(current.get(info_key, "")):
+                continue
+            value_text = billing_display_value(info_value)
+            if value_text:
+                current[info_key] = value_text
+        merged[key] = current
+    return merged
+
+
+def build_billing_crm_reference(crm_df):
+    if crm_df is None or crm_df.empty:
+        return {}, {"total": 0, "mapped": 0}
+    crm = clean_header_logic(crm_df.copy()).replace({np.nan: ""})
+    biz_col = find_col_by_priority(crm, ["사업자번호", "사업자등록번호"])
+    customer_col = find_col_by_priority(
+        crm,
+        ["고객번호", "고개관리번호", "고객관리번호", "고객 관리번호", "고객 식별코드", "고객NO", "고객 No"],
+    )
+    company_col = find_col_by_priority(crm, ["고객사명", "고객명", "업체명", "상호"])
+    if not biz_col or not customer_col:
+        return {}, {
+            "total": len(crm),
+            "mapped": 0,
+            "error": "CRM 파일에서 사업자번호 또는 고객번호 컬럼을 찾을 수 없습니다.",
+        }
+
+    lookup = {}
+    mapped = 0
+    for _, row in crm.iterrows():
+        biz_key = normalize_biz_no(row.get(biz_col, ""))
+        customer_no = normalize_customer_no(row.get(customer_col, ""))
+        if not biz_key or not customer_no:
+            continue
+        info = {
+            "고객번호": customer_no,
+            "사업자번호": biz_key,
+        }
+        company = billing_display_value(row.get(company_col, "")) if company_col else ""
+        if company:
+            info["업체명"] = company
+            info["청구원본 고객명"] = company
+        for customer_key in billing_customer_keys(customer_no):
+            lookup.setdefault(customer_key, info)
+        lookup.setdefault(f"biz:{biz_key}", info)
+        mapped += 1
+    return lookup, {"total": len(crm), "mapped": mapped}
+
+
+def read_billing_crm_upload(uploaded_file):
+    file_name = (uploaded_file.name or "").lower()
+    raw = uploaded_file.getvalue()
+    if file_name.endswith(".csv"):
+        try:
+            return pd.read_csv(BytesIO(raw), dtype=str).fillna("")
+        except UnicodeDecodeError:
+            return pd.read_csv(BytesIO(raw), dtype=str, encoding="cp949").fillna("")
+    return pd.read_excel(BytesIO(raw), dtype=str).fillna("")
 
 
 def billing_value(row, candidates):
@@ -16814,6 +16922,26 @@ def render_billing_source_tables(source_upload=None, login_df=None):
         key="billing_source_upload",
         help="2026년 6월 구축 및 연계 리스트_최종본.xlsx 파일을 업로드해주세요.",
     )
+    crm_file = st.file_uploader(
+        "CRM 구독정보 파일 업로드",
+        type=["xlsx", "xls", "csv"],
+        key="billing_crm_upload",
+        help="subscriptions_export 파일을 업로드하면 사업자번호 기준으로 고객번호를 한 번 더 대사합니다.",
+    )
+    crm_reference_lookup = {}
+    if crm_file:
+        try:
+            crm_df = read_billing_crm_upload(crm_file)
+            crm_reference_lookup, crm_info = build_billing_crm_reference(crm_df)
+            if crm_info.get("error"):
+                st.warning(crm_info["error"])
+            else:
+                st.success(
+                    f"CRM 사업자번호 기준 고객번호 대사 {crm_info.get('mapped', 0):,}건 준비"
+                    f" / 전체 {crm_info.get('total', 0):,}건"
+                )
+        except Exception as exc:
+            st.error(f"CRM 구독정보 파일을 읽을 수 없습니다: {exc}")
     open_sections = [("2026년 6월 구축 실적", build_open_billing_table(pd.DataFrame(), login_df))]
     erp_sections = [("당월 ERP연계 청구 고객사", build_erp_billing_table(pd.DataFrame(), login_df))]
     education_sections = [("사용자교육(방문)대기 고객사", pd.DataFrame())]
@@ -16836,6 +16964,7 @@ def render_billing_source_tables(source_upload=None, login_df=None):
             reference_lookup, reference_error = load_billing_customer_reference()
             if reference_error:
                 st.warning(reference_error)
+            reference_lookup = merge_billing_reference_lookup(reference_lookup, crm_reference_lookup)
             education_sections = [
                 (title, build_open_billing_table(section_df, login_df, reference_lookup))
                 for title, section_df in parsed_open_sections
@@ -16894,6 +17023,7 @@ def render_billing_source_tables(source_upload=None, login_df=None):
                 open_count,
                 link_count,
                 login_df,
+                reference_lookup,
             )
             st.download_button(
                 "청구자료 엑셀 다운로드",
