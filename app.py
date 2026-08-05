@@ -11616,6 +11616,24 @@ def build_report_ppt_bytes(report_df, compare_df, curr_month_label, prev_month_l
 
     prs = Presentation(PPT_TEMPLATE_FILE)
     ym, _, _ = report_month_info(report_df)
+    try:
+        report_year, report_month = ym.split("-")
+        report_title = f"’{report_year[-2:]}년 {int(report_month)}월\nLMB 성과보고서"
+    except Exception:
+        report_title = f"{curr_month_label}\nLMB 성과보고서"
+
+    def update_title_slide():
+        if not prs.slides:
+            return
+        for shape in prs.slides[0].shapes:
+            if getattr(shape, "has_text_frame", False) and "LMB 성과보고서" in shape.text:
+                shape.text = report_title
+                for paragraph in shape.text_frame.paragraphs:
+                    for run in paragraph.runs:
+                        run.font.name = "맑은 고딕"
+                break
+
+    update_title_slide()
 
     def fmt(value):
         if value == "":
