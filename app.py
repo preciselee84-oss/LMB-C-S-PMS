@@ -16431,20 +16431,25 @@ def apply_billing_reference_to_source_df(df, reference_lookup):
             owner = crm_owner or billing_display_value(reference_info.get("담당자", ""))
             if crm_owner or (owner and not billing_display_value(work.at[idx, owner_col])):
                 work.at[idx, owner_col] = owner
+        build_date = billing_display_value(reference_info.get("CRM 개설일", ""))
         if build_col and build_col in work.columns:
-            build_date = billing_display_value(reference_info.get("CRM 개설일", ""))
             if build_date:
                 work.at[idx, build_col] = build_date
+            else:
+                build_date = billing_display_value(work.at[idx, build_col])
         if link_start_col and link_start_col in work.columns:
-            link_start_date = billing_display_value(reference_info.get("CRM ERP연계접수일자", ""))
+            link_start_date = build_date or billing_display_value(work.at[idx, link_start_col])
             if link_start_date:
                 work.at[idx, link_start_col] = link_start_date
         if extra_link_col and extra_link_col in work.columns:
-            build_value = work.at[idx, build_col] if build_col and build_col in work.columns else ""
-            link_value = work.at[idx, link_start_col] if link_start_col and link_start_col in work.columns else ""
-            if billing_date_after(link_value, build_value):
-                work.at[idx, extra_link_col] = link_value
-            elif not billing_display_value(work.at[idx, extra_link_col]):
+            erp_receipt_date = billing_display_value(reference_info.get("CRM ERP연계접수일자", ""))
+            if not erp_receipt_date:
+                erp_receipt_date = billing_display_value(work.at[idx, extra_link_col])
+            if not erp_receipt_date and link_start_col and link_start_col in work.columns:
+                erp_receipt_date = billing_display_value(work.at[idx, link_start_col])
+            if billing_date_after(erp_receipt_date, build_date):
+                work.at[idx, extra_link_col] = erp_receipt_date
+            else:
                 work.at[idx, extra_link_col] = ""
     return work
 
@@ -16952,8 +16957,11 @@ def build_erp_billing_table(source_df, login_df=None, reference_lookup=None):
             customer_no = login_info.get("고객번호", "")
         customer_no = normalize_customer_no(customer_no)
         build_date = billing_display_value(reference_info.get("CRM 개설일", "")) or billing_value(row, ["구축일", "구축일자"])
-        link_start_date = billing_display_value(reference_info.get("CRM ERP연계접수일자", "")) or billing_value(row, ["연계시작일자"])
-        extra_link_date = link_start_date if billing_date_after(link_start_date, build_date) else ""
+        link_start_date = build_date or billing_value(row, ["연계시작일자"])
+        erp_receipt_date = billing_display_value(reference_info.get("CRM ERP연계접수일자", ""))
+        if not erp_receipt_date:
+            erp_receipt_date = billing_value(row, ["추가연계신청일자"]) or billing_value(row, ["연계시작일자"])
+        extra_link_date = erp_receipt_date if billing_date_after(erp_receipt_date, build_date) else ""
         owner = billing_display_value(reference_info.get("CRM 운영담당자", "")) or billing_fill_blank(
             billing_value(row, ["담당자", "담당자(당월)"]),
             reference_info,
