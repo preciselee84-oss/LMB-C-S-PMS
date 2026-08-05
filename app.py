@@ -1825,6 +1825,9 @@ def monthly_webcash_criteria_df():
     )
 
 
+MONTHLY_STAFF_COUNT_ORDER = ["이성환", "임인지", "전준수", "이수현", "길민종"]
+
+
 def monthly_staff_count_matrix_df(perf_df):
     if perf_df is None or not isinstance(perf_df, pd.DataFrame) or perf_df.empty or "담당자" not in perf_df.columns:
         return pd.DataFrame()
@@ -1843,19 +1846,20 @@ def monthly_staff_count_matrix_df(perf_df):
     for label, col in metrics:
         item = {"구분": label}
         total = 0
-        for _, row in work.iterrows():
-            staff = str(row.get("담당자", "")).strip()
-            if not staff:
-                continue
-            try:
-                value = int(float(str(row.get(col, 0) or 0).replace(",", "")))
-            except Exception:
-                value = 0
+        for staff in MONTHLY_STAFF_COUNT_ORDER:
+            staff_rows = work[work["담당자"].astype(str).str.strip() == staff]
+            value = 0
+            if col in staff_rows.columns:
+                for raw_value in staff_rows[col].tolist():
+                    try:
+                        value += int(float(str(raw_value or 0).replace(",", "")))
+                    except Exception:
+                        value += 0
             item[staff] = value
             total += value
         item["합계"] = total
         rows.append(item)
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=["구분"] + MONTHLY_STAFF_COUNT_ORDER + ["합계"])
 
 
 def monthly_staff_count_matrix_from_history_df(history_df):
@@ -1866,22 +1870,21 @@ def monthly_staff_count_matrix_from_history_df(history_df):
     if work.empty or "등록자" not in work.columns or "활동상세" not in work.columns:
         return pd.DataFrame()
 
-    staff_names = [str(name).strip() for name in work["등록자"].dropna().unique().tolist() if str(name).strip()]
-    if not staff_names:
+    if not any(work["등록자"].astype(str).str.strip().isin(MONTHLY_STAFF_COUNT_ORDER)):
         return pd.DataFrame()
 
     rows = []
     for label in ["개설", "연계", "운영"]:
         item = {"구분": label}
         total = 0
-        for staff in staff_names:
+        for staff in MONTHLY_STAFF_COUNT_ORDER:
             staff_df = work[work["등록자"].astype(str).str.strip() == staff]
             value = int(staff_df["활동상세"].astype(str).str.contains(label, na=False).sum())
             item[staff] = value
             total += value
         item["합계"] = total
         rows.append(item)
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=["구분"] + MONTHLY_STAFF_COUNT_ORDER + ["합계"])
 
 
 def render_monthly_staff_count_matrix(perf_df=None, history_df=None):
