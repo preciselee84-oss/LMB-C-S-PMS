@@ -1829,6 +1829,17 @@ def monthly_webcash_criteria_df():
 MONTHLY_STAFF_COUNT_ORDER = ["이성환", "임인지", "전준수", "이수현", "길민종"]
 
 
+def order_staff_rows(df, name_col="담당자"):
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty or name_col not in df.columns:
+        return df
+    result = df.copy()
+    order_map = {name: idx for idx, name in enumerate(MONTHLY_STAFF_COUNT_ORDER)}
+    result["_staff_order"] = result[name_col].astype(str).str.strip().map(order_map)
+    result = result[result["_staff_order"].notna()].copy()
+    result["_staff_order"] = result["_staff_order"].astype(int)
+    return result.sort_values("_staff_order").drop(columns=["_staff_order"]).reset_index(drop=True)
+
+
 def monthly_staff_count_matrix_df(perf_df):
     if perf_df is None or not isinstance(perf_df, pd.DataFrame) or perf_df.empty or "담당자" not in perf_df.columns:
         return pd.DataFrame()
@@ -2742,6 +2753,7 @@ def build_daily_visit_matrix_df(curr_df_raw):
     display_cols = [daily_visit_date_header(d) for d in all_dates]
     grouped.columns = display_cols
     result = grouped.reset_index().rename(columns={u_col: "담당자"})
+    result = order_staff_rows(result, "담당자")
     result.attrs["date_map"] = {label: key for label, key in zip(display_cols, date_keys)}
     return result
 
@@ -9126,6 +9138,11 @@ def show_all_staff_summary(staff_names):
         perf_df = perf_df.sort_values(by="_rank_order", ascending=ascending)
     else:
         perf_df = perf_df.sort_values(by=sort_by, ascending=ascending)
+    perf_df = order_staff_rows(perf_df, "담당자")
+
+    if perf_df.empty:
+        st.warning("검색 결과가 없습니다.")
+        return
 
     # 통계 요약
     st.markdown("#### 📊 전체 실적 요약")
@@ -9786,6 +9803,7 @@ def show_all_staff_summary(staff_names):
             perf_df = apply_webcash_monthly_score_caps(perf_df)
             perf_df = apply_rs_allowance_formula(perf_df, user_db)
             perf_df = apply_perf_sheet_payouts(perf_df)
+            perf_df = order_staff_rows(perf_df, "담당자")
 
             total_row = {}
             for col in display_cols:
