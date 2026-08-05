@@ -1842,6 +1842,7 @@ def monthly_staff_count_matrix_df(perf_df):
     ]
     for label, col in metrics:
         item = {"구분": label}
+        total = 0
         for _, row in work.iterrows():
             staff = str(row.get("담당자", "")).strip()
             if not staff:
@@ -1851,6 +1852,8 @@ def monthly_staff_count_matrix_df(perf_df):
             except Exception:
                 value = 0
             item[staff] = value
+            total += value
+        item["합계"] = total
         rows.append(item)
     return pd.DataFrame(rows)
 
@@ -1870,9 +1873,13 @@ def monthly_staff_count_matrix_from_history_df(history_df):
     rows = []
     for label in ["개설", "연계", "운영"]:
         item = {"구분": label}
+        total = 0
         for staff in staff_names:
             staff_df = work[work["등록자"].astype(str).str.strip() == staff]
-            item[staff] = int(staff_df["활동상세"].astype(str).str.contains(label, na=False).sum())
+            value = int(staff_df["활동상세"].astype(str).str.contains(label, na=False).sum())
+            item[staff] = value
+            total += value
+        item["합계"] = total
         rows.append(item)
     return pd.DataFrame(rows)
 
