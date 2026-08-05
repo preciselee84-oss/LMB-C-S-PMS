@@ -16502,6 +16502,13 @@ def billing_sections_excel_bytes(open_sections, erp_sections):
     return output.getvalue()
 
 
+def billing_open_download_df(title, source_df, login_df, reference_lookup):
+    display_df = build_open_billing_table(source_df, login_df, reference_lookup)
+    if "구축 실적" in str(title) or "사용자교육" in str(title):
+        display_df = display_df.drop(columns=["최종로그인일자"], errors="ignore")
+    return display_df
+
+
 def build_billing_download_sections(parsed_open_sections, parsed_erp_sections, open_count, link_count, login_df, reference_lookup=None):
     reference_lookup = reference_lookup or {}
     prepared_open_sections = [
@@ -16543,9 +16550,17 @@ def build_billing_download_sections(parsed_open_sections, parsed_erp_sections, o
     if edu_columns:
         moved_df = moved_df.reindex(columns=edu_columns, fill_value="")
     education_title = education_sections[0][0] if education_sections else "사용자교육(방문)대기 고객사"
-    final_open_sections = selected_open + [(education_title, moved_df)]
+    final_open_sections = [
+        (title, billing_open_download_df(title, df, login_df, reference_lookup))
+        for title, df in selected_open
+    ]
+    final_open_sections.append((education_title, billing_open_download_df(education_title, moved_df, login_df, reference_lookup)))
     final_open_sections = clear_education_visit_dates(final_open_sections)
-    return final_open_sections, selected_erp
+    final_erp_sections = [
+        (title, build_erp_billing_table(df, login_df, reference_lookup))
+        for title, df in selected_erp
+    ]
+    return final_open_sections, final_erp_sections
 
 
 def billing_display_value(value):
