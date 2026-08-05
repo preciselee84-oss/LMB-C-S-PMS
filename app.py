@@ -11394,11 +11394,14 @@ def subscription_customer_counts(name=None):
     def unique_count(mask):
         return int(df.loc[mask.fillna(False), "_customer_key"].astype(str).str.strip().replace("", np.nan).dropna().nunique())
 
+    def row_count(mask):
+        return int(mask.fillna(False).sum())
+
     return {
         "manage_total": unique_count(active_mask),
         "manage_link": unique_count(active_mask & erp_mask),
-        "year_open": unique_count(open_dates.dt.year == year),
-        "year_link": unique_count(link_dates.dt.year == year),
+        "year_open": row_count(open_dates.dt.year == year),
+        "year_link": row_count(link_dates.dt.year == year),
         "month_open": 0,
         "month_link": 0,
     }
@@ -11817,8 +11820,13 @@ def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_m
                 report_subscription_df = pd.read_csv(report_subscription_file, dtype=str).fillna("")
             else:
                 report_subscription_df = pd.read_excel(report_subscription_file, dtype=str).fillna("")
-            st.session_state.report_subscription_df = report_subscription_df
-            st.success(f"CRM 구독정보 {len(report_subscription_df):,}건 준비 완료")
+            if len(report_subscription_df) < 100:
+                if not isinstance(st.session_state.get("report_subscription_df"), pd.DataFrame):
+                    st.session_state.report_subscription_df = pd.DataFrame()
+                st.warning("업로드한 CRM 구독정보가 일부 파일로 보입니다. PPT 집계에는 전체 subscriptions_export 파일을 업로드해주세요.")
+            else:
+                st.session_state.report_subscription_df = report_subscription_df
+                st.success(f"CRM 전체 구독정보 {len(report_subscription_df):,}건 준비 완료")
         except Exception as exc:
             st.session_state.report_subscription_df = pd.DataFrame()
             st.error(f"CRM 구독정보 파일을 읽을 수 없습니다: {exc}")
@@ -11830,6 +11838,8 @@ def render_report_action_buttons(report_df, compare_df, curr_month_label, prev_m
         st.warning("CRM 구독정보가 없어 PPT 고객 실적의 관리고객/2026년 실적이 0으로 표시됩니다.")
     elif len(subscription_df_for_report) < 100:
         st.warning("CRM 구독정보가 일부만 포함된 파일로 보입니다. 관리고객 전체 집계를 위해 전체 subscriptions_export 파일을 업로드해주세요.")
+    else:
+        st.caption(f"PPT 고객 실적 집계 기준 CRM 구독정보: {len(subscription_df_for_report):,}건")
 
     dc1, dc2 = st.columns([0.85, 0.15])
     with dc2:
