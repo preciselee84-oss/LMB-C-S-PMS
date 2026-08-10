@@ -15432,18 +15432,30 @@ th, td {{
     font-size: 9pt;
     text-align: center;
 }}
+.detail-table {{
+    table-layout: fixed;
+    width: 100%;
+}}
 .query-cell {{
     text-align: left;
     vertical-align: top;
+    max-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-all;
 }}
 .query-cell pre {{
+    display: block;
+    width: 100%;
+    max-width: 100%;
     margin: 0;
     white-space: pre-wrap;
-    word-break: break-word;
+    overflow-wrap: anywhere;
+    word-break: break-all;
     font-family: Consolas, "Malgun Gothic", "맑은 고딕", monospace;
-    font-size: 8.5pt;
+    font-size: 8pt;
     line-height: 1.35;
     text-align: left;
+    overflow: hidden;
 }}
 </style>
 </head>
