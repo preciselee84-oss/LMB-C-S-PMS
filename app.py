@@ -15035,6 +15035,243 @@ INTEGRATION_WORK_OPTIONS = [
     "국내대량송금",
 ]
 
+AMARANTH_ATTACHMENT_TEMPLATES = {
+    "계좌거래내역": [
+        {
+            "title": "거래내역",
+            "transfer_method": "내보내기",
+            "process_method": "",
+            "scheduler": "",
+            "body": """[원본]
+SELECT '081' AS ebankCd, -- 연동하는 은행코드
+       RIGHT(A.INST_DV_NO, 3) AS bankCd,
+       A.CRYP_CMSV_ACCT_NO AS baNb,
+       B.TRSC_DT AS bankDt,
+       B.CMSV_ACCT_TRSC_SEQ_NO AS bankSq,
+       B.TRSC_DRTM AS bankTm,
+       regNb,
+       B.RCV_AMT AS drAm,
+       B.WDRW_AMT AS crAm,
+       B.TRSC_AF_ACCT_BAL AS balanceAm,
+       CASE WHEN A.INST_DV_NO = '10000004'
+            THEN B.ADD_RCRD_MTTR_CTT
+            ELSE B.RCRD_MTTR_CTT
+       END AS rmkDc,
+       B.RPT_WRTG_EXCN_CTT AS textDc,
+       B.CMSV_TRSC_BR_NM AS branchDc,
+       A.CMSV_CUR_CD AS exchCd,
+       '' AS insertIp,
+       '' AS insertProgramNm
+
+/*거래내역전송_통합(대상 ERP)*/
+/system/cmsCommon/00a01001
+ebankCd bankCd baNb bankDt bankSq regNb drAm crAm balanceAm rmkDc textDc branchDc exchCd insertIp insertProgramNm""",
+        }
+    ],
+    "대량이체": [
+        {
+            "title": "대량이체가져오기",
+            "transfer_method": "가져오기",
+            "process_method": "",
+            "scheduler": "",
+            "body": """[원본 ERP]
+/system/cmsCommon/00a01006
+tranDt isssq paySq tranTm tranFg outBaNb outRmkDc inBankCd inBaNb inDepositorNm inRmkDc acctAm erpKey
+
+/*대량이체가져오기(대상 CMS)*/
+SELECT CUST_NO, APNX_FILE_NM, REMT_SEQ_NO, REG_TM, EVLM_TRNS_SAL_TRNS_DV_CD,
+       CRYP_WDRW_ACCT_NO, WDRW_PSBK_MARK_CTT, RCV_INST_DV_NO, CRYP_RCV_ACCT_NO,
+       ACCT_EPCT_OWAC_NM, RCV_PSBK_MARK_CTT, TRSC_AMT, ERP_LNK_CTT,
+       SMS_TRMS_YN, REG_DT, REG_EMP_NO, UPD_EMP_NO,
+       '' AS SYS_REG_DTM, '' AS SYS_UPD_DTM
+FROM IEBK_E2C_EVLM_TRNS_PTCL
+WHERE 1 = 0
+
+/*전송 후 업데이트*/
+SELECT '081' AS ebankCd,
+       ERP_LNK_CTT AS erpKey,
+       '3' AS procFg,
+       '081' AS outBankCd,
+       CRYP_WDRW_ACCT_NO AS outBaNb,
+       '' AS modifyIp,
+       '' AS modifyRrogramNm
+FROM IEBK_E2C_EVLM_TRNS_PTCL
+WHERE CMSV_TRMS_ST_CD = '' OR CMSV_TRMS_ST_CD IS NULL""",
+        },
+        {
+            "title": "대량이체결과내보내기",
+            "transfer_method": "내보내기",
+            "process_method": "업데이트",
+            "scheduler": "",
+            "body": """[원본]
+SELECT '081' AS ebankCd,
+       B.ERP_LNK_CTT AS erpKey,
+       CASE WHEN A.TRMS_ST_CTT = '1' THEN '4'
+            WHEN A.TRMS_ST_CTT = '2' THEN '9'
+            WHEN A.TRMS_ST_CTT = '3' THEN '10'
+            WHEN A.TRMS_ST_CTT = '4' THEN '7'
+            ELSE ''
+       END AS procFg,
+       A.ERR_MSG AS errNm,
+       A.COMM AS feeAm,
+       '081' AS outBankCd,
+       B.CRYP_WDRW_ACCT_NO AS outBaNb,
+       '' AS modifyIp,
+       '' AS modifyRrogramNm
+
+/*대량이체결과내보내기(대상 ERP)*/
+/system/cmsCommon/00a03006
+ebankCd erpKey procFg outBankCd outBaNb modifyIp modifyRrogramNm errNm feeAm
+
+/*전송 후 업데이트*/
+UPDATE IEBK_C2E_EVLM_TRNS_PTCL
+   SET CMSV_TRMS_ST_CD = 'S'
+ WHERE CMSV_TRMS_ST_CD = 'I'""",
+        },
+    ],
+    "급여이체": [
+        {
+            "title": "급여이체가져오기",
+            "transfer_method": "가져오기",
+            "process_method": "",
+            "scheduler": "",
+            "body": """[원본 ERP]
+/system/cmsCommon/00a01006
+tranDt isssq paySq tranTm tranFg outBaNb outRmkDc inBankCd inBaNb inDepositorNm inRmkDc acctAm erpKey
+
+/*급여이체가져오기(대상 CMS)*/
+SELECT CUST_NO, APNX_FILE_NM, REMT_SEQ_NO, REG_TM, EVLM_TRNS_SAL_TRNS_DV_CD,
+       CRYP_WDRW_ACCT_NO, WDRW_PSBK_MARK_CTT, RCV_INST_DV_NO, CRYP_RCV_ACCT_NO,
+       ACCT_EPCT_OWAC_NM, RCV_PSBK_MARK_CTT, TRSC_AMT, ERP_LNK_CTT,
+       SMS_TRMS_YN, REG_DT, REG_EMP_NO, UPD_EMP_NO,
+       '' AS SYS_REG_DTM, '' AS SYS_UPD_DTM
+FROM IEBK_E2C_EVLM_TRNS_PTCL
+WHERE 1 = 0""",
+        },
+        {
+            "title": "급여이체결과내보내기",
+            "transfer_method": "내보내기",
+            "process_method": "업데이트",
+            "scheduler": "",
+            "body": """[원본]
+SELECT '081' AS ebankCd,
+       B.ERP_LNK_CTT AS erpKey,
+       CASE WHEN A.TRMS_ST_CTT = '1' THEN '4'
+            WHEN A.TRMS_ST_CTT = '2' THEN '9'
+            WHEN A.TRMS_ST_CTT = '3' THEN '10'
+            WHEN A.TRMS_ST_CTT = '4' THEN '7'
+            ELSE ''
+       END AS procFg,
+       A.ERR_MSG AS errNm,
+       A.COMM AS feeAm,
+       '081' AS outBankCd,
+       B.CRYP_WDRW_ACCT_NO AS outBaNb,
+       '' AS modifyIp,
+       '' AS modifyRrogramNm
+FROM IEBK_C2E_EVLM_TRNS_PTCL A,
+     IEBK_E2C_EVLM_TRNS_PTCL B
+WHERE B.ERP_LNK_CTT = A.ERP_LNK_CTT
+  AND A.CUST_NO = B.CUST_NO
+
+/*급여이체결과내보내기(대상 ERP)*/
+/system/cmsCommon/00a03006
+ebankCd erpKey procFg outBankCd outBaNb modifyIp modifyRrogramNm errNm feeAm""",
+        },
+    ],
+}
+
+for _card_work_name in ["법인카드 승인내역", "법인카드 이용내역", "법인카드 청구내역"]:
+    AMARANTH_ATTACHMENT_TEMPLATES[_card_work_name] = [
+        {
+            "title": _card_work_name,
+            "transfer_method": "내보내기",
+            "process_method": "",
+            "scheduler": "",
+            "body": """[원본]
+SELECT '081' AS ebankCd, -- 연동하는 은행코드
+       A.INST_DV_NO,
+       B.CRYP_CRD_NO,
+       B.APV_DT,
+       B.CMSV_CRD_APV_SEQ_NO,
+       B.APV_NO,
+       B.APV_DRTM,
+       B.APV_AMT,
+       B.SPLY_PRC,
+       B.VAT,
+       B.SRV_FEE,
+       B.CUR_CD,
+       B.OVRS_USE_YN,
+       B.CMSV_MEST_NM,
+       B.CRYP_MEST_BZ_REG_NO,
+       B.CMSV_MEST_NO,
+       B.MEST_ALL_ADR,
+       B.MEST_TEL_NO,
+       B.MEST_ZIP_NO,
+       B.MEST_TPBZ_NM,
+       B.CMSV_MEST_REPR_NM,
+       B.VAT_SBTR_YN
+
+/*법인카드내역전송(대상 ERP)*/
+/system/cmsCommon/00a01003
+ebankCd cardNo apprDt apprNo apprTm apprAm supplyAm vatAm serviceAm chainNm chainRegNb chainTelNo chainBtNm""",
+        }
+    ]
+
+
+def build_integration_attachment_html(form_data):
+    erp_type = str(form_data.get("erp_type", "") or "").strip()
+    if erp_type != "더존 아마란스 10":
+        return ""
+
+    selected_work_types = []
+    for item in form_data.get("work_items", []):
+        work_type = str(item.get("work_type", "") or "").strip()
+        if work_type and work_type not in selected_work_types:
+            selected_work_types.append(work_type)
+
+    sections = []
+    for work_type in selected_work_types:
+        for detail in AMARANTH_ATTACHMENT_TEMPLATES.get(work_type, []):
+            body = html.escape(str(detail.get("body", "") or ""))
+            sections.append(
+                f"""
+<div class="attachment-page">
+    <div class="attachment-title">[ 첨부 ] 상세 작업 내용</div>
+    <table class="detail-table">
+        <colgroup>
+            <col style="width: 18%">
+            <col style="width: 32%">
+            <col style="width: 18%">
+            <col style="width: 32%">
+        </colgroup>
+        <tr>
+            <th class="label">업무</th>
+            <td colspan="3" class="value">{html.escape(str(detail.get('title', '') or ''))}</td>
+        </tr>
+        <tr>
+            <th class="label">전송방식</th>
+            <td class="value">{html.escape(str(detail.get('transfer_method', '') or ''))}</td>
+            <th class="label">데이터 처리방식</th>
+            <td class="value">{html.escape(str(detail.get('process_method', '') or ''))}</td>
+        </tr>
+        <tr>
+            <th class="label">스케줄러 사용여부</th>
+            <td colspan="3" class="value">{html.escape(str(detail.get('scheduler', '') or ''))}</td>
+        </tr>
+        <tr>
+            <th class="label">작업내용</th>
+            <td colspan="3" class="query-cell"><pre>{body}</pre></td>
+        </tr>
+        <tr>
+            <th class="label">데이터 전송 시 특이사항</th>
+            <td colspan="3" class="value">&nbsp;</td>
+        </tr>
+    </table>
+</div>"""
+            )
+
+    return "".join(sections)
+
 
 def build_integration_confirmation_doc_html(form_data):
     def v(key):
@@ -15065,6 +15302,8 @@ def build_integration_confirmation_doc_html(form_data):
             f"<td class=\"value center mark\">{mark(item.get('test'))}</td>"
             "</tr>"
         )
+
+    attachment_html = build_integration_attachment_html(form_data)
 
     doc_html = f"""<!doctype html>
 <html>
@@ -15162,6 +15401,38 @@ th, td {{
     display: inline-block;
     min-width: 3.7cm;
     text-align: center;
+}}
+.attachment-page {{
+    width: 18.6cm;
+    min-height: 26.5cm;
+    margin: 0 auto;
+    border: 1.5pt solid #000;
+    padding: 1.1cm 1.45cm 1.1cm 1.45cm;
+    box-sizing: border-box;
+    page-break-before: always;
+}}
+.attachment-title {{
+    font-size: 12pt;
+    font-weight: 700;
+    margin: 0 0 12px 0;
+}}
+.detail-table th,
+.detail-table td {{
+    font-size: 9pt;
+    text-align: center;
+}}
+.query-cell {{
+    text-align: left;
+    vertical-align: top;
+}}
+.query-cell pre {{
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: Consolas, "Malgun Gothic", "맑은 고딕", monospace;
+    font-size: 8.5pt;
+    line-height: 1.35;
+    text-align: left;
 }}
 </style>
 </head>
@@ -15265,6 +15536,7 @@ th, td {{
 </div>
 </div>
 </div>
+{attachment_html}
 </body>
 </html>"""
     return doc_html
