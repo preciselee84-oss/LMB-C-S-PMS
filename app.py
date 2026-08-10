@@ -15752,7 +15752,7 @@ def build_integration_confirmation_docx_bytes(form_data):
                 borders.append(element)
             element.set(qn("w:val"), "single")
             element.set(qn("w:sz"), "12")
-            element.set(qn("w:space"), "18")
+            element.set(qn("w:space"), "20")
             element.set(qn("w:color"), "000000")
 
     def add_header_block(doc):
@@ -15803,6 +15803,12 @@ def build_integration_confirmation_docx_bytes(form_data):
             run.font.size = Pt(size)
             run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
 
+    def add_spacer(doc, height_pt):
+        paragraph = doc.add_paragraph()
+        paragraph.paragraph_format.space_before = Pt(0)
+        paragraph.paragraph_format.space_after = Pt(height_pt)
+        paragraph.paragraph_format.line_spacing = 1
+
     def mark(value):
         return "완료" if value else ""
 
@@ -15817,10 +15823,10 @@ def build_integration_confirmation_docx_bytes(form_data):
     section = doc.sections[0]
     section.page_width = Cm(21)
     section.page_height = Cm(29.7)
-    section.top_margin = Cm(0.8)
-    section.bottom_margin = Cm(0.8)
-    section.left_margin = Cm(1.1)
-    section.right_margin = Cm(1.1)
+    section.top_margin = Cm(1.25)
+    section.bottom_margin = Cm(1.05)
+    section.left_margin = Cm(1.55)
+    section.right_margin = Cm(1.55)
     set_page_border(section)
 
     add_header_block(doc)
@@ -15891,13 +15897,12 @@ def build_integration_confirmation_docx_bytes(form_data):
         set_cell_text(table.cell(row_idx, 2), mark(item.get("data_migration")))
         set_cell_text(table.cell(row_idx, 3), mark(item.get("test")))
 
-    for _ in range(1):
-        doc.add_paragraph()
+    add_spacer(doc, 58)
     p = doc.add_paragraph("상기 업무의 ERP연계 작업을 확인합니다.")
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     set_paragraph_font(p, 10, True)
 
-    doc.add_paragraph()
+    add_spacer(doc, 36)
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     date_text = form_data.get("link_date", "")
