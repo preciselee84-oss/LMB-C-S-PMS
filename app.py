@@ -14977,6 +14977,8 @@ INTEGRATION_CMS_MANAGER_OPTIONS = [
     "선택",
 ]
 
+INTEGRATION_WORK_ROW_COUNT = 8
+
 INTEGRATION_WORK_OPTIONS = [
     "선택",
     "계좌조회",
@@ -15005,11 +15007,11 @@ def build_integration_confirmation_doc_bytes(form_data):
         confirm_year = confirm_month = confirm_day = ""
 
     work_items = list(form_data.get("work_items", []))
-    while len(work_items) < 8:
+    while len(work_items) < INTEGRATION_WORK_ROW_COUNT:
         work_items.append({})
 
     rows_work = []
-    for item in work_items[:8]:
+    for item in work_items[:INTEGRATION_WORK_ROW_COUNT]:
         rows_work.append(
             "<tr>"
             f"<td class=\"value left\">{html.escape(str(item.get('work_type', '') or ''))}</td>"
@@ -15044,7 +15046,13 @@ body {{
     font-size: 22pt;
     font-weight: 700;
     letter-spacing: 0;
-    margin: 4px 0 22px 0;
+    margin: 4px 0 6px 0;
+}}
+.subtitle {{
+    text-align: center;
+    font-size: 12pt;
+    font-weight: 700;
+    margin: 0 0 16px 0;
 }}
 table {{
     width: 100%;
@@ -15094,6 +15102,7 @@ th, td {{
 <div class="Section1">
 <div class="doc">
 <div class="title">통합CMS ERP연계작업결과서</div>
+<div class="subtitle">ERP연계작업 보고서</div>
 
 <table>
 <colgroup>
@@ -15182,7 +15191,7 @@ th, td {{
 <div class="confirm">
 상기 업무의 ERP연계 작업을 확인합니다.<br>
 {confirm_year}년&nbsp;&nbsp;{confirm_month}월&nbsp;&nbsp;{confirm_day}일<br>
-확 인 자 : <span class="sign-line">&nbsp;</span> (인)
+고 객 사 : <span class="sign-line">{v('customer_signer') or '&nbsp;'}</span> (인)
 </div>
 </div>
 </div>
@@ -15194,8 +15203,12 @@ th, td {{
 def show_integration_confirmation():
     st.markdown("### 연계확인서 출력")
     today_kst = (datetime.utcnow() + timedelta(hours=9)).date()
+    st.caption("통합CMS_ERP연계작업결과서 샘플 문서와 같은 고객정보·연계정보·연계업무 구조로 입력합니다.")
 
     with st.form("integration_confirmation_form"):
+        st.markdown("#### 통합CMS ERP연계작업결과서")
+        st.markdown("##### ERP연계작업 보고서")
+
         st.markdown("#### 고객정보")
         c1, c2 = st.columns(2)
         customer_name = c1.text_input("고객명")
@@ -15219,13 +15232,35 @@ def show_integration_confirmation():
         memo = st.text_area("비고", height=90)
 
         st.markdown("#### 연계업무")
+        h1, h2, h3, h4 = st.columns([2, 1, 1, 1])
+        h1.markdown("**업무 구분**")
+        h2.markdown("**연계 작업**")
+        h3.markdown("**데이터 이관**")
+        h4.markdown("**테스트**")
         work_items = []
-        for idx in range(1, 4):
+        for idx in range(1, INTEGRATION_WORK_ROW_COUNT + 1):
             w1, w2, w3, w4 = st.columns([2, 1, 1, 1])
-            work_type = w1.selectbox("업무 구분", INTEGRATION_WORK_OPTIONS, key=f"integration_work_type_{idx}")
-            link_work = w2.checkbox("연계 작업", key=f"integration_link_work_{idx}")
-            data_migration = w3.checkbox("데이터 이관", key=f"integration_data_migration_{idx}")
-            test = w4.checkbox("테스트", key=f"integration_test_{idx}")
+            work_type = w1.selectbox(
+                f"업무 구분 {idx}",
+                INTEGRATION_WORK_OPTIONS,
+                key=f"integration_work_type_{idx}",
+                label_visibility="collapsed",
+            )
+            link_work = w2.checkbox(
+                f"{idx}행 연계 작업",
+                key=f"integration_link_work_{idx}",
+                label_visibility="collapsed",
+            )
+            data_migration = w3.checkbox(
+                f"{idx}행 데이터 이관",
+                key=f"integration_data_migration_{idx}",
+                label_visibility="collapsed",
+            )
+            test = w4.checkbox(
+                f"{idx}행 테스트",
+                key=f"integration_test_{idx}",
+                label_visibility="collapsed",
+            )
             if work_type != "선택" or link_work or data_migration or test:
                 work_items.append(
                     {
@@ -15235,6 +15270,9 @@ def show_integration_confirmation():
                         "test": test,
                     }
                 )
+
+        st.markdown("#### 확인")
+        customer_signer = st.text_input("고 객 사 확인자", help="문서 하단 '고 객 사 : (인)' 서명란에 표시됩니다.")
 
         submitted = st.form_submit_button("작성 내용 확인", type="primary", use_container_width=True)
 
@@ -15258,6 +15296,7 @@ def show_integration_confirmation():
         "memo": memo,
         "work_items": work_items,
         "confirm_date": today_kst,
+        "customer_signer": customer_signer,
     }
 
     missing = [label for label, value in [("고객명", customer_name), ("개발사", developer)] if not str(value or "").strip()]
@@ -15279,6 +15318,7 @@ def show_integration_confirmation():
             {"항목": "연계방식", "내용": link_method},
             {"항목": "연계일자", "내용": form_data["link_date"]},
             {"항목": "비고", "내용": memo},
+            {"항목": "고 객 사 확인자", "내용": customer_signer},
         ]
     )
     st.markdown("#### 출력 미리보기")
