@@ -15254,6 +15254,30 @@ _QUERY_P_STYLE = (
 )
 
 
+def get_docx_wrapped_query_lines(body, width=72):
+    wrapped_lines = []
+    wrapper = textwrap.TextWrapper(
+        width=width,
+        break_long_words=True,
+        break_on_hyphens=False,
+        replace_whitespace=False,
+        drop_whitespace=True,
+    )
+
+    for raw_line in str(body or "").splitlines():
+        if not raw_line.strip():
+            wrapped_lines.append("")
+            continue
+
+        indent_match = re.match(r"^\s*", raw_line)
+        indent = indent_match.group(0) if indent_match else ""
+        wrapper.initial_indent = indent
+        wrapper.subsequent_indent = f"{indent}    "
+        wrapped_lines.extend(wrapper.wrap(raw_line.strip()) or [""])
+
+    return wrapped_lines
+
+
 def format_integration_query_body(body, width=66):
     wrapped_lines = []
     wrapper = textwrap.TextWrapper(
@@ -15959,13 +15983,13 @@ def build_integration_confirmation_docx_bytes(form_data):
                 set_cell_text(table.cell(3, 0), "작업내용", True); set_cell_shading(table.cell(3, 0))
                 query_cell = table.cell(3, 1).merge(table.cell(3, 3))
                 query_cell.text = ""
-                for line in str(detail.get("body", "") or "").splitlines():
+                for line in get_docx_wrapped_query_lines(detail.get("body", ""), width=68):
                     paragraph = query_cell.add_paragraph()
                     paragraph.paragraph_format.space_before = Pt(0)
                     paragraph.paragraph_format.space_after = Pt(0)
                     run = paragraph.add_run(line)
                     run.font.name = "Consolas"
-                    run.font.size = Pt(7)
+                    run.font.size = Pt(6.5)
                     run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
                 for _ in range(2):
                     paragraph = query_cell.add_paragraph()
@@ -15973,7 +15997,7 @@ def build_integration_confirmation_docx_bytes(form_data):
                     paragraph.paragraph_format.space_after = Pt(0)
                     run = paragraph.add_run(" ")
                     run.font.name = "Consolas"
-                    run.font.size = Pt(7)
+                    run.font.size = Pt(6.5)
                     run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
                 set_cell_text(table.cell(4, 0), "데이터 전송 시\n특이사항", True); set_cell_shading(table.cell(4, 0))
                 table.cell(4, 1).merge(table.cell(4, 3)); set_cell_text(table.cell(4, 1), "")
