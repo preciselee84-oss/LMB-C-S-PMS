@@ -15219,7 +15219,7 @@ ebankCd cardNo apprDt apprNo apprTm apprAm supplyAm vatAm serviceAm chainNm chai
     ]
 
 
-def format_integration_query_body(body, width=72):
+def format_integration_query_body(body, width=54):
     wrapped_lines = []
     wrapper = textwrap.TextWrapper(
         width=width,
@@ -15504,7 +15504,6 @@ th, td {{
 .query-cell {{
     text-align: left;
     vertical-align: top;
-    max-width: 0;
     overflow-wrap: anywhere;
     word-break: break-all;
 }}
@@ -15520,7 +15519,7 @@ th, td {{
     font-size: 7.5pt;
     line-height: 1.28;
     text-align: left;
-    overflow: hidden;
+    overflow: visible;
 }}
 </style>
 </head>
