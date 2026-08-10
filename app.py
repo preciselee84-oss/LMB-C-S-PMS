@@ -15684,7 +15684,7 @@ th, td {{
 def build_integration_confirmation_docx_bytes(form_data):
     from docx import Document
     from docx.enum.section import WD_SECTION
-    from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
+    from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_ROW_HEIGHT_RULE, WD_TABLE_ALIGNMENT
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
@@ -15694,6 +15694,9 @@ def build_integration_confirmation_docx_bytes(form_data):
         cell.text = ""
         paragraph = cell.paragraphs[0]
         paragraph.alignment = align
+        paragraph.paragraph_format.space_before = Pt(0)
+        paragraph.paragraph_format.space_after = Pt(0)
+        paragraph.paragraph_format.line_spacing = 1
         run = paragraph.add_run(str(text or ""))
         run.bold = bold
         run.font.name = "Malgun Gothic"
@@ -15754,6 +15757,9 @@ def build_integration_confirmation_docx_bytes(form_data):
 
     def add_header_block(doc):
         p = doc.add_paragraph()
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(2)
+        p.paragraph_format.line_spacing = 1
         p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         run = p.add_run("통합CMS ERP연계작업결과서")
         run.bold = True
@@ -15770,8 +15776,9 @@ def build_integration_confirmation_docx_bytes(form_data):
 
     def add_section_title(doc, text):
         p = doc.add_paragraph()
-        p.paragraph_format.space_before = Pt(8)
+        p.paragraph_format.space_before = Pt(5)
         p.paragraph_format.space_after = Pt(2)
+        p.paragraph_format.line_spacing = 1
         run = p.add_run(text)
         run.bold = True
         run.font.name = "Malgun Gothic"
@@ -15782,15 +15789,36 @@ def build_integration_confirmation_docx_bytes(form_data):
         for cell, width in zip(row.cells, widths):
             set_cell_width(cell, width)
 
+    def set_row_height(row, height_cm, rule=WD_ROW_HEIGHT_RULE.EXACTLY):
+        row.height = Cm(height_cm)
+        row.height_rule = rule
+
+    def set_paragraph_font(paragraph, size=10, bold=False):
+        paragraph.paragraph_format.space_before = Pt(0)
+        paragraph.paragraph_format.space_after = Pt(0)
+        paragraph.paragraph_format.line_spacing = 1
+        for run in paragraph.runs:
+            run.bold = bold
+            run.font.name = "Malgun Gothic"
+            run.font.size = Pt(size)
+            run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
+
     def mark(value):
         return "완료" if value else ""
 
     doc = Document()
+    normal_style = doc.styles["Normal"]
+    normal_style.font.name = "Malgun Gothic"
+    normal_style.font.size = Pt(10)
+    normal_style._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
+    normal_style.paragraph_format.space_before = Pt(0)
+    normal_style.paragraph_format.space_after = Pt(0)
+    normal_style.paragraph_format.line_spacing = 1
     section = doc.sections[0]
     section.page_width = Cm(21)
     section.page_height = Cm(29.7)
-    section.top_margin = Cm(1.0)
-    section.bottom_margin = Cm(1.0)
+    section.top_margin = Cm(0.8)
+    section.bottom_margin = Cm(0.8)
     section.left_margin = Cm(1.1)
     section.right_margin = Cm(1.1)
     set_page_border(section)
@@ -15804,6 +15832,7 @@ def build_integration_confirmation_docx_bytes(form_data):
     widths5 = [3.0, 3.0, 3.6, 3.0, 4.0]
     for row in table.rows:
         set_row_cells(row, widths5)
+        set_row_height(row, 0.55)
     set_cell_text(table.cell(0, 0), "고객명", True); set_cell_shading(table.cell(0, 0))
     table.cell(0, 1).merge(table.cell(0, 2)); set_cell_text(table.cell(0, 1), form_data.get("customer_name", ""))
     set_cell_text(table.cell(0, 3), "사업자번호", True); set_cell_shading(table.cell(0, 3))
@@ -15829,6 +15858,7 @@ def build_integration_confirmation_docx_bytes(form_data):
     widths4 = [4.0, 4.3, 4.0, 4.3]
     for row in table.rows:
         set_row_cells(row, widths4)
+        set_row_height(row, 0.55)
     rows = [
         ("ERP종류", "erp_type", "ERP DB종류", "erp_db_type"),
         ("서버 위치", "server_location", "서버 IP", "server_ip"),
@@ -15852,6 +15882,7 @@ def build_integration_confirmation_docx_bytes(form_data):
     set_table_borders(table)
     for row in table.rows:
         set_row_cells(row, widths4)
+        set_row_height(row, 0.52)
     for col_idx, title in enumerate(["업무 구분", "연계 작업", "데이터 이관", "테스트"]):
         set_cell_text(table.cell(0, col_idx), title, True); set_cell_shading(table.cell(0, col_idx))
     for row_idx, item in enumerate(work_items[:INTEGRATION_WORK_ROW_COUNT], start=1):
@@ -15860,13 +15891,13 @@ def build_integration_confirmation_docx_bytes(form_data):
         set_cell_text(table.cell(row_idx, 2), mark(item.get("data_migration")))
         set_cell_text(table.cell(row_idx, 3), mark(item.get("test")))
 
-    for _ in range(4):
+    for _ in range(1):
         doc.add_paragraph()
     p = doc.add_paragraph("상기 업무의 ERP연계 작업을 확인합니다.")
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.runs[0].bold = True
-    p.runs[0].font.size = Pt(10)
+    set_paragraph_font(p, 10, True)
 
+    doc.add_paragraph()
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     date_text = form_data.get("link_date", "")
@@ -15875,15 +15906,16 @@ def build_integration_confirmation_docx_bytes(form_data):
         p.add_run(f"{year}    년    {month}    월    {day}    일")
     else:
         p.add_run("          년          월          일")
-    p.runs[0].bold = True
-    p.runs[0].font.size = Pt(10)
+    set_paragraph_font(p, 10, True)
 
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     p.add_run(f"확 인 자 : {form_data.get('confirmer', '')}        (인)")
+    set_paragraph_font(p, 10, True)
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     p.add_run(f"고 객 사 : {form_data.get('customer_signer', '')}        (인)")
+    set_paragraph_font(p, 10, True)
 
     erp_type = str(form_data.get("erp_type", "") or "").strip()
     if erp_type == "더존 아마란스 10":
@@ -15903,8 +15935,13 @@ def build_integration_confirmation_docx_bytes(form_data):
                 table.alignment = WD_TABLE_ALIGNMENT.CENTER
                 table.autofit = False
                 set_table_borders(table)
+                attachment_widths = [2.3, 5.5, 3.2, 5.6]
                 for row in table.rows:
-                    set_row_cells(row, [2.3, 5.5, 3.2, 5.6])
+                    set_row_cells(row, attachment_widths)
+                for row in table.rows[:3]:
+                    set_row_height(row, 0.55)
+                set_row_height(table.rows[4], 1.15, WD_ROW_HEIGHT_RULE.AT_LEAST)
+                set_row_height(table.rows[5], 1.15, WD_ROW_HEIGHT_RULE.AT_LEAST)
                 table.cell(0, 0).merge(table.cell(2, 0)); set_cell_text(table.cell(0, 0), "업무", True); set_cell_shading(table.cell(0, 0))
                 table.cell(0, 1).merge(table.cell(2, 1)); set_cell_text(table.cell(0, 1), detail.get("title", ""))
                 set_cell_text(table.cell(0, 2), "전송방식", True); set_cell_shading(table.cell(0, 2))
