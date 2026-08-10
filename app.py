@@ -15393,7 +15393,6 @@ body {{
 }}
 .doc {{
     width: 18.6cm;
-    min-height: 26.5cm;
     margin: 0 auto;
     border: 1.5pt solid #000;
     padding: 1.1cm 1.45cm 1.1cm 1.45cm;
@@ -15486,7 +15485,6 @@ th, td {{
 }}
 .attachment-page {{
     width: 18.6cm;
-    min-height: 26.5cm;
     margin: 0 auto;
     border: 1.5pt solid #000;
     padding: 1.1cm 1.45cm 1.1cm 1.45cm;
@@ -15577,10 +15575,6 @@ th, td {{
     page-break-inside: auto;
 }}
 </style>
-<!--[if gte mso 9]><style>
-.doc {{ min-height: 0 !important; }}
-.attachment-page {{ min-height: 0 !important; }}
-</style><![endif]-->
 </head>
 <body>
 <div class="Section1">
