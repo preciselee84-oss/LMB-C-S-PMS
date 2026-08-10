@@ -15830,6 +15830,7 @@ def build_integration_confirmation_docx_bytes(form_data):
     set_page_border(section)
 
     add_header_block(doc)
+    add_spacer(doc, 14)
     add_section_title(doc, "1. 고객정보")
     table = doc.add_table(rows=5, cols=5)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -15897,12 +15898,12 @@ def build_integration_confirmation_docx_bytes(form_data):
         set_cell_text(table.cell(row_idx, 2), mark(item.get("data_migration")))
         set_cell_text(table.cell(row_idx, 3), mark(item.get("test")))
 
-    add_spacer(doc, 58)
+    add_spacer(doc, 84)
     p = doc.add_paragraph("상기 업무의 ERP연계 작업을 확인합니다.")
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     set_paragraph_font(p, 10, True)
 
-    add_spacer(doc, 36)
+    add_spacer(doc, 48)
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     date_text = form_data.get("link_date", "")
@@ -15940,7 +15941,7 @@ def build_integration_confirmation_docx_bytes(form_data):
                 table.alignment = WD_TABLE_ALIGNMENT.CENTER
                 table.autofit = False
                 set_table_borders(table)
-                attachment_widths = [2.3, 5.5, 3.2, 5.6]
+                attachment_widths = [2.8, 5.0, 3.2, 5.6]
                 for row in table.rows:
                     set_row_cells(row, attachment_widths)
                 for row in table.rows[:3]:
@@ -15963,6 +15964,14 @@ def build_integration_confirmation_docx_bytes(form_data):
                     paragraph.paragraph_format.space_before = Pt(0)
                     paragraph.paragraph_format.space_after = Pt(0)
                     run = paragraph.add_run(line)
+                    run.font.name = "Consolas"
+                    run.font.size = Pt(7)
+                    run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
+                for _ in range(2):
+                    paragraph = query_cell.add_paragraph()
+                    paragraph.paragraph_format.space_before = Pt(0)
+                    paragraph.paragraph_format.space_after = Pt(0)
+                    run = paragraph.add_run(" ")
                     run.font.name = "Consolas"
                     run.font.size = Pt(7)
                     run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
