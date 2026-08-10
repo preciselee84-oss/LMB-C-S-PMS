@@ -11,6 +11,7 @@ import base64
 import hashlib
 import unicodedata
 import requests as _requests
+import streamlit.components.v1 as components
 from io import BytesIO
 from datetime import datetime, timedelta
 from streamlit_cookies_controller import CookieController
@@ -14991,7 +14992,7 @@ INTEGRATION_WORK_OPTIONS = [
 ]
 
 
-def build_integration_confirmation_doc_bytes(form_data):
+def build_integration_confirmation_doc_html(form_data):
     def v(key):
         return html.escape(str(form_data.get(key, "") or "")).replace("\n", "<br>")
 
@@ -15197,7 +15198,11 @@ th, td {{
 </div>
 </body>
 </html>"""
-    return doc_html.encode("utf-8-sig")
+    return doc_html
+
+
+def build_integration_confirmation_doc_bytes(form_data):
+    return build_integration_confirmation_doc_html(form_data).encode("utf-8-sig")
 
 
 def show_integration_confirmation():
@@ -15303,30 +15308,9 @@ def show_integration_confirmation():
     if missing:
         st.warning(f"필수 입력값을 확인해주세요: {', '.join(missing)}")
 
-    preview = pd.DataFrame(
-        [
-            {"항목": "고객명", "내용": customer_name},
-            {"항목": "사업자번호", "내용": business_no},
-            {"항목": "소재지", "내용": address},
-            {"항목": "고객사 담당자", "내용": customer_manager},
-            {"항목": "개발사 담당자", "내용": developer},
-            {"항목": "통합CMS 담당자", "내용": form_data["cms_manager"]},
-            {"항목": "ERP종류", "내용": erp_type},
-            {"항목": "ERP DB종류", "내용": erp_db_type},
-            {"항목": "서버 위치", "내용": server_location},
-            {"항목": "서버 IP", "내용": server_ip},
-            {"항목": "연계방식", "내용": link_method},
-            {"항목": "연계일자", "내용": form_data["link_date"]},
-            {"항목": "비고", "내용": memo},
-            {"항목": "고 객 사 확인자", "내용": customer_signer},
-        ]
-    )
     st.markdown("#### 출력 미리보기")
-    st.dataframe(preview, use_container_width=True, hide_index=True)
-    if work_items:
-        st.dataframe(pd.DataFrame(work_items), use_container_width=True, hide_index=True)
-    else:
-        st.caption("연계업무 선택 내역이 없습니다.")
+    preview_html = build_integration_confirmation_doc_html(form_data)
+    components.html(preview_html, height=980, scrolling=True)
 
     safe_customer = re.sub(r"[^0-9A-Za-z가-힣_-]+", "_", customer_name.strip() or "고객")
     st.download_button(
