@@ -15071,9 +15071,14 @@ WHERE A.CUST_NO = B.CUST_NO
 
   AND C.USER_ID = :Param11
   AND B.TRSC_DT between :Param12 and :Param13
-  AND B.TRSC_DT >= '20240101'
-
-/*거래내역전송_통합(대상 ERP)*/
+  AND B.TRSC_DT >= '20240101'""",
+        },
+        {
+            "title": "거래내역",
+            "transfer_method": "내보내기",
+            "process_method": "",
+            "scheduler": "사용",
+            "body": """/*거래내역전송_통합(대상 ERP)*/
 /system/cmsCommon/00a01001
 ebankCd
 bankCd
@@ -15090,7 +15095,7 @@ branchDc
 exchCd
 insertIp
 insertProgramNm""",
-        }
+        },
     ],
     "대량이체": [
         {
