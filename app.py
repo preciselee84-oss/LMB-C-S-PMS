@@ -15042,7 +15042,7 @@ AMARANTH_ATTACHMENT_TEMPLATES = {
             "title": "거래내역",
             "transfer_method": "내보내기",
             "process_method": "",
-            "scheduler": "",
+            "scheduler": "사용",
             "body": """[원본]
 SELECT '081' AS ebankCd, -- 연동하는 은행코드
        RIGHT(A.INST_DV_NO, 3) AS bankCd,
@@ -15054,8 +15054,7 @@ SELECT '081' AS ebankCd, -- 연동하는 은행코드
        B.RCV_AMT AS drAm,
        B.WDRW_AMT AS crAm,
        B.TRSC_AF_ACCT_BAL AS balanceAm,
-       CASE WHEN A.INST_DV_NO = '10000004'
-            THEN B.ADD_RCRD_MTTR_CTT
+       CASE WHEN A.INST_DV_NO = '10000004' THEN B.ADD_RCRD_MTTR_CTT -- 국민은행일 경우 의뢰인정보를 가져옴
             ELSE B.RCRD_MTTR_CTT
        END AS rmkDc,
        B.RPT_WRTG_EXCN_CTT AS textDc,
@@ -15064,9 +15063,33 @@ SELECT '081' AS ebankCd, -- 연동하는 은행코드
        '' AS insertIp,
        '' AS insertProgramNm
 
+FROM IEBK_ACCT_BASE A, IEBK_ACCT_TRSC_PTCL B, IEBK_USR_BASE C
+WHERE A.CUST_NO = B.CUST_NO
+  AND A.CUST_NO = C.CUST_NO
+  AND A.CMSV_ACCT_ID_NO = B.CMSV_ACCT_ID_NO
+  AND A.DEL_YN = 'N'
+
+  AND C.USER_ID = :Param11
+  AND B.TRSC_DT between :Param12 and :Param13
+  AND B.TRSC_DT >= '20240101'
+
 /*거래내역전송_통합(대상 ERP)*/
 /system/cmsCommon/00a01001
-ebankCd bankCd baNb bankDt bankSq regNb drAm crAm balanceAm rmkDc textDc branchDc exchCd insertIp insertProgramNm""",
+ebankCd
+bankCd
+baNb
+bankDt
+bankSq
+regNb
+drAm
+crAm
+balanceAm
+rmkDc
+textDc
+branchDc
+exchCd
+insertIp
+insertProgramNm""",
         }
     ],
     "대량이체": [
@@ -15303,6 +15326,10 @@ def build_integration_attachment_html(form_data):
         </tr>
         <tr>
             <th class="label">데이터 전송 시 특이사항</th>
+            <td colspan="3" class="value">&nbsp;</td>
+        </tr>
+        <tr>
+            <th class="label">비고</th>
             <td colspan="3" class="value">&nbsp;</td>
         </tr>
     </table>
