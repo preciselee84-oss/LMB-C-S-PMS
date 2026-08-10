@@ -14980,6 +14980,17 @@ INTEGRATION_CMS_MANAGER_OPTIONS = [
 
 INTEGRATION_WORK_ROW_COUNT = 5
 
+INTEGRATION_ERP_TYPE_OPTIONS = [
+    "선택",
+    "더존 I-U",
+    "더존 I-CUBE",
+    "더존 옴니이솔 10",
+    "더존 아마란스 10",
+    "영림원",
+    "자체개발",
+    "SAP",
+]
+
 INTEGRATION_WORK_OPTIONS = [
     "선택",
     "계좌조회",
@@ -15252,7 +15263,7 @@ def show_integration_confirmation():
 
         st.markdown("#### 연계정보")
         i1, i2, i3 = st.columns(3)
-        erp_type = i1.text_input("ERP종류")
+        erp_type = i1.selectbox("ERP종류", INTEGRATION_ERP_TYPE_OPTIONS)
         erp_db_type = i2.text_input("ERP DB종류")
         server_location = i3.text_input("서버 위치")
         i4, i5, i6 = st.columns(3)
@@ -15319,7 +15330,7 @@ def show_integration_confirmation():
         "customer_manager": customer_manager,
         "developer": developer,
         "cms_manager": "" if cms_manager == "선택" else cms_manager,
-        "erp_type": erp_type,
+        "erp_type": "" if erp_type == "선택" else erp_type,
         "erp_db_type": erp_db_type,
         "server_location": server_location,
         "server_ip": server_ip,
