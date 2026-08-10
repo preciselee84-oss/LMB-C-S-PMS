@@ -14978,7 +14978,7 @@ INTEGRATION_CMS_MANAGER_OPTIONS = [
     "선택",
 ]
 
-INTEGRATION_WORK_ROW_COUNT = 8
+INTEGRATION_WORK_ROW_COUNT = 5
 
 INTEGRATION_WORK_OPTIONS = [
     "선택",
@@ -15029,55 +15029,62 @@ def build_integration_confirmation_doc_html(form_data):
 <style>
 @page Section1 {{
     size: 21cm 29.7cm;
-    margin: 1.8cm 1.7cm 1.7cm 1.7cm;
+    margin: 1.2cm 1.2cm 1.2cm 1.2cm;
 }}
 div.Section1 {{ page: Section1; }}
 body {{
     margin: 0;
     font-family: "Malgun Gothic", "맑은 고딕", Gulim, sans-serif;
-    font-size: 10pt;
+    font-size: 9pt;
     color: #000;
 }}
 .doc {{
-    width: 17.6cm;
+    width: 18.6cm;
+    min-height: 26.5cm;
     margin: 0 auto;
+    border: 1.5pt solid #000;
+    padding: 1.1cm 1.45cm 1.1cm 1.45cm;
+    box-sizing: border-box;
 }}
-.title {{
-    text-align: center;
-    font-size: 22pt;
+.top-title {{
+    text-align: right;
+    font-size: 10pt;
     font-weight: 700;
-    letter-spacing: 0;
-    margin: 4px 0 6px 0;
-}}
-.subtitle {{
-    text-align: center;
-    font-size: 12pt;
-    font-weight: 700;
+    color: #666;
     margin: 0 0 16px 0;
+}}
+.title-box {{
+    border: 1pt solid #777;
+    text-align: center;
+    font-size: 14pt;
+    font-weight: 700;
+    color: #666;
+    height: 34px;
+    line-height: 34px;
+    margin: 0 0 16px 0;
+}}
+.section-title {{
+    font-size: 11pt;
+    font-weight: 700;
+    margin: 14px 0 4px 0;
 }}
 table {{
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
-    margin: 0 0 12px 0;
+    margin: 0;
 }}
 th, td {{
-    border: 1.2pt solid #000;
-    padding: 4px 6px;
-    height: 26px;
+    border: 0.75pt solid #aaa;
+    padding: 3px 5px;
+    height: 21px;
     vertical-align: middle;
     word-break: keep-all;
-}}
-.section {{
-    height: 28px;
-    text-align: center;
-    font-weight: 700;
-    background: #fff;
 }}
 .label {{
     text-align: center;
     font-weight: 700;
-    background: #f7f7f7;
+    background: #f2f2f2;
 }}
 .value {{
     text-align: left;
@@ -15086,81 +15093,94 @@ th, td {{
 .left {{ text-align: left; }}
 .center {{ text-align: center; }}
 .mark {{ font-family: "Malgun Gothic", "맑은 고딕", sans-serif; font-size: 12pt; }}
-.memo {{ height: 42px; }}
+.memo {{ height: 56px; }}
+.work td, .work th {{ height: 23px; }}
 .confirm {{
-    margin-top: 34px;
+    margin-top: 110px;
     text-align: center;
-    line-height: 2.1;
+    line-height: 2.2;
     font-size: 11pt;
+    font-weight: 700;
 }}
-.sign-line {{
+.date-line {{
+    margin: 54px 0 18px 0;
+    text-align: right;
+    font-weight: 700;
+}}
+.sign-area {{
+    width: 7.3cm;
+    margin-left: auto;
+    line-height: 2.2;
+    font-size: 10pt;
+    font-weight: 700;
+}}
+.sign-name {{
     display: inline-block;
-    width: 190px;
+    min-width: 3.7cm;
+    text-align: center;
 }}
 </style>
 </head>
 <body>
 <div class="Section1">
 <div class="doc">
-<div class="title">통합CMS ERP연계작업결과서</div>
-<div class="subtitle">ERP연계작업 보고서</div>
+<div class="top-title">통합CMS ERP연계작업결과서</div>
+<div class="title-box">ERP연계작업 보고서</div>
 
+<div class="section-title">1. 고객정보</div>
 <table>
 <colgroup>
-    <col style="width: 15%">
-    <col style="width: 17%">
-    <col style="width: 18%">
-    <col style="width: 15%">
-    <col style="width: 17%">
-    <col style="width: 18%">
+    <col style="width: 24%">
+    <col style="width: 28%">
+    <col style="width: 24%">
+    <col style="width: 24%">
 </colgroup>
-<tr><th colspan="6" class="section">고객정보</th></tr>
 <tr>
     <th class="label">고객명</th>
-    <td colspan="2" class="value">{v('customer_name')}</td>
+    <td class="value">{v('customer_name')}</td>
     <th class="label">사업자번호</th>
-    <td colspan="2" class="value">{v('business_no')}</td>
+    <td class="value">{v('business_no')}</td>
 </tr>
 <tr>
     <th class="label">소재지</th>
-    <td colspan="5" class="value">{v('address')}</td>
+    <td colspan="3" class="value">{v('address')}</td>
 </tr>
 <tr>
     <th rowspan="3" class="label">담당자</th>
     <th class="label">고객사</th>
-    <td colspan="4" class="value">{v('customer_manager')}</td>
+    <td colspan="2" class="value">{v('customer_manager')}</td>
 </tr>
 <tr>
     <th class="label">개발사</th>
-    <td colspan="4" class="value">{v('developer')}</td>
+    <td colspan="2" class="value">{v('developer')}</td>
 </tr>
 <tr>
     <th class="label">통합CMS</th>
-    <td colspan="4" class="value">{v('cms_manager')}</td>
+    <td colspan="2" class="value">{v('cms_manager')}</td>
 </tr>
 </table>
 
+<div class="section-title">2. 연계정보</div>
 <table>
 <colgroup>
-    <col style="width: 15%">
-    <col style="width: 17%">
-    <col style="width: 18%">
-    <col style="width: 15%">
-    <col style="width: 17%">
-    <col style="width: 18%">
+    <col style="width: 24%">
+    <col style="width: 28%">
+    <col style="width: 24%">
+    <col style="width: 24%">
 </colgroup>
-<tr><th colspan="6" class="section">연계정보</th></tr>
 <tr>
     <th class="label">ERP종류</th>
     <td class="value">{v('erp_type')}</td>
     <th class="label">ERP DB종류</th>
     <td class="value">{v('erp_db_type')}</td>
-    <th class="label">서버 위치</th>
-    <td class="value">{v('server_location')}</td>
 </tr>
 <tr>
+    <th class="label">서버 위치</th>
+    <td class="value">{v('server_location')}</td>
     <th class="label">서버 IP</th>
     <td class="value">{v('server_ip')}</td>
+</tr>
+<tr>
     <th class="label">연계방식</th>
     <td class="value">{v('link_method')}</td>
     <th class="label">연계일자</th>
@@ -15172,14 +15192,14 @@ th, td {{
 </tr>
 </table>
 
-<table>
+<div class="section-title">3. 연계업무</div>
+<table class="work">
 <colgroup>
-    <col style="width: 46%">
-    <col style="width: 18%">
-    <col style="width: 18%">
-    <col style="width: 18%">
+    <col style="width: 24%">
+    <col style="width: 26%">
+    <col style="width: 26%">
+    <col style="width: 24%">
 </colgroup>
-<tr><th colspan="4" class="section">연계업무</th></tr>
 <tr>
     <th class="label">업무 구분</th>
     <th class="label">연계 작업</th>
@@ -15190,9 +15210,14 @@ th, td {{
 </table>
 
 <div class="confirm">
-상기 업무의 ERP연계 작업을 확인합니다.<br>
-{confirm_year}년&nbsp;&nbsp;{confirm_month}월&nbsp;&nbsp;{confirm_day}일<br>
-고 객 사 : <span class="sign-line">{v('customer_signer') or '&nbsp;'}</span> (인)
+상기 업무의 ERP연계 작업을 확인합니다.
+</div>
+<div class="date-line">
+{confirm_year}&nbsp;&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;&nbsp;{confirm_month}&nbsp;&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;&nbsp;{confirm_day}&nbsp;&nbsp;&nbsp;&nbsp;일
+</div>
+<div class="sign-area">
+확&nbsp;&nbsp;인&nbsp;&nbsp;자 : <span class="sign-name">{v('confirmer') or '&nbsp;'}</span> (인)<br>
+고&nbsp;&nbsp;객&nbsp;&nbsp;사 : <span class="sign-name">{v('customer_signer') or '&nbsp;'}</span> (인)
 </div>
 </div>
 </div>
@@ -15277,7 +15302,9 @@ def show_integration_confirmation():
                 )
 
         st.markdown("#### 확인")
-        customer_signer = st.text_input("고 객 사 확인자", help="문서 하단 '고 객 사 : (인)' 서명란에 표시됩니다.")
+        s1, s2 = st.columns(2)
+        confirmer = s1.text_input("확 인 자", help="문서 하단 '확 인 자 : (인)' 서명란에 표시됩니다.")
+        customer_signer = s2.text_input("고 객 사", help="문서 하단 '고 객 사 : (인)' 서명란에 표시됩니다.")
 
         submitted = st.form_submit_button("작성 내용 확인", type="primary", use_container_width=True)
 
@@ -15301,6 +15328,7 @@ def show_integration_confirmation():
         "memo": memo,
         "work_items": work_items,
         "confirm_date": today_kst,
+        "confirmer": confirmer,
         "customer_signer": customer_signer,
     }
 
