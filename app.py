@@ -14991,6 +14991,14 @@ INTEGRATION_ERP_TYPE_OPTIONS = [
     "SAP",
 ]
 
+INTEGRATION_ERP_DB_TYPE_OPTIONS = [
+    "선택",
+    "DB to DB",
+    "API",
+    "RFC",
+    "FTP",
+]
+
 INTEGRATION_WORK_OPTIONS = [
     "선택",
     "계좌조회",
@@ -15264,7 +15272,7 @@ def show_integration_confirmation():
         st.markdown("#### 연계정보")
         i1, i2, i3 = st.columns(3)
         erp_type = i1.selectbox("ERP종류", INTEGRATION_ERP_TYPE_OPTIONS)
-        erp_db_type = i2.text_input("ERP DB종류")
+        erp_db_type = i2.selectbox("ERP DB종류", INTEGRATION_ERP_DB_TYPE_OPTIONS)
         server_location = i3.text_input("서버 위치")
         i4, i5, i6 = st.columns(3)
         server_ip = i4.text_input("서버 IP")
@@ -15331,7 +15339,7 @@ def show_integration_confirmation():
         "developer": developer,
         "cms_manager": "" if cms_manager == "선택" else cms_manager,
         "erp_type": "" if erp_type == "선택" else erp_type,
-        "erp_db_type": erp_db_type,
+        "erp_db_type": "" if erp_db_type == "선택" else erp_db_type,
         "server_location": server_location,
         "server_ip": server_ip,
         "link_method": link_method,
