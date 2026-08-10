@@ -15269,11 +15269,21 @@ def get_docx_wrapped_query_lines(body, width=72):
             wrapped_lines.append("")
             continue
 
+        stripped_line = raw_line.strip()
+        mapping_tokens = stripped_line.split()
+        is_mapping_line = (
+            len(mapping_tokens) >= 4
+            and all(re.match(r"^[A-Za-z][A-Za-z0-9_]*$", token) for token in mapping_tokens)
+        )
+        if is_mapping_line:
+            wrapped_lines.extend(mapping_tokens)
+            continue
+
         indent_match = re.match(r"^\s*", raw_line)
         indent = indent_match.group(0) if indent_match else ""
         wrapper.initial_indent = indent
         wrapper.subsequent_indent = f"{indent}    "
-        wrapped_lines.extend(wrapper.wrap(raw_line.strip()) or [""])
+        wrapped_lines.extend(wrapper.wrap(stripped_line) or [""])
 
     return wrapped_lines
 
