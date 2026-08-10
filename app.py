@@ -15762,6 +15762,21 @@ def build_integration_confirmation_docx_bytes(form_data):
             element.set(qn("w:space"), "0")
             element.set(qn("w:color"), color)
 
+    def set_table_fixed_layout(table, width_cm):
+        tbl_pr = table._tbl.tblPr
+        layout = tbl_pr.find(qn("w:tblLayout"))
+        if layout is None:
+            layout = OxmlElement("w:tblLayout")
+            tbl_pr.append(layout)
+        layout.set(qn("w:type"), "fixed")
+
+        tbl_w = tbl_pr.find(qn("w:tblW"))
+        if tbl_w is None:
+            tbl_w = OxmlElement("w:tblW")
+            tbl_pr.append(tbl_w)
+        tbl_w.set(qn("w:w"), str(int(width_cm * 567)))
+        tbl_w.set(qn("w:type"), "dxa")
+
     def set_page_border(section):
         sect_pr = section._sectPr
         borders = sect_pr.find(qn("w:pgBorders"))
@@ -15796,6 +15811,7 @@ def build_integration_confirmation_docx_bytes(form_data):
         title.autofit = False
         title.columns[0].width = Cm(16.6)
         set_table_borders(title, "777777", "8")
+        set_table_fixed_layout(title, 16.6)
         set_cell_text(title.cell(0, 0), "ERP연계작업 보고서", bold=True, size=10)
 
     def add_section_title(doc, text):
@@ -15860,6 +15876,7 @@ def build_integration_confirmation_docx_bytes(form_data):
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
     set_table_borders(table)
+    set_table_fixed_layout(table, 16.6)
     widths5 = [3.0, 3.0, 3.6, 3.0, 4.0]
     for row in table.rows:
         set_row_cells(row, widths5)
@@ -15886,6 +15903,7 @@ def build_integration_confirmation_docx_bytes(form_data):
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
     set_table_borders(table)
+    set_table_fixed_layout(table, 16.6)
     widths4 = [4.0, 4.3, 4.0, 4.3]
     for row in table.rows:
         set_row_cells(row, widths4)
@@ -15911,6 +15929,7 @@ def build_integration_confirmation_docx_bytes(form_data):
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
     set_table_borders(table)
+    set_table_fixed_layout(table, 16.6)
     for row in table.rows:
         set_row_cells(row, widths4)
         set_row_height(row, 0.52)
@@ -15965,7 +15984,8 @@ def build_integration_confirmation_docx_bytes(form_data):
                 table.alignment = WD_TABLE_ALIGNMENT.CENTER
                 table.autofit = False
                 set_table_borders(table)
-                attachment_widths = [2.8, 5.0, 3.2, 5.6]
+                set_table_fixed_layout(table, 16.6)
+                attachment_widths = [2.4, 4.6, 2.9, 6.7]
                 for row in table.rows:
                     set_row_cells(row, attachment_widths)
                 for row in table.rows[:3]:
@@ -15983,13 +16003,13 @@ def build_integration_confirmation_docx_bytes(form_data):
                 set_cell_text(table.cell(3, 0), "작업내용", True); set_cell_shading(table.cell(3, 0))
                 query_cell = table.cell(3, 1).merge(table.cell(3, 3))
                 query_cell.text = ""
-                for line in get_docx_wrapped_query_lines(detail.get("body", ""), width=68):
+                for line in get_docx_wrapped_query_lines(detail.get("body", ""), width=52):
                     paragraph = query_cell.add_paragraph()
                     paragraph.paragraph_format.space_before = Pt(0)
                     paragraph.paragraph_format.space_after = Pt(0)
                     run = paragraph.add_run(line)
                     run.font.name = "Consolas"
-                    run.font.size = Pt(6.5)
+                    run.font.size = Pt(6)
                     run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
                 for _ in range(2):
                     paragraph = query_cell.add_paragraph()
@@ -15997,7 +16017,7 @@ def build_integration_confirmation_docx_bytes(form_data):
                     paragraph.paragraph_format.space_after = Pt(0)
                     run = paragraph.add_run(" ")
                     run.font.name = "Consolas"
-                    run.font.size = Pt(6.5)
+                    run.font.size = Pt(6)
                     run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
                 set_cell_text(table.cell(4, 0), "데이터 전송 시\n특이사항", True); set_cell_shading(table.cell(4, 0))
                 table.cell(4, 1).merge(table.cell(4, 3)); set_cell_text(table.cell(4, 1), "")
