@@ -14993,6 +14993,15 @@ INTEGRATION_ERP_TYPE_OPTIONS = [
 
 INTEGRATION_ERP_DB_TYPE_OPTIONS = [
     "선택",
+    "MS-SQL",
+    "ORACLE",
+    "MYSQL",
+    "PostgreSQL",
+    "Tibero",
+]
+
+INTEGRATION_LINK_METHOD_OPTIONS = [
+    "선택",
     "DB to DB",
     "API",
     "RFC",
@@ -15276,7 +15285,7 @@ def show_integration_confirmation():
         server_location = i3.text_input("서버 위치")
         i4, i5, i6 = st.columns(3)
         server_ip = i4.text_input("서버 IP")
-        link_method = i5.text_input("연계방식")
+        link_method = i5.selectbox("연계방식", INTEGRATION_LINK_METHOD_OPTIONS)
         link_date = i6.date_input("연계일자", value=today_kst)
         memo = st.text_area("비고", height=90)
 
@@ -15342,7 +15351,7 @@ def show_integration_confirmation():
         "erp_db_type": "" if erp_db_type == "선택" else erp_db_type,
         "server_location": server_location,
         "server_ip": server_ip,
-        "link_method": link_method,
+        "link_method": "" if link_method == "선택" else link_method,
         "link_date": link_date.strftime("%Y-%m-%d") if hasattr(link_date, "strftime") else str(link_date),
         "memo": memo,
         "work_items": work_items,
