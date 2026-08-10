@@ -15263,6 +15263,31 @@ def show_integration_confirmation():
     today_kst = (datetime.utcnow() + timedelta(hours=9)).date()
     st.caption("통합CMS_ERP연계작업결과서 샘플 문서와 같은 고객정보·연계정보·연계업무 구조로 입력합니다.")
 
+    if "integration_work_row_count" not in st.session_state:
+        st.session_state.integration_work_row_count = 1
+    st.session_state.integration_work_row_count = max(
+        1,
+        min(int(st.session_state.integration_work_row_count), INTEGRATION_WORK_ROW_COUNT),
+    )
+
+    add_col, remove_col, spacer_col = st.columns([1, 1, 5])
+    if add_col.button(
+        "업무 추가",
+        key="integration_add_work_row",
+        use_container_width=True,
+        disabled=st.session_state.integration_work_row_count >= INTEGRATION_WORK_ROW_COUNT,
+    ):
+        st.session_state.integration_work_row_count += 1
+        st.rerun()
+    if remove_col.button(
+        "업무 삭제",
+        key="integration_remove_work_row",
+        use_container_width=True,
+        disabled=st.session_state.integration_work_row_count <= 1,
+    ):
+        st.session_state.integration_work_row_count -= 1
+        st.rerun()
+
     with st.form("integration_confirmation_form"):
         st.markdown("#### 통합CMS ERP연계작업결과서")
         st.markdown("##### ERP연계작업 보고서")
@@ -15286,7 +15311,7 @@ def show_integration_confirmation():
         i4, i5, i6 = st.columns(3)
         server_ip = i4.text_input("서버 IP")
         link_method = i5.selectbox("연계방식", INTEGRATION_LINK_METHOD_OPTIONS)
-        link_date = i6.date_input("연계일자", value=today_kst)
+        link_date = i6.date_input("연계일자", value=None)
         memo = st.text_area("비고", height=90)
 
         st.markdown("#### 연계업무")
@@ -15296,7 +15321,7 @@ def show_integration_confirmation():
         h3.markdown("**데이터 이관**")
         h4.markdown("**테스트**")
         work_items = []
-        for idx in range(1, INTEGRATION_WORK_ROW_COUNT + 1):
+        for idx in range(1, st.session_state.integration_work_row_count + 1):
             w1, w2, w3, w4 = st.columns([2, 1, 1, 1])
             work_type = w1.selectbox(
                 f"업무 구분 {idx}",
@@ -15352,7 +15377,7 @@ def show_integration_confirmation():
         "server_location": server_location,
         "server_ip": server_ip,
         "link_method": "" if link_method == "선택" else link_method,
-        "link_date": link_date.strftime("%Y-%m-%d") if hasattr(link_date, "strftime") else str(link_date),
+        "link_date": link_date.strftime("%Y-%m-%d") if hasattr(link_date, "strftime") else "",
         "memo": memo,
         "work_items": work_items,
         "confirm_date": today_kst,
