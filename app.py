@@ -15992,19 +15992,16 @@ def build_integration_confirmation_docx_bytes(form_data):
                 set_cell_text(table.cell(3, 0), "작업내용", True); set_cell_shading(table.cell(3, 0))
                 query_cell = table.cell(3, 1).merge(table.cell(3, 3))
                 query_cell.text = ""
-                for line in get_docx_wrapped_query_lines(detail.get("body", ""), width=86):
-                    paragraph = query_cell.add_paragraph()
-                    paragraph.paragraph_format.space_before = Pt(0)
-                    paragraph.paragraph_format.space_after = Pt(0)
-                    run = paragraph.add_run(line)
-                    run.font.name = "Consolas"
-                    run.font.size = Pt(6.5)
-                    run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
-                for _ in range(2):
-                    paragraph = query_cell.add_paragraph()
-                    paragraph.paragraph_format.space_before = Pt(0)
-                    paragraph.paragraph_format.space_after = Pt(0)
-                    run = paragraph.add_run(" ")
+                para = query_cell.paragraphs[0]
+                para.paragraph_format.space_before = Pt(0)
+                para.paragraph_format.space_after = Pt(0)
+                para.paragraph_format.line_spacing = Pt(8)
+                for i, line in enumerate(get_docx_wrapped_query_lines(detail.get("body", ""), width=86)):
+                    if i > 0:
+                        br_run = para.add_run()
+                        br_run.add_break()
+                        br_run.font.size = Pt(6.5)
+                    run = para.add_run(line)
                     run.font.name = "Consolas"
                     run.font.size = Pt(6.5)
                     run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
