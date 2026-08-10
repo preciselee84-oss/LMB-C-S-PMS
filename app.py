@@ -15270,24 +15270,6 @@ def show_integration_confirmation():
         min(int(st.session_state.integration_work_row_count), INTEGRATION_WORK_ROW_COUNT),
     )
 
-    add_col, remove_col, spacer_col = st.columns([1, 1, 5])
-    if add_col.button(
-        "업무 추가",
-        key="integration_add_work_row",
-        use_container_width=True,
-        disabled=st.session_state.integration_work_row_count >= INTEGRATION_WORK_ROW_COUNT,
-    ):
-        st.session_state.integration_work_row_count += 1
-        st.rerun()
-    if remove_col.button(
-        "업무 삭제",
-        key="integration_remove_work_row",
-        use_container_width=True,
-        disabled=st.session_state.integration_work_row_count <= 1,
-    ):
-        st.session_state.integration_work_row_count -= 1
-        st.rerun()
-
     with st.form("integration_confirmation_form"):
         st.markdown("#### 통합CMS ERP연계작업결과서")
         st.markdown("##### ERP연계작업 보고서")
@@ -15354,12 +15336,32 @@ def show_integration_confirmation():
                     }
                 )
 
+        add_col, remove_col, count_col = st.columns([1, 1, 5])
+        add_work_row = add_col.form_submit_button(
+            "업무 추가",
+            use_container_width=True,
+            disabled=st.session_state.integration_work_row_count >= INTEGRATION_WORK_ROW_COUNT,
+        )
+        remove_work_row = remove_col.form_submit_button(
+            "업무 삭제",
+            use_container_width=True,
+            disabled=st.session_state.integration_work_row_count <= 1,
+        )
+        count_col.caption(f"현재 {st.session_state.integration_work_row_count}개 / 최대 {INTEGRATION_WORK_ROW_COUNT}개")
+
         st.markdown("#### 확인")
         s1, s2 = st.columns(2)
         confirmer = s1.text_input("확 인 자", help="문서 하단 '확 인 자 : (인)' 서명란에 표시됩니다.")
         customer_signer = s2.text_input("고 객 사", help="문서 하단 '고 객 사 : (인)' 서명란에 표시됩니다.")
 
         submitted = st.form_submit_button("작성 내용 확인", type="primary", use_container_width=True)
+
+    if add_work_row:
+        st.session_state.integration_work_row_count += 1
+        st.rerun()
+    if remove_work_row:
+        st.session_state.integration_work_row_count -= 1
+        st.rerun()
 
     if not submitted:
         st.info("필수 정보를 입력한 뒤 작성 내용 확인을 누르면 출력 파일을 내려받을 수 있습니다.")
