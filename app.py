@@ -15078,8 +15078,8 @@ def build_integration_confirmation_doc_html(form_data):
 div.Section1 {{ page: Section1; }}
 body {{
     margin: 0;
-    font-family: "Malgun Gothic", "맑은 고딕", Gulim, sans-serif;
-    font-size: 9pt;
+    font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+    font-size: 12pt;
     color: #000;
 }}
 .doc {{
@@ -15092,7 +15092,7 @@ body {{
 }}
 .top-title {{
     text-align: right;
-    font-size: 10pt;
+    font-size: 12pt;
     font-weight: 700;
     color: #666;
     margin: 0 0 16px 0;
@@ -15100,7 +15100,7 @@ body {{
 .title-box {{
     border: 1pt solid #777;
     text-align: center;
-    font-size: 14pt;
+    font-size: 12pt;
     font-weight: 700;
     color: #666;
     height: 34px;
@@ -15108,7 +15108,7 @@ body {{
     margin: 0 0 16px 0;
 }}
 .section-title {{
-    font-size: 11pt;
+    font-size: 12pt;
     font-weight: 700;
     margin: 14px 0 4px 0;
 }}
@@ -15121,7 +15121,7 @@ table {{
 th, td {{
     border: 0.75pt solid #aaa;
     padding: 3px 5px;
-    height: 21px;
+    height: 26px;
     vertical-align: middle;
     word-break: keep-all;
 }}
@@ -15137,13 +15137,13 @@ th, td {{
 .left {{ text-align: left; }}
 .center {{ text-align: center; }}
 .mark {{ font-family: "Malgun Gothic", "맑은 고딕", sans-serif; font-size: 12pt; }}
-.memo {{ height: 56px; }}
-.work td, .work th {{ height: 23px; }}
+.memo {{ height: 64px; }}
+.work td, .work th {{ height: 28px; }}
 .confirm {{
     margin-top: 110px;
     text-align: center;
     line-height: 2.2;
-    font-size: 11pt;
+    font-size: 12pt;
     font-weight: 700;
 }}
 .date-line {{
@@ -15155,7 +15155,7 @@ th, td {{
     width: 7.3cm;
     margin-left: auto;
     line-height: 2.2;
-    font-size: 10pt;
+    font-size: 12pt;
     font-weight: 700;
 }}
 .sign-name {{
