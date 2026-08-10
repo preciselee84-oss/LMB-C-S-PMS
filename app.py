@@ -15536,7 +15536,11 @@ th, td {{
     font-weight: 700;
     margin: 0 0 8px 0;
 }}
-.detail-table th,
+.detail-table th {{
+    font-size: 8pt;
+    text-align: center;
+    page-break-inside: auto;
+}}
 .detail-table td {{
     font-size: 9pt;
     text-align: center;
@@ -15550,7 +15554,7 @@ th, td {{
     width: 100%;
     page-break-inside: auto;
 }}
-.query-cell {{
+.detail-table td.query-cell {{
     text-align: left;
     vertical-align: top;
     overflow-wrap: anywhere;
