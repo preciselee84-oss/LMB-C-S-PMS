@@ -15448,14 +15448,14 @@ th, td {{
 .memo {{ height: 58px; }}
 .work td, .work th {{ height: 25px; }}
 .confirm {{
-    margin-top: 110px;
+    margin-top: 50px;
     text-align: center;
     line-height: 2.2;
     font-size: 10pt;
     font-weight: 700;
 }}
 .date-line {{
-    margin: 54px 0 18px 0;
+    margin: 28px 0 10px 0;
     text-align: right;
     font-weight: 700;
 }}
@@ -15686,8 +15686,8 @@ th, td {{
 고&nbsp;&nbsp;객&nbsp;&nbsp;사 : <span class="sign-name">{v('customer_signer') or '&nbsp;'}</span> (인)
 </div>
 </div>
-</div>
 {attachment_html}
+</div>
 </body>
 </html>"""
     return doc_html
