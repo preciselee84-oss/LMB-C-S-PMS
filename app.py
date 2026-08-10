@@ -15762,7 +15762,7 @@ def build_integration_confirmation_docx_bytes(form_data):
             element.set(qn("w:space"), "0")
             element.set(qn("w:color"), color)
 
-    def set_table_fixed_layout(table, width_cm):
+    def set_table_fixed_layout(table, width_cm, column_widths_cm=None):
         tbl_pr = table._tbl.tblPr
         layout = tbl_pr.find(qn("w:tblLayout"))
         if layout is None:
@@ -15776,6 +15776,18 @@ def build_integration_confirmation_docx_bytes(form_data):
             tbl_pr.append(tbl_w)
         tbl_w.set(qn("w:w"), str(int(width_cm * 567)))
         tbl_w.set(qn("w:type"), "dxa")
+
+        if column_widths_cm:
+            grid = table._tbl.tblGrid
+            if grid is None:
+                grid = OxmlElement("w:tblGrid")
+                table._tbl.insert(0, grid)
+            for child in list(grid):
+                grid.remove(child)
+            for column_width in column_widths_cm:
+                grid_col = OxmlElement("w:gridCol")
+                grid_col.set(qn("w:w"), str(int(column_width * 567)))
+                grid.append(grid_col)
 
     def set_page_border(section):
         sect_pr = section._sectPr
@@ -15809,9 +15821,9 @@ def build_integration_confirmation_docx_bytes(form_data):
         title = doc.add_table(rows=1, cols=1)
         title.alignment = WD_TABLE_ALIGNMENT.CENTER
         title.autofit = False
-        title.columns[0].width = Cm(16.6)
+        title.columns[0].width = Cm(15.9)
         set_table_borders(title, "777777", "8")
-        set_table_fixed_layout(title, 16.6)
+        set_table_fixed_layout(title, 15.9, [15.9])
         set_cell_text(title.cell(0, 0), "ERP연계작업 보고서", bold=True, size=10)
 
     def add_section_title(doc, text):
@@ -15863,30 +15875,30 @@ def build_integration_confirmation_docx_bytes(form_data):
     section = doc.sections[0]
     section.page_width = Cm(21)
     section.page_height = Cm(29.7)
-    section.top_margin = Cm(1.25)
-    section.bottom_margin = Cm(1.05)
-    section.left_margin = Cm(1.55)
-    section.right_margin = Cm(1.55)
+    section.top_margin = Cm(3.0)
+    section.bottom_margin = Cm(2.54)
+    section.left_margin = Cm(2.54)
+    section.right_margin = Cm(2.54)
     set_page_border(section)
 
     add_header_block(doc)
     add_spacer(doc, 14)
     add_section_title(doc, "1. 고객정보")
-    table = doc.add_table(rows=5, cols=5)
+    table = doc.add_table(rows=5, cols=6)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
     set_table_borders(table)
-    set_table_fixed_layout(table, 16.6)
-    widths5 = [3.0, 3.0, 3.6, 3.0, 4.0]
+    widths6 = [3.74, 2.25, 2.25, 1.70, 1.55, 4.41]
+    set_table_fixed_layout(table, 15.9, widths6)
     for row in table.rows:
-        set_row_cells(row, widths5)
+        set_row_cells(row, widths6)
         set_row_height(row, 0.55)
     set_cell_text(table.cell(0, 0), "고객명", True); set_cell_shading(table.cell(0, 0))
     table.cell(0, 1).merge(table.cell(0, 2)); set_cell_text(table.cell(0, 1), form_data.get("customer_name", ""))
-    set_cell_text(table.cell(0, 3), "사업자번호", True); set_cell_shading(table.cell(0, 3))
-    set_cell_text(table.cell(0, 4), form_data.get("business_no", ""))
+    table.cell(0, 3).merge(table.cell(0, 4)); set_cell_text(table.cell(0, 3), "사업자번호", True); set_cell_shading(table.cell(0, 3))
+    set_cell_text(table.cell(0, 5), form_data.get("business_no", ""))
     set_cell_text(table.cell(1, 0), "소재지", True); set_cell_shading(table.cell(1, 0))
-    table.cell(1, 1).merge(table.cell(1, 4)); set_cell_text(table.cell(1, 1), form_data.get("address", ""))
+    table.cell(1, 1).merge(table.cell(1, 5)); set_cell_text(table.cell(1, 1), form_data.get("address", ""))
     table.cell(2, 0).merge(table.cell(4, 0)); set_cell_text(table.cell(2, 0), "담당자", True); set_cell_shading(table.cell(2, 0))
     for row_idx, label, name_key, contact_key in [
         (2, "고객사", "customer_manager_name", "customer_manager_contact"),
@@ -15895,16 +15907,16 @@ def build_integration_confirmation_docx_bytes(form_data):
     ]:
         set_cell_text(table.cell(row_idx, 1), label, True); set_cell_shading(table.cell(row_idx, 1))
         set_cell_text(table.cell(row_idx, 2), form_data.get(name_key, ""))
-        set_cell_text(table.cell(row_idx, 3), "연락처", True); set_cell_shading(table.cell(row_idx, 3))
-        set_cell_text(table.cell(row_idx, 4), form_data.get(contact_key, ""))
+        table.cell(row_idx, 3).merge(table.cell(row_idx, 4)); set_cell_text(table.cell(row_idx, 3), "연락처", True); set_cell_shading(table.cell(row_idx, 3))
+        set_cell_text(table.cell(row_idx, 5), form_data.get(contact_key, ""))
 
     add_section_title(doc, "2. 연계정보")
     table = doc.add_table(rows=4, cols=4)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
     set_table_borders(table)
-    set_table_fixed_layout(table, 16.6)
-    widths4 = [4.0, 4.3, 4.0, 4.3]
+    widths4 = [3.74, 4.50, 3.25, 4.41]
+    set_table_fixed_layout(table, 15.9, widths4)
     for row in table.rows:
         set_row_cells(row, widths4)
         set_row_height(row, 0.55)
@@ -15929,9 +15941,10 @@ def build_integration_confirmation_docx_bytes(form_data):
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
     set_table_borders(table)
-    set_table_fixed_layout(table, 16.6)
+    work_widths = [3.74, 4.05, 4.05, 4.05]
+    set_table_fixed_layout(table, 15.9, work_widths)
     for row in table.rows:
-        set_row_cells(row, widths4)
+        set_row_cells(row, work_widths)
         set_row_height(row, 0.52)
     for col_idx, title in enumerate(["업무 구분", "연계 작업", "데이터 이관", "테스트"]):
         set_cell_text(table.cell(0, col_idx), title, True); set_cell_shading(table.cell(0, col_idx))
@@ -15977,15 +15990,22 @@ def build_integration_confirmation_docx_bytes(form_data):
         for work_type in selected_work_types:
             for detail in AMARANTH_ATTACHMENT_TEMPLATES.get(work_type, []):
                 doc.add_section(WD_SECTION.NEW_PAGE)
-                set_page_border(doc.sections[-1])
+                section = doc.sections[-1]
+                section.page_width = Cm(21)
+                section.page_height = Cm(29.7)
+                section.top_margin = Cm(3.0)
+                section.bottom_margin = Cm(2.54)
+                section.left_margin = Cm(2.54)
+                section.right_margin = Cm(2.54)
+                set_page_border(section)
                 add_header_block(doc)
                 add_section_title(doc, "[ 첨부 ] 상세 작업 내용")
                 table = doc.add_table(rows=6, cols=4)
                 table.alignment = WD_TABLE_ALIGNMENT.CENTER
                 table.autofit = False
                 set_table_borders(table)
-                set_table_fixed_layout(table, 16.6)
-                attachment_widths = [3.0, 6.0, 3.0, 4.6]
+                attachment_widths = [3.05, 6.08, 3.05, 3.72]
+                set_table_fixed_layout(table, 15.9, attachment_widths)
                 for row in table.rows:
                     set_row_cells(row, attachment_widths)
                 for row in table.rows[:3]:
@@ -16003,13 +16023,13 @@ def build_integration_confirmation_docx_bytes(form_data):
                 set_cell_text(table.cell(3, 0), "작업내용", True); set_cell_shading(table.cell(3, 0))
                 query_cell = table.cell(3, 1).merge(table.cell(3, 3))
                 query_cell.text = ""
-                for line in get_docx_wrapped_query_lines(detail.get("body", ""), width=72):
+                for line in get_docx_wrapped_query_lines(detail.get("body", ""), width=86):
                     paragraph = query_cell.add_paragraph()
                     paragraph.paragraph_format.space_before = Pt(0)
                     paragraph.paragraph_format.space_after = Pt(0)
                     run = paragraph.add_run(line)
                     run.font.name = "Consolas"
-                    run.font.size = Pt(7)
+                    run.font.size = Pt(6.5)
                     run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
                 for _ in range(2):
                     paragraph = query_cell.add_paragraph()
@@ -16017,7 +16037,7 @@ def build_integration_confirmation_docx_bytes(form_data):
                     paragraph.paragraph_format.space_after = Pt(0)
                     run = paragraph.add_run(" ")
                     run.font.name = "Consolas"
-                    run.font.size = Pt(7)
+                    run.font.size = Pt(6.5)
                     run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
                 set_cell_text(table.cell(4, 0), "데이터 전송 시\n특이사항", True); set_cell_shading(table.cell(4, 0))
                 table.cell(4, 1).merge(table.cell(4, 3)); set_cell_text(table.cell(4, 1), "")
