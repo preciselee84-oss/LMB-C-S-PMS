@@ -1581,6 +1581,20 @@ def _activity_template_type(value):
     return "메모"
 
 
+def _activity_template_detail(activity_type, activity_text):
+    if activity_type in ["원격활동", "통화"]:
+        return "운영"
+
+    text = _activity_template_text(activity_text)
+    if activity_type == "미팅":
+        if any(keyword in text for keyword in ["신규", "구축", "개설"]):
+            return "개설"
+        if "ERP" in text.upper() or "연계" in text:
+            return "연계"
+
+    return "운영"
+
+
 def _activity_template_title(row, request_col, result_col, work_type_col):
     request_text = _activity_template_text(row.get(request_col, "")) if request_col else ""
     result_text = _activity_template_text(row.get(result_col, "")) if result_col else ""
@@ -1686,12 +1700,14 @@ def convert_history_to_activity_template_df(history_df, template_bytes):
         request_text = _activity_template_text(row.get(request_col, "")) if request_col else ""
         result_text = _activity_template_text(row.get(result_col, "")) if result_col else ""
         activity_text = result_text or request_text
+        activity_type = _activity_template_type(row.get(type_col, "")) if type_col else "메모"
+        activity_detail = _activity_template_detail(activity_type, activity_text)
         owner = _activity_template_text(row.get(owner_col, "")) if owner_col else ""
         if not owner and receiver_col:
             owner = _activity_template_text(row.get(receiver_col, ""))
 
         converted_rows.append({
-            "유형(필수: 통화/미팅/원격활동/이메일/메모)": _activity_template_type(row.get(type_col, "")) if type_col else "메모",
+            "유형(필수: 통화/미팅/원격활동/이메일/메모)": activity_type,
             "제목(필수)": _activity_template_title(row, request_col, result_col, work_type_col),
             "일시(필수: 202606110930 또는 2026-06-11 09:30)": _activity_template_datetime(row.get(date_col, ""), row.get(time_col, "")) if date_col else "",
             "활동자(필수: 이름)": owner,
@@ -1702,7 +1718,7 @@ def convert_history_to_activity_template_df(history_df, template_bytes):
             "고객": "",
             "관련제품(코드 또는 이름)": _activity_template_text(row.get(product_col, "")) if product_col else "통합CMS",
             "활동내역": activity_text,
-            "활동 상세(마케팅/개설/운영/연계/기타)": "운영",
+            "활동 상세(마케팅/개설/운영/연계/기타)": activity_detail,
             "활동 구분(IN/OUT)": "IN",
             "활동 목적(운영활동/신규구축/사용자교육/ERP연계진행/ERP연계완료/ERP추가연계/상품전환/재구축/사전협의/수수료연체안내)": _activity_template_purpose(work_type),
             "팀구분(MANAGE/HOTLINE/TECH)": "HOTLINE",
