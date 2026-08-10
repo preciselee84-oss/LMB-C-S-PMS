@@ -15041,7 +15041,7 @@ def build_integration_confirmation_doc_html(form_data):
         return html.escape(str(form_data.get(key, "") or "")).replace("\n", "<br>")
 
     def mark(value):
-        return "■" if value else "□"
+        return "완료" if value else ""
 
     today = form_data.get("confirm_date")
     if hasattr(today, "strftime"):
@@ -15059,7 +15059,7 @@ def build_integration_confirmation_doc_html(form_data):
     for item in work_items[:INTEGRATION_WORK_ROW_COUNT]:
         rows_work.append(
             "<tr>"
-            f"<td class=\"value left\">{html.escape(str(item.get('work_type', '') or ''))}</td>"
+            f"<td class=\"value center\">{html.escape(str(item.get('work_type', '') or ''))}</td>"
             f"<td class=\"value center mark\">{mark(item.get('link_work'))}</td>"
             f"<td class=\"value center mark\">{mark(item.get('data_migration'))}</td>"
             f"<td class=\"value center mark\">{mark(item.get('test'))}</td>"
@@ -15131,7 +15131,7 @@ th, td {{
     background: #f2f2f2;
 }}
 .value {{
-    text-align: left;
+    text-align: center;
     font-weight: 400;
 }}
 .left {{ text-align: left; }}
