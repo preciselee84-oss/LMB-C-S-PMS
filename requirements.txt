@@ -3,6 +3,7 @@ openpyxl
 pandas
 numpy
 python-pptx
+python-docx
 plotly
 streamlit-cookies-controller
 xlrd

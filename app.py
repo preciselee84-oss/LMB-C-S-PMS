@@ -15681,6 +15681,260 @@ th, td {{
     return doc_html
 
 
+def build_integration_confirmation_docx_bytes(form_data):
+    from docx import Document
+    from docx.enum.section import WD_SECTION
+    from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.shared import Cm, Pt
+
+    def set_cell_text(cell, text="", bold=False, size=10, align=WD_ALIGN_PARAGRAPH.CENTER):
+        cell.text = ""
+        paragraph = cell.paragraphs[0]
+        paragraph.alignment = align
+        run = paragraph.add_run(str(text or ""))
+        run.bold = bold
+        run.font.name = "Malgun Gothic"
+        run.font.size = Pt(size)
+        run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
+        cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+
+    def set_cell_shading(cell, fill="F2F2F2"):
+        tc_pr = cell._tc.get_or_add_tcPr()
+        shd = tc_pr.find(qn("w:shd"))
+        if shd is None:
+            shd = OxmlElement("w:shd")
+            tc_pr.append(shd)
+        shd.set(qn("w:fill"), fill)
+
+    def set_cell_width(cell, width_cm):
+        tc_pr = cell._tc.get_or_add_tcPr()
+        tc_w = tc_pr.find(qn("w:tcW"))
+        if tc_w is None:
+            tc_w = OxmlElement("w:tcW")
+            tc_pr.append(tc_w)
+        tc_w.set(qn("w:w"), str(int(width_cm * 567)))
+        tc_w.set(qn("w:type"), "dxa")
+
+    def set_table_borders(table, color="AAAAAA", size="6"):
+        tbl_pr = table._tbl.tblPr
+        borders = tbl_pr.find(qn("w:tblBorders"))
+        if borders is None:
+            borders = OxmlElement("w:tblBorders")
+            tbl_pr.append(borders)
+        for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+            tag = qn(f"w:{edge}")
+            element = borders.find(tag)
+            if element is None:
+                element = OxmlElement(f"w:{edge}")
+                borders.append(element)
+            element.set(qn("w:val"), "single")
+            element.set(qn("w:sz"), size)
+            element.set(qn("w:space"), "0")
+            element.set(qn("w:color"), color)
+
+    def set_page_border(section):
+        sect_pr = section._sectPr
+        borders = sect_pr.find(qn("w:pgBorders"))
+        if borders is None:
+            borders = OxmlElement("w:pgBorders")
+            sect_pr.append(borders)
+        borders.set(qn("w:offsetFrom"), "page")
+        for edge in ("top", "left", "bottom", "right"):
+            element = borders.find(qn(f"w:{edge}"))
+            if element is None:
+                element = OxmlElement(f"w:{edge}")
+                borders.append(element)
+            element.set(qn("w:val"), "single")
+            element.set(qn("w:sz"), "12")
+            element.set(qn("w:space"), "18")
+            element.set(qn("w:color"), "000000")
+
+    def add_header_block(doc):
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        run = p.add_run("통합CMS ERP연계작업결과서")
+        run.bold = True
+        run.font.name = "Malgun Gothic"
+        run.font.size = Pt(8)
+        run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
+
+        title = doc.add_table(rows=1, cols=1)
+        title.alignment = WD_TABLE_ALIGNMENT.CENTER
+        title.autofit = False
+        title.columns[0].width = Cm(16.6)
+        set_table_borders(title, "777777", "8")
+        set_cell_text(title.cell(0, 0), "ERP연계작업 보고서", bold=True, size=10)
+
+    def add_section_title(doc, text):
+        p = doc.add_paragraph()
+        p.paragraph_format.space_before = Pt(8)
+        p.paragraph_format.space_after = Pt(2)
+        run = p.add_run(text)
+        run.bold = True
+        run.font.name = "Malgun Gothic"
+        run.font.size = Pt(10)
+        run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
+
+    def set_row_cells(row, widths):
+        for cell, width in zip(row.cells, widths):
+            set_cell_width(cell, width)
+
+    def mark(value):
+        return "완료" if value else ""
+
+    doc = Document()
+    section = doc.sections[0]
+    section.page_width = Cm(21)
+    section.page_height = Cm(29.7)
+    section.top_margin = Cm(1.0)
+    section.bottom_margin = Cm(1.0)
+    section.left_margin = Cm(1.1)
+    section.right_margin = Cm(1.1)
+    set_page_border(section)
+
+    add_header_block(doc)
+    add_section_title(doc, "1. 고객정보")
+    table = doc.add_table(rows=5, cols=5)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
+    set_table_borders(table)
+    widths5 = [3.0, 3.0, 3.6, 3.0, 4.0]
+    for row in table.rows:
+        set_row_cells(row, widths5)
+    set_cell_text(table.cell(0, 0), "고객명", True); set_cell_shading(table.cell(0, 0))
+    table.cell(0, 1).merge(table.cell(0, 2)); set_cell_text(table.cell(0, 1), form_data.get("customer_name", ""))
+    set_cell_text(table.cell(0, 3), "사업자번호", True); set_cell_shading(table.cell(0, 3))
+    set_cell_text(table.cell(0, 4), form_data.get("business_no", ""))
+    set_cell_text(table.cell(1, 0), "소재지", True); set_cell_shading(table.cell(1, 0))
+    table.cell(1, 1).merge(table.cell(1, 4)); set_cell_text(table.cell(1, 1), form_data.get("address", ""))
+    table.cell(2, 0).merge(table.cell(4, 0)); set_cell_text(table.cell(2, 0), "담당자", True); set_cell_shading(table.cell(2, 0))
+    for row_idx, label, name_key, contact_key in [
+        (2, "고객사", "customer_manager_name", "customer_manager_contact"),
+        (3, "개발사", "developer_name", "developer_contact"),
+        (4, "통합CMS", "cms_manager_name", "cms_manager_contact"),
+    ]:
+        set_cell_text(table.cell(row_idx, 1), label, True); set_cell_shading(table.cell(row_idx, 1))
+        set_cell_text(table.cell(row_idx, 2), form_data.get(name_key, ""))
+        set_cell_text(table.cell(row_idx, 3), "연락처", True); set_cell_shading(table.cell(row_idx, 3))
+        set_cell_text(table.cell(row_idx, 4), form_data.get(contact_key, ""))
+
+    add_section_title(doc, "2. 연계정보")
+    table = doc.add_table(rows=4, cols=4)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
+    set_table_borders(table)
+    widths4 = [4.0, 4.3, 4.0, 4.3]
+    for row in table.rows:
+        set_row_cells(row, widths4)
+    rows = [
+        ("ERP종류", "erp_type", "ERP DB종류", "erp_db_type"),
+        ("서버 위치", "server_location", "서버 IP", "server_ip"),
+        ("연계방식", "link_method", "연계일자", "link_date"),
+    ]
+    for idx, (l1, k1, l2, k2) in enumerate(rows):
+        set_cell_text(table.cell(idx, 0), l1, True); set_cell_shading(table.cell(idx, 0))
+        set_cell_text(table.cell(idx, 1), form_data.get(k1, ""))
+        set_cell_text(table.cell(idx, 2), l2, True); set_cell_shading(table.cell(idx, 2))
+        set_cell_text(table.cell(idx, 3), form_data.get(k2, ""))
+    set_cell_text(table.cell(3, 0), "비고", True); set_cell_shading(table.cell(3, 0))
+    table.cell(3, 1).merge(table.cell(3, 3)); set_cell_text(table.cell(3, 1), form_data.get("memo", ""))
+
+    add_section_title(doc, "3. 연계업무")
+    work_items = list(form_data.get("work_items", []))
+    while len(work_items) < INTEGRATION_WORK_ROW_COUNT:
+        work_items.append({})
+    table = doc.add_table(rows=1 + INTEGRATION_WORK_ROW_COUNT, cols=4)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
+    set_table_borders(table)
+    for row in table.rows:
+        set_row_cells(row, widths4)
+    for col_idx, title in enumerate(["업무 구분", "연계 작업", "데이터 이관", "테스트"]):
+        set_cell_text(table.cell(0, col_idx), title, True); set_cell_shading(table.cell(0, col_idx))
+    for row_idx, item in enumerate(work_items[:INTEGRATION_WORK_ROW_COUNT], start=1):
+        set_cell_text(table.cell(row_idx, 0), item.get("work_type", ""))
+        set_cell_text(table.cell(row_idx, 1), mark(item.get("link_work")))
+        set_cell_text(table.cell(row_idx, 2), mark(item.get("data_migration")))
+        set_cell_text(table.cell(row_idx, 3), mark(item.get("test")))
+
+    for _ in range(4):
+        doc.add_paragraph()
+    p = doc.add_paragraph("상기 업무의 ERP연계 작업을 확인합니다.")
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.runs[0].bold = True
+    p.runs[0].font.size = Pt(10)
+
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    date_text = form_data.get("link_date", "")
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", str(date_text)):
+        year, month, day = str(date_text).split("-")
+        p.add_run(f"{year}    년    {month}    월    {day}    일")
+    else:
+        p.add_run("          년          월          일")
+    p.runs[0].bold = True
+    p.runs[0].font.size = Pt(10)
+
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p.add_run(f"확 인 자 : {form_data.get('confirmer', '')}        (인)")
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p.add_run(f"고 객 사 : {form_data.get('customer_signer', '')}        (인)")
+
+    erp_type = str(form_data.get("erp_type", "") or "").strip()
+    if erp_type == "더존 아마란스 10":
+        selected_work_types = []
+        for item in form_data.get("work_items", []):
+            work_type = str(item.get("work_type", "") or "").strip()
+            if work_type and work_type not in selected_work_types:
+                selected_work_types.append(work_type)
+
+        for work_type in selected_work_types:
+            for detail in AMARANTH_ATTACHMENT_TEMPLATES.get(work_type, []):
+                doc.add_section(WD_SECTION.NEW_PAGE)
+                set_page_border(doc.sections[-1])
+                add_header_block(doc)
+                add_section_title(doc, "[ 첨부 ] 상세 작업 내용")
+                table = doc.add_table(rows=6, cols=4)
+                table.alignment = WD_TABLE_ALIGNMENT.CENTER
+                table.autofit = False
+                set_table_borders(table)
+                for row in table.rows:
+                    set_row_cells(row, [2.3, 5.5, 3.2, 5.6])
+                table.cell(0, 0).merge(table.cell(2, 0)); set_cell_text(table.cell(0, 0), "업무", True); set_cell_shading(table.cell(0, 0))
+                table.cell(0, 1).merge(table.cell(2, 1)); set_cell_text(table.cell(0, 1), detail.get("title", ""))
+                set_cell_text(table.cell(0, 2), "전송방식", True); set_cell_shading(table.cell(0, 2))
+                set_cell_text(table.cell(0, 3), detail.get("transfer_method", ""))
+                set_cell_text(table.cell(1, 2), "데이터 처리방식", True); set_cell_shading(table.cell(1, 2))
+                set_cell_text(table.cell(1, 3), detail.get("process_method", ""))
+                set_cell_text(table.cell(2, 2), "스케줄러 사용여부", True); set_cell_shading(table.cell(2, 2))
+                set_cell_text(table.cell(2, 3), detail.get("scheduler", ""))
+                set_cell_text(table.cell(3, 0), "작업내용", True); set_cell_shading(table.cell(3, 0))
+                query_cell = table.cell(3, 1).merge(table.cell(3, 3))
+                query_cell.text = ""
+                for line in str(detail.get("body", "") or "").splitlines():
+                    paragraph = query_cell.add_paragraph()
+                    paragraph.paragraph_format.space_before = Pt(0)
+                    paragraph.paragraph_format.space_after = Pt(0)
+                    run = paragraph.add_run(line)
+                    run.font.name = "Consolas"
+                    run.font.size = Pt(7)
+                    run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
+                set_cell_text(table.cell(4, 0), "데이터 전송 시\n특이사항", True); set_cell_shading(table.cell(4, 0))
+                table.cell(4, 1).merge(table.cell(4, 3)); set_cell_text(table.cell(4, 1), "")
+                set_cell_text(table.cell(5, 0), "비고", True); set_cell_shading(table.cell(5, 0))
+                table.cell(5, 1).merge(table.cell(5, 3)); set_cell_text(table.cell(5, 1), "")
+
+    output = BytesIO()
+    doc.save(output)
+    output.seek(0)
+    return output.getvalue()
+
+
 def build_integration_confirmation_doc_bytes(form_data):
     return build_integration_confirmation_doc_html(form_data).encode("utf-8-sig")
 
@@ -15837,9 +16091,9 @@ def show_integration_confirmation():
     safe_customer = re.sub(r"[^0-9A-Za-z가-힣_-]+", "_", customer_name.strip() or "고객")
     st.download_button(
         "연계확인서 다운로드",
-        data=build_integration_confirmation_doc_bytes(form_data),
-        file_name=f"통합CMS_ERP연계작업결과서_{safe_customer}.doc",
-        mime="application/msword",
+        data=build_integration_confirmation_docx_bytes(form_data),
+        file_name=f"통합CMS_ERP연계작업결과서_{safe_customer}.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         use_container_width=True,
     )
 
