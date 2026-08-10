@@ -15352,9 +15352,10 @@ def show_integration_confirmation():
                     }
                 )
 
-        add_col, remove_col, count_col = st.columns([1, 1, 5])
+        add_col, remove_col = st.columns(2)
         add_work_row = add_col.form_submit_button(
             "업무 추가",
+            type="primary",
             use_container_width=True,
             disabled=st.session_state.integration_work_row_count >= INTEGRATION_WORK_ROW_COUNT,
         )
@@ -15363,7 +15364,6 @@ def show_integration_confirmation():
             use_container_width=True,
             disabled=st.session_state.integration_work_row_count <= 1,
         )
-        count_col.caption(f"현재 {st.session_state.integration_work_row_count}개 / 최대 {INTEGRATION_WORK_ROW_COUNT}개")
 
         st.markdown("#### 확인")
         s1, s2 = st.columns(2)
