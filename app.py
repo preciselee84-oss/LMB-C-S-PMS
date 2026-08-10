@@ -15267,23 +15267,23 @@ def build_integration_attachment_html(form_data):
     <table class="detail-table">
         <colgroup>
             <col style="width: 18%">
-            <col style="width: 32%">
+            <col style="width: 36%">
             <col style="width: 18%">
-            <col style="width: 32%">
+            <col style="width: 28%">
         </colgroup>
         <tr>
-            <th class="label">업무</th>
-            <td colspan="3" class="value">{html.escape(str(detail.get('title', '') or ''))}</td>
-        </tr>
-        <tr>
+            <th rowspan="3" class="label">업무</th>
+            <td rowspan="3" class="value">{html.escape(str(detail.get('title', '') or ''))}</td>
             <th class="label">전송방식</th>
             <td class="value">{html.escape(str(detail.get('transfer_method', '') or ''))}</td>
+        </tr>
+        <tr>
             <th class="label">데이터 처리방식</th>
             <td class="value">{html.escape(str(detail.get('process_method', '') or ''))}</td>
         </tr>
         <tr>
             <th class="label">스케줄러 사용여부</th>
-            <td colspan="3" class="value">{html.escape(str(detail.get('scheduler', '') or ''))}</td>
+            <td class="value">{html.escape(str(detail.get('scheduler', '') or ''))}</td>
         </tr>
         <tr>
             <th class="label">작업내용</th>
