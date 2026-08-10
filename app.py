@@ -15445,33 +15445,40 @@ th, td {{
 <div class="section-title">1. 고객정보</div>
 <table>
 <colgroup>
-    <col style="width: 24%">
-    <col style="width: 28%">
-    <col style="width: 24%">
-    <col style="width: 24%">
+    <col style="width: 18%">
+    <col style="width: 20%">
+    <col style="width: 22%">
+    <col style="width: 18%">
+    <col style="width: 22%">
 </colgroup>
 <tr>
     <th class="label">고객명</th>
-    <td class="value">{v('customer_name')}</td>
+    <td colspan="2" class="value">{v('customer_name')}</td>
     <th class="label">사업자번호</th>
     <td class="value">{v('business_no')}</td>
 </tr>
 <tr>
     <th class="label">소재지</th>
-    <td colspan="3" class="value">{v('address')}</td>
+    <td colspan="4" class="value">{v('address')}</td>
 </tr>
 <tr>
     <th rowspan="3" class="label">담당자</th>
     <th class="label">고객사</th>
-    <td colspan="2" class="value">{v('customer_manager')}</td>
+    <td class="value">{v('customer_manager_name')}</td>
+    <th class="label">연락처</th>
+    <td class="value">{v('customer_manager_contact')}</td>
 </tr>
 <tr>
     <th class="label">개발사</th>
-    <td colspan="2" class="value">{v('developer')}</td>
+    <td class="value">{v('developer_name')}</td>
+    <th class="label">연락처</th>
+    <td class="value">{v('developer_contact')}</td>
 </tr>
 <tr>
     <th class="label">통합CMS</th>
-    <td colspan="2" class="value">{v('cms_manager')}</td>
+    <td class="value">{v('cms_manager_name')}</td>
+    <th class="label">연락처</th>
+    <td class="value">{v('cms_manager_contact')}</td>
 </tr>
 </table>
 
@@ -15503,7 +15510,7 @@ th, td {{
 </tr>
 <tr>
     <th class="label memo">비고</th>
-    <td colspan="5" class="value memo">{v('memo')}</td>
+    <td colspan="3" class="value memo">{v('memo')}</td>
 </tr>
 </table>
 
@@ -15568,10 +15575,16 @@ def show_integration_confirmation():
         business_no = c2.text_input("사업자번호")
         address = st.text_input("소재지")
 
-        m1, m2, m3 = st.columns(3)
-        customer_manager = m1.text_input("담당자 - 고객사")
-        developer = m2.text_input("담당자 - 개발사")
-        cms_manager = m3.selectbox("담당자 - 통합CMS", INTEGRATION_CMS_MANAGER_OPTIONS)
+        st.markdown("##### 담당자")
+        cm1, cm2 = st.columns(2)
+        customer_manager_name = cm1.text_input("담당자 - 고객사 성명")
+        customer_manager_contact = cm2.text_input("담당자 - 고객사 연락처")
+        dv1, dv2 = st.columns(2)
+        developer_name = dv1.text_input("담당자 - 개발사 성명")
+        developer_contact = dv2.text_input("담당자 - 개발사 연락처")
+        cms1, cms2 = st.columns(2)
+        cms_manager_name = cms1.text_input("담당자 - 통합CMS 성명")
+        cms_manager_contact = cms2.text_input("담당자 - 통합CMS 연락처")
 
         st.markdown("#### 연계정보")
         i1, i2, i3 = st.columns(3)
@@ -15659,9 +15672,15 @@ def show_integration_confirmation():
         "customer_name": customer_name,
         "business_no": business_no,
         "address": address,
-        "customer_manager": customer_manager,
-        "developer": developer,
-        "cms_manager": "" if cms_manager == "선택" else cms_manager,
+        "customer_manager": customer_manager_name,
+        "customer_manager_name": customer_manager_name,
+        "customer_manager_contact": customer_manager_contact,
+        "developer": developer_name,
+        "developer_name": developer_name,
+        "developer_contact": developer_contact,
+        "cms_manager": cms_manager_name,
+        "cms_manager_name": cms_manager_name,
+        "cms_manager_contact": cms_manager_contact,
         "erp_type": "" if erp_type == "선택" else erp_type,
         "erp_db_type": "" if erp_db_type == "선택" else erp_db_type,
         "server_location": server_location,
@@ -15675,7 +15694,7 @@ def show_integration_confirmation():
         "customer_signer": customer_signer,
     }
 
-    missing = [label for label, value in [("고객명", customer_name), ("개발사", developer)] if not str(value or "").strip()]
+    missing = [label for label, value in [("고객명", customer_name), ("개발사", developer_name)] if not str(value or "").strip()]
     if missing:
         st.warning(f"필수 입력값을 확인해주세요: {', '.join(missing)}")
 
