@@ -15219,6 +15219,13 @@ ebankCd cardNo apprDt apprNo apprTm apprAm supplyAm vatAm serviceAm chainNm chai
     ]
 
 
+_QUERY_P_STYLE = (
+    "margin:0; padding:0; "
+    "font-family:Consolas,'Malgun Gothic','맑은 고딕',monospace; "
+    "font-size:7.5pt; line-height:1.28; white-space:pre-wrap;"
+)
+
+
 def format_integration_query_body(body, width=54):
     wrapped_lines = []
     wrapper = textwrap.TextWrapper(
@@ -15240,7 +15247,12 @@ def format_integration_query_body(body, width=54):
         wrapper.subsequent_indent = f"{indent}    "
         wrapped_lines.extend(wrapper.wrap(raw_line.strip()) or [""])
 
-    return html.escape("\n".join(wrapped_lines)).replace("\n", "<br>")
+    # 각 줄을 <p>로 출력 — Word는 <p> 단락 경계에서 페이지를 나눔
+    parts = []
+    for line in wrapped_lines:
+        escaped = html.escape(line) if line.strip() else "&nbsp;"
+        parts.append(f'<p style="{_QUERY_P_STYLE}">{escaped}</p>')
+    return "\n".join(parts)
 
 
 def build_integration_attachment_html(form_data):
@@ -15287,7 +15299,7 @@ def build_integration_attachment_html(form_data):
         </tr>
         <tr>
             <th class="label" style="vertical-align: top; padding-top: 4px;">작업내용</th>
-            <td colspan="3" class="query-cell"><div class="query-text">{body}</div></td>
+            <td colspan="3" class="query-cell">{body}</td>
         </tr>
         <tr>
             <th class="label">데이터 전송 시 특이사항</th>
@@ -15349,6 +15361,7 @@ body {{
 }}
 .doc {{
     width: 18.6cm;
+    min-height: 26.5cm;
     margin: 0 auto;
     border: 1.5pt solid #000;
     padding: 1.1cm 1.45cm 1.1cm 1.45cm;
@@ -15441,6 +15454,7 @@ th, td {{
 }}
 .attachment-page {{
     width: 18.6cm;
+    min-height: 26.5cm;
     margin: 0 auto;
     border: 1.5pt solid #000;
     padding: 1.1cm 1.45cm 1.1cm 1.45cm;
