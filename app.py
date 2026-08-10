@@ -15254,7 +15254,7 @@ _QUERY_P_STYLE = (
 )
 
 
-def format_integration_query_body(body, width=54):
+def format_integration_query_body(body, width=80):
     wrapped_lines = []
     wrapper = textwrap.TextWrapper(
         width=width,
@@ -15275,12 +15275,11 @@ def format_integration_query_body(body, width=54):
         wrapper.subsequent_indent = f"{indent}    "
         wrapped_lines.extend(wrapper.wrap(raw_line.strip()) or [""])
 
-    # 각 줄을 <p>로 출력 — Word는 <p> 단락 경계에서 페이지를 나눔
+    # <p> 하나에 <br>로 연결 — Word의 단락별 간격 중복 방지
     parts = []
     for line in wrapped_lines:
-        escaped = html.escape(line) if line.strip() else "&nbsp;"
-        parts.append(f'<p style="{_QUERY_P_STYLE}">{escaped}</p>')
-    return "\n".join(parts)
+        parts.append(html.escape(line) if line.strip() else "")
+    return f'<p style="{_QUERY_P_STYLE}">' + "<br>".join(parts) + "</p>"
 
 
 def build_integration_attachment_html(form_data):
