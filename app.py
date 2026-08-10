@@ -10,6 +10,7 @@ import re
 import base64
 import hashlib
 import unicodedata
+import textwrap
 import requests as _requests
 import streamlit.components.v1 as components
 from io import BytesIO
@@ -15218,6 +15219,30 @@ ebankCd cardNo apprDt apprNo apprTm apprAm supplyAm vatAm serviceAm chainNm chai
     ]
 
 
+def format_integration_query_body(body, width=72):
+    wrapped_lines = []
+    wrapper = textwrap.TextWrapper(
+        width=width,
+        break_long_words=True,
+        break_on_hyphens=False,
+        replace_whitespace=False,
+        drop_whitespace=True,
+    )
+
+    for raw_line in str(body or "").splitlines():
+        if not raw_line.strip():
+            wrapped_lines.append("")
+            continue
+
+        indent_match = re.match(r"^\s*", raw_line)
+        indent = indent_match.group(0) if indent_match else ""
+        wrapper.initial_indent = indent
+        wrapper.subsequent_indent = f"{indent}    "
+        wrapped_lines.extend(wrapper.wrap(raw_line.strip()) or [""])
+
+    return html.escape("\n".join(wrapped_lines)).replace("\n", "<br>")
+
+
 def build_integration_attachment_html(form_data):
     erp_type = str(form_data.get("erp_type", "") or "").strip()
     if erp_type != "더존 아마란스 10":
@@ -15232,7 +15257,7 @@ def build_integration_attachment_html(form_data):
     sections = []
     for work_type in selected_work_types:
         for detail in AMARANTH_ATTACHMENT_TEMPLATES.get(work_type, []):
-            body = html.escape(str(detail.get("body", "") or ""))
+            body = format_integration_query_body(detail.get("body", ""))
             sections.append(
                 f"""
 <div class="attachment-page">
@@ -15260,7 +15285,7 @@ def build_integration_attachment_html(form_data):
         </tr>
         <tr>
             <th class="label">작업내용</th>
-            <td colspan="3" class="query-cell"><pre>{body}</pre></td>
+            <td colspan="3" class="query-cell"><div class="query-text">{body}</div></td>
         </tr>
         <tr>
             <th class="label">데이터 전송 시 특이사항</th>
@@ -15443,17 +15468,17 @@ th, td {{
     overflow-wrap: anywhere;
     word-break: break-all;
 }}
-.query-cell pre {{
+.query-text {{
     display: block;
     width: 100%;
     max-width: 100%;
     margin: 0;
-    white-space: pre-wrap;
+    white-space: normal;
     overflow-wrap: anywhere;
     word-break: break-all;
     font-family: Consolas, "Malgun Gothic", "맑은 고딕", monospace;
-    font-size: 8pt;
-    line-height: 1.35;
+    font-size: 7.5pt;
+    line-height: 1.28;
     text-align: left;
     overflow: hidden;
 }}
