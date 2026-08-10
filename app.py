@@ -15380,10 +15380,11 @@ def build_integration_confirmation_doc_html(form_data):
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <style>
-@page {{
+@page Section1 {{
     size: 21cm 29.7cm;
     margin: 1.2cm 1.2cm 1.2cm 1.2cm;
 }}
+div.Section1 {{ page: Section1; }}
 body {{
     margin: 0;
     font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
@@ -15489,6 +15490,7 @@ th, td {{
     padding: 1.1cm 1.45cm 1.1cm 1.45cm;
     box-sizing: border-box;
     page-break-before: always;
+    page-break-inside: avoid;
 }}
 .attachment-top-title {{
     display: block;
@@ -15501,7 +15503,6 @@ th, td {{
     line-height: 1.2;
 }}
 .attachment-title-box {{
-    position: relative;
     display: block;
     width: 100%;
     height: 27px;
@@ -15562,6 +15563,7 @@ th, td {{
 </style>
 </head>
 <body>
+<div class="Section1">
 <div class="doc">
 <div class="top-title">통합CMS ERP연계작업결과서</div>
 <div class="title-box">ERP연계작업 보고서</div>
@@ -15671,6 +15673,7 @@ th, td {{
 </div>
 </div>
 {attachment_html.strip()}
+</div>
 </body>
 </html>"""
     return doc_html
