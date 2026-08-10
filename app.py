@@ -15285,13 +15285,19 @@ def build_integration_attachment_html(form_data):
             <th class="label">스케줄러 사용여부</th>
             <td class="value">{html.escape(str(detail.get('scheduler', '') or ''))}</td>
         </tr>
+    </table>
+    <table class="detail-table" style="border-top: none;">
+        <colgroup>
+            <col style="width: 18%">
+            <col style="width: 82%">
+        </colgroup>
         <tr>
-            <th class="label">작업내용</th>
-            <td colspan="3" class="query-cell"><div class="query-text">{body}</div></td>
+            <th class="label" style="border-top: none; vertical-align: top; padding-top: 4px;">작업내용</th>
+            <td class="query-cell" style="border-top: none;"><div class="query-text">{body}</div></td>
         </tr>
         <tr>
-            <th class="label">데이터 전송 시 특이사항</th>
-            <td colspan="3" class="value">&nbsp;</td>
+            <th class="label">데이터 전송 시<br>특이사항</th>
+            <td class="value">&nbsp;</td>
         </tr>
     </table>
 </div>"""
@@ -15496,23 +15502,29 @@ th, td {{
 .detail-table td {{
     font-size: 9pt;
     text-align: center;
+    page-break-inside: auto;
+}}
+.detail-table tr {{
+    page-break-inside: auto;
 }}
 .detail-table {{
     table-layout: fixed;
     width: 100%;
+    page-break-inside: auto;
 }}
 .query-cell {{
     text-align: left;
     vertical-align: top;
     overflow-wrap: anywhere;
     word-break: break-all;
+    page-break-inside: auto;
 }}
 .query-text {{
     display: block;
     width: 100%;
     max-width: 100%;
     margin: 0;
-    white-space: normal;
+    white-space: pre-wrap;
     overflow-wrap: anywhere;
     word-break: break-all;
     font-family: Consolas, "Malgun Gothic", "맑은 고딕", monospace;
@@ -15520,6 +15532,7 @@ th, td {{
     line-height: 1.28;
     text-align: left;
     overflow: visible;
+    page-break-inside: auto;
 }}
 </style>
 </head>
