@@ -15514,11 +15514,13 @@ th, td {{
     font-weight: 700;
     color: #666;
     margin: 0 0 11px 0;
+    page-break-after: avoid;
 }}
 .attachment-title {{
-    font-size: 12pt;
+    font-size: 10pt;
     font-weight: 700;
     margin: 0 0 8px 0;
+    page-break-before: avoid;
 }}
 .detail-table th {{
     font-size: 8pt;
