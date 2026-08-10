@@ -15269,21 +15269,11 @@ def get_docx_wrapped_query_lines(body, width=72):
             wrapped_lines.append("")
             continue
 
-        stripped_line = raw_line.strip()
-        mapping_tokens = stripped_line.split()
-        is_mapping_line = (
-            len(mapping_tokens) >= 4
-            and all(re.match(r"^[A-Za-z][A-Za-z0-9_]*$", token) for token in mapping_tokens)
-        )
-        if is_mapping_line:
-            wrapped_lines.extend(mapping_tokens)
-            continue
-
         indent_match = re.match(r"^\s*", raw_line)
         indent = indent_match.group(0) if indent_match else ""
         wrapper.initial_indent = indent
         wrapper.subsequent_indent = f"{indent}    "
-        wrapped_lines.extend(wrapper.wrap(stripped_line) or [""])
+        wrapped_lines.extend(wrapper.wrap(raw_line.strip()) or [""])
 
     return wrapped_lines
 
@@ -15995,7 +15985,7 @@ def build_integration_confirmation_docx_bytes(form_data):
                 table.autofit = False
                 set_table_borders(table)
                 set_table_fixed_layout(table, 16.6)
-                attachment_widths = [2.4, 4.6, 2.9, 6.7]
+                attachment_widths = [3.0, 6.0, 3.0, 4.6]
                 for row in table.rows:
                     set_row_cells(row, attachment_widths)
                 for row in table.rows[:3]:
@@ -16013,13 +16003,13 @@ def build_integration_confirmation_docx_bytes(form_data):
                 set_cell_text(table.cell(3, 0), "작업내용", True); set_cell_shading(table.cell(3, 0))
                 query_cell = table.cell(3, 1).merge(table.cell(3, 3))
                 query_cell.text = ""
-                for line in get_docx_wrapped_query_lines(detail.get("body", ""), width=52):
+                for line in get_docx_wrapped_query_lines(detail.get("body", ""), width=72):
                     paragraph = query_cell.add_paragraph()
                     paragraph.paragraph_format.space_before = Pt(0)
                     paragraph.paragraph_format.space_after = Pt(0)
                     run = paragraph.add_run(line)
                     run.font.name = "Consolas"
-                    run.font.size = Pt(6)
+                    run.font.size = Pt(7)
                     run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
                 for _ in range(2):
                     paragraph = query_cell.add_paragraph()
@@ -16027,7 +16017,7 @@ def build_integration_confirmation_docx_bytes(form_data):
                     paragraph.paragraph_format.space_after = Pt(0)
                     run = paragraph.add_run(" ")
                     run.font.name = "Consolas"
-                    run.font.size = Pt(6)
+                    run.font.size = Pt(7)
                     run._element.rPr.rFonts.set(qn("w:eastAsia"), "맑은 고딕")
                 set_cell_text(table.cell(4, 0), "데이터 전송 시\n특이사항", True); set_cell_shading(table.cell(4, 0))
                 table.cell(4, 1).merge(table.cell(4, 3)); set_cell_text(table.cell(4, 1), "")
