@@ -15355,7 +15355,6 @@ body {{
 }}
 .doc {{
     width: 18.6cm;
-    min-height: 26.5cm;
     margin: 0 auto;
     border: 1.5pt solid #000;
     padding: 1.1cm 1.45cm 1.1cm 1.45cm;
@@ -15448,12 +15447,14 @@ th, td {{
 }}
 .attachment-page {{
     width: 18.6cm;
-    min-height: 26.5cm;
     margin: 0 auto;
-    border: 1.5pt solid #000;
+    border-top: 1.5pt solid #000;
+    border-left: 1.5pt solid #000;
+    border-right: 1.5pt solid #000;
     padding: 1.1cm 1.45cm 1.1cm 1.45cm;
     box-sizing: border-box;
     page-break-before: always;
+    page-break-inside: auto;
 }}
 .attachment-top-title {{
     display: block;
