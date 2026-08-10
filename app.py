@@ -15285,19 +15285,13 @@ def build_integration_attachment_html(form_data):
             <th class="label">스케줄러 사용여부</th>
             <td class="value">{html.escape(str(detail.get('scheduler', '') or ''))}</td>
         </tr>
-    </table>
-    <table class="detail-table" style="border-top: none;">
-        <colgroup>
-            <col style="width: 18%">
-            <col style="width: 82%">
-        </colgroup>
         <tr>
-            <th class="label" style="border-top: none; vertical-align: top; padding-top: 4px;">작업내용</th>
-            <td class="query-cell" style="border-top: none;"><div class="query-text">{body}</div></td>
+            <th class="label" style="vertical-align: top; padding-top: 4px;">작업내용</th>
+            <td colspan="3" class="query-cell"><div class="query-text">{body}</div></td>
         </tr>
         <tr>
-            <th class="label">데이터 전송 시<br>특이사항</th>
-            <td class="value">&nbsp;</td>
+            <th class="label">데이터 전송 시 특이사항</th>
+            <td colspan="3" class="value">&nbsp;</td>
         </tr>
     </table>
 </div>"""
@@ -15448,13 +15442,10 @@ th, td {{
 .attachment-page {{
     width: 18.6cm;
     margin: 0 auto;
-    border-top: 1.5pt solid #000;
-    border-left: 1.5pt solid #000;
-    border-right: 1.5pt solid #000;
+    border: 1.5pt solid #000;
     padding: 1.1cm 1.45cm 1.1cm 1.45cm;
     box-sizing: border-box;
     page-break-before: always;
-    page-break-inside: auto;
 }}
 .attachment-top-title {{
     display: block;
@@ -15525,7 +15516,7 @@ th, td {{
     width: 100%;
     max-width: 100%;
     margin: 0;
-    white-space: pre-wrap;
+    white-space: normal;
     overflow-wrap: anywhere;
     word-break: break-all;
     font-family: Consolas, "Malgun Gothic", "맑은 고딕", monospace;
