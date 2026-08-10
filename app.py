@@ -15280,11 +15280,10 @@ def build_integration_confirmation_doc_html(form_data):
     def mark(value):
         return "완료" if value else ""
 
-    today = form_data.get("confirm_date")
-    if hasattr(today, "strftime"):
-        confirm_year = today.strftime("%Y")
-        confirm_month = today.strftime("%m")
-        confirm_day = today.strftime("%d")
+    link_date_text = str(form_data.get("link_date", "") or "").strip()
+    link_date_match = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", link_date_text)
+    if link_date_match:
+        confirm_year, confirm_month, confirm_day = link_date_match.groups()
     else:
         confirm_year = confirm_month = confirm_day = ""
 
@@ -15390,6 +15389,18 @@ th, td {{
     text-align: right;
     font-weight: 700;
 }}
+.date-parts {{
+    display: inline-table;
+    border-collapse: collapse;
+}}
+.date-parts span {{
+    display: inline-block;
+    text-align: center;
+}}
+.date-year {{ width: 46px; }}
+.date-month {{ width: 28px; }}
+.date-day {{ width: 28px; }}
+.date-label {{ width: 28px; }}
 .sign-area {{
     width: 7.3cm;
     margin-left: auto;
@@ -15535,7 +15546,11 @@ th, td {{
 상기 업무의 ERP연계 작업을 확인합니다.
 </div>
 <div class="date-line">
-{confirm_year}&nbsp;&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;&nbsp;{confirm_month}&nbsp;&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;&nbsp;{confirm_day}&nbsp;&nbsp;&nbsp;&nbsp;일
+<span class="date-parts">
+<span class="date-year">{confirm_year}</span><span class="date-label">년</span>
+<span class="date-month">{confirm_month}</span><span class="date-label">월</span>
+<span class="date-day">{confirm_day}</span><span class="date-label">일</span>
+</span>
 </div>
 <div class="sign-area">
 확&nbsp;&nbsp;인&nbsp;&nbsp;자 : <span class="sign-name">{v('confirmer') or '&nbsp;'}</span> (인)<br>
