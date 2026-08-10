@@ -15967,7 +15967,6 @@ def build_integration_confirmation_docx_bytes(form_data):
                 section.left_margin = Cm(2.54)
                 section.right_margin = Cm(2.54)
                 set_page_border(section)
-                add_header_block(doc)
                 add_section_title(doc, "[ 첨부 ] 상세 작업 내용")
                 table = doc.add_table(rows=6, cols=4)
                 table.alignment = WD_TABLE_ALIGNMENT.CENTER
