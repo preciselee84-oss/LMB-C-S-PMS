@@ -15424,7 +15424,7 @@ body {{
 table {{
     width: 100%;
     border-collapse: collapse;
-    table-layout: fixed;
+    table-layout: auto;
     margin: 0;
 }}
 th, td {{
@@ -15583,11 +15583,11 @@ th, td {{
 <div class="section-title">1. 고객정보</div>
 <table>
 <colgroup>
-    <col style="width: 18%">
-    <col style="width: 20%">
-    <col style="width: 22%">
-    <col style="width: 18%">
-    <col style="width: 22%">
+    <col style="width: 2.83cm">
+    <col style="width: 3.14cm">
+    <col style="width: 3.45cm">
+    <col style="width: 2.83cm">
+    <col style="width: 3.45cm">
 </colgroup>
 <tr>
     <th class="label">고객명</th>
@@ -15623,10 +15623,10 @@ th, td {{
 <div class="section-title">2. 연계정보</div>
 <table>
 <colgroup>
-    <col style="width: 24%">
-    <col style="width: 28%">
-    <col style="width: 24%">
-    <col style="width: 24%">
+    <col style="width: 3.77cm">
+    <col style="width: 4.40cm">
+    <col style="width: 3.77cm">
+    <col style="width: 3.77cm">
 </colgroup>
 <tr>
     <th class="label">ERP종류</th>
@@ -15655,10 +15655,10 @@ th, td {{
 <div class="section-title">3. 연계업무</div>
 <table class="work">
 <colgroup>
-    <col style="width: 24%">
-    <col style="width: 26%">
-    <col style="width: 26%">
-    <col style="width: 24%">
+    <col style="width: 3.77cm">
+    <col style="width: 4.08cm">
+    <col style="width: 4.08cm">
+    <col style="width: 3.77cm">
 </colgroup>
 <tr>
     <th class="label">업무 구분</th>
