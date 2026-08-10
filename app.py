@@ -15250,11 +15250,11 @@ ebankCd cardNo apprDt apprNo apprTm apprAm supplyAm vatAm serviceAm chainNm chai
 _QUERY_P_STYLE = (
     "margin:0; padding:0; "
     "font-family:Consolas,'Malgun Gothic','맑은 고딕',monospace; "
-    "font-size:7.5pt; line-height:1.28; white-space:pre-wrap;"
+    "font-size:6.5pt; line-height:1.16; white-space:pre-wrap;"
 )
 
 
-def format_integration_query_body(body, width=80):
+def format_integration_query_body(body, width=66):
     wrapped_lines = []
     wrapper = textwrap.TextWrapper(
         width=width,
@@ -15381,7 +15381,7 @@ def build_integration_confirmation_doc_html(form_data):
 <style>
 @page Section1 {{
     size: 21cm 29.7cm;
-    margin: 1.2cm 1.2cm 1.2cm 1.2cm;
+    margin: 0.9cm 1.0cm 0.9cm 1.0cm;
 }}
 div.Section1 {{ page: Section1; }}
 body {{
@@ -15391,11 +15391,12 @@ body {{
     color: #000;
 }}
 .doc {{
-    width: 18.6cm;
+    width: 18.2cm;
     margin: 0 auto;
     border: 1.5pt solid #000;
-    padding: 1.1cm 1.45cm 1.1cm 1.45cm;
+    padding: 0.85cm 1.05cm 0.85cm 1.05cm;
     box-sizing: border-box;
+    page-break-inside: auto;
 }}
 .top-title {{
     text-align: right;
@@ -15427,8 +15428,8 @@ table {{
 }}
 th, td {{
     border: 0.75pt solid #aaa;
-    padding: 3px 5px;
-    height: 23px;
+    padding: 2px 4px;
+    height: 20px;
     vertical-align: middle;
     word-break: keep-all;
 }}
@@ -15445,7 +15446,7 @@ th, td {{
 .center {{ text-align: center; }}
 .mark {{ font-family: "Malgun Gothic", "맑은 고딕", sans-serif; font-size: 10pt; }}
 .memo {{ height: 58px; }}
-.work td, .work th {{ height: 25px; }}
+.work td, .work th {{ height: 22px; }}
 .confirm {{
     margin-top: 50px;
     text-align: center;
@@ -15483,13 +15484,13 @@ th, td {{
     text-align: center;
 }}
 .attachment-page {{
-    width: 18.6cm;
+    width: 18.2cm;
     margin: 0 auto;
     border: 1.5pt solid #000;
-    padding: 1.1cm 1.45cm 1.1cm 1.45cm;
+    padding: 0.85cm 1.05cm 0.85cm 1.05cm;
     box-sizing: border-box;
     page-break-before: always;
-    page-break-inside: avoid;
+    page-break-inside: auto;
 }}
 .attachment-top-title {{
     display: block;
@@ -15522,12 +15523,12 @@ th, td {{
     page-break-before: avoid;
 }}
 .detail-table th {{
-    font-size: 8pt;
+    font-size: 7.5pt;
     text-align: center;
     page-break-inside: auto;
 }}
 .detail-table td {{
-    font-size: 9pt;
+    font-size: 8pt;
     text-align: center;
     page-break-inside: auto;
 }}
@@ -15555,8 +15556,8 @@ th, td {{
     overflow-wrap: anywhere;
     word-break: break-all;
     font-family: Consolas, "Malgun Gothic", "맑은 고딕", monospace;
-    font-size: 7.5pt;
-    line-height: 1.28;
+    font-size: 6.5pt;
+    line-height: 1.16;
     text-align: left;
     overflow: visible;
     page-break-inside: auto;
