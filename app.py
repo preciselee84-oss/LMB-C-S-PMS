@@ -1718,7 +1718,7 @@ def convert_history_to_activity_template_df(history_df, template_bytes):
             "고객": "",
             "관련제품(코드 또는 이름)": _activity_template_text(row.get(product_col, "")) if product_col else "통합CMS",
             "활동내역": activity_text,
-            "활동 상세(마케팅/개설/운영/연계/기타)": activity_detail,
+            "활동 상세(마케팅/영업/개설/운영/연계/기타)": activity_detail,
             "활동 구분(IN/OUT)": "IN",
             "활동 목적(운영활동/신규구축/사용자교육/ERP연계진행/ERP연계완료/ERP추가연계/상품전환/재구축/사전협의/수수료연체안내)": _activity_template_purpose(work_type),
             "팀구분(MANAGE/HOTLINE/TECH)": "HOTLINE",
@@ -1728,6 +1728,15 @@ def convert_history_to_activity_template_df(history_df, template_bytes):
         })
 
     converted_df = pd.DataFrame(converted_rows)
+    activity_detail_col = next(
+        (col for col in template_columns if "활동" in str(col) and "상세" in str(col)),
+        "",
+    )
+    if activity_detail_col and activity_detail_col not in converted_df.columns:
+        converted_df[activity_detail_col] = converted_df.get(
+            "활동 상세(마케팅/영업/개설/운영/연계/기타)",
+            converted_df.get("활동 상세(마케팅/개설/운영/연계/기타)", ""),
+        )
     for col in template_columns:
         if col not in converted_df.columns:
             converted_df[col] = ""
