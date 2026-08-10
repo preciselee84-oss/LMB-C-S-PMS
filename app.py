@@ -15261,8 +15261,8 @@ def build_integration_attachment_html(form_data):
             sections.append(
                 f"""
 <div class="attachment-page">
-    <div class="top-title">통합CMS ERP연계작업결과서</div>
-    <div class="title-box">ERP연계작업 보고서</div>
+    <div class="attachment-top-title">통합CMS ERP연계작업결과서</div>
+    <div class="attachment-title-box">ERP연계작업 보고서</div>
     <div class="attachment-title">[ 첨부 ] 상세 작업 내용</div>
     <table class="detail-table">
         <colgroup>
@@ -15449,10 +15449,48 @@ th, td {{
     box-sizing: border-box;
     page-break-before: always;
 }}
+.attachment-top-title {{
+    display: block;
+    width: 100%;
+    text-align: right;
+    font-size: 10pt;
+    font-weight: 700;
+    color: #666;
+    margin: 0 0 8px 0;
+    line-height: 1.2;
+}}
+.attachment-title-box {{
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 27px;
+    line-height: 27px;
+    border: 1pt solid #777;
+    box-sizing: border-box;
+    text-align: center;
+    font-size: 10pt;
+    font-weight: 700;
+    color: #666;
+    margin: 0 0 11px 0;
+}}
+.attachment-title-box::before,
+.attachment-title-box::after {{
+    content: "";
+    position: absolute;
+    top: 13px;
+    width: 18px;
+    border-top: 1pt solid #999;
+}}
+.attachment-title-box::before {{
+    left: -18px;
+}}
+.attachment-title-box::after {{
+    right: -18px;
+}}
 .attachment-title {{
     font-size: 12pt;
     font-weight: 700;
-    margin: 8px 0 8px 0;
+    margin: 0 0 8px 0;
 }}
 .detail-table th,
 .detail-table td {{
