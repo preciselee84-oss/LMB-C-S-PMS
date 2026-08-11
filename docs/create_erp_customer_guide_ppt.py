@@ -61,7 +61,7 @@ def rect(slide, x, y, w, h, color, line_color=None, radius=False):
 
 
 def title(slide, heading, sub=None):
-    rect(slide, 0, 0, 25.4, 14.288, PALE)
+    rect(slide, 0, 0, 25.4, 14.288, WHITE)
     rect(slide, 0, 0, 25.4, 0.22, HANA)
     text_box(slide, 1.0, 0.8, 20.5, 0.78, heading, 24, True, DEEP)
     if sub:
@@ -203,17 +203,18 @@ def draw_cms_dashboard(slide, x, y, w, h):
 
 def cover(prs):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    rect(slide, 0, 0, 25.4, 14.288, DEEP)
+    rect(slide, 0, 0, 25.4, 14.288, WHITE)
     rect(slide, 0, 0, 25.4, 0.26, HANA)
     draw_cms_dashboard(slide, 1.0, 1.0, 23.4, 8.75)
-    rect(slide, 1.0, 10.45, 23.4, 2.25, DEEP, None, True)
-    text_box(slide, 1.55, 10.85, 11.2, 0.95, "통합CMS ERP연계\n고객사 안내자료", 22, True, WHITE)
-    text_box(slide, 13.7, 11.0, 9.5, 0.48, "은행 업무 결과를 ERP 회계·자금 업무로 연결합니다.", 11.2, False, MINT)
+    rect(slide, 1.0, 10.45, 23.4, 2.25, WHITE, LINE, True)
+    rect(slide, 1.0, 10.45, 0.12, 2.25, HANA)
+    text_box(slide, 1.55, 10.85, 11.2, 0.95, "통합CMS ERP연계\n고객사 안내자료", 22, True, DEEP)
+    text_box(slide, 13.7, 11.0, 9.5, 0.48, "은행 업무 결과를 ERP 회계·자금 업무로 연결합니다.", 11.2, False, MUTED)
     pill(slide, 13.7, 11.75, 2.2, "조회", HANA)
     pill(slide, 16.25, 11.75, 2.2, "전송", HANA)
     pill(slide, 18.8, 11.75, 2.2, "정산", HANA)
     pill(slide, 21.35, 11.75, 2.2, "마감", HANA)
-    text_box(slide, 1.25, 13.0, 10, 0.36, "하나은행 통합CMS", 10, True, MINT)
+    text_box(slide, 1.25, 13.0, 10, 0.36, "하나은행 통합CMS", 10, True, GREEN)
 
 
 def erp_slide(prs, page, name, protocol, summary, bullets, image, accent=HANA):
