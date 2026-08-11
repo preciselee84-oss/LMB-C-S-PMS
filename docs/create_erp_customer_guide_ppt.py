@@ -146,19 +146,74 @@ def fit_pic(slide, path, x, y, w, h):
     return pic
 
 
+def dashboard_tile(slide, x, y, w, h, label):
+    rect(slide, x, y, w, h, WHITE, LINE, True)
+    rect(slide, x + 0.28, y + 0.28, w - 0.56, h - 0.85, PALE, LINE, True)
+    text_box(slide, x + 0.25, y + h - 0.5, w - 0.5, 0.25, label, 5.5, True, TEXT, PP_ALIGN.CENTER)
+
+
+def draw_cms_dashboard(slide, x, y, w, h):
+    rect(slide, x, y, w, h, WHITE, RGBColor(215, 226, 224), True)
+    rect(slide, x, y, w, 0.45, WHITE, RGBColor(225, 232, 230))
+    text_box(slide, x + 0.25, y + 0.08, 3.0, 0.18, "화면잠금   로그인설정", 4.4, False, MUTED)
+    text_box(slide, x + 8.3, y + 0.08, 7.0, 0.18, "웹케시에앤에스주식회사", 4.4, False, MUTED, PP_ALIGN.CENTER)
+    text_box(slide, x + w - 3.9, y + 0.08, 3.4, 0.18, "결재함  보고서", 4.6, True, GREEN, PP_ALIGN.RIGHT)
+
+    rect(slide, x, y + 0.45, w, 0.68, WHITE, RGBColor(235, 239, 238))
+    text_box(slide, x + 0.35, y + 0.6, 2.2, 0.25, "하나통합CMS", 7.6, True, HANA)
+    nav = ["통합자금관리", "자금수납", "자금지급", "법인카드", "외환/수출입", "부가서비스", "설정"]
+    nx = x + 4.1
+    for item in nav:
+        text_box(slide, nx, y + 0.62, 1.6, 0.22, item, 4.8, True, TEXT, PP_ALIGN.CENTER)
+        nx += 1.9
+
+    rect(slide, x, y + 1.13, w, 2.85, RGBColor(0, 151, 137))
+    tile_labels = ["통합계좌조회", "이체", "대량이체", "계좌관리", "예금주조회", "통합공과금"]
+    tx = x + 4.5
+    for label in tile_labels:
+        dashboard_tile(slide, tx, y + 1.75, 2.25, 1.55, label)
+        tx += 2.55
+
+    content_y = y + 4.35
+    text_box(slide, x + 4.5, content_y, 2.3, 0.26, "금융자산현황", 6.5, True, TEXT)
+    rect(slide, x + 4.5, content_y + 0.35, 9.9, 0.02, TEXT)
+    text_box(slide, x + 4.5, content_y + 1.0, 2.4, 0.32, "금융 총자산", 7.5, True, TEXT)
+    text_box(slide, x + 11.5, content_y + 0.9, 2.6, 0.45, "1,838,188 원", 12, True, HANA, PP_ALIGN.RIGHT)
+    asset_cards = [("외화수시입출", "43 계좌", "1,793,811 원"), ("예적금", "5 계좌", "44,377 원"), ("대출금", "3 계좌", "310,497,000 원")]
+    cx = x + 4.5
+    for head, count, amount in asset_cards:
+        rect(slide, cx, content_y + 2.2, 3.0, 1.25, WHITE, HANA, True)
+        text_box(slide, cx + 0.25, content_y + 2.45, 1.25, 0.22, head, 5.4, True, TEXT)
+        text_box(slide, cx + 1.55, content_y + 2.45, 1.0, 0.22, count, 5.0, True, HANA)
+        text_box(slide, cx + 0.25, content_y + 2.88, 2.45, 0.22, amount, 6.2, True, TEXT, PP_ALIGN.RIGHT)
+        cx += 3.3
+
+    text_box(slide, x + 15.0, content_y, 2.8, 0.26, "금융사별 자금현황", 6.5, True, TEXT)
+    rect(slide, x + 15.0, content_y + 0.35, 4.8, 0.02, TEXT)
+    table_rows = [["No", "은행명", "잔액"], ["1", "하나은행", "82,029"], ["2", "경남은행", "4,197"], ["3", "기업은행", "1,499,339"], ["4", "농협", "66,482"]]
+    table(slide, x + 15.0, content_y + 0.55, 4.8, 2.55, table_rows)
+
+    text_box(slide, x + 4.5, content_y + 4.0, 2.0, 0.24, "공지사항", 6.0, True, TEXT)
+    rect(slide, x + 4.5, content_y + 4.35, 5.4, 0.02, TEXT)
+    text_box(slide, x + 4.7, content_y + 4.75, 4.8, 0.5, "해외대량송금 양식변경 안내\n서울시인천시 세금납부 일시정지 안내", 4.5, False, MUTED)
+    text_box(slide, x + 10.6, content_y + 4.0, 1.9, 0.24, "환율정보", 6.0, True, TEXT)
+    rect(slide, x + 10.6, content_y + 4.35, 3.7, 0.02, TEXT)
+    text_box(slide, x + 10.8, content_y + 4.75, 3.0, 0.5, "미국 USD  1,419.50\n유로 EUR  1,638.53", 4.5, False, MUTED)
+
+
 def cover(prs):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     rect(slide, 0, 0, 25.4, 14.288, DEEP)
     rect(slide, 0, 0, 25.4, 0.26, HANA)
-    text_box(slide, 1.2, 1.65, 14.2, 1.45, "통합CMS ERP연계\n고객사 안내자료", 30, True, WHITE)
-    text_box(slide, 1.25, 3.95, 14.0, 0.55, "은행 업무 결과를 ERP 회계·자금 업무로 연결합니다.", 13.2, False, MINT)
-    card(slide, 1.25, 5.3, 5.1, 1.95, "조회", ["계좌·카드·세금계산서\n데이터 자동 수집"], HANA, "1", 8.0)
-    card(slide, 6.7, 5.3, 5.1, 1.95, "전송", ["API·DB·RFC 방식으로\nERP에 전달"], HANA, "2", 8.0)
-    card(slide, 12.15, 5.3, 5.1, 1.95, "활용", ["전표·정산·마감 업무에서\n바로 확인"], HANA, "3", 8.0)
-    rect(slide, 18.15, 1.75, 5.85, 8.75, MINT, None, True)
-    fit_pic(slide, ASSET_DIR / "corp_card_1.png", 18.55, 2.2, 5.05, 3.0)
-    fit_pic(slide, ASSET_DIR / "bulk_transfer.png", 18.55, 5.95, 5.05, 3.0)
-    text_box(slide, 1.25, 12.7, 10, 0.36, "하나은행 통합CMS", 10, True, MINT)
+    draw_cms_dashboard(slide, 1.0, 1.0, 23.4, 8.75)
+    rect(slide, 1.0, 10.45, 23.4, 2.25, DEEP, None, True)
+    text_box(slide, 1.55, 10.85, 11.2, 0.95, "통합CMS ERP연계\n고객사 안내자료", 22, True, WHITE)
+    text_box(slide, 13.7, 11.0, 9.5, 0.48, "은행 업무 결과를 ERP 회계·자금 업무로 연결합니다.", 11.2, False, MINT)
+    pill(slide, 13.7, 11.75, 2.2, "조회", HANA)
+    pill(slide, 16.25, 11.75, 2.2, "전송", HANA)
+    pill(slide, 18.8, 11.75, 2.2, "정산", HANA)
+    pill(slide, 21.35, 11.75, 2.2, "마감", HANA)
+    text_box(slide, 1.25, 13.0, 10, 0.36, "하나은행 통합CMS", 10, True, MINT)
 
 
 def erp_slide(prs, page, name, protocol, summary, bullets, image, accent=HANA):
