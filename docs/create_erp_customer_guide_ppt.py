@@ -214,6 +214,10 @@ def cover(prs):
     pill(slide, 16.25, 11.75, 2.2, "전송", HANA)
     pill(slide, 18.8, 11.75, 2.2, "정산", HANA)
     pill(slide, 21.35, 11.75, 2.2, "마감", HANA)
+    rect(slide, 13.7, 12.42, 9.85, 0.78, WHITE, LINE, True)
+    rect(slide, 13.7, 12.42, 0.08, 0.78, HANA)
+    text_box(slide, 14.0, 12.54, 1.7, 0.22, "핵심 효과", 7.8, True, GREEN)
+    text_box(slide, 15.8, 12.54, 7.35, 0.22, "수기입력 감소  ·  데이터 정합성 확보  ·  마감시간 단축", 7.6, False, TEXT)
     text_box(slide, 1.25, 13.0, 10, 0.36, "하나은행 통합CMS", 10, True, GREEN)
 
 
