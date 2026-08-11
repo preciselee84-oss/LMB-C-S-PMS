@@ -60,13 +60,12 @@ def rect(slide, x, y, w, h, color, line_color=None, radius=False):
     return fill(shape, color, line_color)
 
 
-def title(slide, heading, sub=None, page_label="CMS PRACTICAL GUIDE"):
+def title(slide, heading, sub=None):
     rect(slide, 0, 0, 25.4, 14.288, PALE)
     rect(slide, 0, 0, 25.4, 0.22, HANA)
-    text_box(slide, 1.05, 0.58, 8, 0.35, page_label, 8.5, True, HANA)
-    text_box(slide, 1.0, 1.0, 19, 0.78, heading, 24, True, DEEP)
+    text_box(slide, 1.0, 0.8, 20.5, 0.78, heading, 24, True, DEEP)
     if sub:
-        text_box(slide, 1.02, 1.85, 19, 0.45, sub, 10.5, False, MUTED)
+        text_box(slide, 1.02, 1.66, 20.5, 0.45, sub, 10.5, False, MUTED)
     rect(slide, 1.0, 2.55, 23.4, 0.03, LINE)
 
 
@@ -75,7 +74,7 @@ def footer(slide, page):
     text_box(slide, 23.5, 13.45, 0.8, 0.28, str(page), 7.5, True, MUTED, PP_ALIGN.RIGHT)
 
 
-def card(slide, x, y, w, h, label, body, accent=HANA, number=None):
+def card(slide, x, y, w, h, label, body, accent=HANA, number=None, body_size=8.7):
     rect(slide, x, y, w, h, WHITE, LINE, True)
     rect(slide, x, y, w, 0.13, accent)
     if number:
@@ -96,7 +95,7 @@ def card(slide, x, y, w, h, label, body, accent=HANA, number=None):
         p = tf.paragraphs[0] if idx == 0 else tf.add_paragraph()
         p.text = line
         p.font.name = FONT
-        p.font.size = Pt(9.3)
+        p.font.size = Pt(body_size)
         p.font.color.rgb = TEXT
         p.space_after = Pt(3)
     return box
@@ -151,16 +150,14 @@ def cover(prs):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     rect(slide, 0, 0, 25.4, 14.288, DEEP)
     rect(slide, 0, 0, 25.4, 0.26, HANA)
-    rect(slide, 1.2, 1.1, 6.6, 0.62, HANA, None, True)
-    text_box(slide, 1.2, 1.18, 6.6, 0.32, "CMS PRACTICAL GUIDE", 10, True, WHITE, PP_ALIGN.CENTER)
-    text_box(slide, 1.2, 2.45, 15.8, 1.1, "통합CMS ERP연계\n고객사 안내자료", 32, True, WHITE)
-    text_box(slide, 1.25, 4.45, 14.6, 0.55, "은행 업무 결과를 ERP 회계·자금 업무로 자연스럽게 연결합니다.", 14, False, MINT)
-    card(slide, 1.25, 5.65, 5.3, 2.0, "조회", ["계좌·법인카드·세금계산서 데이터를 자동 수집"], HANA, "1")
-    card(slide, 6.9, 5.65, 5.3, 2.0, "전송", ["API·DB·RFC 방식으로 ERP에 전달"], HANA, "2")
-    card(slide, 12.55, 5.65, 5.3, 2.0, "활용", ["전표·정산·마감 업무에서 바로 확인"], HANA, "3")
-    rect(slide, 18.3, 2.0, 5.7, 8.8, MINT, None, True)
-    fit_pic(slide, ASSET_DIR / "corp_card_1.png", 18.65, 2.45, 5.0, 3.0)
-    fit_pic(slide, ASSET_DIR / "bulk_transfer.png", 18.65, 6.1, 5.0, 3.0)
+    text_box(slide, 1.2, 1.65, 14.2, 1.45, "통합CMS ERP연계\n고객사 안내자료", 30, True, WHITE)
+    text_box(slide, 1.25, 3.95, 14.0, 0.55, "은행 업무 결과를 ERP 회계·자금 업무로 연결합니다.", 13.2, False, MINT)
+    card(slide, 1.25, 5.3, 5.1, 1.95, "조회", ["계좌·카드·세금계산서\n데이터 자동 수집"], HANA, "1", 8.0)
+    card(slide, 6.7, 5.3, 5.1, 1.95, "전송", ["API·DB·RFC 방식으로\nERP에 전달"], HANA, "2", 8.0)
+    card(slide, 12.15, 5.3, 5.1, 1.95, "활용", ["전표·정산·마감 업무에서\n바로 확인"], HANA, "3", 8.0)
+    rect(slide, 18.15, 1.75, 5.85, 8.75, MINT, None, True)
+    fit_pic(slide, ASSET_DIR / "corp_card_1.png", 18.55, 2.2, 5.05, 3.0)
+    fit_pic(slide, ASSET_DIR / "bulk_transfer.png", 18.55, 5.95, 5.05, 3.0)
     text_box(slide, 1.25, 12.7, 10, 0.36, "하나은행 통합CMS", 10, True, MINT)
 
 
@@ -168,12 +165,12 @@ def erp_slide(prs, page, name, protocol, summary, bullets, image, accent=HANA):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     title(slide, f"{name} 연계 안내", f"{protocol} 방식으로 통합CMS 데이터를 ERP 업무에 연결")
     pill(slide, 1.05, 3.05, 3.2, protocol, accent)
-    text_box(slide, 1.1, 3.95, 10.5, 0.75, summary, 16, True, DEEP)
-    card(slide, 1.1, 5.1, 6.7, 2.2, "연계 대상 업무", bullets[:3], accent)
-    card(slide, 8.2, 5.1, 6.7, 2.2, "운영 포인트", bullets[3:6], GREEN)
-    card(slide, 1.1, 7.75, 13.8, 2.2, "고객사 기대효과", bullets[6:], HANA)
-    rect(slide, 15.7, 3.05, 8.4, 7.2, WHITE, LINE, True)
-    fit_pic(slide, image, 16.05, 3.45, 7.7, 6.4)
+    text_box(slide, 1.1, 3.85, 13.4, 0.9, summary, 13.5, True, DEEP)
+    card(slide, 1.1, 5.1, 6.7, 2.55, "연계 대상 업무", bullets[:3], accent, None, 8.4)
+    card(slide, 8.2, 5.1, 6.7, 2.55, "운영 포인트", bullets[3:6], GREEN, None, 8.4)
+    card(slide, 1.1, 8.05, 13.8, 2.55, "고객사 기대효과", bullets[6:], HANA, None, 8.4)
+    rect(slide, 15.7, 3.25, 8.4, 7.55, WHITE, LINE, True)
+    fit_pic(slide, image, 16.05, 3.7, 7.7, 6.5)
     footer(slide, page)
 
 
