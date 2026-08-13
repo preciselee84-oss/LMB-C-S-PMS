@@ -18883,6 +18883,7 @@ def build_operation_activity_targets(
 
     valid_manage = ~merged["관리구분"].astype(str).str.contains("해지|취소", na=False)
     valid_manage &= merged["_cancel_dt"].isna()
+    valid_manage &= merged["_open_dt"].isna() | (merged["_open_dt"] <= end_month)
     if exclude_current_open_month:
         valid_manage &= merged["_open_dt"].dt.strftime("%Y-%m").fillna("") != reference_month
     this_year_build = merged["_open_dt"].between(year_start, year_end, inclusive="both")
