@@ -18685,6 +18685,92 @@ def _operation_contact_reason(row):
     return " / ".join(reasons)
 
 
+def normalize_operation_manage_upload_df(df):
+    if df is None or df.empty:
+        return df
+
+    source = clean_header_logic(df.copy()).replace({np.nan: ""})
+    source.columns = _dedupe_columns([str(c).strip() for c in source.columns])
+
+    company_col = find_col(source, ["고객사명", "고객명", "업체명", "상호"])
+    biz_col = find_col(source, ["사업자번호", "사업자등록번호"])
+    product_col = find_col(source, ["제품", "상품", "제품명"])
+    status_col = find_col(source, ["상태"])
+    owner_col = exact_col(source, ["운영담당자"]) or find_col(source, ["운영담당자", "담당자"])
+    start_col = exact_col(source, ["개설일"]) or find_col(source, ["개설일", "시작일"])
+    link_col = find_col(source, ["연계일", "ERP연계일자", "연계일자"])
+    erp_flag_col = find_col(source, ["ERP연계여부", "ERP 연계 여부"])
+    erp_company_col = find_col(source, ["ERP사"])
+    erp_product_col = find_col(source, ["ERP제품명", "ERP 제품명"])
+    cancel_col = exact_col(source, ["해지/취소/보류일"]) or find_col(source, ["해지/취소/보류일", "해지일자", "종료일"])
+
+    if not company_col or not biz_col:
+        return source
+
+    result = source.copy()
+    if "고객명" not in result.columns:
+        result["고객명"] = result[company_col]
+    if "사업자번호" not in result.columns:
+        result["사업자번호"] = result[biz_col]
+
+    owner_values = result[owner_col].fillna("").astype(str).str.strip() if owner_col else ""
+    if "담당자" in result.columns:
+        result["담당자"] = result["담당자"].fillna("").astype(str).str.strip()
+        if owner_col:
+            result["담당자"] = result["담당자"].where(result["담당자"].ne(""), owner_values)
+    else:
+        result["담당자"] = owner_values
+
+    status_text = result[status_col].fillna("").astype(str).str.strip().str.lower() if status_col else pd.Series("", index=result.index)
+    active_mask = ~status_text.str.contains("해지|취소|보류|cancel|stop|terminate|inactive|ended", na=False)
+    result["관리구분"] = np.where(active_mask, "관리", "해지")
+
+    open_dates = result[start_col].apply(parse_sheet_date) if start_col else pd.Series(pd.NaT, index=result.index)
+    if "개설상태" not in result.columns:
+        result["개설상태"] = np.where(open_dates.notna() & active_mask, "개설완료", "")
+    if "개설/이행일" not in result.columns:
+        result["개설/이행일"] = open_dates.dt.strftime("%Y-%m-%d").fillna("")
+
+    link_dates = result[link_col].apply(parse_sheet_date) if link_col else pd.Series(pd.NaT, index=result.index)
+    erp_flag = result[erp_flag_col].fillna("").astype(str).str.strip() if erp_flag_col else pd.Series("", index=result.index)
+    erp_company = result[erp_company_col].fillna("").astype(str).str.strip() if erp_company_col else pd.Series("", index=result.index)
+    erp_product = result[erp_product_col].fillna("").astype(str).str.strip() if erp_product_col else pd.Series("", index=result.index)
+    erp_yes = erp_flag.str.contains("예|Y|YES|TRUE|1", case=False, na=False) | erp_company.ne("") | erp_product.ne("") | link_dates.notna()
+    if "연계상태" not in result.columns:
+        result["연계상태"] = np.where(erp_yes, "연계완료", "")
+    if "연계일자" not in result.columns:
+        result["연계일자"] = link_dates.dt.strftime("%Y-%m-%d").fillna("")
+
+    cancel_dates = result[cancel_col].apply(parse_sheet_date) if cancel_col else pd.Series(pd.NaT, index=result.index)
+    if "해지일자" not in result.columns:
+        result["해지일자"] = cancel_dates.dt.strftime("%Y-%m-%d").fillna("")
+
+    product_text = result[product_col].fillna("").astype(str) if product_col else pd.Series("", index=result.index)
+    result["_operation_sort_active"] = active_mask.astype(int)
+    result["_operation_sort_product"] = product_text.str.contains("통합CMS", na=False).astype(int)
+    result["_operation_sort_erp"] = erp_yes.astype(int)
+    result["_operation_sort_open"] = open_dates.fillna(pd.Timestamp.min)
+    result = result.sort_values(
+        ["_operation_sort_active", "_operation_sort_product", "_operation_sort_erp", "_operation_sort_open"],
+        ascending=[False, False, False, False],
+    )
+    return result.drop(columns=[c for c in result.columns if str(c).startswith("_operation_sort_")], errors="ignore")
+
+
+def read_operation_manage_upload(source):
+    try:
+        manage_df = read_excel_sheet_with_header_scan(
+            source,
+            "고객원장",
+            required_keys=["고객번호", "사업자번호", "고객명"],
+        )
+    except Exception:
+        if hasattr(source, "seek"):
+            source.seek(0)
+        manage_df = pd.read_excel(source, sheet_name=0)
+    return normalize_operation_manage_upload_df(manage_df)
+
+
 def build_operation_activity_targets(
     manage_df,
     bank_df,
@@ -18874,9 +18960,9 @@ def build_operation_activity_targets(
 
 def show_operation_activity_targets():
     st.markdown("### 운영관리 활동고객 선정")
-    st.caption("HANA사업부 고객관리 엑셀과 은행 통합CMS 고객명단을 비교해 청구 가능 고객과 로그인 공백 점검 고객을 추립니다.")
+    st.caption("HANA사업부 고객관리 subscriptions_export와 은행 통합CMS 고객명단을 비교해 청구 가능 고객과 로그인 공백 점검 고객을 추립니다.")
 
-    default_manage_path = r"C:\Users\이성환\Downloads\25년_HANA사업부_고객관리 (1).xlsx"
+    default_manage_path = r"C:\Users\이성환\Downloads\subscriptions_export (18).xlsx"
     default_bank_path = r"C:\Users\이성환\Downloads\00.(명단)통합CMS고객명단_202606.xlsx"
     default_files_available = os.path.exists(default_manage_path) and os.path.exists(default_bank_path)
 
@@ -18889,7 +18975,8 @@ def show_operation_activity_targets():
 
     col_a, col_b = st.columns(2)
     with col_a:
-        manage_upload = st.file_uploader("HANA사업부 고객관리 엑셀", type=["xlsx", "xls"], key="operation_manage_upload")
+        manage_upload = st.file_uploader("HANA사업부 고객관리 엑셀 (subscriptions_export)", type=["xlsx", "xls"], key="operation_manage_upload")
+        st.caption("subscriptions_export 파일의 고객사명/사업자번호/운영담당자/개설일/ERP연계여부를 사용합니다.")
     with col_b:
         bank_upload = st.file_uploader("은행 통합CMS 고객명단 엑셀", type=["xlsx", "xls"], key="operation_bank_upload")
 
@@ -18905,7 +18992,7 @@ def show_operation_activity_targets():
         return
 
     try:
-        manage_df = read_excel_sheet_with_header_scan(manage_source, "고객원장", required_keys=["고객번호", "사업자번호", "고객명"])
+        manage_df = read_operation_manage_upload(manage_source)
         bank_df = pd.read_excel(bank_source, sheet_name="명단")
     except Exception as exc:
         st.error(f"엑셀을 읽는 중 오류가 발생했습니다: {exc}")
