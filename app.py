@@ -18813,7 +18813,7 @@ def build_operation_activity_targets(
     manage.columns = _dedupe_columns([str(c).strip() for c in manage.columns])
     bank.columns = _dedupe_columns([str(c).strip() for c in bank.columns])
 
-    m_customer_col = find_col(manage, ["고객번호"])
+    m_customer_col = find_col(manage, ["고객번호", "고개관리번호", "고객관리번호", "고객 관리번호"])
     m_biz_col = find_col(manage, ["사업자번호", "사업자등록번호"])
     m_company_col = find_col(manage, ["고객명", "고객사명", "업체명", "상호"])
     m_owner_col = find_col(manage, ["담당자"])
@@ -18847,18 +18847,18 @@ def build_operation_activity_targets(
     gap_watch_start = pd.Timestamp(year=max(2025, start_month.year - 1), month=1, day=1)
 
     manage_key = pd.Series([""] * len(manage), index=manage.index, dtype="object")
-    if m_customer_col:
-        manage_key = manage[m_customer_col].apply(normalize_billing_customer_no)
     if m_biz_col:
-        biz_key = manage[m_biz_col].apply(normalize_biz_no)
-        manage_key = manage_key.where(manage_key.astype(str) != "", biz_key)
+        manage_key = manage[m_biz_col].apply(normalize_biz_no)
+    if m_customer_col:
+        customer_key = manage[m_customer_col].apply(normalize_billing_customer_no)
+        manage_key = manage_key.where(manage_key.astype(str) != "", customer_key)
 
     bank_key = pd.Series([""] * len(bank), index=bank.index, dtype="object")
-    if b_customer_col:
-        bank_key = bank[b_customer_col].apply(normalize_billing_customer_no)
     if b_biz_col:
-        bank_biz_key = bank[b_biz_col].apply(normalize_biz_no)
-        bank_key = bank_key.where(bank_key.astype(str) != "", bank_biz_key)
+        bank_key = bank[b_biz_col].apply(normalize_biz_no)
+    if b_customer_col:
+        bank_customer_key = bank[b_customer_col].apply(normalize_billing_customer_no)
+        bank_key = bank_key.where(bank_key.astype(str) != "", bank_customer_key)
 
     bank_norm = pd.DataFrame({
         "_match_key": bank_key,
