@@ -18955,7 +18955,7 @@ def build_operation_activity_targets(
         "청구구분", "최근3개월기준", "선정사유", "활동권장",
     ]
     result["_type_order"] = np.where(result["_login_stopped"], 0, 1)
-    result = result.sort_values(["_type_order"] + sort_cols, ascending=[True] + sort_ascending)
+    result = result.sort_values(["_type_order", "_open_dt", "담당자", "고객사명"], ascending=[True, True, True, True], na_position="last")
     return result[[col for col in display_cols if col in result.columns]].reset_index(drop=True), None
 
 
