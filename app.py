@@ -18999,15 +18999,27 @@ def show_operation_activity_targets():
         return
 
     bank_file_name = os.path.basename(default_bank_path) if use_default else getattr(bank_upload, "name", "")
+    if use_default:
+        try:
+            bank_source_key = f"default:{default_bank_path}:{os.path.getmtime(default_bank_path)}"
+        except OSError:
+            bank_source_key = f"default:{default_bank_path}"
+    else:
+        bank_source_key = f"upload:{getattr(bank_upload, 'name', '')}:{getattr(bank_upload, 'size', '')}"
     inferred_month = (
-        _infer_month_from_bank_df(bank_df)
-        or _infer_month_from_name(bank_file_name)
+        _infer_month_from_name(bank_file_name)
+        or _infer_month_from_bank_df(bank_df)
         or (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m")
     )
-    if "operation_reference_month" not in st.session_state:
+    if (
+        "operation_reference_month" not in st.session_state
+        or st.session_state.get("operation_bank_source_key") != bank_source_key
+    ):
         st.session_state["operation_reference_month"] = inferred_month
+        st.session_state["operation_bank_source_key"] = bank_source_key
     ctrl_a, ctrl_b, ctrl_c, ctrl_d = st.columns([0.18, 0.18, 0.24, 0.4])
     reference_month = ctrl_a.text_input("기준월", key="operation_reference_month", help="예: 2026-07")
+    st.caption(f"은행 고객명단 기준월은 `{inferred_month}`로 인식했습니다. 6월 명단이면 7월/8월 로그인 이력은 없는 것이 정상입니다.")
     max_targets = ctrl_b.number_input("활동 고객수", min_value=1, max_value=500, value=50, step=10, key="operation_target_limit")
     sort_label = ctrl_c.selectbox(
         "우선순위",
