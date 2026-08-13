@@ -18698,10 +18698,9 @@ def _operation_contact_reason(row):
         reasons.append("올해 연계")
     elif bool(row.get("_is_gap_watch_link")):
         reasons.append("2025년 이후 연계")
-    if bool(row.get("_login_stopped")):
-        reasons.append("최근 3개월 로그인 없음")
-    if bool(row.get("_is_billable")):
-        reasons.append("최근 3개월 로그인 있음")
+    if bool(row.get("_no_login_since_may")):
+        last_login = str(row.get("은행최종로그인일자", "") or "").strip()
+        reasons.append(f"5월 이후 로그인 없음(최종로그인: {last_login or '없음'})")
     if bool(row.get("_has_recent_menu")):
         reasons.append("메뉴사용 이력 있음")
     return " / ".join(reasons)
@@ -18842,6 +18841,7 @@ def build_operation_activity_targets(
     if pd.isna(start_month):
         return pd.DataFrame(), "기준월을 확인할 수 없습니다."
     recent_start = start_month - pd.DateOffset(months=2)
+    login_watch_start = pd.Timestamp(year=start_month.year, month=5, day=1)
     year_start = pd.Timestamp(year=start_month.year, month=1, day=1)
     year_end = pd.Timestamp(year=start_month.year, month=12, day=31)
     gap_watch_start = pd.Timestamp(year=max(2025, start_month.year - 1), month=1, day=1)
@@ -18913,6 +18913,7 @@ def build_operation_activity_targets(
     gap_watch_build = merged["_open_dt"].between(gap_watch_start, year_end, inclusive="both")
     gap_watch_link = merged["_link_dt"].between(gap_watch_start, year_end, inclusive="both")
     recent_login = last_login.between(recent_start, end_month, inclusive="both")
+    no_login_since_may = last_login.isna() | last_login.lt(login_watch_start)
 
     merged["_is_this_year_build"] = this_year_build
     merged["_is_this_year_link"] = this_year_link
@@ -18920,7 +18921,8 @@ def build_operation_activity_targets(
     merged["_is_gap_watch_link"] = gap_watch_link
     merged["_is_billable"] = recent_login
     merged["_has_recent_menu"] = True if not b_menu_col else menu_count.gt(0)
-    merged["_login_stopped"] = (gap_watch_build | gap_watch_link) & ~recent_login
+    merged["_no_login_since_may"] = no_login_since_may
+    merged["_login_stopped"] = no_login_since_may
     merged["_recent_build_dt"] = pd.concat([merged["_open_dt"], merged["_link_dt"]], axis=1).max(axis=1)
     merged["_recent_build_rank_dt"] = merged["_recent_build_dt"].fillna(pd.Timestamp.min)
     merged["_priority_score"] = (
@@ -18930,10 +18932,9 @@ def build_operation_activity_targets(
         + login_count.clip(upper=30)
     )
 
-    billable_mask = valid_manage & merged["_is_billable"] & merged["_has_recent_menu"]
     stopped_mask = valid_manage & merged["_login_stopped"]
-    result_billable = merged[billable_mask].copy()
-    result_stopped = merged[stopped_mask].copy() if contact_only else pd.DataFrame()
+    result_billable = pd.DataFrame()
+    result_stopped = merged[stopped_mask].copy()
 
     if sort_mode == "recent_login":
         sort_cols = ["_last_login_dt", "_recent_build_rank_dt", "담당자", "고객사명"]
@@ -18945,11 +18946,14 @@ def build_operation_activity_targets(
         sort_cols = ["_recent_build_rank_dt", "_last_login_dt", "담당자", "고객사명"]
         sort_ascending = [False, False, True, True]
 
-    result_billable = result_billable.sort_values(sort_cols, ascending=sort_ascending)
+    if not result_billable.empty:
+        result_billable = result_billable.sort_values(sort_cols, ascending=sort_ascending)
     if max_targets:
         result_billable = result_billable.head(int(max_targets))
     if not result_stopped.empty:
         result_stopped = result_stopped.sort_values(["_recent_build_rank_dt", "담당자", "고객사명"], ascending=[False, True, True])
+        if max_targets:
+            result_stopped = result_stopped.head(int(max_targets))
         result = pd.concat([result_stopped, result_billable], ignore_index=True)
         result = result.drop_duplicates("_match_key", keep="first")
     else:
@@ -18958,15 +18962,11 @@ def build_operation_activity_targets(
     if result.empty:
         return pd.DataFrame(), None
 
-    result["구분"] = np.where(result["_login_stopped"], "로그인 끊김 점검", "청구 가능 운영관리")
+    result["구분"] = "5월 이후 로그인 없음"
     result["선정사유"] = result.apply(_operation_contact_reason, axis=1)
-    result["최근3개월기준"] = f"{recent_start.strftime('%Y-%m-%d')} ~ {end_month.strftime('%Y-%m-%d')}"
+    result["로그인점검기준"] = f"{login_watch_start.strftime('%Y-%m-%d')} 이후 로그인 이력 없음"
     result["최근구축/연계일"] = result["_recent_build_dt"].dt.strftime("%Y-%m-%d").fillna("")
-    result["활동권장"] = np.where(
-        result["_login_stopped"],
-        "올해 구축/연계 후 로그인 공백 확인 및 사용 재유도",
-        "최근 사용 고객 청구 유지 및 추가 사용 메뉴 점검",
-    )
+    result["활동권장"] = "5월 이후 로그인 여부 확인 및 사용 재유도"
     for col in ["은행로그인건수", "은행메뉴사용"]:
         if col in result.columns:
             result[col] = pd.to_numeric(result[col], errors="coerce").fillna(0).astype(int)
@@ -18974,7 +18974,7 @@ def build_operation_activity_targets(
         "구분", "담당자", "고객사명", "고객번호", "사업자번호", "관리구분",
         "개설상태", "개설/이행일", "연계상태", "연계일자",
         "은행최종로그인일자", "은행최종이체일자", "은행로그인건수", "은행메뉴사용",
-        "청구구분", "최근3개월기준", "선정사유", "활동권장",
+        "청구구분", "로그인점검기준", "선정사유", "활동권장",
     ]
     result["_type_order"] = np.where(result["_login_stopped"], 0, 1)
     result = result.sort_values(["_type_order", "_open_dt", "담당자", "고객사명"], ascending=[True, True, True, True], na_position="last")
@@ -18983,7 +18983,7 @@ def build_operation_activity_targets(
 
 def show_operation_activity_targets():
     st.markdown("### 운영관리 활동고객 선정")
-    st.caption("HANA사업부 고객관리 subscriptions_export와 은행 통합CMS 고객명단을 비교해 청구 가능 고객과 로그인 공백 점검 고객을 추립니다.")
+    st.caption("HANA사업부 고객관리 subscriptions_export와 은행 통합CMS 고객명단을 비교해 5월 이후 로그인 이력이 없는 고객사를 추립니다.")
 
     default_manage_path = r"C:\Users\이성환\Downloads\subscriptions_export (18).xlsx"
     default_bank_path = r"C:\Users\이성환\Downloads\606167200_통합cms 2606_260803 (1).xlsx"
@@ -19051,15 +19051,17 @@ def show_operation_activity_targets():
         key="operation_target_sort",
     )
     billable_only = ctrl_d.checkbox(
-        "비용 청구 가능 고객만",
+        "5월 이후 로그인 없는 고객만",
         value=True,
         key="operation_billable_only",
-        help="직전 3개월 최종로그인 이력이 있는 고객만 선정합니다.",
+        disabled=True,
+        help="최종로그인일자가 없거나 기준연도 5월 1일 이전인 고객만 선정합니다.",
     )
     include_stopped = st.checkbox(
-        "2025년 이후 구축/연계 후 로그인 끊긴 고객도 별도 점검 대상으로 포함",
+        "로그인 공백 고객 포함",
         value=True,
         key="operation_include_stopped",
+        disabled=True,
     )
     exclude_current_open_month = st.checkbox(
         "당월 개설/이행 고객 제외",
@@ -19090,12 +19092,12 @@ def show_operation_activity_targets():
         st.info("조건에 맞는 활동고객사가 없습니다.")
         return
 
-    stopped_count = int(targets["구분"].astype(str).eq("로그인 끊김 점검").sum()) if "구분" in targets.columns else 0
-    billable_count = int(targets["구분"].astype(str).eq("청구 가능 운영관리").sum()) if "구분" in targets.columns else 0
+    stopped_count = int(targets["구분"].astype(str).eq("5월 이후 로그인 없음").sum()) if "구분" in targets.columns else 0
+    billable_count = 0
     c1, c2, c3 = st.columns(3)
     c1.metric("전체 표시", f"{len(targets):,}개")
-    c2.metric("청구 가능 활동", f"{billable_count:,}개")
-    c3.metric("로그인 공백 점검", f"{stopped_count:,}개")
+    c2.metric("5월 이후 로그인 없음", f"{stopped_count:,}개")
+    c3.metric("제외", f"{billable_count:,}개")
 
     owner_options = ["전체"] + sorted(v for v in targets.get("담당자", pd.Series(dtype=str)).astype(str).str.strip().unique() if v)
     f1, f2 = st.columns([0.25, 0.75])
@@ -19108,19 +19110,19 @@ def show_operation_activity_targets():
     if keyword.strip() and "고객사명" in view.columns:
         view = view[view["고객사명"].astype(str).str.contains(keyword.strip(), case=False, na=False)]
 
-    gap_view = view[view["구분"].astype(str).eq("로그인 끊김 점검")].reset_index(drop=True) if "구분" in view.columns else pd.DataFrame()
-    billable_view = view[view["구분"].astype(str).eq("청구 가능 운영관리")].reset_index(drop=True) if "구분" in view.columns else view
+    gap_view = view[view["구분"].astype(str).eq("5월 이후 로그인 없음")].reset_index(drop=True) if "구분" in view.columns else pd.DataFrame()
+    billable_view = pd.DataFrame()
 
     gap_tab, billable_tab, all_tab = st.tabs([
-        f"로그인 공백 점검 {len(gap_view):,}",
-        f"청구 가능 활동 {len(billable_view):,}",
+        f"5월 이후 로그인 없음 {len(gap_view):,}",
+        f"제외 {len(billable_view):,}",
         f"전체 {len(view):,}",
     ])
     with gap_tab:
-        st.caption("2025년 이후 개설/연계 고객 중 직전 3개월 로그인 이력이 없는 고객입니다.")
+        st.caption("최종로그인일자가 없거나 기준연도 5월 1일 이전인 고객입니다.")
         st.dataframe(gap_view, use_container_width=True, hide_index=True)
     with billable_tab:
-        st.caption("직전 3개월 로그인 이력이 있어 비용 청구 가능한 고객 중 활동 고객수만큼 선정한 목록입니다.")
+        st.caption("이번 조건에서는 제외 탭을 사용하지 않습니다.")
         st.dataframe(billable_view, use_container_width=True, hide_index=True)
     with all_tab:
         st.dataframe(view, use_container_width=True, hide_index=True)
@@ -19128,8 +19130,8 @@ def show_operation_activity_targets():
     st.download_button(
         "활동고객사 엑셀 다운로드",
         data=dataframe_to_excel_bytes({
-            "로그인공백점검": gap_view,
-            "청구가능활동": billable_view,
+            "5월이후로그인없음": gap_view,
+            "제외": billable_view,
             "전체": view,
         }),
         file_name=f"운영관리_활동고객사_{reference_month.replace('-', '')}.xlsx",
