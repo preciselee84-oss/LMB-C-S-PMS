@@ -18634,10 +18634,14 @@ def _dedupe_columns(columns):
 
 
 def _infer_month_from_name(file_name):
-    match = re.search(r"(20\d{2})[-_ .]?(0[1-9]|1[0-2])", str(file_name or ""))
-    if not match:
-        return None
-    return f"{match.group(1)}-{match.group(2)}"
+    text = str(file_name or "")
+    match = re.search(r"(20\d{2})[-_ .]?(0[1-9]|1[0-2])", text)
+    if match:
+        return f"{match.group(1)}-{match.group(2)}"
+    short_match = re.search(r"(?<!\d)(\d{2})(0[1-9]|1[0-2])(?!\d)", text)
+    if short_match:
+        return f"20{short_match.group(1)}-{short_match.group(2)}"
+    return None
 
 
 def _infer_month_from_bank_df(bank_df):
@@ -18664,6 +18668,24 @@ def _format_date_for_display(value):
     if pd.isna(parsed):
         return ""
     return parsed.strftime("%Y-%m-%d")
+
+
+def read_operation_bank_upload(source):
+    try:
+        return pd.read_excel(source, sheet_name="명단")
+    except Exception:
+        if hasattr(source, "seek"):
+            source.seek(0)
+        xls = pd.ExcelFile(source)
+        sheet_name = xls.sheet_names[0]
+        if hasattr(source, "seek"):
+            source.seek(0)
+        return read_excel_sheet_with_header_scan(
+            source,
+            sheet_name,
+            required_keys=["고객번호", "사업자등록번호", "최종로그인일자"],
+            max_scan_rows=20,
+        )
 
 
 def _operation_contact_reason(row):
@@ -18845,7 +18867,7 @@ def build_operation_activity_targets(
         "은행최종로그인일자": bank[b_last_login_col].apply(_format_date_for_display) if b_last_login_col else "",
         "은행최종이체일자": bank[b_last_transfer_col].apply(_format_date_for_display) if b_last_transfer_col else "",
         "은행로그인건수": pd.to_numeric(bank[b_login_count_col], errors="coerce").fillna(0).astype(int) if b_login_count_col else 0,
-        "은행메뉴사용": pd.to_numeric(bank[b_menu_col], errors="coerce").fillna(0).astype(int) if b_menu_col else 0,
+        "은행메뉴사용": pd.to_numeric(bank[b_menu_col], errors="coerce").fillna(0).astype(int) if b_menu_col else 1,
         "청구구분": bank[b_bill_col].fillna("").astype(str).str.strip() if b_bill_col else "",
     })
     bank_norm["_last_login_dt"] = pd.to_datetime(bank_norm["은행최종로그인일자"], errors="coerce")
@@ -18897,7 +18919,7 @@ def build_operation_activity_targets(
     merged["_is_gap_watch_build"] = gap_watch_build
     merged["_is_gap_watch_link"] = gap_watch_link
     merged["_is_billable"] = recent_login
-    merged["_has_recent_menu"] = menu_count.gt(0)
+    merged["_has_recent_menu"] = True if not b_menu_col else menu_count.gt(0)
     merged["_login_stopped"] = (gap_watch_build | gap_watch_link) & ~recent_login
     merged["_recent_build_dt"] = pd.concat([merged["_open_dt"], merged["_link_dt"]], axis=1).max(axis=1)
     merged["_recent_build_rank_dt"] = merged["_recent_build_dt"].fillna(pd.Timestamp.min)
@@ -18964,7 +18986,7 @@ def show_operation_activity_targets():
     st.caption("HANA사업부 고객관리 subscriptions_export와 은행 통합CMS 고객명단을 비교해 청구 가능 고객과 로그인 공백 점검 고객을 추립니다.")
 
     default_manage_path = r"C:\Users\이성환\Downloads\subscriptions_export (18).xlsx"
-    default_bank_path = r"C:\Users\이성환\Downloads\00.(명단)통합CMS고객명단_202606.xlsx"
+    default_bank_path = r"C:\Users\이성환\Downloads\606167200_통합cms 2606_260803 (1).xlsx"
     default_files_available = os.path.exists(default_manage_path) and os.path.exists(default_bank_path)
 
     use_default = st.checkbox(
@@ -18980,6 +19002,7 @@ def show_operation_activity_targets():
         st.caption("subscriptions_export 파일의 고객사명/사업자번호/운영담당자/개설일/ERP연계여부를 사용합니다.")
     with col_b:
         bank_upload = st.file_uploader("은행 통합CMS 고객명단 엑셀", type=["xlsx", "xls"], key="operation_bank_upload")
+        st.caption("606167200_통합cms 형식은 Sheet1의 헤더 행을 자동으로 찾아 읽습니다.")
 
     if use_default:
         manage_source = default_manage_path
@@ -18994,7 +19017,7 @@ def show_operation_activity_targets():
 
     try:
         manage_df = read_operation_manage_upload(manage_source)
-        bank_df = pd.read_excel(bank_source, sheet_name="명단")
+        bank_df = read_operation_bank_upload(bank_source)
     except Exception as exc:
         st.error(f"엑셀을 읽는 중 오류가 발생했습니다: {exc}")
         return
