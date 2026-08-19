@@ -90,6 +90,38 @@ body {
   line-height: 1.6;
 }
 
+.compact-alert {
+  margin-bottom: 16px;
+}
+
+.visit-voc-page .ant-card-head-title {
+  min-width: 0;
+}
+
+.minutes-summary {
+  margin-bottom: 0;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.minutes-block {
+  min-height: 148px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.minutes-block ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
+.minutes-block li {
+  margin: 6px 0;
+}
+
 .risk-item {
   display: flex;
   align-items: center;

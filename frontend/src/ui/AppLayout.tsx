@@ -1,11 +1,13 @@
-import { BankOutlined } from '@ant-design/icons';
+import { BankOutlined, FormOutlined } from '@ant-design/icons';
 import { Layout, Menu, Typography } from 'antd';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 const { Header, Sider, Content } = Layout;
 
 export function AppLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const selectedKey = location.pathname.startsWith('/crm/visit-voc') ? 'visit-voc' : 'billing';
 
   return (
     <Layout className="app-shell">
@@ -15,9 +17,12 @@ export function AppLayout() {
         </Typography.Title>
         <Menu
           mode="inline"
-          selectedKeys={['billing']}
-          onClick={() => navigate('/')}
-          items={[{ key: 'billing', icon: <BankOutlined />, label: '청구자료 생성' }]}
+          selectedKeys={[selectedKey]}
+          onClick={({ key }) => navigate(key === 'visit-voc' ? '/crm/visit-voc' : '/')}
+          items={[
+            { key: 'billing', icon: <BankOutlined />, label: '청구자료 생성' },
+            { key: 'visit-voc', icon: <FormOutlined />, label: 'CRM 방문 VOC' },
+          ]}
         />
       </Sider>
       <Layout>
