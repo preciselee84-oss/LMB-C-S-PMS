@@ -87,10 +87,12 @@ BILLING_MENU = "청구자료 생성"
 INTEGRATION_CONFIRM_MENU = "연계확인서 출력"
 ACTIVITY_TEMPLATE_CONVERT_MENU = "활동이력 템플릿 변환"
 OPERATION_TARGET_MENU = "운영관리 활동고객 선정"
+VISIT_VOC_MENU = "방문 VOC 수집"
 
 CRM_MENU_LABELS = {
     "대시보드": "홈 대시보드",
     "업로드 및 실적 확인": "활동 이력",
+    VISIT_VOC_MENU: "방문 VOC 수집",
     "이번달 활동 대상고객 추천": "대상 고객 추천",
     OPERATION_TARGET_MENU: "운영관리 타깃",
     "주간보고 이력 작성": "주간 리포트",
@@ -3799,7 +3801,7 @@ def show_sidebar():
                 render_nav_button(menu_name)
 
         st.markdown("<div class='gpt-section'>Customer CRM</div>", unsafe_allow_html=True)
-        for menu_name in ["업로드 및 실적 확인", OPERATION_TARGET_MENU, "이번달 활동 대상고객 추천", "주간보고 이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU]:
+        for menu_name in ["업로드 및 실적 확인", VISIT_VOC_MENU, OPERATION_TARGET_MENU, "이번달 활동 대상고객 추천", "주간보고 이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU]:
             render_nav_button(menu_name)
 
         if st.session_state.user_role != "관리자":
@@ -19206,6 +19208,175 @@ def show_billing_generation():
     render_billing_source_tables(login_df=normalized_df)
 
 
+def build_visit_minutes_from_text(title, company_name, meeting_date, participants, transcript_text, source_name=""):
+    lines = [line.strip(" -\t") for line in str(transcript_text or "").splitlines() if line.strip(" -\t")]
+    if not lines:
+        return None
+
+    def compact(line, limit=110):
+        normalized = re.sub(r"\s+", " ", str(line)).strip()
+        return normalized if len(normalized) <= limit else f"{normalized[:limit].rstrip()}..."
+
+    def pick(keywords, fallback):
+        picked = [
+            compact(line)
+            for line in lines
+            if any(keyword in line.lower() for keyword in keywords)
+        ]
+        return (picked or fallback)[:5]
+
+    attendee_list = [
+        item.strip()
+        for item in str(participants or "").replace("\n", ",").split(",")
+        if item.strip()
+    ]
+    return {
+        "회의명": title,
+        "고객사": company_name,
+        "회의일": meeting_date,
+        "참석자": attendee_list,
+        "원본파일": source_name,
+        "요약": " ".join(compact(line, 130) for line in lines[:3]),
+        "주요 VOC/안건": pick(
+            ("문의", "요청", "불편", "개선", "필요", "voc", "이슈", "문제", "확인"),
+            [compact(line) for line in lines[:4]],
+        ),
+        "결정사항": pick(
+            ("결정", "합의", "진행", "확정", "도입", "반영"),
+            ["회의 중 명시적 결정사항은 별도 확인이 필요합니다."],
+        ),
+        "후속조치": pick(
+            ("할 일", "조치", "전달", "검토", "공유", "회신", "업로드", "등록", "추가"),
+            ["담당자가 주요 VOC를 CRM에 등록하고 후속 조치 담당자를 지정합니다."],
+        ),
+        "리스크": pick(
+            ("리스크", "지연", "장애", "오류", "불가", "어려움", "불만"),
+            ["중요 리스크가 없으면 고객 요청사항의 처리 기한만 추적합니다."],
+        ),
+        "원문": transcript_text,
+    }
+
+
+def show_visit_voc_collection():
+    st.markdown("#### 모바일 1분 간편 VOC 입력")
+    st.caption("현장 방문조직이 고객사 방문 직후 스마트폰으로 핵심 VOC와 후속조치를 빠르게 남기는 입력 화면입니다.")
+
+    if "visit_voc_entries" not in st.session_state:
+        st.session_state.visit_voc_entries = []
+
+    left, right = st.columns([0.92, 1.08], gap="large")
+    with left:
+        with st.form("visit_voc_quick_form", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            company_name = c1.text_input("고객사", placeholder="예: 하나투어")
+            visit_date = c2.date_input("방문일", value=datetime.today().date())
+            c3, c4 = st.columns(2)
+            visitor_name = c3.text_input("방문자", value=st.session_state.get("user_name", ""))
+            contact_name = c4.text_input("고객 담당자", placeholder="면담자명")
+            c5, c6, c7 = st.columns(3)
+            channel = c5.selectbox("채널", ["방문", "통화", "화상회의"], index=0)
+            sentiment = c6.selectbox("고객 반응", ["보통", "긍정", "불만"], index=0)
+            product_area = c7.text_input("업무/상품", placeholder="CMS, ERP 연계")
+            voc_text = st.text_area("VOC 내용", height=120, placeholder="고객 요청, 불편, 개선 의견을 짧게 입력")
+            next_action = st.text_area("후속조치", height=80, placeholder="담당자 배정, 회신 기한, 내부 공유 내용")
+            submitted = st.form_submit_button("VOC 등록", use_container_width=True, type="primary")
+
+        if submitted:
+            if not company_name.strip() or not visitor_name.strip() or not voc_text.strip():
+                st.warning("고객사, 방문자, VOC 내용은 필수입니다.")
+            else:
+                st.session_state.visit_voc_entries.insert(
+                    0,
+                    {
+                        "등록일시": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "방문일": visit_date.strftime("%Y-%m-%d"),
+                        "고객사": company_name.strip(),
+                        "방문자": visitor_name.strip(),
+                        "고객 담당자": contact_name.strip(),
+                        "채널": channel,
+                        "고객 반응": sentiment,
+                        "업무/상품": product_area.strip(),
+                        "VOC 내용": voc_text.strip(),
+                        "후속조치": next_action.strip(),
+                        "상태": "수집 완료",
+                    },
+                )
+                st.success("방문 VOC가 수집되었습니다.")
+
+    with right:
+        st.markdown("#### 녹취 텍스트 회의록 변환")
+        st.info("통화녹음/화상회의 파일은 사내 STT 또는 Whisper 연동 후 생성된 텍스트를 붙여넣거나, txt/vtt/srt 자막 파일을 업로드하면 회의록 형태로 정리됩니다.")
+        with st.form("visit_minutes_form"):
+            m1, m2 = st.columns(2)
+            minutes_title = m1.text_input("회의명", placeholder="고객 방문 미팅")
+            minutes_company = m2.text_input("고객사", placeholder="고객사명")
+            m3, m4 = st.columns(2)
+            minutes_date = m3.date_input("회의일", value=datetime.today().date())
+            participants = m4.text_input("참석자", placeholder="홍길동, 김하나")
+            uploaded_file = st.file_uploader(
+                "녹취/자막 파일",
+                type=["txt", "md", "srt", "vtt", "csv", "mp3", "m4a", "wav", "mp4", "webm"],
+            )
+            transcript_text = st.text_area("변환 텍스트", height=170, placeholder="STT 변환 결과 또는 회의 자막 텍스트를 붙여넣기")
+            minutes_submitted = st.form_submit_button("회의록 생성", use_container_width=True, type="primary")
+
+        if minutes_submitted:
+            source_name = uploaded_file.name if uploaded_file else ""
+            file_text = ""
+            if uploaded_file is not None and uploaded_file.name.lower().rsplit(".", 1)[-1] in {"txt", "md", "srt", "vtt", "csv"}:
+                raw = uploaded_file.getvalue()
+                for encoding in ("utf-8-sig", "utf-8", "cp949"):
+                    try:
+                        file_text = raw.decode(encoding)
+                        break
+                    except UnicodeDecodeError:
+                        continue
+            final_text = (file_text or transcript_text or "").strip()
+            if uploaded_file is not None and not final_text:
+                st.warning("음성/영상 원본만으로는 아직 자동 STT가 실행되지 않습니다. 변환 텍스트를 함께 입력해주세요.")
+            elif not minutes_title.strip() or not final_text:
+                st.warning("회의명과 변환 텍스트는 필수입니다.")
+            else:
+                st.session_state.visit_minutes = build_visit_minutes_from_text(
+                    minutes_title.strip(),
+                    minutes_company.strip(),
+                    minutes_date.strftime("%Y-%m-%d"),
+                    participants,
+                    final_text,
+                    source_name,
+                )
+                st.success("회의록 초안이 생성되었습니다.")
+
+    minutes = st.session_state.get("visit_minutes")
+    if minutes:
+        st.markdown("#### 회의록 초안")
+        meta_cols = st.columns(4)
+        meta_cols[0].metric("고객사", minutes.get("고객사") or "-")
+        meta_cols[1].metric("회의일", minutes.get("회의일") or "-")
+        meta_cols[2].metric("참석자", f"{len(minutes.get('참석자', []))}명")
+        meta_cols[3].metric("원본", minutes.get("원본파일") or "텍스트")
+        st.markdown(f"**요약**  \n{minutes.get('요약', '')}")
+        for section in ["주요 VOC/안건", "결정사항", "후속조치", "리스크"]:
+            st.markdown(f"**{section}**")
+            for item in minutes.get(section, []):
+                st.markdown(f"- {item}")
+
+    st.markdown("#### 최근 입력 VOC")
+    entries = st.session_state.get("visit_voc_entries", [])
+    if entries:
+        st.dataframe(pd.DataFrame(entries), use_container_width=True, hide_index=True)
+        excel_bytes = dataframe_to_excel_bytes({"방문 VOC": pd.DataFrame(entries)})
+        st.download_button(
+            "방문 VOC 다운로드",
+            data=excel_bytes,
+            file_name=f"방문VOC_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+    else:
+        st.info("아직 입력된 VOC가 없습니다.")
+
+
 def show_main():
     apply_global_table_css()
     inject_theme_toggle()
@@ -19216,6 +19387,7 @@ def show_main():
     allowed_menus = {
         "대시보드",
         "업로드 및 실적 확인",
+        VISIT_VOC_MENU,
         "이번달 활동 대상고객 추천",
         OPERATION_TARGET_MENU,
         "주간보고 이력 작성",
@@ -19235,7 +19407,7 @@ def show_main():
         st.session_state.current_menu = "업로드 및 실적 확인"
         persist_current_menu()
         st.rerun()
-    user_menus = {"업로드 및 실적 확인", "이번달 활동 대상고객 추천", OPERATION_TARGET_MENU, "주간보고 이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU, BILLING_MENU, INTEGRATION_CONFIRM_MENU}
+    user_menus = {"업로드 및 실적 확인", VISIT_VOC_MENU, "이번달 활동 대상고객 추천", OPERATION_TARGET_MENU, "주간보고 이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU, BILLING_MENU, INTEGRATION_CONFIRM_MENU}
     if menu not in user_menus and st.session_state.user_role != "관리자":
         st.session_state.current_menu = "업로드 및 실적 확인"
         persist_current_menu()
@@ -19247,6 +19419,8 @@ def show_main():
         show_dashboard()
     elif menu == "업로드 및 실적 확인":
         show_user_history()
+    elif menu == VISIT_VOC_MENU:
+        show_visit_voc_collection()
     elif menu == "이번달 활동 대상고객 추천":
         show_target_customers()
     elif menu == OPERATION_TARGET_MENU:
