@@ -19257,68 +19257,110 @@ def build_visit_minutes_from_text(title, company_name, meeting_date, participant
     }
 
 
+def extract_business_card_text_from_image(uploaded_image):
+    if uploaded_image is None:
+        return ""
+    try:
+        from PIL import Image
+        import pytesseract
+
+        image = Image.open(BytesIO(uploaded_image.getvalue()))
+        return pytesseract.image_to_string(image, lang="kor+eng").strip()
+    except Exception:
+        return ""
+
+
+def parse_business_card_text(card_text):
+    text = str(card_text or "").strip()
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    result = {"company": "", "name": "", "phone": "", "email": "", "title": ""}
+    if not lines:
+        return result
+
+    phone_match = re.search(r"(?:\+?82[-.\s]?)?0\d{1,2}[-.\s]?\d{3,4}[-.\s]?\d{4}", text)
+    email_match = re.search(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", text)
+    result["phone"] = phone_match.group(0).strip() if phone_match else ""
+    result["email"] = email_match.group(0).strip() if email_match else ""
+
+    company_keywords = ("주식회사", "(주)", "㈜", "회사", "은행", "투어", "시스템", "테크", "솔루션", "그룹")
+    for line in lines:
+        if any(keyword in line for keyword in company_keywords):
+            result["company"] = line
+            break
+    if not result["company"] and len(lines) >= 2:
+        result["company"] = lines[0]
+
+    title_keywords = ("대표", "이사", "부장", "차장", "과장", "대리", "팀장", "매니저", "책임", "선임")
+    for line in lines:
+        if any(keyword in line for keyword in title_keywords):
+            result["title"] = line
+            break
+
+    name_candidates = [
+        line
+        for line in lines
+        if line not in {result["company"], result["title"]}
+        and not re.search(r"\d|@|www|http", line, re.IGNORECASE)
+        and len(line.replace(" ", "")) <= 8
+    ]
+    result["name"] = name_candidates[0] if name_candidates else ""
+    return result
+
+
 def show_visit_voc_collection():
-    st.markdown("#### 모바일 1분 간편 VOC 입력")
-    st.caption("현장 방문조직이 고객사 방문 직후 스마트폰으로 핵심 VOC와 후속조치를 빠르게 남기는 입력 화면입니다.")
+    st.markdown("#### 외근 현장 회의록 생성")
+    st.caption("입력은 최소화하고, 명함 이미지와 녹취 변환 파일을 올린 뒤 최종 회의록만 확인하는 흐름입니다.")
 
     if "visit_voc_entries" not in st.session_state:
         st.session_state.visit_voc_entries = []
+    if "visit_card_info" not in st.session_state:
+        st.session_state.visit_card_info = {"company": "", "name": "", "phone": "", "email": "", "title": ""}
 
-    left, right = st.columns([0.92, 1.08], gap="large")
+    left, right = st.columns([0.86, 1.14], gap="large")
     with left:
-        with st.form("visit_voc_quick_form", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            company_name = c1.text_input("고객사", placeholder="예: 하나투어")
-            visit_date = c2.date_input("방문일", value=datetime.today().date())
-            c3, c4 = st.columns(2)
-            visitor_name = c3.text_input("방문자", value=st.session_state.get("user_name", ""))
-            contact_name = c4.text_input("고객 담당자", placeholder="면담자명")
-            c5, c6, c7 = st.columns(3)
-            channel = c5.selectbox("채널", ["방문", "통화", "화상회의"], index=0)
-            sentiment = c6.selectbox("고객 반응", ["보통", "긍정", "불만"], index=0)
-            product_area = c7.text_input("업무/상품", placeholder="CMS, ERP 연계")
-            voc_text = st.text_area("VOC 내용", height=120, placeholder="고객 요청, 불편, 개선 의견을 짧게 입력")
-            next_action = st.text_area("후속조치", height=80, placeholder="담당자 배정, 회신 기한, 내부 공유 내용")
-            submitted = st.form_submit_button("VOC 등록", use_container_width=True, type="primary")
+        st.markdown("##### 1. 명함 이미지")
+        card_image = st.file_uploader("명함 업로드", type=["png", "jpg", "jpeg"], key="visit_card_image")
+        if card_image is not None:
+            st.image(card_image, caption="업로드한 명함", use_container_width=True)
+            if not st.session_state.get("visit_card_text"):
+                extracted_text = extract_business_card_text_from_image(card_image)
+                if extracted_text:
+                    st.session_state.visit_card_text = extracted_text
+                    st.session_state.visit_card_info = parse_business_card_text(extracted_text)
+                    st.success("명함 이미지에서 고객 정보를 추출했습니다.")
+        st.caption("OCR이 가능한 서버에서는 명함 이미지만으로 자동 생성되고, 인식이 안 되면 아래 텍스트만 보정하면 됩니다.")
+        card_text = st.text_area(
+            "명함 인식 텍스트",
+            height=95,
+            placeholder="예: 주식회사 하나투어\n홍길동 팀장\n010-1234-5678\nhong@example.com",
+            key="visit_card_text",
+        )
+        if st.button("명함 정보 생성", use_container_width=True):
+            st.session_state.visit_card_info = parse_business_card_text(card_text)
+            st.success("명함 정보가 생성되었습니다.")
 
-        if submitted:
-            if not company_name.strip() or not visitor_name.strip() or not voc_text.strip():
-                st.warning("고객사, 방문자, VOC 내용은 필수입니다.")
-            else:
-                st.session_state.visit_voc_entries.insert(
-                    0,
-                    {
-                        "등록일시": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        "방문일": visit_date.strftime("%Y-%m-%d"),
-                        "고객사": company_name.strip(),
-                        "방문자": visitor_name.strip(),
-                        "고객 담당자": contact_name.strip(),
-                        "채널": channel,
-                        "고객 반응": sentiment,
-                        "업무/상품": product_area.strip(),
-                        "VOC 내용": voc_text.strip(),
-                        "후속조치": next_action.strip(),
-                        "상태": "수집 완료",
-                    },
-                )
-                st.success("방문 VOC가 수집되었습니다.")
+        card_info = st.session_state.visit_card_info
+        st.markdown("##### 생성된 고객 정보")
+        c1, c2 = st.columns(2)
+        company_name = c1.text_input("회사명", value=card_info.get("company", ""), key="visit_card_company")
+        contact_name = c2.text_input("담당자", value=card_info.get("name", ""), key="visit_card_name")
+        c3, c4 = st.columns(2)
+        contact_phone = c3.text_input("연락처", value=card_info.get("phone", ""), key="visit_card_phone")
+        contact_email = c4.text_input("이메일", value=card_info.get("email", ""), key="visit_card_email")
 
     with right:
-        st.markdown("#### 녹취 텍스트 회의록 변환")
-        st.info("통화녹음/화상회의 파일은 사내 STT 또는 Whisper 연동 후 생성된 텍스트를 붙여넣거나, txt/vtt/srt 자막 파일을 업로드하면 회의록 형태로 정리됩니다.")
+        st.markdown("##### 2. 녹취/텍스트 변환 파일")
+        st.info("외근 중에는 변환된 txt/vtt/srt 파일만 올리거나, 음성 파일 업로드 후 변환 텍스트를 붙여넣으면 됩니다.")
         with st.form("visit_minutes_form"):
-            m1, m2 = st.columns(2)
-            minutes_title = m1.text_input("회의명", placeholder="고객 방문 미팅")
-            minutes_company = m2.text_input("고객사", placeholder="고객사명")
             m3, m4 = st.columns(2)
             minutes_date = m3.date_input("회의일", value=datetime.today().date())
-            participants = m4.text_input("참석자", placeholder="홍길동, 김하나")
+            visitor_name = m4.text_input("방문자", value=st.session_state.get("user_name", ""))
             uploaded_file = st.file_uploader(
                 "녹취/자막 파일",
                 type=["txt", "md", "srt", "vtt", "csv", "mp3", "m4a", "wav", "mp4", "webm"],
             )
-            transcript_text = st.text_area("변환 텍스트", height=170, placeholder="STT 변환 결과 또는 회의 자막 텍스트를 붙여넣기")
-            minutes_submitted = st.form_submit_button("회의록 생성", use_container_width=True, type="primary")
+            transcript_text = st.text_area("변환 텍스트", height=210, placeholder="STT 변환 결과 또는 회의 자막 텍스트")
+            minutes_submitted = st.form_submit_button("3. 최종 회의록 생성", use_container_width=True, type="primary")
 
         if minutes_submitted:
             source_name = uploaded_file.name if uploaded_file else ""
@@ -19334,27 +19376,59 @@ def show_visit_voc_collection():
             final_text = (file_text or transcript_text or "").strip()
             if uploaded_file is not None and not final_text:
                 st.warning("음성/영상 원본만으로는 아직 자동 STT가 실행되지 않습니다. 변환 텍스트를 함께 입력해주세요.")
-            elif not minutes_title.strip() or not final_text:
-                st.warning("회의명과 변환 텍스트는 필수입니다.")
+            elif not company_name.strip() or not final_text:
+                st.warning("회사명과 변환 텍스트는 필수입니다.")
             else:
+                participants = ", ".join([name for name in [visitor_name.strip(), contact_name.strip()] if name])
+                minutes_title = f"{company_name.strip()} 방문 회의록"
                 st.session_state.visit_minutes = build_visit_minutes_from_text(
-                    minutes_title.strip(),
-                    minutes_company.strip(),
+                    minutes_title,
+                    company_name.strip(),
                     minutes_date.strftime("%Y-%m-%d"),
                     participants,
                     final_text,
                     source_name,
                 )
+                st.session_state.visit_minutes.update(
+                    {
+                        "고객사": company_name.strip(),
+                        "고객 담당자": contact_name.strip(),
+                        "연락처": contact_phone.strip(),
+                        "이메일": contact_email.strip(),
+                        "방문자": visitor_name.strip(),
+                    }
+                )
+                first_topic = st.session_state.visit_minutes.get("주요 VOC/안건", [""])[0]
+                first_action = st.session_state.visit_minutes.get("후속조치", [""])[0]
+                st.session_state.visit_voc_entries.insert(
+                    0,
+                    {
+                        "등록일시": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "방문일": minutes_date.strftime("%Y-%m-%d"),
+                        "고객사": company_name.strip(),
+                        "방문자": visitor_name.strip(),
+                        "고객 담당자": contact_name.strip(),
+                        "연락처": contact_phone.strip(),
+                        "이메일": contact_email.strip(),
+                        "VOC 내용": first_topic,
+                        "후속조치": first_action,
+                        "원본파일": source_name,
+                        "상태": "회의록 생성",
+                    },
+                )
                 st.success("회의록 초안이 생성되었습니다.")
 
     minutes = st.session_state.get("visit_minutes")
     if minutes:
-        st.markdown("#### 회의록 초안")
-        meta_cols = st.columns(4)
+        st.markdown("#### 3. 최종 회의록")
+        meta_cols = st.columns(5)
         meta_cols[0].metric("고객사", minutes.get("고객사") or "-")
         meta_cols[1].metric("회의일", minutes.get("회의일") or "-")
-        meta_cols[2].metric("참석자", f"{len(minutes.get('참석자', []))}명")
-        meta_cols[3].metric("원본", minutes.get("원본파일") or "텍스트")
+        meta_cols[2].metric("담당자", minutes.get("고객 담당자") or "-")
+        meta_cols[3].metric("방문자", minutes.get("방문자") or "-")
+        meta_cols[4].metric("원본", minutes.get("원본파일") or "텍스트")
+        if minutes.get("연락처") or minutes.get("이메일"):
+            st.caption(f"연락처: {minutes.get('연락처') or '-'} / 이메일: {minutes.get('이메일') or '-'}")
         st.markdown(f"**요약**  \n{minutes.get('요약', '')}")
         for section in ["주요 VOC/안건", "결정사항", "후속조치", "리스크"]:
             st.markdown(f"**{section}**")
