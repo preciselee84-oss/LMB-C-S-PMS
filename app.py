@@ -19294,6 +19294,9 @@ def parse_business_card_text(card_text):
     for line in lines:
         if any(keyword in line for keyword in title_keywords):
             result["title"] = line
+            name_part = re.sub("|".join(title_keywords), "", line).strip(" /,·-")
+            if 1 < len(name_part.replace(" ", "")) <= 8 and not re.search(r"\d|@", name_part):
+                result["name"] = name_part
             break
 
     name_candidates = [
@@ -19303,8 +19306,16 @@ def parse_business_card_text(card_text):
         and not re.search(r"\d|@|www|http", line, re.IGNORECASE)
         and len(line.replace(" ", "")) <= 8
     ]
-    result["name"] = name_candidates[0] if name_candidates else ""
+    result["name"] = result["name"] or (name_candidates[0] if name_candidates else "")
     return result
+
+
+def apply_business_card_info(card_info):
+    st.session_state.visit_card_info = card_info
+    st.session_state.visit_card_company = card_info.get("company", "")
+    st.session_state.visit_card_name = card_info.get("name", "")
+    st.session_state.visit_card_phone = card_info.get("phone", "")
+    st.session_state.visit_card_email = card_info.get("email", "")
 
 
 def show_visit_voc_collection():
@@ -19326,7 +19337,7 @@ def show_visit_voc_collection():
                 extracted_text = extract_business_card_text_from_image(card_image)
                 if extracted_text:
                     st.session_state.visit_card_text = extracted_text
-                    st.session_state.visit_card_info = parse_business_card_text(extracted_text)
+                    apply_business_card_info(parse_business_card_text(extracted_text))
                     st.success("명함 이미지에서 고객 정보를 추출했습니다.")
         st.caption("OCR이 가능한 서버에서는 명함 이미지만으로 자동 생성되고, 인식이 안 되면 아래 텍스트만 보정하면 됩니다.")
         card_text = st.text_area(
@@ -19336,7 +19347,7 @@ def show_visit_voc_collection():
             key="visit_card_text",
         )
         if st.button("명함 정보 생성", use_container_width=True):
-            st.session_state.visit_card_info = parse_business_card_text(card_text)
+            apply_business_card_info(parse_business_card_text(card_text))
             st.success("명함 정보가 생성되었습니다.")
 
         card_info = st.session_state.visit_card_info
