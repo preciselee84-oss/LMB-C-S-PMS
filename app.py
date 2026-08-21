@@ -19606,6 +19606,9 @@ def show_cms_chatbot():
                 .hana-chat-shell {
                     margin: 10px 0 18px;
                     padding: 18px;
+                    width: 52%;
+                    min-width: 560px;
+                    max-width: 820px;
                     border: 1px solid #D7E3E1;
                     border-radius: 16px;
                     background: #F3F8F7;
@@ -19673,9 +19676,20 @@ def show_cms_chatbot():
                 .hana-chat-input-panel {
                     margin-top: 12px;
                     padding: 14px;
+                    width: 52%;
+                    min-width: 560px;
+                    max-width: 820px;
                     border-radius: 14px;
                     background: #FFFFFF;
                     border: 1px solid #D7E3E1;
+                }
+                @media (max-width: 1100px) {
+                    .hana-chat-shell,
+                    .hana-chat-input-panel {
+                        width: 100%;
+                        min-width: 0;
+                        max-width: none;
+                    }
                 }
             </style>
             """,
