@@ -17,5 +17,7 @@ frontend/.vite/
 *.log
 server_connection.json
 data/server_connection.json
+data/cms_chatbot_faq.json
+data/cms_chatbot_images.json
 .DS_Store
 Thumbs.db

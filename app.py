@@ -40,6 +40,8 @@ APPROVAL_FILE = "approvals.json"
 BANK_ACCOUNT_FILE = "bank_accounts.json"
 USAGE_REPORT_FILE = "usage_reports.json"
 COMPANY_PROFILE_FILE = "company_profile.json"
+CMS_CHATBOT_FAQ_FILE = os.path.join("data", "cms_chatbot_faq.json")
+CMS_CHATBOT_IMAGE_FILE = os.path.join("data", "cms_chatbot_images.json")
 EXCEL_SAMPLE_FILE = resolve_template_file("LMB월간 활동실적_000000(샘플).xlsx")
 PPT_TEMPLATE_FILE = resolve_template_file("LMB활동실적보고서_202605_하나지사.pptx")
 WEEKLY_PPT_TEMPLATE_FILE = resolve_template_file("주간보고_통합CMS고객_개설운영_주간보고_템플릿.pptx")
@@ -324,6 +326,24 @@ def save_db(file_path, data, allow_shrink=False):
         except Exception:
             pass
     _github_save(file_path, data)
+
+
+def load_local_json(file_path, default_data):
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return default_data
+    return default_data
+
+
+def save_local_json(file_path, data):
+    directory = os.path.dirname(file_path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def safe_cookie_controller():
@@ -19470,42 +19490,84 @@ def show_cms_chatbot():
 
     work_options = ["전체", "사용자 교육", "사후관리", "기타", "오류발생", "서버점검", "ERP연계", "설치", "설치등록", "추가설치", "재설치", "클레임"]
     operation_options = ["전체", "운영", "연계", "개설"]
+    default_faq_rows = [
+        {
+            "회사": "고객사 공통",
+            "업무": "오류발생",
+            "운영구분": "운영",
+            "질문": "통합CMS 로그인 실패 시 무엇을 확인해야 하나요?",
+            "답변요약": "기업뱅킹 로그인 가능 여부, 인증서 사업장 일치 여부, 고객사 연결정보 접속 테스트를 순서대로 확인합니다.",
+            "상태": "기본",
+        },
+        {
+            "회사": "고객사 공통",
+            "업무": "서버점검",
+            "운영구분": "운영",
+            "질문": "Agent 재시작 후 무엇을 확인해야 하나요?",
+            "답변요약": "CMD 창 종료, 스케줄러 구동, 트레이 아이콘 우클릭 메뉴 표시 여부를 확인합니다.",
+            "상태": "기본",
+        },
+        {
+            "회사": "고객사 공통",
+            "업무": "ERP연계",
+            "운영구분": "연계",
+            "질문": "ERP 접속 테스트 실패 시 어떤 정보를 기록해야 하나요?",
+            "답변요약": "변경 전/후 서버 정보와 접속 테스트 오류 메시지를 함께 기록합니다.",
+            "상태": "기본",
+        },
+        {
+            "회사": "고객사 공통",
+            "업무": "설치등록",
+            "운영구분": "개설",
+            "질문": "신규 개설 처리 시 어떤 업무유형으로 분류하나요?",
+            "답변요약": "원본 활동이력 기준으로 업무유형이 설치등록인 건은 운영구분을 개설로 분류합니다.",
+            "상태": "기본",
+        },
+    ]
 
     if "cms_chatbot_faq_rows" not in st.session_state:
-        st.session_state.cms_chatbot_faq_rows = [
+        saved_faq = load_local_json(CMS_CHATBOT_FAQ_FILE, {})
+        saved_rows = saved_faq.get("rows", []) if isinstance(saved_faq, dict) else []
+        st.session_state.cms_chatbot_faq_rows = saved_rows or default_faq_rows
+    if "cms_chatbot_image_store" not in st.session_state:
+        saved_images = load_local_json(CMS_CHATBOT_IMAGE_FILE, {})
+        st.session_state.cms_chatbot_image_store = {
+            key: [base64.b64decode(image_text) for image_text in image_list]
+            for key, image_list in saved_images.get("images", {}).items()
+            if isinstance(image_list, list)
+        } if isinstance(saved_images, dict) else {}
+
+    def save_cms_chatbot_faq_store():
+        save_local_json(
+            CMS_CHATBOT_FAQ_FILE,
             {
-                "회사": "고객사 공통",
-                "업무": "오류발생",
-                "운영구분": "운영",
-                "질문": "통합CMS 로그인 실패 시 무엇을 확인해야 하나요?",
-                "답변요약": "기업뱅킹 로그인 가능 여부, 인증서 사업장 일치 여부, 고객사 연결정보 접속 테스트를 순서대로 확인합니다.",
-                "상태": "기본",
+                "saved_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
+                "rows": st.session_state.cms_chatbot_faq_rows,
             },
+        )
+        image_store = st.session_state.get("cms_chatbot_image_store", {})
+        save_local_json(
+            CMS_CHATBOT_IMAGE_FILE,
             {
-                "회사": "고객사 공통",
-                "업무": "서버점검",
-                "운영구분": "운영",
-                "질문": "Agent 재시작 후 무엇을 확인해야 하나요?",
-                "답변요약": "CMD 창 종료, 스케줄러 구동, 트레이 아이콘 우클릭 메뉴 표시 여부를 확인합니다.",
-                "상태": "기본",
+                "saved_at": (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S"),
+                "images": {
+                    key: [base64.b64encode(image_bytes).decode("ascii") for image_bytes in image_list[:4]]
+                    for key, image_list in image_store.items()
+                    if image_list
+                },
             },
-            {
-                "회사": "고객사 공통",
-                "업무": "ERP연계",
-                "운영구분": "연계",
-                "질문": "ERP 접속 테스트 실패 시 어떤 정보를 기록해야 하나요?",
-                "답변요약": "변경 전/후 서버 정보와 접속 테스트 오류 메시지를 함께 기록합니다.",
-                "상태": "기본",
-            },
-            {
-                "회사": "고객사 공통",
-                "업무": "설치등록",
-                "운영구분": "개설",
-                "질문": "신규 개설 처리 시 어떤 업무유형으로 분류하나요?",
-                "답변요약": "원본 활동이력 기준으로 업무유형이 설치등록인 건은 운영구분을 개설로 분류합니다.",
-                "상태": "기본",
-            },
-        ]
+        )
+
+    def reload_cms_chatbot_faq_store():
+        saved_faq = load_local_json(CMS_CHATBOT_FAQ_FILE, {})
+        saved_rows = saved_faq.get("rows", []) if isinstance(saved_faq, dict) else []
+        st.session_state.cms_chatbot_faq_rows = saved_rows or default_faq_rows
+        saved_images = load_local_json(CMS_CHATBOT_IMAGE_FILE, {})
+        st.session_state.cms_chatbot_image_store = {
+            key: [base64.b64decode(image_text) for image_text in image_list]
+            for key, image_list in saved_images.get("images", {}).items()
+            if isinstance(image_list, list)
+        } if isinstance(saved_images, dict) else {}
 
     rows = st.session_state.cms_chatbot_faq_rows
     work_options = ["전체"] + sorted(
@@ -19978,6 +20040,24 @@ def show_cms_chatbot():
 
     with tab_faq:
         st.markdown("##### 자주 받는 질문")
+        store_col1, store_col2, store_col3, store_col4 = st.columns([0.18, 0.18, 0.18, 0.46])
+        with store_col1:
+            if st.button("FAQ 보강 데이터 저장", use_container_width=True, type="primary"):
+                save_cms_chatbot_faq_store()
+                st.success("FAQ 보강 데이터를 서버 로컬 저장소에 저장했습니다.")
+        with store_col2:
+            if st.button("FAQ 보강 데이터 불러오기", use_container_width=True):
+                reload_cms_chatbot_faq_store()
+                st.success("저장된 FAQ 보강 데이터를 불러왔습니다.")
+                st.rerun()
+        with store_col3:
+            if st.button("FAQ 기본값으로 초기화", use_container_width=True):
+                st.session_state.cms_chatbot_faq_rows = default_faq_rows
+                st.session_state.cms_chatbot_image_store = {}
+                save_cms_chatbot_faq_store()
+                st.success("FAQ를 기본값 4건으로 초기화하고 저장했습니다.")
+                st.rerun()
+        st.caption(f"저장 위치: {CMS_CHATBOT_FAQ_FILE} / 원본 엑셀·PPT 파일은 저장하지 않습니다.")
         st.dataframe(pd.DataFrame(filtered_rows), use_container_width=True, hide_index=True)
 
         with st.expander("활동이력/문서 파일로 FAQ 초안 만들기"):
@@ -20071,9 +20151,10 @@ def show_cms_chatbot():
                             existing_keys.add(row_key)
                             deduped_rows.append(row)
                         st.session_state.cms_chatbot_faq_rows = deduped_rows + st.session_state.cms_chatbot_faq_rows
+                        save_cms_chatbot_faq_store()
                         st.success(
                             f"FAQ 초안 {len(deduped_rows):,}건을 반영했습니다. "
-                            f"중복 {duplicate_count:,}건, 답변이 비어 있는 {skipped_count:,}건은 제외했습니다."
+                            f"중복 {duplicate_count:,}건, 답변이 비어 있는 {skipped_count:,}건은 제외했고 로컬 저장소에 저장했습니다."
                         )
                         st.rerun()
                     elif not unsupported_messages:
@@ -20105,7 +20186,8 @@ def show_cms_chatbot():
                             "상태": "등록",
                         },
                     )
-                    st.success("FAQ 항목이 추가되었습니다.")
+                    save_cms_chatbot_faq_store()
+                    st.success("FAQ 항목이 추가되고 로컬 저장소에 저장되었습니다.")
                     st.rerun()
 
     with tab_setup:
