@@ -19508,6 +19508,18 @@ def show_cms_chatbot():
         ]
 
     rows = st.session_state.cms_chatbot_faq_rows
+    work_options = ["전체"] + sorted(
+        dict.fromkeys(
+            [
+                *work_options[1:],
+                *[
+                    str(row.get("업무", "")).strip()
+                    for row in rows
+                    if str(row.get("업무", "")).strip()
+                ],
+            ]
+        )
+    )
     company_candidates = sorted(
         {
             "고객사 공통",
@@ -19580,6 +19592,118 @@ def show_cms_chatbot():
         if any(keyword in source for keyword in ["교육", "사용", "주요기능", "기능"]):
             return "사용자 교육"
         return "기타"
+
+    def clean_chatbot_text(value):
+        return re.sub(r"\s+", " ", str(value or "").replace("\xa0", " ")).strip()
+
+    def first_chatbot_value(row, columns):
+        for column in columns:
+            value = clean_chatbot_text(row.get(column, ""))
+            if value and value.lower() != "nan":
+                return value
+        return ""
+
+    def detect_chatbot_header_row(preview_df, required_markers):
+        for row_index, row in preview_df.iterrows():
+            values = {clean_chatbot_text(value) for value in row.tolist() if clean_chatbot_text(value)}
+            if required_markers.issubset(values):
+                return row_index
+        return None
+
+    def build_chatbot_rows_from_standard_history(history_df, file_name):
+        imported = []
+        skipped = 0
+        for _, row in history_df.iterrows():
+            question_text = clean_chatbot_text(row.get("요청사항", ""))
+            answer_text = clean_chatbot_text(row.get("처리내용", ""))
+            if not question_text or not answer_text:
+                skipped += 1
+                continue
+            work = clean_chatbot_text(row.get("업무유형", "")) or "기타"
+            imported.append(
+                {
+                    "회사": clean_chatbot_text(row.get("업체명", "")) or "고객사 공통",
+                    "업무": work,
+                    "운영구분": chatbot_operation_from_work(work),
+                    "질문": question_text,
+                    "답변요약": answer_text,
+                    "상태": f"활동이력:{file_name}",
+                }
+            )
+        return imported, skipped
+
+    def build_chatbot_rows_from_monthly_performance(uploaded_file, file_name):
+        imported = []
+        skipped = 0
+        workbook_bytes = uploaded_file.getvalue()
+        excel_file = pd.ExcelFile(BytesIO(workbook_bytes))
+        target_sheets = [
+            sheet_name
+            for sheet_name in excel_file.sheet_names
+            if any(keyword in str(sheet_name) for keyword in ["상세", "활동"])
+        ] or excel_file.sheet_names
+
+        for sheet_name in target_sheets:
+            preview_df = pd.read_excel(
+                BytesIO(workbook_bytes),
+                sheet_name=sheet_name,
+                dtype=str,
+                header=None,
+                nrows=15,
+            ).fillna("")
+            header_row = detect_chatbot_header_row(preview_df, {"업체명", "활동상세"})
+            if header_row is None:
+                continue
+
+            detail_df = pd.read_excel(
+                BytesIO(workbook_bytes),
+                sheet_name=sheet_name,
+                dtype=str,
+                header=header_row,
+            ).fillna("")
+            detail_df.columns = [clean_chatbot_text(column) for column in detail_df.columns]
+
+            for _, row in detail_df.iterrows():
+                company = first_chatbot_value(row, ["업체명", "고객사", "고객명", "회사명"])
+                activity_detail = first_chatbot_value(row, ["활동상세", "활동내용", "상담내용", "처리내용", "비고"])
+                title = first_chatbot_value(row, ["제목", "업무번호", "요청사항", "문의내용"])
+                if not activity_detail and not title:
+                    skipped += 1
+                    continue
+
+                work = first_chatbot_value(row, ["업무유형", "활동상세"])
+                if not work or len(work) > 20:
+                    work = chatbot_work_from_document_text(f"{title} {activity_detail}")
+                product = first_chatbot_value(row, ["상품"])
+                activity_type = first_chatbot_value(row, ["활동구분"])
+                activity_date = first_chatbot_value(row, ["활동일"])
+                question_text = title or f"{company or '고객사'} {work} 관련 처리 사례는?"
+                if not question_text.endswith("?"):
+                    question_text = f"{question_text} 관련 처리내용은?"
+
+                answer_parts = []
+                if product:
+                    answer_parts.append(f"상품: {product}")
+                if activity_type:
+                    answer_parts.append(f"활동구분: {activity_type}")
+                if activity_date:
+                    answer_parts.append(f"활동일: {activity_date}")
+                if title:
+                    answer_parts.append(f"제목: {title}")
+                if activity_detail:
+                    answer_parts.append(f"처리내용: {activity_detail}")
+
+                imported.append(
+                    {
+                        "회사": company or "고객사 공통",
+                        "업무": work or "기타",
+                        "운영구분": chatbot_operation_from_work(work),
+                        "질문": question_text,
+                        "답변요약": "\n".join(answer_parts),
+                        "상태": f"월간실적:{file_name}:{sheet_name}",
+                    }
+                )
+        return imported, skipped
 
     def chatbot_text_tokens(text):
         normalized = re.sub(r"[^0-9A-Za-z가-힣]+", " ", str(text or "").lower())
@@ -19857,7 +19981,7 @@ def show_cms_chatbot():
         st.dataframe(pd.DataFrame(filtered_rows), use_container_width=True, hide_index=True)
 
         with st.expander("활동이력/문서 파일로 FAQ 초안 만들기"):
-            st.caption("활동이력은 요청사항을 질문, 처리내용을 답변으로 변환합니다. PPT 문서는 슬라이드별 텍스트를 FAQ 지식으로 반영합니다.")
+            st.caption("활동이력은 요청사항/처리내용을, 월간활동실적은 상세 활동 사례를 FAQ 지식으로 반영합니다. PPT 문서는 슬라이드별 텍스트와 이미지를 함께 반영합니다.")
             history_file = st.file_uploader(
                 "FAQ 보강 파일 업로드",
                 type=["xls", "xlsx", "pptx"],
@@ -19868,7 +19992,7 @@ def show_cms_chatbot():
                 try:
                     imported_rows = []
                     skipped_count = 0
-                    missing_messages = []
+                    unsupported_messages = []
                     if "cms_chatbot_image_store" not in st.session_state:
                         st.session_state.cms_chatbot_image_store = {}
                     required_columns = {"업체명", "업무유형", "요청사항", "처리내용"}
@@ -19909,36 +20033,51 @@ def show_cms_chatbot():
                                     }
                                 )
                                 continue
-                        history_df = pd.read_excel(uploaded_history_file, dtype=str).fillna("")
-                        missing_columns = required_columns - set(history_df.columns)
-                        if missing_columns:
-                            missing_messages.append(f"{file_name}: {', '.join(sorted(missing_columns))}")
-                            continue
-                        for _, row in history_df.iterrows():
-                            question_text = str(row.get("요청사항", "")).strip()
-                            answer_text = str(row.get("처리내용", "")).strip()
-                            if not question_text or not answer_text:
-                                skipped_count += 1
-                                continue
-                            work = str(row.get("업무유형", "")).strip() or "기타"
-                            imported_rows.append(
-                                {
-                                    "회사": str(row.get("업체명", "")).strip() or "고객사 공통",
-                                    "업무": work,
-                                    "운영구분": chatbot_operation_from_work(work),
-                                    "질문": question_text,
-                                    "답변요약": answer_text,
-                                    "상태": f"활동이력:{file_name}",
-                                }
-                            )
-                    if missing_messages:
-                        st.error("필수 컬럼이 없는 파일이 있습니다. " + " / ".join(missing_messages))
+                        uploaded_history_file.seek(0)
+                        first_sheet_df = pd.read_excel(uploaded_history_file, dtype=str).fillna("")
+                        if required_columns.issubset(set(first_sheet_df.columns)):
+                            file_rows, file_skipped = build_chatbot_rows_from_standard_history(first_sheet_df, file_name)
+                        else:
+                            uploaded_history_file.seek(0)
+                            file_rows, file_skipped = build_chatbot_rows_from_monthly_performance(uploaded_history_file, file_name)
+                        if file_rows:
+                            imported_rows.extend(file_rows)
+                            skipped_count += file_skipped
+                        else:
+                            unsupported_messages.append(file_name)
+                            skipped_count += file_skipped
+                    if unsupported_messages:
+                        st.warning("FAQ로 변환할 수 있는 상세 데이터를 찾지 못한 파일이 있습니다. " + " / ".join(unsupported_messages))
                     if imported_rows:
-                        st.session_state.cms_chatbot_faq_rows = imported_rows + st.session_state.cms_chatbot_faq_rows
-                        st.success(f"FAQ 초안 {len(imported_rows):,}건을 반영했습니다. 답변이 비어 있는 {skipped_count:,}건은 제외했습니다.")
+                        existing_keys = {
+                            (
+                                clean_chatbot_text(row.get("회사", "")),
+                                clean_chatbot_text(row.get("질문", "")),
+                                clean_chatbot_text(row.get("답변요약", "")),
+                            )
+                            for row in st.session_state.cms_chatbot_faq_rows
+                        }
+                        deduped_rows = []
+                        duplicate_count = 0
+                        for row in imported_rows:
+                            row_key = (
+                                clean_chatbot_text(row.get("회사", "")),
+                                clean_chatbot_text(row.get("질문", "")),
+                                clean_chatbot_text(row.get("답변요약", "")),
+                            )
+                            if row_key in existing_keys:
+                                duplicate_count += 1
+                                continue
+                            existing_keys.add(row_key)
+                            deduped_rows.append(row)
+                        st.session_state.cms_chatbot_faq_rows = deduped_rows + st.session_state.cms_chatbot_faq_rows
+                        st.success(
+                            f"FAQ 초안 {len(deduped_rows):,}건을 반영했습니다. "
+                            f"중복 {duplicate_count:,}건, 답변이 비어 있는 {skipped_count:,}건은 제외했습니다."
+                        )
                         st.rerun()
-                    elif not missing_messages:
-                        st.warning("반영할 FAQ가 없습니다. 요청사항과 처리내용이 입력된 행을 확인해주세요.")
+                    elif not unsupported_messages:
+                        st.warning("반영할 FAQ가 없습니다. 요청사항/처리내용 또는 월간활동실적 상세 시트를 확인해주세요.")
                 except Exception as exc:
                     st.error(f"활동이력 파일을 읽지 못했습니다: {exc}")
 
