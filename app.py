@@ -20058,9 +20058,8 @@ def show_cms_chatbot():
                 st.success("FAQ를 기본값 4건으로 초기화하고 저장했습니다.")
                 st.rerun()
         st.caption(f"저장 위치: {CMS_CHATBOT_FAQ_FILE} / 원본 엑셀·PPT 파일은 저장하지 않습니다.")
-        st.dataframe(pd.DataFrame(filtered_rows), use_container_width=True, hide_index=True)
 
-        with st.expander("활동이력/문서 파일로 FAQ 초안 만들기"):
+        with st.expander("FAQ 보강 파일 업로드 및 반영", expanded=True):
             st.caption("활동이력은 요청사항/처리내용을, 월간활동실적은 상세 활동 사례를 FAQ 지식으로 반영합니다. PPT 문서는 슬라이드별 텍스트와 이미지를 함께 반영합니다.")
             history_file = st.file_uploader(
                 "FAQ 보강 파일 업로드",
@@ -20068,7 +20067,15 @@ def show_cms_chatbot():
                 key="cms_chatbot_history_upload",
                 accept_multiple_files=True,
             )
-            if history_file and st.button("FAQ 보강 데이터 반영", use_container_width=True):
+            apply_faq_upload = st.button(
+                "FAQ 보강 데이터 반영",
+                use_container_width=True,
+                type="primary",
+                disabled=not bool(history_file),
+            )
+            if not history_file:
+                st.info("엑셀 또는 PPT 파일을 업로드하면 FAQ 보강 데이터 반영 버튼이 활성화됩니다.")
+            if apply_faq_upload:
                 try:
                     imported_rows = []
                     skipped_count = 0
@@ -20161,6 +20168,8 @@ def show_cms_chatbot():
                         st.warning("반영할 FAQ가 없습니다. 요청사항/처리내용 또는 월간활동실적 상세 시트를 확인해주세요.")
                 except Exception as exc:
                     st.error(f"활동이력 파일을 읽지 못했습니다: {exc}")
+
+        st.dataframe(pd.DataFrame(filtered_rows), use_container_width=True, hide_index=True)
 
         with st.expander("FAQ 항목 추가"):
             with st.form("cms_chatbot_faq_form", clear_on_submit=True):
