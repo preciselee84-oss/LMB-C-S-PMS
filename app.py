@@ -19658,6 +19658,47 @@ def show_cms_chatbot():
     def clean_chatbot_text(value):
         return re.sub(r"\s+", " ", str(value or "").replace("\xa0", " ")).strip()
 
+    def split_chatbot_result_clauses(text):
+        source = str(text or "").replace("\xa0", " ")
+        source = re.sub(r"(상품|활동구분|활동일|제목|처리내용)\s*:", "\n", source)
+        source = re.sub(r"\[(처리사항|조치사항|처리결과|결과|이슈사항)\]", r"\n\1\n", source)
+        source = re.sub(r"(처리사항|조치사항|처리결과|결과)\s*[:：]", r"\n\1\n", source)
+        raw_clauses = re.split(r"\n+|\s*[>▶•]\s*|\s+-\s+|(?<=함)\s+|(?<=완료)\s+|(?<=안내)\s+", source)
+        return [clean_chatbot_text(clause) for clause in raw_clauses if clean_chatbot_text(clause)]
+
+    def summarize_chatbot_result(text, max_items=3):
+        clauses = split_chatbot_result_clauses(text)
+        if not clauses:
+            return clean_chatbot_text(text)
+        priority_keywords = [
+            "처리완료", "완료", "해결", "조치", "처리", "안내", "접수", "전달", "연락",
+            "확인", "진행", "재전송", "재처리", "수동", "등록", "변경", "반영",
+        ]
+        issue_only_keywords = ["고객", "담당자", "말씀", "문의", "요청", "불편", "증상", "상태"]
+        scored = []
+        for index, clause in enumerate(clauses):
+            if len(clause) < 8:
+                continue
+            score = sum(4 for keyword in priority_keywords if keyword in clause)
+            if any(keyword in clause for keyword in ["거래 없음", "내역 없음", "정상", "이상없음", "미반영", "실패"]):
+                score += 3
+            if any(keyword in clause for keyword in issue_only_keywords) and not score:
+                score -= 2
+            score += min(index, 20) * 0.05
+            if score > 0:
+                scored.append((score, index, clause))
+
+        if not scored:
+            fallback = [clause for clause in clauses if len(clause) >= 8][:max_items]
+            return " / ".join(fallback) if fallback else clean_chatbot_text(text)
+
+        selected = sorted(scored, key=lambda item: item[0], reverse=True)[:max_items]
+        selected = sorted(selected, key=lambda item: item[1])
+        result = " / ".join(clause for _, _, clause in selected)
+        if len(result) > 420:
+            result = result[:420].rsplit(" ", 1)[0].rstrip() + "..."
+        return result
+
     def first_chatbot_value(row, columns):
         for column in columns:
             value = clean_chatbot_text(row.get(column, ""))
@@ -19682,13 +19723,14 @@ def show_cms_chatbot():
                 skipped += 1
                 continue
             work = clean_chatbot_text(row.get("업무유형", "")) or "기타"
+            result_text = summarize_chatbot_result(answer_text)
             imported.append(
                 {
                     "회사": clean_chatbot_text(row.get("업체명", "")) or "고객사 공통",
                     "업무": work,
                     "운영구분": chatbot_operation_from_work(work),
                     "질문": question_text,
-                    "답변요약": answer_text,
+                    "답변요약": f"처리결과: {result_text}\n\n상세내용: {answer_text}",
                     "상태": f"활동이력:{file_name}",
                 }
             )
@@ -19754,6 +19796,7 @@ def show_cms_chatbot():
                     answer_parts.append(f"제목: {title}")
                 if activity_detail:
                     answer_parts.append(f"처리내용: {activity_detail}")
+                result_text = summarize_chatbot_result(activity_detail or "\n".join(answer_parts))
 
                 imported.append(
                     {
@@ -19761,7 +19804,7 @@ def show_cms_chatbot():
                         "업무": work or "기타",
                         "운영구분": chatbot_operation_from_work(work),
                         "질문": question_text,
-                        "답변요약": "\n".join(answer_parts),
+                        "답변요약": f"처리결과: {result_text}\n\n상세내용: " + "\n".join(answer_parts),
                         "상태": f"월간실적:{file_name}:{sheet_name}",
                     }
                 )
@@ -19966,17 +20009,38 @@ def show_cms_chatbot():
             if st.session_state.get("cms_chatbot_last_filter_empty"):
                 st.caption("현재 필터 조건에 맞는 FAQ가 없어 전체 FAQ에서 검색했습니다.")
             answer_text = str(best_row.get("답변요약", "")).strip()
-            answer_html = html.escape(answer_text).replace("\n", "<br>")
+            display_answer = answer_text
+            detail_answer = ""
+            if "상세내용:" in answer_text:
+                result_part, detail_part = answer_text.split("상세내용:", 1)
+                display_answer = result_part.replace("처리결과:", "").strip()
+                detail_answer = detail_part.strip()
+            else:
+                display_answer = summarize_chatbot_result(answer_text)
+                detail_answer = answer_text if clean_chatbot_text(display_answer) != clean_chatbot_text(answer_text) else ""
+            answer_html = html.escape(display_answer).replace("\n", "<br>")
+            detail_html = html.escape(detail_answer).replace("\n", "<br>")
+            detail_block = (
+                f"""
+                <details style="margin-top: 12px; font-size: 14px; font-weight: 500;">
+                    <summary style="cursor:pointer;color:#00857A;font-weight:900;">상세 원문 보기</summary>
+                    <div style="margin-top:8px;line-height:1.6;color:#334155;">{detail_html}</div>
+                </details>
+                """
+                if detail_answer
+                else ""
+            )
             st.markdown(
                 f"""
                 <div class="hana-chat-shell">
                     <div class="hana-chat-row bot">
                         <div class="hana-avatar">하나</div>
                         <div class="hana-bubble bot" style="border-color:#00857A;">
-                            <div style="font-size: 13px; font-weight: 900; color: #00857A; margin-bottom: 7px;">챗봇 답변</div>
+                            <div style="font-size: 13px; font-weight: 900; color: #00857A; margin-bottom: 7px;">처리결과</div>
                             <div style="font-size: 17px; line-height: 1.75; font-weight: 700;">
                                 {answer_html or "등록된 답변 내용이 없습니다."}
                             </div>
+                            {detail_block}
                             <div class="hana-chat-meta">
                                 {html.escape(str(best_row.get("회사", "-")))} · {html.escape(str(best_row.get("업무", "-")))} · {html.escape(str(best_row.get("운영구분", "-")))} · 유사도 {best_score}점
                             </div>
