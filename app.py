@@ -88,11 +88,13 @@ INTEGRATION_CONFIRM_MENU = "연계확인서 출력"
 ACTIVITY_TEMPLATE_CONVERT_MENU = "활동이력 템플릿 변환"
 OPERATION_TARGET_MENU = "운영관리 활동고객 선정"
 VISIT_VOC_MENU = "방문 VOC 수집"
+CMS_CHATBOT_MENU = "CMS 챗봇"
 
 CRM_MENU_LABELS = {
     "대시보드": "홈 대시보드",
     "업로드 및 실적 확인": "활동 이력",
     VISIT_VOC_MENU: "방문 VOC 수집",
+    CMS_CHATBOT_MENU: "CMS 챗봇",
     "이번달 활동 대상고객 추천": "대상 고객 추천",
     OPERATION_TARGET_MENU: "운영관리 타깃",
     "주간보고 이력 작성": "주간 리포트",
@@ -3801,7 +3803,7 @@ def show_sidebar():
                 render_nav_button(menu_name)
 
         st.markdown("<div class='gpt-section'>Customer CRM</div>", unsafe_allow_html=True)
-        for menu_name in ["업로드 및 실적 확인", VISIT_VOC_MENU, OPERATION_TARGET_MENU, "이번달 활동 대상고객 추천", "주간보고 이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU]:
+        for menu_name in ["업로드 및 실적 확인", VISIT_VOC_MENU, CMS_CHATBOT_MENU, OPERATION_TARGET_MENU, "이번달 활동 대상고객 추천", "주간보고 이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU]:
             render_nav_button(menu_name)
 
         if st.session_state.user_role != "관리자":
@@ -19462,6 +19464,127 @@ def show_visit_voc_collection():
         st.info("아직 입력된 VOC가 없습니다.")
 
 
+def show_cms_chatbot():
+    st.markdown("#### 통합CMS 운영 FAQ 챗봇")
+    st.caption("하나은행 통합CMS 운영 중 자주 받는 질문을 회사별, 업무별, 운영구분별로 분류해 답변 기반을 구성하는 메뉴입니다.")
+
+    company_options = ["전체", "하나투어", "웹케시", "고객사 공통"]
+    work_options = ["전체", "로그인/인증서", "프로그램 실행", "에이전트", "ERP 연계", "청구자료", "데이터 이관"]
+    operation_options = ["전체", "장애 문의", "사용 방법", "설치/환경설정", "정기점검", "요청/개선사항"]
+
+    if "cms_chatbot_faq_rows" not in st.session_state:
+        st.session_state.cms_chatbot_faq_rows = [
+            {
+                "회사": "고객사 공통",
+                "업무": "로그인/인증서",
+                "운영구분": "장애 문의",
+                "질문": "통합CMS 로그인 실패 시 무엇을 확인해야 하나요?",
+                "답변요약": "기업뱅킹 로그인 가능 여부, 인증서 사업장 일치 여부, 고객사 연결정보 접속 테스트를 순서대로 확인합니다.",
+                "상태": "기본",
+            },
+            {
+                "회사": "고객사 공통",
+                "업무": "에이전트",
+                "운영구분": "정기점검",
+                "질문": "Agent 재시작 후 무엇을 확인해야 하나요?",
+                "답변요약": "CMD 창 종료, 스케줄러 구동, 트레이 아이콘 우클릭 메뉴 표시 여부를 확인합니다.",
+                "상태": "기본",
+            },
+            {
+                "회사": "고객사 공통",
+                "업무": "ERP 연계",
+                "운영구분": "환경설정",
+                "질문": "ERP 접속 테스트 실패 시 어떤 정보를 기록해야 하나요?",
+                "답변요약": "변경 전/후 서버 정보와 접속 테스트 오류 메시지를 함께 기록합니다.",
+                "상태": "기본",
+            },
+        ]
+
+    filter_col1, filter_col2, filter_col3 = st.columns(3)
+    selected_company = filter_col1.selectbox("회사별", company_options)
+    selected_work = filter_col2.selectbox("업무별", work_options)
+    selected_operation = filter_col3.selectbox("운영구분별", operation_options)
+
+    rows = st.session_state.cms_chatbot_faq_rows
+    filtered_rows = [
+        row
+        for row in rows
+        if (selected_company == "전체" or row["회사"] == selected_company)
+        and (selected_work == "전체" or row["업무"] == selected_work)
+        and (selected_operation == "전체" or row["운영구분"] == selected_operation)
+    ]
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("등록 FAQ", f"{len(rows):,}건")
+    m2.metric("조회 결과", f"{len(filtered_rows):,}건")
+    m3.metric("업무 분류", f"{len(work_options) - 1:,}개")
+    m4.metric("운영구분", f"{len(operation_options) - 1:,}개")
+
+    tab_chat, tab_faq, tab_setup = st.tabs(["질문하기", "FAQ 목록", "분류 관리"])
+
+    with tab_chat:
+        st.markdown("##### 질문 입력")
+        st.info("현재는 기본 메뉴 구성 단계입니다. 이후 FAQ 데이터와 답변 생성 로직을 연결하면 선택한 분류 기준으로 답변이 표시됩니다.")
+        question = st.text_area(
+            "질문",
+            height=110,
+            placeholder="예: 고객사에서 통합CMS 로그인은 되지 않는데 DB 접속 테스트는 성공합니다. 무엇을 확인해야 하나요?",
+        )
+        if st.button("답변 생성 준비", use_container_width=True, type="primary"):
+            if not question.strip():
+                st.warning("질문을 입력해주세요.")
+            else:
+                st.success("질문이 접수되었습니다. FAQ 답변 엔진 연결 후 이 영역에 답변이 표시됩니다.")
+                st.markdown("**선택 분류**")
+                st.write(f"- 회사: {selected_company}")
+                st.write(f"- 업무: {selected_work}")
+                st.write(f"- 운영구분: {selected_operation}")
+
+    with tab_faq:
+        st.markdown("##### 자주 받는 질문")
+        st.dataframe(pd.DataFrame(filtered_rows), use_container_width=True, hide_index=True)
+
+        with st.expander("FAQ 항목 추가"):
+            with st.form("cms_chatbot_faq_form", clear_on_submit=True):
+                c1, c2, c3 = st.columns(3)
+                company = c1.selectbox("회사", company_options[1:], key="faq_company")
+                work = c2.selectbox("업무", work_options[1:], key="faq_work")
+                operation = c3.selectbox("운영구분", operation_options[1:], key="faq_operation")
+                faq_question = st.text_input("질문")
+                faq_answer = st.text_area("답변요약", height=90)
+                submitted = st.form_submit_button("FAQ 추가", use_container_width=True)
+            if submitted:
+                if not faq_question.strip() or not faq_answer.strip():
+                    st.warning("질문과 답변요약을 입력해주세요.")
+                else:
+                    st.session_state.cms_chatbot_faq_rows.insert(
+                        0,
+                        {
+                            "회사": company,
+                            "업무": work,
+                            "운영구분": operation,
+                            "질문": faq_question.strip(),
+                            "답변요약": faq_answer.strip(),
+                            "상태": "등록",
+                        },
+                    )
+                    st.success("FAQ 항목이 추가되었습니다.")
+                    st.rerun()
+
+    with tab_setup:
+        st.markdown("##### 분류 체계")
+        left, right = st.columns(2)
+        with left:
+            st.markdown("**업무별 분류**")
+            for item in work_options[1:]:
+                st.markdown(f"- {item}")
+        with right:
+            st.markdown("**운영구분별 분류**")
+            for item in operation_options[1:]:
+                st.markdown(f"- {item}")
+        st.caption("향후 회사 목록, 업무 분류, 운영구분은 관리자 관리 화면 또는 엑셀 업로드 방식으로 확장할 수 있습니다.")
+
+
 def show_main():
     apply_global_table_css()
     inject_theme_toggle()
@@ -19473,6 +19596,7 @@ def show_main():
         "대시보드",
         "업로드 및 실적 확인",
         VISIT_VOC_MENU,
+        CMS_CHATBOT_MENU,
         "이번달 활동 대상고객 추천",
         OPERATION_TARGET_MENU,
         "주간보고 이력 작성",
@@ -19492,7 +19616,7 @@ def show_main():
         st.session_state.current_menu = "업로드 및 실적 확인"
         persist_current_menu()
         st.rerun()
-    user_menus = {"업로드 및 실적 확인", VISIT_VOC_MENU, "이번달 활동 대상고객 추천", OPERATION_TARGET_MENU, "주간보고 이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU, BILLING_MENU, INTEGRATION_CONFIRM_MENU}
+    user_menus = {"업로드 및 실적 확인", VISIT_VOC_MENU, CMS_CHATBOT_MENU, "이번달 활동 대상고객 추천", OPERATION_TARGET_MENU, "주간보고 이력 작성", ACTIVITY_TEMPLATE_CONVERT_MENU, BILLING_MENU, INTEGRATION_CONFIRM_MENU}
     if menu not in user_menus and st.session_state.user_role != "관리자":
         st.session_state.current_menu = "업로드 및 실적 확인"
         persist_current_menu()
@@ -19506,6 +19630,8 @@ def show_main():
         show_user_history()
     elif menu == VISIT_VOC_MENU:
         show_visit_voc_collection()
+    elif menu == CMS_CHATBOT_MENU:
+        show_cms_chatbot()
     elif menu == "이번달 활동 대상고객 추천":
         show_target_customers()
     elif menu == OPERATION_TARGET_MENU:
