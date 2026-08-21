@@ -19592,7 +19592,10 @@ def show_cms_chatbot():
                 score += 5
             scored_rows.append((score, len(overlap), row, sorted(overlap)))
         scored_rows.sort(key=lambda item: (item[0], item[1]), reverse=True)
-        return scored_rows[:3]
+        return scored_rows[:5]
+
+    def select_chatbot_answer(index):
+        st.session_state.cms_chatbot_answer_index = index
 
     tab_chat, tab_faq, tab_setup = st.tabs(["질문하기", "FAQ 목록", "분류 관리"])
 
@@ -19610,54 +19613,81 @@ def show_cms_chatbot():
             else:
                 search_pool = filtered_rows or rows
                 matches = find_chatbot_answers(question, search_pool)
+                st.session_state.cms_chatbot_last_filter_empty = not bool(filtered_rows)
+                st.session_state.cms_chatbot_matches = [
+                    {
+                        "score": score,
+                        "row": dict(row),
+                        "keywords": keywords,
+                    }
+                    for score, _, row, keywords in matches
+                ]
+                st.session_state.cms_chatbot_answer_index = 0
                 st.markdown("**선택 분류**")
                 st.write(f"- 회사: {company_filter or '전체'}")
                 st.write(f"- 업무: {selected_work}")
                 st.write(f"- 운영구분: {selected_operation}")
-                if not filtered_rows:
-                    st.caption("현재 필터 조건에 맞는 FAQ가 없어 전체 FAQ에서 검색했습니다.")
-                if not matches:
-                    st.warning("유사한 FAQ 답변을 찾지 못했습니다. 업무/운영구분 필터를 전체로 바꾸거나 FAQ를 추가해주세요.")
-                else:
-                    best_score, _, best_row, best_keywords = matches[0]
-                    st.success("가장 유사한 FAQ 답변을 찾았습니다.")
-                    answer_text = str(best_row.get("답변요약", "")).strip()
-                    answer_html = html.escape(answer_text).replace("\n", "<br>")
-                    st.markdown(
-                        f"""
-                        <div style="
-                            margin: 14px 0 16px;
-                            padding: 20px 22px;
-                            border: 2px solid #2563EB;
-                            border-left: 8px solid #2563EB;
-                            border-radius: 14px;
-                            background: #EFF6FF;
-                            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.14);
-                        ">
-                            <div style="font-size: 13px; font-weight: 800; color: #1D4ED8; margin-bottom: 8px;">
-                                챗봇 답변
-                            </div>
-                            <div style="font-size: 19px; line-height: 1.75; font-weight: 700; color: #0F172A;">
-                                {answer_html or "등록된 답변 내용이 없습니다."}
-                            </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-                    meta_cols = st.columns(4)
-                    meta_cols[0].metric("회사", best_row.get("회사", "-"))
-                    meta_cols[1].metric("업무", best_row.get("업무", "-"))
-                    meta_cols[2].metric("운영구분", best_row.get("운영구분", "-"))
-                    meta_cols[3].metric("유사도", f"{best_score}점")
-                    with st.expander("매칭 근거 보기"):
-                        st.markdown("**원본 질문**")
-                        st.write(best_row.get("질문", ""))
-                        st.markdown("**일치 키워드**")
-                        st.write(", ".join(best_keywords) if best_keywords else "-")
-                        if len(matches) > 1:
-                            st.markdown("**다른 후보**")
-                            for score, _, row, keywords in matches[1:]:
-                                st.write(f"- [{score}점] {row.get('회사', '-')} / {row.get('업무', '-')} / {row.get('질문', '')}")
+
+        saved_matches = st.session_state.get("cms_chatbot_matches", [])
+        if saved_matches:
+            selected_index = min(
+                int(st.session_state.get("cms_chatbot_answer_index", 0)),
+                len(saved_matches) - 1,
+            )
+            selected_match = saved_matches[selected_index]
+            best_score = selected_match.get("score", 0)
+            best_row = selected_match.get("row", {})
+            best_keywords = selected_match.get("keywords", [])
+            st.success("FAQ 답변을 찾았습니다.")
+            if st.session_state.get("cms_chatbot_last_filter_empty"):
+                st.caption("현재 필터 조건에 맞는 FAQ가 없어 전체 FAQ에서 검색했습니다.")
+            answer_text = str(best_row.get("답변요약", "")).strip()
+            answer_html = html.escape(answer_text).replace("\n", "<br>")
+            st.markdown(
+                f"""
+                <div style="
+                    margin: 14px 0 16px;
+                    padding: 20px 22px;
+                    border: 2px solid #2563EB;
+                    border-left: 8px solid #2563EB;
+                    border-radius: 14px;
+                    background: #EFF6FF;
+                    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.14);
+                ">
+                    <div style="font-size: 13px; font-weight: 800; color: #1D4ED8; margin-bottom: 8px;">
+                        챗봇 답변
+                    </div>
+                    <div style="font-size: 19px; line-height: 1.75; font-weight: 700; color: #0F172A;">
+                        {answer_html or "등록된 답변 내용이 없습니다."}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            meta_cols = st.columns(4)
+            meta_cols[0].metric("회사", best_row.get("회사", "-"))
+            meta_cols[1].metric("업무", best_row.get("업무", "-"))
+            meta_cols[2].metric("운영구분", best_row.get("운영구분", "-"))
+            meta_cols[3].metric("유사도", f"{best_score}점")
+            st.markdown("##### 유사한 질문")
+            for idx, match in enumerate(saved_matches[:5]):
+                row = match.get("row", {})
+                question_label = str(row.get("질문", "")).strip() or "질문 내용 없음"
+                prefix = "현재 답변" if idx == selected_index else "답변 보기"
+                st.button(
+                    f"{idx + 1}. {prefix} · [{match.get('score', 0)}점] {row.get('회사', '-')} / {row.get('업무', '-')} - {question_label[:90]}",
+                    key=f"cms_chatbot_similar_question_{idx}",
+                    use_container_width=True,
+                    on_click=select_chatbot_answer,
+                    args=(idx,),
+                )
+            with st.expander("매칭 근거 보기"):
+                st.markdown("**원본 질문**")
+                st.write(best_row.get("질문", ""))
+                st.markdown("**일치 키워드**")
+                st.write(", ".join(best_keywords) if best_keywords else "-")
+        elif st.session_state.get("cms_chatbot_matches") == [] and question.strip():
+            st.warning("유사한 FAQ 답변을 찾지 못했습니다. 업무/운영구분 필터를 전체로 바꾸거나 FAQ를 추가해주세요.")
 
     with tab_faq:
         st.markdown("##### 자주 받는 질문")
