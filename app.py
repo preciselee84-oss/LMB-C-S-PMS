@@ -19800,6 +19800,32 @@ def show_cms_chatbot():
                 """,
                 unsafe_allow_html=True,
             )
+            image_key = best_row.get("이미지키")
+            image_store = st.session_state.get("cms_chatbot_image_store", {})
+            answer_images = image_store.get(image_key, []) if image_key else []
+            if answer_images:
+                st.markdown(
+                    """
+                    <div class="hana-chat-shell">
+                        <div class="hana-chat-row bot">
+                            <div class="hana-avatar">하나</div>
+                            <div class="hana-bubble bot" style="border-color:#00857A; max-width: 90%;">
+                                <div style="font-size: 13px; font-weight: 900; color: #00857A; margin-bottom: 7px;">관련 이미지</div>
+                            </div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                image_col, _ = st.columns([0.52, 0.48])
+                with image_col:
+                    if len(answer_images) == 1:
+                        st.image(BytesIO(answer_images[0]), use_container_width=True)
+                    else:
+                        cols = st.columns(min(len(answer_images), 2))
+                        for image_index, image_bytes in enumerate(answer_images[:4]):
+                            with cols[image_index % len(cols)]:
+                                st.image(BytesIO(image_bytes), use_container_width=True)
             meta_cols = st.columns(4)
             meta_cols[0].metric("회사", best_row.get("회사", "-"))
             meta_cols[1].metric("업무", best_row.get("업무", "-"))
@@ -19843,6 +19869,8 @@ def show_cms_chatbot():
                     imported_rows = []
                     skipped_count = 0
                     missing_messages = []
+                    if "cms_chatbot_image_store" not in st.session_state:
+                        st.session_state.cms_chatbot_image_store = {}
                     required_columns = {"업체명", "업무유형", "요청사항", "처리내용"}
                     for uploaded_history_file in history_file:
                         file_name = uploaded_history_file.name
@@ -19853,15 +19881,22 @@ def show_cms_chatbot():
                             prs = Presentation(BytesIO(uploaded_history_file.getvalue()))
                             for slide_no, slide in enumerate(prs.slides, 1):
                                 slide_texts = []
+                                slide_images = []
                                 for shape in slide.shapes:
                                     if getattr(shape, "has_text_frame", False) and shape.text.strip():
                                         slide_texts.append(re.sub(r"\s+", " ", shape.text).strip())
+                                    if shape.shape_type == 13:
+                                        slide_images.append(shape.image.blob)
                                 if not slide_texts:
                                     skipped_count += 1
                                     continue
                                 title = slide_texts[0]
                                 answer_text = "\n".join(slide_texts[:12])
                                 work = chatbot_work_from_document_text(answer_text)
+                                image_key = ""
+                                if slide_images:
+                                    image_key = f"{file_name}:p{slide_no}"
+                                    st.session_state.cms_chatbot_image_store[image_key] = slide_images[:4]
                                 imported_rows.append(
                                     {
                                         "회사": "고객사 공통",
@@ -19869,6 +19904,7 @@ def show_cms_chatbot():
                                         "운영구분": chatbot_operation_from_work(work),
                                         "질문": f"{title} 관련 내용은?",
                                         "답변요약": answer_text,
+                                        "이미지키": image_key,
                                         "상태": f"문서:{file_name}:p{slide_no}",
                                     }
                                 )
