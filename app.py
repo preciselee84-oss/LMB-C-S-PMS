@@ -19709,35 +19709,37 @@ def show_cms_chatbot():
             """,
             unsafe_allow_html=True,
         )
-        st.markdown('<div class="hana-chat-input-panel">', unsafe_allow_html=True)
-        question = st.text_area(
-            "질문",
-            height=110,
-            placeholder="예: 고객사에서 통합CMS 로그인은 되지 않는데 DB 접속 테스트는 성공합니다. 무엇을 확인해야 하나요?",
-        )
-        if st.button("답변 검색", use_container_width=True, type="primary"):
-            if not question.strip():
-                st.warning("질문을 입력해주세요.")
-            else:
-                search_pool = filtered_rows or rows
-                matches = find_chatbot_answers(question, search_pool)
-                st.session_state.cms_chatbot_last_filter_empty = not bool(filtered_rows)
-                st.session_state.cms_chatbot_matches = [
-                    {
-                        "score": score,
-                        "row": dict(row),
-                        "keywords": keywords,
+        input_col, _ = st.columns([0.52, 0.48])
+        with input_col:
+            st.markdown('<div class="hana-chat-input-panel">', unsafe_allow_html=True)
+            question = st.text_area(
+                "질문",
+                height=110,
+                placeholder="예: 고객사에서 통합CMS 로그인은 되지 않는데 DB 접속 테스트는 성공합니다. 무엇을 확인해야 하나요?",
+            )
+            if st.button("답변 검색", use_container_width=True, type="primary"):
+                if not question.strip():
+                    st.warning("질문을 입력해주세요.")
+                else:
+                    search_pool = filtered_rows or rows
+                    matches = find_chatbot_answers(question, search_pool)
+                    st.session_state.cms_chatbot_last_filter_empty = not bool(filtered_rows)
+                    st.session_state.cms_chatbot_matches = [
+                        {
+                            "score": score,
+                            "row": dict(row),
+                            "keywords": keywords,
+                        }
+                        for score, _, row, keywords in matches
+                    ]
+                    st.session_state.cms_chatbot_answer_index = 0
+                    st.session_state.cms_chatbot_filter_summary = {
+                        "회사": company_filter or "전체",
+                        "업무": selected_work,
+                        "운영구분": selected_operation,
                     }
-                    for score, _, row, keywords in matches
-                ]
-                st.session_state.cms_chatbot_answer_index = 0
-                st.session_state.cms_chatbot_filter_summary = {
-                    "회사": company_filter or "전체",
-                    "업무": selected_work,
-                    "운영구분": selected_operation,
-                }
-                st.session_state.cms_chatbot_last_question = question.strip()
-        st.markdown("</div>", unsafe_allow_html=True)
+                    st.session_state.cms_chatbot_last_question = question.strip()
+            st.markdown("</div>", unsafe_allow_html=True)
 
         saved_matches = st.session_state.get("cms_chatbot_matches", [])
         if saved_matches:
