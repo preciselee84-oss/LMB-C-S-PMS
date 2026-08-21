@@ -19567,6 +19567,20 @@ def show_cms_chatbot():
             return "연계"
         return "운영"
 
+    def chatbot_work_from_document_text(text):
+        source = str(text or "")
+        if any(keyword in source for keyword in ["ERP", "연계", "API", "RFC", "서버관리"]):
+            return "ERP연계"
+        if any(keyword in source for keyword in ["설치", "개설", "등록"]):
+            return "설치등록"
+        if any(keyword in source for keyword in ["오류", "로그인", "인증서", "접속 실패", "장애"]):
+            return "오류발생"
+        if any(keyword in source for keyword in ["스케줄", "Agent", "에이전트", "서버점검"]):
+            return "서버점검"
+        if any(keyword in source for keyword in ["교육", "사용", "주요기능", "기능"]):
+            return "사용자 교육"
+        return "기타"
+
     def chatbot_text_tokens(text):
         normalized = re.sub(r"[^0-9A-Za-z가-힣]+", " ", str(text or "").lower())
         return {token for token in normalized.split() if len(token) >= 2}
@@ -19816,27 +19830,53 @@ def show_cms_chatbot():
         st.markdown("##### 자주 받는 질문")
         st.dataframe(pd.DataFrame(filtered_rows), use_container_width=True, hide_index=True)
 
-        with st.expander("활동이력 파일로 FAQ 초안 만들기"):
-            st.caption("활동이력 파일의 요청사항을 질문으로, 처리내용을 답변으로 변환합니다. 파일 내용은 세션에만 반영됩니다.")
+        with st.expander("활동이력/문서 파일로 FAQ 초안 만들기"):
+            st.caption("활동이력은 요청사항을 질문, 처리내용을 답변으로 변환합니다. PPT 문서는 슬라이드별 텍스트를 FAQ 지식으로 반영합니다.")
             history_file = st.file_uploader(
-                "활동이력 엑셀 업로드",
-                type=["xls", "xlsx"],
+                "FAQ 보강 파일 업로드",
+                type=["xls", "xlsx", "pptx"],
                 key="cms_chatbot_history_upload",
                 accept_multiple_files=True,
             )
-            if history_file and st.button("활동이력 FAQ 반영", use_container_width=True):
+            if history_file and st.button("FAQ 보강 데이터 반영", use_container_width=True):
                 try:
                     imported_rows = []
                     skipped_count = 0
                     missing_messages = []
                     required_columns = {"업체명", "업무유형", "요청사항", "처리내용"}
                     for uploaded_history_file in history_file:
+                        file_name = uploaded_history_file.name
+                        lower_name = file_name.lower()
+                        if lower_name.endswith(".pptx"):
+                            from pptx import Presentation
+
+                            prs = Presentation(BytesIO(uploaded_history_file.getvalue()))
+                            for slide_no, slide in enumerate(prs.slides, 1):
+                                slide_texts = []
+                                for shape in slide.shapes:
+                                    if getattr(shape, "has_text_frame", False) and shape.text.strip():
+                                        slide_texts.append(re.sub(r"\s+", " ", shape.text).strip())
+                                if not slide_texts:
+                                    skipped_count += 1
+                                    continue
+                                title = slide_texts[0]
+                                answer_text = "\n".join(slide_texts[:12])
+                                work = chatbot_work_from_document_text(answer_text)
+                                imported_rows.append(
+                                    {
+                                        "회사": "고객사 공통",
+                                        "업무": work,
+                                        "운영구분": chatbot_operation_from_work(work),
+                                        "질문": f"{title} 관련 내용은?",
+                                        "답변요약": answer_text,
+                                        "상태": f"문서:{file_name}:p{slide_no}",
+                                    }
+                                )
+                                continue
                         history_df = pd.read_excel(uploaded_history_file, dtype=str).fillna("")
                         missing_columns = required_columns - set(history_df.columns)
                         if missing_columns:
-                            missing_messages.append(
-                                f"{uploaded_history_file.name}: {', '.join(sorted(missing_columns))}"
-                            )
+                            missing_messages.append(f"{file_name}: {', '.join(sorted(missing_columns))}")
                             continue
                         for _, row in history_df.iterrows():
                             question_text = str(row.get("요청사항", "")).strip()
@@ -19852,7 +19892,7 @@ def show_cms_chatbot():
                                     "운영구분": chatbot_operation_from_work(work),
                                     "질문": question_text,
                                     "답변요약": answer_text,
-                                    "상태": f"활동이력:{uploaded_history_file.name}",
+                                    "상태": f"활동이력:{file_name}",
                                 }
                             )
                     if missing_messages:
