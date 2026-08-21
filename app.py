@@ -19600,8 +19600,102 @@ def show_cms_chatbot():
     tab_chat, tab_faq, tab_setup = st.tabs(["질문하기", "FAQ 목록", "분류 관리"])
 
     with tab_chat:
-        st.markdown("##### 질문 입력")
-        st.info("현재 등록된 FAQ에서 질문과 가장 유사한 답변을 검색합니다. 활동이력 파일을 먼저 반영하면 실제 처리내용 기반으로 답변됩니다.")
+        st.markdown(
+            """
+            <style>
+                .hana-chat-shell {
+                    margin: 10px 0 18px;
+                    padding: 18px;
+                    border: 1px solid #D7E3E1;
+                    border-radius: 16px;
+                    background: #F3F8F7;
+                }
+                .hana-chat-row {
+                    display: flex;
+                    align-items: flex-end;
+                    gap: 10px;
+                    margin: 12px 0;
+                }
+                .hana-chat-row.bot { justify-content: flex-start; }
+                .hana-chat-row.user { justify-content: flex-end; }
+                .hana-avatar {
+                    width: 34px;
+                    height: 34px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #FFFFFF;
+                    font-size: 12px;
+                    font-weight: 900;
+                    flex: 0 0 auto;
+                    background: #00857A;
+                }
+                .hana-bubble {
+                    max-width: 78%;
+                    padding: 13px 16px;
+                    border-radius: 16px;
+                    font-size: 15px;
+                    line-height: 1.65;
+                    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+                }
+                .hana-bubble.bot {
+                    background: #FFFFFF;
+                    border: 1px solid #D7E3E1;
+                    color: #0F172A;
+                    border-bottom-left-radius: 5px;
+                }
+                .hana-bubble.user {
+                    background: #8FD44A;
+                    color: #12320F;
+                    font-weight: 700;
+                    border-bottom-right-radius: 5px;
+                }
+                .hana-chat-meta {
+                    margin-top: 6px;
+                    color: #64748B;
+                    font-size: 12px;
+                }
+                .hana-chip-wrap {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 6px;
+                    margin-top: 10px;
+                }
+                .hana-chip {
+                    padding: 5px 9px;
+                    border-radius: 999px;
+                    font-size: 12px;
+                    font-weight: 800;
+                    background: #E0F2F1;
+                    color: #00796B;
+                }
+                .hana-chat-input-panel {
+                    margin-top: 12px;
+                    padding: 14px;
+                    border-radius: 14px;
+                    background: #FFFFFF;
+                    border: 1px solid #D7E3E1;
+                }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            """
+            <div class="hana-chat-shell">
+                <div class="hana-chat-row bot">
+                    <div class="hana-avatar">하나</div>
+                    <div class="hana-bubble bot">
+                        통합CMS 운영 FAQ에서 답변을 찾아드리겠습니다.<br>
+                        활동이력 파일을 먼저 반영하면 실제 처리내용 기반으로 답변됩니다.
+                    </div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown('<div class="hana-chat-input-panel">', unsafe_allow_html=True)
         question = st.text_area(
             "질문",
             height=110,
@@ -19628,6 +19722,8 @@ def show_cms_chatbot():
                     "업무": selected_work,
                     "운영구분": selected_operation,
                 }
+                st.session_state.cms_chatbot_last_question = question.strip()
+        st.markdown("</div>", unsafe_allow_html=True)
 
         saved_matches = st.session_state.get("cms_chatbot_matches", [])
         if saved_matches:
@@ -19643,22 +19739,23 @@ def show_cms_chatbot():
                 "cms_chatbot_filter_summary",
                 {"회사": company_filter or "전체", "업무": selected_work, "운영구분": selected_operation},
             )
+            user_question = html.escape(str(st.session_state.get("cms_chatbot_last_question", question)).strip())
             st.markdown(
                 f"""
-                <div style="
-                    margin: 16px 0 10px;
-                    padding: 14px 16px;
-                    border: 1px solid #CBD5E1;
-                    border-radius: 12px;
-                    background: #F8FAFC;
-                ">
-                    <div style="font-size: 13px; font-weight: 800; color: #334155; margin-bottom: 10px;">
-                        선택 분류
+                <div class="hana-chat-shell">
+                    <div class="hana-chat-row user">
+                        <div class="hana-bubble user">{user_question}</div>
                     </div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                        <span style="padding: 7px 10px; border-radius: 999px; background: #DBEAFE; color: #1D4ED8; font-weight: 700; font-size: 13px;">회사 · {html.escape(str(filter_summary.get("회사", "전체")))}</span>
-                        <span style="padding: 7px 10px; border-radius: 999px; background: #DCFCE7; color: #15803D; font-weight: 700; font-size: 13px;">업무 · {html.escape(str(filter_summary.get("업무", "전체")))}</span>
-                        <span style="padding: 7px 10px; border-radius: 999px; background: #FEF3C7; color: #B45309; font-weight: 700; font-size: 13px;">운영구분 · {html.escape(str(filter_summary.get("운영구분", "전체")))}</span>
+                    <div class="hana-chat-row bot">
+                        <div class="hana-avatar">하나</div>
+                        <div class="hana-bubble bot">
+                            <strong>선택 분류</strong>
+                            <div class="hana-chip-wrap">
+                                <span class="hana-chip">회사 · {html.escape(str(filter_summary.get("회사", "전체")))}</span>
+                                <span class="hana-chip">업무 · {html.escape(str(filter_summary.get("업무", "전체")))}</span>
+                                <span class="hana-chip">운영구분 · {html.escape(str(filter_summary.get("운영구분", "전체")))}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 """,
@@ -19670,20 +19767,18 @@ def show_cms_chatbot():
             answer_html = html.escape(answer_text).replace("\n", "<br>")
             st.markdown(
                 f"""
-                <div style="
-                    margin: 14px 0 16px;
-                    padding: 20px 22px;
-                    border: 2px solid #2563EB;
-                    border-left: 8px solid #2563EB;
-                    border-radius: 14px;
-                    background: #EFF6FF;
-                    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.14);
-                ">
-                    <div style="font-size: 13px; font-weight: 800; color: #1D4ED8; margin-bottom: 8px;">
-                        챗봇 답변
-                    </div>
-                    <div style="font-size: 19px; line-height: 1.75; font-weight: 700; color: #0F172A;">
-                        {answer_html or "등록된 답변 내용이 없습니다."}
+                <div class="hana-chat-shell">
+                    <div class="hana-chat-row bot">
+                        <div class="hana-avatar">하나</div>
+                        <div class="hana-bubble bot" style="border-color:#00857A;">
+                            <div style="font-size: 13px; font-weight: 900; color: #00857A; margin-bottom: 7px;">챗봇 답변</div>
+                            <div style="font-size: 17px; line-height: 1.75; font-weight: 700;">
+                                {answer_html or "등록된 답변 내용이 없습니다."}
+                            </div>
+                            <div class="hana-chat-meta">
+                                {html.escape(str(best_row.get("회사", "-")))} · {html.escape(str(best_row.get("업무", "-")))} · {html.escape(str(best_row.get("운영구분", "-")))} · 유사도 {best_score}점
+                            </div>
+                        </div>
                     </div>
                 </div>
                 """,
@@ -19694,7 +19789,7 @@ def show_cms_chatbot():
             meta_cols[1].metric("업무", best_row.get("업무", "-"))
             meta_cols[2].metric("운영구분", best_row.get("운영구분", "-"))
             meta_cols[3].metric("유사도", f"{best_score}점")
-            st.markdown("##### 유사한 질문")
+            st.markdown("##### 추천 질문")
             st.caption("아래 질문을 선택하면 해당 처리내용 답변으로 바뀝니다.")
             for idx, match in enumerate(saved_matches[:5]):
                 row = match.get("row", {})
