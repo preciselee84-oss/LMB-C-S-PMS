@@ -19881,6 +19881,45 @@ def show_cms_chatbot():
     def select_chatbot_answer(index):
         st.session_state.cms_chatbot_answer_index = index
 
+    def parse_chatbot_answer_parts(answer_text):
+        source = str(answer_text or "").strip()
+        if "상세내용:" in source:
+            result_part, detail_part = source.split("상세내용:", 1)
+            display_answer = result_part.replace("처리결과:", "").strip()
+            detail_answer = detail_part.strip()
+        else:
+            display_answer = summarize_chatbot_result(source)
+            detail_answer = source if clean_chatbot_text(display_answer) != clean_chatbot_text(source) else ""
+        return display_answer, detail_answer
+
+    def merged_chatbot_result_from_matches(matches, max_items=5):
+        merged_items = []
+        fallback_items = []
+
+        def add_item(item):
+            cleaned = clean_chatbot_text(str(item).lstrip("-• "))
+            if cleaned and cleaned not in merged_items:
+                merged_items.append(cleaned)
+
+        for match in matches:
+            row = match.get("row", {})
+            answer_text = str(row.get("답변요약", ""))
+            display_answer, detail_answer = parse_chatbot_answer_parts(answer_text)
+            for item in re.split(r"\n+|<br\s*/?>", display_answer):
+                add_item(item)
+            for item in infer_chatbot_action_result(f"{row.get('질문', '')} {detail_answer or answer_text}"):
+                add_item(item)
+            if not merged_items:
+                fallback_items.extend(split_chatbot_result_clauses(detail_answer or answer_text))
+
+        if not merged_items:
+            for item in fallback_items:
+                add_item(item)
+                if len(merged_items) >= max_items:
+                    break
+
+        return "\n".join(f"- {item}" for item in merged_items[:max_items])
+
     tab_chat, tab_faq, tab_setup = st.tabs(["질문하기", "FAQ 목록", "분류 관리"])
 
     with tab_chat:
@@ -20050,28 +20089,21 @@ def show_cms_chatbot():
             if st.session_state.get("cms_chatbot_last_filter_empty"):
                 st.caption("현재 필터 조건에 맞는 FAQ가 없어 전체 FAQ에서 검색했습니다.")
             answer_text = str(best_row.get("답변요약", "")).strip()
-            display_answer = answer_text
-            detail_answer = ""
-            if "상세내용:" in answer_text:
-                result_part, detail_part = answer_text.split("상세내용:", 1)
-                display_answer = result_part.replace("처리결과:", "").strip()
-                detail_answer = detail_part.strip()
-            else:
-                display_answer = summarize_chatbot_result(answer_text)
-                detail_answer = answer_text if clean_chatbot_text(display_answer) != clean_chatbot_text(answer_text) else ""
-            answer_html = html.escape(display_answer).replace("\n", "<br>")
+            display_answer, detail_answer = parse_chatbot_answer_parts(answer_text)
+            merged_answer = merged_chatbot_result_from_matches(saved_matches[:5]) or display_answer
+            answer_html = html.escape(merged_answer).replace("\n", "<br>")
             st.markdown(
                 f"""
                 <div class="hana-chat-shell">
                     <div class="hana-chat-row bot">
                         <div class="hana-avatar">하나</div>
                         <div class="hana-bubble bot" style="border-color:#00857A;">
-                            <div style="font-size: 13px; font-weight: 900; color: #00857A; margin-bottom: 7px;">처리결과</div>
+                            <div style="font-size: 13px; font-weight: 900; color: #00857A; margin-bottom: 7px;">통합 처리결과</div>
                             <div style="font-size: 17px; line-height: 1.75; font-weight: 700;">
                                 {answer_html or "등록된 답변 내용이 없습니다."}
                             </div>
                             <div class="hana-chat-meta">
-                                {html.escape(str(best_row.get("회사", "-")))} · {html.escape(str(best_row.get("업무", "-")))} · {html.escape(str(best_row.get("운영구분", "-")))} · 유사도 {best_score}점
+                                유사 질문 {len(saved_matches[:5])}건 기준 · 대표 사례 {html.escape(str(best_row.get("회사", "-")))} · 유사도 {best_score}점
                             </div>
                         </div>
                     </div>
@@ -20079,11 +20111,22 @@ def show_cms_chatbot():
                 """,
                 unsafe_allow_html=True,
             )
-            if detail_answer:
-                detail_col, _ = st.columns([0.52, 0.48])
-                with detail_col:
-                    with st.expander("상세 원문 보기"):
-                        st.write(detail_answer)
+            st.markdown("##### 최근 유사 고객사 사례")
+            for idx, match in enumerate(saved_matches[:5]):
+                row = match.get("row", {})
+                case_answer, case_detail = parse_chatbot_answer_parts(str(row.get("답변요약", "")))
+                case_question = str(row.get("질문", "")).strip() or "질문 내용 없음"
+                case_company = str(row.get("회사", "-"))
+                case_meta = f"{row.get('업무', '-')} / {row.get('운영구분', '-')} / 유사도 {match.get('score', 0)}점"
+                with st.expander(f"{idx + 1}. {case_company} - {case_question[:70]}", expanded=(idx == selected_index)):
+                    st.markdown("**질문**")
+                    st.write(case_question)
+                    st.markdown("**처리결과**")
+                    st.write(case_answer)
+                    st.caption(case_meta)
+                    if case_detail:
+                        with st.expander("상세 원문"):
+                            st.write(case_detail)
             image_key = best_row.get("이미지키")
             image_store = st.session_state.get("cms_chatbot_image_store", {})
             answer_images = image_store.get(image_key, []) if image_key else []
@@ -20115,8 +20158,8 @@ def show_cms_chatbot():
             meta_cols[1].metric("업무", best_row.get("업무", "-"))
             meta_cols[2].metric("운영구분", best_row.get("운영구분", "-"))
             meta_cols[3].metric("유사도", f"{best_score}점")
-            st.markdown("##### 추천 질문")
-            st.caption("아래 질문을 선택하면 해당 처리내용 답변으로 바뀝니다.")
+            st.markdown("##### 유사 질문 선택")
+            st.caption("질문을 선택하면 해당 고객사 사례가 펼쳐집니다.")
             for idx, match in enumerate(saved_matches[:5]):
                 row = match.get("row", {})
                 question_label = str(row.get("질문", "")).strip() or "질문 내용 없음"
