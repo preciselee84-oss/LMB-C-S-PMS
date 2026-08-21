@@ -19560,6 +19560,13 @@ def show_cms_chatbot():
     m3.metric("업무 분류", f"{len(work_options) - 1:,}개")
     m4.metric("운영구분", f"{len(operation_options) - 1:,}개")
 
+    def chatbot_operation_from_work(work):
+        if work == "설치등록":
+            return "개설"
+        if work == "ERP연계":
+            return "연계"
+        return "운영"
+
     tab_chat, tab_faq, tab_setup = st.tabs(["질문하기", "FAQ 목록", "분류 관리"])
 
     with tab_chat:
@@ -19583,6 +19590,46 @@ def show_cms_chatbot():
     with tab_faq:
         st.markdown("##### 자주 받는 질문")
         st.dataframe(pd.DataFrame(filtered_rows), use_container_width=True, hide_index=True)
+
+        with st.expander("활동이력 파일로 FAQ 초안 만들기"):
+            st.caption("활동이력 파일의 요청사항을 질문으로, 처리내용을 답변으로 변환합니다. 파일 내용은 세션에만 반영됩니다.")
+            history_file = st.file_uploader(
+                "활동이력 엑셀 업로드",
+                type=["xls", "xlsx"],
+                key="cms_chatbot_history_upload",
+            )
+            if history_file is not None and st.button("활동이력 FAQ 반영", use_container_width=True):
+                try:
+                    history_df = pd.read_excel(history_file, dtype=str).fillna("")
+                    required_columns = {"업체명", "업무유형", "요청사항", "처리내용"}
+                    missing_columns = required_columns - set(history_df.columns)
+                    if missing_columns:
+                        st.error(f"필수 컬럼이 없습니다: {', '.join(sorted(missing_columns))}")
+                    else:
+                        imported_rows = []
+                        skipped_count = 0
+                        for _, row in history_df.iterrows():
+                            question_text = str(row.get("요청사항", "")).strip()
+                            answer_text = str(row.get("처리내용", "")).strip()
+                            if not question_text or not answer_text:
+                                skipped_count += 1
+                                continue
+                            work = str(row.get("업무유형", "")).strip() or "기타"
+                            imported_rows.append(
+                                {
+                                    "회사": str(row.get("업체명", "")).strip() or "고객사 공통",
+                                    "업무": work,
+                                    "운영구분": chatbot_operation_from_work(work),
+                                    "질문": question_text,
+                                    "답변요약": answer_text,
+                                    "상태": "활동이력",
+                                }
+                            )
+                        st.session_state.cms_chatbot_faq_rows = imported_rows + st.session_state.cms_chatbot_faq_rows
+                        st.success(f"FAQ 초안 {len(imported_rows):,}건을 반영했습니다. 답변이 비어 있는 {skipped_count:,}건은 제외했습니다.")
+                        st.rerun()
+                except Exception as exc:
+                    st.error(f"활동이력 파일을 읽지 못했습니다: {exc}")
 
         with st.expander("FAQ 항목 추가"):
             with st.form("cms_chatbot_faq_form", clear_on_submit=True):
