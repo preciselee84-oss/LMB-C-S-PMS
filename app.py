@@ -19695,20 +19695,6 @@ def show_cms_chatbot():
             """,
             unsafe_allow_html=True,
         )
-        st.markdown(
-            """
-            <div class="hana-chat-shell">
-                <div class="hana-chat-row bot">
-                    <div class="hana-avatar">하나</div>
-                    <div class="hana-bubble bot">
-                        통합CMS 운영 FAQ에서 답변을 찾아드리겠습니다.<br>
-                        활동이력 파일을 먼저 반영하면 실제 처리내용 기반으로 답변됩니다.
-                    </div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
         input_col, _ = st.columns([0.52, 0.48])
         with input_col:
             st.markdown('<div class="hana-chat-input-panel">', unsafe_allow_html=True)
