@@ -19822,17 +19822,22 @@ def show_cms_chatbot():
                 "활동이력 엑셀 업로드",
                 type=["xls", "xlsx"],
                 key="cms_chatbot_history_upload",
+                accept_multiple_files=True,
             )
-            if history_file is not None and st.button("활동이력 FAQ 반영", use_container_width=True):
+            if history_file and st.button("활동이력 FAQ 반영", use_container_width=True):
                 try:
-                    history_df = pd.read_excel(history_file, dtype=str).fillna("")
+                    imported_rows = []
+                    skipped_count = 0
+                    missing_messages = []
                     required_columns = {"업체명", "업무유형", "요청사항", "처리내용"}
-                    missing_columns = required_columns - set(history_df.columns)
-                    if missing_columns:
-                        st.error(f"필수 컬럼이 없습니다: {', '.join(sorted(missing_columns))}")
-                    else:
-                        imported_rows = []
-                        skipped_count = 0
+                    for uploaded_history_file in history_file:
+                        history_df = pd.read_excel(uploaded_history_file, dtype=str).fillna("")
+                        missing_columns = required_columns - set(history_df.columns)
+                        if missing_columns:
+                            missing_messages.append(
+                                f"{uploaded_history_file.name}: {', '.join(sorted(missing_columns))}"
+                            )
+                            continue
                         for _, row in history_df.iterrows():
                             question_text = str(row.get("요청사항", "")).strip()
                             answer_text = str(row.get("처리내용", "")).strip()
@@ -19847,12 +19852,17 @@ def show_cms_chatbot():
                                     "운영구분": chatbot_operation_from_work(work),
                                     "질문": question_text,
                                     "답변요약": answer_text,
-                                    "상태": "활동이력",
+                                    "상태": f"활동이력:{uploaded_history_file.name}",
                                 }
                             )
+                    if missing_messages:
+                        st.error("필수 컬럼이 없는 파일이 있습니다. " + " / ".join(missing_messages))
+                    if imported_rows:
                         st.session_state.cms_chatbot_faq_rows = imported_rows + st.session_state.cms_chatbot_faq_rows
                         st.success(f"FAQ 초안 {len(imported_rows):,}건을 반영했습니다. 답변이 비어 있는 {skipped_count:,}건은 제외했습니다.")
                         st.rerun()
+                    elif not missing_messages:
+                        st.warning("반영할 FAQ가 없습니다. 요청사항과 처리내용이 입력된 행을 확인해주세요.")
                 except Exception as exc:
                     st.error(f"활동이력 파일을 읽지 못했습니다: {exc}")
 
