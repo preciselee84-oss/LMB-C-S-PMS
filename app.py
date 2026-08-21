@@ -19623,10 +19623,11 @@ def show_cms_chatbot():
                     for score, _, row, keywords in matches
                 ]
                 st.session_state.cms_chatbot_answer_index = 0
-                st.markdown("**선택 분류**")
-                st.write(f"- 회사: {company_filter or '전체'}")
-                st.write(f"- 업무: {selected_work}")
-                st.write(f"- 운영구분: {selected_operation}")
+                st.session_state.cms_chatbot_filter_summary = {
+                    "회사": company_filter or "전체",
+                    "업무": selected_work,
+                    "운영구분": selected_operation,
+                }
 
         saved_matches = st.session_state.get("cms_chatbot_matches", [])
         if saved_matches:
@@ -19638,7 +19639,31 @@ def show_cms_chatbot():
             best_score = selected_match.get("score", 0)
             best_row = selected_match.get("row", {})
             best_keywords = selected_match.get("keywords", [])
-            st.success("FAQ 답변을 찾았습니다.")
+            filter_summary = st.session_state.get(
+                "cms_chatbot_filter_summary",
+                {"회사": company_filter or "전체", "업무": selected_work, "운영구분": selected_operation},
+            )
+            st.markdown(
+                f"""
+                <div style="
+                    margin: 16px 0 10px;
+                    padding: 14px 16px;
+                    border: 1px solid #CBD5E1;
+                    border-radius: 12px;
+                    background: #F8FAFC;
+                ">
+                    <div style="font-size: 13px; font-weight: 800; color: #334155; margin-bottom: 10px;">
+                        선택 분류
+                    </div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <span style="padding: 7px 10px; border-radius: 999px; background: #DBEAFE; color: #1D4ED8; font-weight: 700; font-size: 13px;">회사 · {html.escape(str(filter_summary.get("회사", "전체")))}</span>
+                        <span style="padding: 7px 10px; border-radius: 999px; background: #DCFCE7; color: #15803D; font-weight: 700; font-size: 13px;">업무 · {html.escape(str(filter_summary.get("업무", "전체")))}</span>
+                        <span style="padding: 7px 10px; border-radius: 999px; background: #FEF3C7; color: #B45309; font-weight: 700; font-size: 13px;">운영구분 · {html.escape(str(filter_summary.get("운영구분", "전체")))}</span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
             if st.session_state.get("cms_chatbot_last_filter_empty"):
                 st.caption("현재 필터 조건에 맞는 FAQ가 없어 전체 FAQ에서 검색했습니다.")
             answer_text = str(best_row.get("답변요약", "")).strip()
@@ -19670,17 +19695,18 @@ def show_cms_chatbot():
             meta_cols[2].metric("운영구분", best_row.get("운영구분", "-"))
             meta_cols[3].metric("유사도", f"{best_score}점")
             st.markdown("##### 유사한 질문")
+            st.caption("아래 질문을 선택하면 해당 처리내용 답변으로 바뀝니다.")
             for idx, match in enumerate(saved_matches[:5]):
                 row = match.get("row", {})
                 question_label = str(row.get("질문", "")).strip() or "질문 내용 없음"
-                prefix = "현재 답변" if idx == selected_index else "답변 보기"
+                prefix = "현재" if idx == selected_index else "보기"
                 st.button(
-                    f"{idx + 1}. {prefix} · [{match.get('score', 0)}점] {row.get('회사', '-')} / {row.get('업무', '-')} - {question_label[:90]}",
+                    f"{idx + 1}. {question_label[:110]}",
                     key=f"cms_chatbot_similar_question_{idx}",
-                    use_container_width=True,
                     on_click=select_chatbot_answer,
                     args=(idx,),
                 )
+                st.caption(f"{prefix} · {row.get('회사', '-')} / {row.get('업무', '-')} / {row.get('운영구분', '-')} · 유사도 {match.get('score', 0)}점")
             with st.expander("매칭 근거 보기"):
                 st.markdown("**원본 질문**")
                 st.write(best_row.get("질문", ""))
