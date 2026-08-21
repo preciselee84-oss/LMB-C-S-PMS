@@ -19567,25 +19567,76 @@ def show_cms_chatbot():
             return "연계"
         return "운영"
 
+    def chatbot_text_tokens(text):
+        normalized = re.sub(r"[^0-9A-Za-z가-힣]+", " ", str(text or "").lower())
+        return {token for token in normalized.split() if len(token) >= 2}
+
+    def find_chatbot_answers(question_text, candidates):
+        question_tokens = chatbot_text_tokens(question_text)
+        if not question_tokens:
+            return []
+        scored_rows = []
+        for row in candidates:
+            faq_question = str(row.get("질문", ""))
+            faq_answer = str(row.get("답변요약", ""))
+            target_tokens = chatbot_text_tokens(f"{faq_question} {faq_answer} {row.get('업무', '')} {row.get('운영구분', '')}")
+            overlap = question_tokens & target_tokens
+            if not overlap:
+                continue
+            score = len(overlap) * 10
+            if str(row.get("업무", "")) == selected_work:
+                score += 3
+            if str(row.get("운영구분", "")) == selected_operation:
+                score += 3
+            if company_filter and company_filter.lower() in str(row.get("회사", "")).lower():
+                score += 5
+            scored_rows.append((score, len(overlap), row, sorted(overlap)))
+        scored_rows.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        return scored_rows[:3]
+
     tab_chat, tab_faq, tab_setup = st.tabs(["질문하기", "FAQ 목록", "분류 관리"])
 
     with tab_chat:
         st.markdown("##### 질문 입력")
-        st.info("현재는 기본 메뉴 구성 단계입니다. 이후 FAQ 데이터와 답변 생성 로직을 연결하면 선택한 분류 기준으로 답변이 표시됩니다.")
+        st.info("현재 등록된 FAQ에서 질문과 가장 유사한 답변을 검색합니다. 활동이력 파일을 먼저 반영하면 실제 처리내용 기반으로 답변됩니다.")
         question = st.text_area(
             "질문",
             height=110,
             placeholder="예: 고객사에서 통합CMS 로그인은 되지 않는데 DB 접속 테스트는 성공합니다. 무엇을 확인해야 하나요?",
         )
-        if st.button("답변 생성 준비", use_container_width=True, type="primary"):
+        if st.button("답변 검색", use_container_width=True, type="primary"):
             if not question.strip():
                 st.warning("질문을 입력해주세요.")
             else:
-                st.success("질문이 접수되었습니다. FAQ 답변 엔진 연결 후 이 영역에 답변이 표시됩니다.")
+                search_pool = filtered_rows or rows
+                matches = find_chatbot_answers(question, search_pool)
                 st.markdown("**선택 분류**")
                 st.write(f"- 회사: {company_filter or '전체'}")
                 st.write(f"- 업무: {selected_work}")
                 st.write(f"- 운영구분: {selected_operation}")
+                if not filtered_rows:
+                    st.caption("현재 필터 조건에 맞는 FAQ가 없어 전체 FAQ에서 검색했습니다.")
+                if not matches:
+                    st.warning("유사한 FAQ 답변을 찾지 못했습니다. 업무/운영구분 필터를 전체로 바꾸거나 FAQ를 추가해주세요.")
+                else:
+                    best_score, _, best_row, best_keywords = matches[0]
+                    st.success("가장 유사한 FAQ 답변을 찾았습니다.")
+                    st.markdown("##### 답변")
+                    st.write(best_row.get("답변요약", ""))
+                    meta_cols = st.columns(4)
+                    meta_cols[0].metric("회사", best_row.get("회사", "-"))
+                    meta_cols[1].metric("업무", best_row.get("업무", "-"))
+                    meta_cols[2].metric("운영구분", best_row.get("운영구분", "-"))
+                    meta_cols[3].metric("유사도", f"{best_score}점")
+                    with st.expander("매칭 근거 보기"):
+                        st.markdown("**원본 질문**")
+                        st.write(best_row.get("질문", ""))
+                        st.markdown("**일치 키워드**")
+                        st.write(", ".join(best_keywords) if best_keywords else "-")
+                        if len(matches) > 1:
+                            st.markdown("**다른 후보**")
+                            for score, _, row, keywords in matches[1:]:
+                                st.write(f"- [{score}점] {row.get('회사', '-')} / {row.get('업무', '-')} / {row.get('질문', '')}")
 
     with tab_faq:
         st.markdown("##### 자주 받는 질문")
