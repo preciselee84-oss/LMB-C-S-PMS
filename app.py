@@ -19468,7 +19468,6 @@ def show_cms_chatbot():
     st.markdown("#### 통합CMS 운영 FAQ 챗봇")
     st.caption("하나은행 통합CMS 운영 중 자주 받는 질문을 회사별, 업무별, 운영구분별로 분류해 답변 기반을 구성하는 메뉴입니다.")
 
-    company_options = ["전체", "고객사 공통", "신풍제약(주)", "주식회사 알팩", "한전산업개발(주)", "(주)라우드코퍼레이션", "경희대학교"]
     work_options = ["전체", "사용자 교육", "사후관리", "기타", "오류발생", "서버점검", "ERP연계", "설치", "설치등록", "추가설치", "재설치", "클레임"]
     operation_options = ["전체", "운영", "연계", "개설"]
 
@@ -19509,15 +19508,16 @@ def show_cms_chatbot():
         ]
 
     filter_col1, filter_col2, filter_col3 = st.columns(3)
-    selected_company = filter_col1.selectbox("회사별", company_options)
+    company_query = filter_col1.text_input("회사별", placeholder="회사명을 입력해 검색")
     selected_work = filter_col2.selectbox("업무별", work_options)
     selected_operation = filter_col3.selectbox("운영구분별", operation_options)
+    normalized_company_query = company_query.strip().lower()
 
     rows = st.session_state.cms_chatbot_faq_rows
     filtered_rows = [
         row
         for row in rows
-        if (selected_company == "전체" or row["회사"] == selected_company)
+        if (not normalized_company_query or normalized_company_query in str(row["회사"]).lower())
         and (selected_work == "전체" or row["업무"] == selected_work)
         and (selected_operation == "전체" or row["운영구분"] == selected_operation)
     ]
@@ -19544,7 +19544,7 @@ def show_cms_chatbot():
             else:
                 st.success("질문이 접수되었습니다. FAQ 답변 엔진 연결 후 이 영역에 답변이 표시됩니다.")
                 st.markdown("**선택 분류**")
-                st.write(f"- 회사: {selected_company}")
+                st.write(f"- 회사: {company_query.strip() or '전체'}")
                 st.write(f"- 업무: {selected_work}")
                 st.write(f"- 운영구분: {selected_operation}")
 
@@ -19555,20 +19555,20 @@ def show_cms_chatbot():
         with st.expander("FAQ 항목 추가"):
             with st.form("cms_chatbot_faq_form", clear_on_submit=True):
                 c1, c2, c3 = st.columns(3)
-                company = c1.selectbox("회사", company_options[1:], key="faq_company")
+                company = c1.text_input("회사", placeholder="회사명 직접 입력", key="faq_company")
                 work = c2.selectbox("업무", work_options[1:], key="faq_work")
                 operation = c3.selectbox("운영구분", operation_options[1:], key="faq_operation")
                 faq_question = st.text_input("질문")
                 faq_answer = st.text_area("답변요약", height=90)
                 submitted = st.form_submit_button("FAQ 추가", use_container_width=True)
             if submitted:
-                if not faq_question.strip() or not faq_answer.strip():
-                    st.warning("질문과 답변요약을 입력해주세요.")
+                if not company.strip() or not faq_question.strip() or not faq_answer.strip():
+                    st.warning("회사, 질문, 답변요약을 입력해주세요.")
                 else:
                     st.session_state.cms_chatbot_faq_rows.insert(
                         0,
                         {
-                            "회사": company,
+                            "회사": company.strip(),
                             "업무": work,
                             "운영구분": operation,
                             "질문": faq_question.strip(),
