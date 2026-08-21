@@ -19621,8 +19621,29 @@ def show_cms_chatbot():
                 else:
                     best_score, _, best_row, best_keywords = matches[0]
                     st.success("가장 유사한 FAQ 답변을 찾았습니다.")
-                    st.markdown("##### 답변")
-                    st.write(best_row.get("답변요약", ""))
+                    answer_text = str(best_row.get("답변요약", "")).strip()
+                    answer_html = html.escape(answer_text).replace("\n", "<br>")
+                    st.markdown(
+                        f"""
+                        <div style="
+                            margin: 14px 0 16px;
+                            padding: 20px 22px;
+                            border: 2px solid #2563EB;
+                            border-left: 8px solid #2563EB;
+                            border-radius: 14px;
+                            background: #EFF6FF;
+                            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.14);
+                        ">
+                            <div style="font-size: 13px; font-weight: 800; color: #1D4ED8; margin-bottom: 8px;">
+                                챗봇 답변
+                            </div>
+                            <div style="font-size: 19px; line-height: 1.75; font-weight: 700; color: #0F172A;">
+                                {answer_html or "등록된 답변 내용이 없습니다."}
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
                     meta_cols = st.columns(4)
                     meta_cols[0].metric("회사", best_row.get("회사", "-"))
                     meta_cols[1].metric("업무", best_row.get("업무", "-"))
