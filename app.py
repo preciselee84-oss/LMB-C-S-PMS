@@ -19507,17 +19507,49 @@ def show_cms_chatbot():
             },
         ]
 
+    rows = st.session_state.cms_chatbot_faq_rows
+    company_candidates = sorted(
+        {
+            "고객사 공통",
+            "신풍제약(주)",
+            "주식회사 알팩",
+            "한전산업개발(주)",
+            "(주)라우드코퍼레이션",
+            "경희대학교",
+            *[str(row.get("회사", "")).strip() for row in rows if str(row.get("회사", "")).strip()],
+        }
+    )
+
     filter_col1, filter_col2, filter_col3 = st.columns(3)
-    company_query = filter_col1.text_input("회사별", placeholder="회사명을 입력해 검색")
+    company_query = filter_col1.text_input("회사별", placeholder="회사명을 입력하면 자동 검색")
     selected_work = filter_col2.selectbox("업무별", work_options)
     selected_operation = filter_col3.selectbox("운영구분별", operation_options)
     normalized_company_query = company_query.strip().lower()
+    matched_companies = [
+        company
+        for company in company_candidates
+        if normalized_company_query and normalized_company_query in company.lower()
+    ][:20]
+    selected_company_match = ""
+    if matched_companies:
+        selected_company_match = st.selectbox(
+            "회사 검색 결과",
+            ["입력값으로 검색"] + matched_companies,
+            help="검색된 회사명을 선택하면 해당 회사 기준으로 FAQ가 필터링됩니다.",
+        )
+    elif normalized_company_query:
+        st.caption("일치하는 등록 회사가 없습니다. 입력한 회사명 포함 조건으로 검색합니다.")
 
-    rows = st.session_state.cms_chatbot_faq_rows
+    company_filter = (
+        selected_company_match
+        if selected_company_match and selected_company_match != "입력값으로 검색"
+        else company_query.strip()
+    )
+    normalized_company_filter = company_filter.lower()
     filtered_rows = [
         row
         for row in rows
-        if (not normalized_company_query or normalized_company_query in str(row["회사"]).lower())
+        if (not normalized_company_filter or normalized_company_filter in str(row["회사"]).lower())
         and (selected_work == "전체" or row["업무"] == selected_work)
         and (selected_operation == "전체" or row["운영구분"] == selected_operation)
     ]
@@ -19544,7 +19576,7 @@ def show_cms_chatbot():
             else:
                 st.success("질문이 접수되었습니다. FAQ 답변 엔진 연결 후 이 영역에 답변이 표시됩니다.")
                 st.markdown("**선택 분류**")
-                st.write(f"- 회사: {company_query.strip() or '전체'}")
+                st.write(f"- 회사: {company_filter or '전체'}")
                 st.write(f"- 업무: {selected_work}")
                 st.write(f"- 운영구분: {selected_operation}")
 
