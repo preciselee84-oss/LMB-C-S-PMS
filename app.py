@@ -19666,7 +19666,48 @@ def show_cms_chatbot():
         raw_clauses = re.split(r"\n+|\s*[>▶•]\s*|\s+-\s+|(?<=함)\s+|(?<=완료)\s+|(?<=안내)\s+", source)
         return [clean_chatbot_text(clause) for clause in raw_clauses if clean_chatbot_text(clause)]
 
-    def summarize_chatbot_result(text, max_items=3):
+    def infer_chatbot_action_result(text):
+        source = clean_chatbot_text(text)
+        result_items = []
+
+        def add_result(item):
+            if item and item not in result_items:
+                result_items.append(item)
+
+        if any(keyword in source for keyword in ["ERP", "반영", "내보내기"]) and any(keyword in source for keyword in ["거래내역", "잔액", "계좌"]):
+            add_result("계좌 거래내역이 통합CMS에 정상적으로 조회되어 있는지 확인")
+            if any(keyword in source for keyword in ["기간", "날짜", "6/", "조회된 내역", "내역 없음", "거래 없음"]):
+                add_result("문제 기간의 실제 거래내역 존재 여부를 통합CMS와 기업뱅킹 거래내역조회에서 확인")
+            if any(keyword in source for keyword in ["거래가 없", "거래 없음", "내역이 없음", "조회된 내역이 없음"]):
+                add_result("해당 기간 거래내역이 없어 ERP 반영 대상 데이터가 없음을 안내")
+            elif any(keyword in source for keyword in ["수동", "내보내기"]):
+                add_result("통합CMS에서 ERP 수동 내보내기를 진행해 반영 여부 확인")
+            if any(keyword in source for keyword in ["기술지원", "접수", "연락"]):
+                add_result("추가 확인을 위해 기술지원팀 접수 후 연락하기로 처리")
+
+        if any(keyword in source for keyword in ["로그인", "접속", "인증서"]):
+            add_result("통합CMS 로그인 가능 여부와 인증서/사업장 정보 일치 여부 확인")
+            if any(keyword in source for keyword in ["DB", "데이터베이스"]):
+                add_result("DB 접속 테스트와 연결정보 정상 여부 확인")
+            if any(keyword in source for keyword in ["재설치", "재등록", "갱신"]):
+                add_result("인증서 또는 접속 프로그램 재등록 후 정상 로그인 여부 확인")
+
+        if any(keyword in source for keyword in ["Agent", "에이전트", "스케줄", "서비스"]):
+            add_result("Agent 서비스와 스케줄러 실행 상태 확인")
+            if any(keyword in source for keyword in ["재시작", "재기동", "시작"]):
+                add_result("Agent 재시작 후 트레이 아이콘과 작업 정상 동작 여부 확인")
+
+        if any(keyword in source for keyword in ["설치", "개설", "등록"]) and any(keyword in source for keyword in ["완료", "진행", "처리"]):
+            add_result("통합CMS 설치/개설 정보 등록 상태 확인")
+            add_result("설치 후 접속 및 주요 기능 정상 동작 여부 확인")
+
+        return result_items
+
+    def summarize_chatbot_result(text, max_items=4):
+        inferred_items = infer_chatbot_action_result(text)
+        if inferred_items:
+            return "\n".join(f"- {item}" for item in inferred_items[:max_items])
+
         clauses = split_chatbot_result_clauses(text)
         if not clauses:
             return clean_chatbot_text(text)
@@ -20019,17 +20060,6 @@ def show_cms_chatbot():
                 display_answer = summarize_chatbot_result(answer_text)
                 detail_answer = answer_text if clean_chatbot_text(display_answer) != clean_chatbot_text(answer_text) else ""
             answer_html = html.escape(display_answer).replace("\n", "<br>")
-            detail_html = html.escape(detail_answer).replace("\n", "<br>")
-            detail_block = (
-                f"""
-                <details style="margin-top: 12px; font-size: 14px; font-weight: 500;">
-                    <summary style="cursor:pointer;color:#00857A;font-weight:900;">상세 원문 보기</summary>
-                    <div style="margin-top:8px;line-height:1.6;color:#334155;">{detail_html}</div>
-                </details>
-                """
-                if detail_answer
-                else ""
-            )
             st.markdown(
                 f"""
                 <div class="hana-chat-shell">
@@ -20040,7 +20070,6 @@ def show_cms_chatbot():
                             <div style="font-size: 17px; line-height: 1.75; font-weight: 700;">
                                 {answer_html or "등록된 답변 내용이 없습니다."}
                             </div>
-                            {detail_block}
                             <div class="hana-chat-meta">
                                 {html.escape(str(best_row.get("회사", "-")))} · {html.escape(str(best_row.get("업무", "-")))} · {html.escape(str(best_row.get("운영구분", "-")))} · 유사도 {best_score}점
                             </div>
@@ -20050,6 +20079,11 @@ def show_cms_chatbot():
                 """,
                 unsafe_allow_html=True,
             )
+            if detail_answer:
+                detail_col, _ = st.columns([0.52, 0.48])
+                with detail_col:
+                    with st.expander("상세 원문 보기"):
+                        st.write(detail_answer)
             image_key = best_row.get("이미지키")
             image_store = st.session_state.get("cms_chatbot_image_store", {})
             answer_images = image_store.get(image_key, []) if image_key else []
