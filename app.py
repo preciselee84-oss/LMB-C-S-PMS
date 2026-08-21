@@ -32,6 +32,7 @@ def resolve_template_file(file_name):
     return candidates[0]
 
 
+APP_DIR = os.path.dirname(__file__)
 DB_FILE = "users.json"
 SAVED_STATE_FILE = "saved_state.json"
 SERVER_CONNECTION_FILE = "server_connection.json"
@@ -40,8 +41,8 @@ APPROVAL_FILE = "approvals.json"
 BANK_ACCOUNT_FILE = "bank_accounts.json"
 USAGE_REPORT_FILE = "usage_reports.json"
 COMPANY_PROFILE_FILE = "company_profile.json"
-CMS_CHATBOT_FAQ_FILE = os.path.join("data", "cms_chatbot_faq.json")
-CMS_CHATBOT_IMAGE_FILE = os.path.join("data", "cms_chatbot_images.json")
+CMS_CHATBOT_FAQ_FILE = os.path.join(APP_DIR, "data", "cms_chatbot_faq.json")
+CMS_CHATBOT_IMAGE_FILE = os.path.join(APP_DIR, "data", "cms_chatbot_images.json")
 EXCEL_SAMPLE_FILE = resolve_template_file("LMB월간 활동실적_000000(샘플).xlsx")
 PPT_TEMPLATE_FILE = resolve_template_file("LMB활동실적보고서_202605_하나지사.pptx")
 WEEKLY_PPT_TEMPLATE_FILE = resolve_template_file("주간보고_통합CMS고객_개설운영_주간보고_템플릿.pptx")
@@ -19525,10 +19526,12 @@ def show_cms_chatbot():
         },
     ]
 
+    saved_faq = load_local_json(CMS_CHATBOT_FAQ_FILE, {})
+    saved_rows = saved_faq.get("rows", []) if isinstance(saved_faq, dict) else []
     if "cms_chatbot_faq_rows" not in st.session_state:
-        saved_faq = load_local_json(CMS_CHATBOT_FAQ_FILE, {})
-        saved_rows = saved_faq.get("rows", []) if isinstance(saved_faq, dict) else []
         st.session_state.cms_chatbot_faq_rows = saved_rows or default_faq_rows
+    elif len(saved_rows) > len(st.session_state.cms_chatbot_faq_rows):
+        st.session_state.cms_chatbot_faq_rows = saved_rows
     if "cms_chatbot_image_store" not in st.session_state:
         saved_images = load_local_json(CMS_CHATBOT_IMAGE_FILE, {})
         st.session_state.cms_chatbot_image_store = {
@@ -20198,7 +20201,7 @@ def show_cms_chatbot():
                 save_cms_chatbot_faq_store()
                 st.success("FAQ를 기본값 4건으로 초기화하고 저장했습니다.")
                 st.rerun()
-        st.caption(f"저장 위치: {CMS_CHATBOT_FAQ_FILE} / 원본 엑셀·PPT 파일은 저장하지 않습니다.")
+        st.caption("저장 위치: data/cms_chatbot_faq.json / 원본 엑셀·PPT 파일은 저장하지 않습니다.")
 
         with st.expander("FAQ 보강 파일 업로드 및 반영", expanded=True):
             st.caption("활동이력은 요청사항/처리내용을, 월간활동실적은 상세 활동 사례를 FAQ 지식으로 반영합니다. PPT 문서는 슬라이드별 텍스트와 이미지를 함께 반영합니다.")
