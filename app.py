@@ -20309,7 +20309,7 @@ def show_cms_chatbot():
                     int(st.session_state.get("cms_chatbot_answer_index", 0)),
                     len(saved_matches) - 1,
                 )
-                st.markdown("##### 유사 사례")
+                st.markdown("##### 같이 질문했던 사례")
                 for idx, match in enumerate(saved_matches[:5]):
                     row = match.get("row", {})
                     case_answer, case_detail = parse_chatbot_answer_parts(str(row.get("답변요약", "")))
