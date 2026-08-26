@@ -20035,9 +20035,9 @@ def show_cms_chatbot():
                     width: 100%;
                     min-width: 0;
                     max-width: none;
-                    border: 1px solid #D7E3E1;
+                    border: 1px solid #B8DAD6;
                     border-radius: 16px;
-                    background: #F3F8F7;
+                    background: #F2FAF8;
                 }
                 .hana-chat-row {
                     display: flex;
@@ -20070,13 +20070,13 @@ def show_cms_chatbot():
                 }
                 .hana-bubble.bot {
                     background: #FFFFFF;
-                    border: 1px solid #D7E3E1;
+                    border: 1px solid #B8DAD6;
                     color: #0F172A;
                     border-bottom-left-radius: 5px;
                 }
                 .hana-bubble.user {
-                    background: #8FD44A;
-                    color: #12320F;
+                    background: #00A88E;
+                    color: #FFFFFF;
                     font-weight: 700;
                     border-bottom-right-radius: 5px;
                 }
@@ -20107,7 +20107,7 @@ def show_cms_chatbot():
                     max-width: none;
                     border-radius: 14px;
                     background: #FFFFFF;
-                    border: 1px solid #D7E3E1;
+                    border: 1px solid #B8DAD6;
                 }
                 .hana-workflow-note {
                     width: 100%;
@@ -20116,19 +20116,19 @@ def show_cms_chatbot():
                     margin: 10px 0 8px;
                     padding: 12px 14px;
                     border-radius: 12px;
-                    background: #EAF7F5;
-                    color: #006E66;
+                    background: #E7F7F4;
+                    color: #00796B;
                     font-weight: 800;
-                    border: 1px solid #C8E6E2;
+                    border: 1px solid #B8DAD6;
                 }
                 .hana-side-panel {
-                    min-height: 640px;
-                    padding: 18px 14px;
-                    border-right: 1px solid #E2E8F0;
-                    background: #F8FAFC;
+                    min-height: 680px;
+                    padding: 18px 16px;
+                    border-right: 1px solid #B8DAD6;
+                    background: #F2FAF8;
                 }
                 .hana-side-title {
-                    font-size: 18px;
+                    font-size: 20px;
                     font-weight: 900;
                     color: #00857A;
                     margin-bottom: 14px;
@@ -20136,8 +20136,8 @@ def show_cms_chatbot():
                 .hana-side-section {
                     margin: 18px 0 8px;
                     padding-top: 14px;
-                    border-top: 1px solid #D8E3E1;
-                    color: #64748B;
+                    border-top: 1px solid #B8DAD6;
+                    color: #00796B;
                     font-size: 13px;
                     font-weight: 900;
                 }
@@ -20151,14 +20151,63 @@ def show_cms_chatbot():
                     font-size: 13px;
                     line-height: 1.45;
                 }
+                div[data-testid="stButton"] > button {
+                    border-radius: 8px;
+                    border: 1px solid #00857A;
+                    background: #FFFFFF;
+                    color: #00796B;
+                    font-weight: 800;
+                }
+                div[data-testid="stButton"] > button:hover {
+                    border-color: #00A88E;
+                    color: #006E66;
+                    background: #E7F7F4;
+                }
+                div[data-testid="stButton"] > button[kind="primary"] {
+                    background: #00857A;
+                    border-color: #00857A;
+                    color: #FFFFFF;
+                }
+                div[data-testid="stButton"] > button[kind="primary"]:hover {
+                    background: #00A88E;
+                    border-color: #00A88E;
+                    color: #FFFFFF;
+                }
+                div[data-testid="stTextArea"] textarea,
+                div[data-testid="stTextInput"] input,
+                div[data-testid="stSelectbox"] > div {
+                    border-color: #B8DAD6;
+                    border-radius: 8px;
+                }
                 @media (max-width: 1100px) {
-                    .hana-side-panel { min-height: auto; border-right: 0; border-bottom: 1px solid #E2E8F0; }
+                    .hana-side-panel {
+                        min-height: auto;
+                        border-right: 0;
+                        border-bottom: 1px solid #B8DAD6;
+                        padding: 14px 12px;
+                    }
+                    .hana-side-title { font-size: 18px; }
+                    .hana-bubble { max-width: 92%; }
+                }
+                @media (max-width: 640px) {
+                    .hana-workflow-note {
+                        font-size: 13px;
+                        line-height: 1.45;
+                    }
+                    .hana-chat-shell {
+                        padding: 12px;
+                        border-radius: 12px;
+                    }
+                    .hana-bubble {
+                        font-size: 14px;
+                        padding: 11px 12px;
+                    }
                 }
             </style>
             """,
             unsafe_allow_html=True,
         )
-        nav_col, qna_col = st.columns([0.22, 0.78], gap="large")
+        nav_col, qna_col = st.columns([0.32, 0.68], gap="large")
         with nav_col:
             st.markdown('<div class="hana-side-panel">', unsafe_allow_html=True)
             st.markdown('<div class="hana-side-title">CMS 챗봇</div>', unsafe_allow_html=True)
