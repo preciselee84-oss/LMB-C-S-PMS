@@ -19665,11 +19665,9 @@ def show_cms_chatbot():
         ):
             return "\n".join(
                 [
-                    "- 통합CMS 이체는 등록된 출금계좌와 이체 서비스 권한 기준으로 가능 여부 확인",
-                    "- 하나은행 계좌는 통합CMS 출금계좌로 등록되어 있는지 먼저 확인",
-                    "- 타행 계좌는 해당 은행의 이체/조회 연동 또는 스크래핑 등록 여부 확인",
-                    "- 사업자번호나 법인번호가 다른 계좌는 동일 사업장 계좌인지 은행 등록정보 확인",
-                    "- 이체가 되지 않으면 출금계좌 등록상태, 이체권한, 결재선, 이체한도 설정을 순서대로 확인",
+                    "- 타행계좌는 통합CMS에서 이체가 불가합니다.",
+                    "- 통합CMS 이체는 하나은행 출금계좌로 등록된 계좌 기준으로 가능합니다.",
+                    "- 이체가 되지 않으면 출금계좌 등록상태, 이체권한, 결재선, 이체한도 설정을 확인합니다.",
                 ]
             )
         if (
@@ -19678,11 +19676,9 @@ def show_cms_chatbot():
         ):
             return "\n".join(
                 [
-                    "- 계좌거래내역조회는 통합CMS에 등록된 조회계좌 기준으로 확인",
-                    "- 하나은행 계좌는 통합CMS에서 거래내역 조회 가능 여부를 우선 확인",
-                    "- 타은행 계좌는 해당 은행의 조회 연동/스크래핑 등록 여부를 확인",
-                    "- 거래내역이 보이지 않으면 조회 기간, 계좌 선택, 거래 발생 여부를 먼저 확인",
-                    "- 최신정보가져오기 실행 후에도 조회되지 않으면 은행별 조회 가능 범위와 오류 메시지를 기록해 확인",
+                    "- 계좌거래내역조회는 통합CMS에 등록된 조회계좌 기준으로 확인합니다.",
+                    "- 타행 계좌는 조회 연동 또는 스크래핑 등록 여부를 먼저 확인합니다.",
+                    "- 거래내역이 보이지 않으면 조회 기간, 계좌 선택, 실제 거래 발생 여부를 확인합니다.",
                 ]
             )
         if (
@@ -19694,14 +19690,12 @@ def show_cms_chatbot():
                 [
                     "- 통합CMS 프로그램에서 ERP에 반영하려는 데이터가 조회되어 있는지 확인",
                     "- 데이터가 조회되지 않으면 최신정보가져오기가 정상 수행되었는지 확인",
-                    "- 조회 기간, 계좌 조건, 거래 발생 여부를 실제 거래내역 기준으로 재확인",
                     "- 통합CMS에서 데이터 조회가 확인되면 ERP 내보내기 또는 수동 전송 후 ERP 화면 반영 여부 확인",
-                    "- 계속 미반영되면 조회 조건과 오류 화면을 기록해 기술지원팀 접수",
                 ]
             )
         return ""
 
-    def summarize_chatbot_result(text, max_items=4):
+    def summarize_chatbot_result(text, max_items=3):
         inferred_items = infer_chatbot_action_result(text)
         if inferred_items:
             return "\n".join(f"- {item}" for item in inferred_items[:max_items])
@@ -20014,7 +20008,7 @@ def show_cms_chatbot():
         }
         return any(keyword in text for keyword in intent_keywords.get(intent, []))
 
-    def merged_chatbot_result_from_matches(matches, question_text="", max_items=5):
+    def merged_chatbot_result_from_matches(matches, question_text="", max_items=3):
         merged_items = []
         fallback_items = []
         intent = chatbot_question_intent(question_text)
@@ -20316,7 +20310,7 @@ def show_cms_chatbot():
                 answer_text = str(best_row.get("답변요약", "")).strip()
                 display_answer, _detail_answer = parse_chatbot_answer_parts(answer_text)
                 direct_answer = direct_chatbot_answer_for_question(last_question_text)
-                merged_answer = direct_answer or merged_chatbot_result_from_matches(saved_matches[:5], last_question_text) or display_answer
+                merged_answer = direct_answer or merged_chatbot_result_from_matches(saved_matches[:3], last_question_text) or display_answer
                 answer_html = html.escape(merged_answer).replace("\n", "<br>")
                 st.markdown(
                     f"""
