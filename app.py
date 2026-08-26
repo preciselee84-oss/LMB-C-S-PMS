@@ -19780,6 +19780,86 @@ def show_cms_chatbot():
             )
         return imported, skipped
 
+    def is_chatbot_question_text(text):
+        source = clean_chatbot_text(text)
+        if len(source) < 5:
+            return False
+        return any(keyword in source for keyword in ["?", "나요", "습니까", "있는지", "무엇", "어떻게", "가능한가"])
+
+    def is_chatbot_number_cell(text):
+        return bool(re.fullmatch(r"\d+(\.0)?", clean_chatbot_text(text)))
+
+    def pick_chatbot_qna_answer(values):
+        candidates = []
+        for value in values:
+            text = clean_chatbot_text(value)
+            if len(text) < 3:
+                continue
+            if any(keyword in text for keyword in ["답변에 대한 문의", "보완할 사항", "재작성 요청", "검수"]):
+                continue
+            candidates.append(text)
+        if not candidates:
+            return ""
+        rightmost_answer = candidates[-1]
+        longest_answer = max(candidates, key=len)
+        return longest_answer if len(longest_answer) > len(rightmost_answer) * 1.8 else rightmost_answer
+
+    def build_chatbot_rows_from_qna_workbook(uploaded_file, file_name):
+        imported = []
+        skipped = 0
+        workbook_bytes = uploaded_file.getvalue()
+        excel_file = pd.ExcelFile(BytesIO(workbook_bytes))
+
+        for sheet_name in excel_file.sheet_names:
+            raw_df = pd.read_excel(
+                BytesIO(workbook_bytes),
+                sheet_name=sheet_name,
+                dtype=str,
+                header=None,
+            ).fillna("")
+            category = ""
+            for row_no, row in raw_df.iterrows():
+                values = [clean_chatbot_text(value) for value in row.tolist()]
+                non_empty_values = [value for value in values if value]
+                if row_no == 0 or not non_empty_values:
+                    continue
+                first_value = values[0] if values else ""
+                if (
+                    first_value
+                    and not is_chatbot_number_cell(first_value)
+                    and not is_chatbot_question_text(first_value)
+                    and len(first_value) < 40
+                ):
+                    category = first_value
+
+                question_index = None
+                for index, value in enumerate(values):
+                    if is_chatbot_question_text(value):
+                        question_index = index
+                        break
+                if question_index is None:
+                    skipped += 1
+                    continue
+
+                question_text = values[question_index]
+                answer_text = pick_chatbot_qna_answer(values[question_index + 1 :])
+                if not answer_text:
+                    skipped += 1
+                    continue
+                work = chatbot_work_from_document_text(f"{sheet_name} {category} {question_text} {answer_text}")
+                imported.append(
+                    {
+                        "회사": "고객사 공통",
+                        "업무": work,
+                        "운영구분": chatbot_operation_from_work(work),
+                        "질문": question_text,
+                        "답변요약": answer_text,
+                        "상태": f"QNA:{file_name}:{sheet_name}",
+                        "이미지키": "",
+                    }
+                )
+        return imported, skipped
+
     def build_chatbot_rows_from_monthly_performance(uploaded_file, file_name):
         imported = []
         skipped = 0
@@ -20204,7 +20284,7 @@ def show_cms_chatbot():
         st.caption("저장 위치: data/cms_chatbot_faq.json / 원본 엑셀·PPT 파일은 저장하지 않습니다.")
 
         with st.expander("FAQ 보강 파일 업로드 및 반영", expanded=True):
-            st.caption("활동이력은 요청사항/처리내용을, 월간활동실적은 상세 활동 사례를 FAQ 지식으로 반영합니다. PPT 문서는 슬라이드별 텍스트와 이미지를 함께 반영합니다.")
+            st.caption("QNA정리본은 질문/답변을, 활동이력은 요청사항/처리내용을, 월간활동실적은 상세 활동 사례를 FAQ 지식으로 반영합니다. PPT 문서는 슬라이드별 텍스트와 이미지를 함께 반영합니다.")
             history_file = st.file_uploader(
                 "FAQ 보강 파일 업로드",
                 type=["xls", "xlsx", "pptx"],
@@ -20270,7 +20350,10 @@ def show_cms_chatbot():
                             file_rows, file_skipped = build_chatbot_rows_from_standard_history(first_sheet_df, file_name)
                         else:
                             uploaded_history_file.seek(0)
-                            file_rows, file_skipped = build_chatbot_rows_from_monthly_performance(uploaded_history_file, file_name)
+                            file_rows, file_skipped = build_chatbot_rows_from_qna_workbook(uploaded_history_file, file_name)
+                            if not file_rows:
+                                uploaded_history_file.seek(0)
+                                file_rows, file_skipped = build_chatbot_rows_from_monthly_performance(uploaded_history_file, file_name)
                         if file_rows:
                             imported_rows.extend(file_rows)
                             skipped_count += file_skipped
