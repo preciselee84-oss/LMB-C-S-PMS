@@ -19585,24 +19585,7 @@ def show_cms_chatbot():
             ]
         )
     )
-    if "cms_chatbot_work_filter" not in st.session_state:
-        st.session_state.cms_chatbot_work_filter = "전체"
-    if "cms_chatbot_operation_filter" not in st.session_state:
-        st.session_state.cms_chatbot_operation_filter = "전체"
-    if st.session_state.cms_chatbot_work_filter not in work_options:
-        st.session_state.cms_chatbot_work_filter = "전체"
-    if st.session_state.cms_chatbot_operation_filter not in operation_options:
-        st.session_state.cms_chatbot_operation_filter = "전체"
-
-    selected_work = st.session_state.cms_chatbot_work_filter
-    selected_operation = st.session_state.cms_chatbot_operation_filter
-
-    filtered_rows = [
-        row
-        for row in rows
-        if (selected_work == "전체" or row["업무"] == selected_work)
-        and (selected_operation == "전체" or row["운영구분"] == selected_operation)
-    ]
+    filtered_rows = rows
 
     def chatbot_operation_from_work(work):
         if work == "설치등록":
@@ -19937,10 +19920,6 @@ def show_cms_chatbot():
             if not overlap:
                 continue
             score = len(overlap) * 10
-            if str(row.get("업무", "")) == selected_work:
-                score += 3
-            if str(row.get("운영구분", "")) == selected_operation:
-                score += 3
             scored_rows.append((score, len(overlap), row, sorted(overlap)))
         scored_rows.sort(key=lambda item: (item[0], item[1]), reverse=True)
         return scored_rows[:5]
@@ -19960,10 +19939,6 @@ def show_cms_chatbot():
             for score, _, row, keywords in matches
         ]
         st.session_state.cms_chatbot_answer_index = 0
-        st.session_state.cms_chatbot_filter_summary = {
-            "업무": selected_work,
-            "운영구분": selected_operation,
-        }
         st.session_state.cms_chatbot_last_question = question_text.strip()
 
     def parse_chatbot_answer_parts(answer_text):
@@ -20144,7 +20119,7 @@ def show_cms_chatbot():
                     border: 1px solid #B8DAD6 !important;
                     background: #E7F7F4 !important;
                     color: #111827 !important;
-                    font-weight: 800;
+                    font-weight: 900;
                     justify-content: flex-start;
                     text-align: left;
                     min-height: 38px;
@@ -20268,7 +20243,7 @@ def show_cms_chatbot():
                     if len(candidate_questions) >= 5:
                         break
                 if candidate_questions:
-                    st.markdown('<div class="hana-candidate-title">유사 질문 후보</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="hana-candidate-title">유사 질문</div>', unsafe_allow_html=True)
                 for preview_index, preview_question in enumerate(candidate_questions):
                     if st.button(
                         f"{preview_index + 1}. {preview_question[:88]}",
@@ -20276,7 +20251,7 @@ def show_cms_chatbot():
                         use_container_width=True,
                     ):
                         st.session_state.cms_chatbot_question_input = preview_question
-                        save_chatbot_search_results(preview_question, filtered_rows or rows, not bool(filtered_rows))
+                        save_chatbot_search_results(preview_question, rows, False)
                         st.rerun()
             else:
                 st.markdown(
@@ -20290,11 +20265,6 @@ def show_cms_chatbot():
                     """,
                     unsafe_allow_html=True,
                 )
-            condition_col1, condition_col2 = st.columns(2)
-            with condition_col1:
-                st.selectbox("업무 범위", work_options, key="cms_chatbot_work_filter")
-            with condition_col2:
-                st.selectbox("처리 구분", operation_options, key="cms_chatbot_operation_filter")
             question = st.text_area(
                 "증상/질문 검색",
                 height=130,
@@ -20305,10 +20275,10 @@ def show_cms_chatbot():
                 if not question.strip():
                     st.warning("질문을 입력해주세요.")
                 else:
-                    save_chatbot_search_results(question, filtered_rows or rows, not bool(filtered_rows))
+                    save_chatbot_search_results(question, rows, False)
                     st.rerun()
             if st.session_state.get("cms_chatbot_matches") == [] and question.strip():
-                st.warning("유사한 FAQ 답변을 찾지 못했습니다. 업무/운영구분 필터를 전체로 바꾸거나 FAQ를 추가해주세요.")
+                st.warning("유사한 FAQ 답변을 찾지 못했습니다. 질문을 조금 더 구체적으로 입력하거나 FAQ를 추가해주세요.")
             st.markdown('<div class="hana-side-section">과거 대화내용</div>', unsafe_allow_html=True)
             last_question = st.session_state.get("cms_chatbot_last_question", "")
             if last_question:
