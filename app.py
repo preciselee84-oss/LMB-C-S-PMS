@@ -42,6 +42,7 @@ BANK_ACCOUNT_FILE = "bank_accounts.json"
 USAGE_REPORT_FILE = "usage_reports.json"
 COMPANY_PROFILE_FILE = "company_profile.json"
 CMS_CHATBOT_FAQ_FILE = os.path.join(APP_DIR, "data", "cms_chatbot_faq.json")
+CMS_CHATBOT_MANUAL_FAQ_FILE = os.path.join(APP_DIR, "data", "cms_chatbot_manual_faq.json")
 CMS_CHATBOT_IMAGE_FILE = os.path.join(APP_DIR, "data", "cms_chatbot_images.json")
 EXCEL_SAMPLE_FILE = resolve_template_file("LMB월간 활동실적_000000(샘플).xlsx")
 PPT_TEMPLATE_FILE = resolve_template_file("LMB활동실적보고서_202605_하나지사.pptx")
@@ -19528,10 +19529,33 @@ def show_cms_chatbot():
 
     saved_faq = load_local_json(CMS_CHATBOT_FAQ_FILE, {})
     saved_rows = saved_faq.get("rows", []) if isinstance(saved_faq, dict) else []
+    manual_faq = load_local_json(CMS_CHATBOT_MANUAL_FAQ_FILE, {})
+    manual_rows = manual_faq.get("rows", []) if isinstance(manual_faq, dict) else []
+
+    def merge_chatbot_rows(*row_groups):
+        def row_value(value):
+            return re.sub(r"\s+", " ", str(value or "").replace("\xa0", " ")).strip()
+
+        merged = []
+        seen = set()
+        for row_group in row_groups:
+            for row in row_group or []:
+                row_key = (
+                    row_value(row.get("회사", "")),
+                    row_value(row.get("질문", "")),
+                    row_value(row.get("답변요약", "")),
+                )
+                if row_key in seen:
+                    continue
+                seen.add(row_key)
+                merged.append(row)
+        return merged
+
+    seeded_rows = merge_chatbot_rows(saved_rows, manual_rows) or default_faq_rows
     if "cms_chatbot_faq_rows" not in st.session_state:
-        st.session_state.cms_chatbot_faq_rows = saved_rows or default_faq_rows
-    elif len(saved_rows) > len(st.session_state.cms_chatbot_faq_rows):
-        st.session_state.cms_chatbot_faq_rows = saved_rows
+        st.session_state.cms_chatbot_faq_rows = seeded_rows
+    elif len(seeded_rows) > len(st.session_state.cms_chatbot_faq_rows):
+        st.session_state.cms_chatbot_faq_rows = seeded_rows
     if "cms_chatbot_image_store" not in st.session_state:
         saved_images = load_local_json(CMS_CHATBOT_IMAGE_FILE, {})
         st.session_state.cms_chatbot_image_store = {
@@ -19564,7 +19588,9 @@ def show_cms_chatbot():
     def reload_cms_chatbot_faq_store():
         saved_faq = load_local_json(CMS_CHATBOT_FAQ_FILE, {})
         saved_rows = saved_faq.get("rows", []) if isinstance(saved_faq, dict) else []
-        st.session_state.cms_chatbot_faq_rows = saved_rows or default_faq_rows
+        manual_faq = load_local_json(CMS_CHATBOT_MANUAL_FAQ_FILE, {})
+        manual_rows = manual_faq.get("rows", []) if isinstance(manual_faq, dict) else []
+        st.session_state.cms_chatbot_faq_rows = merge_chatbot_rows(saved_rows, manual_rows) or default_faq_rows
         saved_images = load_local_json(CMS_CHATBOT_IMAGE_FILE, {})
         st.session_state.cms_chatbot_image_store = {
             key: [base64.b64decode(image_text) for image_text in image_list]
@@ -19849,6 +19875,99 @@ def show_cms_chatbot():
                 )
         return imported, skipped
 
+    def build_chatbot_rows_from_manual_ppt(ppt_bytes, file_name):
+        from pptx import Presentation
+
+        def ppt_text_lines(slide):
+            lines = []
+            images = []
+            for shape in slide.shapes:
+                if getattr(shape, "has_text_frame", False) and shape.text.strip():
+                    for line in shape.text.splitlines():
+                        cleaned = clean_chatbot_text(line)
+                        if cleaned:
+                            lines.append(cleaned)
+                if shape.shape_type == 13:
+                    images.append(shape.image.blob)
+            return lines, images
+
+        def is_manual_noise_line(text):
+            source = clean_chatbot_text(text)
+            if not source:
+                return True
+            if re.fullmatch(r"\d+(\.\d+)?", source):
+                return True
+            return source.lower() in {"tip", "contents", "목차"}
+
+        def manual_title_from_lines(lines):
+            candidates = [
+                line
+                for line in lines
+                if not is_manual_noise_line(line)
+                and 2 <= len(line) <= 36
+                and not line.startswith(("-", "·", "※", "*"))
+            ]
+            if not candidates:
+                return clean_chatbot_text(lines[0])[:36] if lines else ""
+            return candidates[-1]
+
+        def manual_answer_from_lines(title, lines):
+            answer_lines = []
+            for line in lines:
+                cleaned = clean_chatbot_text(line)
+                if is_manual_noise_line(cleaned) or cleaned == title:
+                    continue
+                if len(cleaned) < 8:
+                    continue
+                if cleaned not in answer_lines:
+                    answer_lines.append(cleaned[:180])
+                if len(answer_lines) >= 6:
+                    break
+            return "\n".join(f"- {line}" for line in answer_lines)
+
+        prs = Presentation(BytesIO(ppt_bytes))
+        grouped = {}
+        skipped = 0
+        for slide_no, slide in enumerate(prs.slides, 1):
+            lines, images = ppt_text_lines(slide)
+            title = manual_title_from_lines(lines)
+            answer_text = manual_answer_from_lines(title, lines)
+            if not title or not answer_text:
+                skipped += 1
+                continue
+            group = grouped.setdefault(title, {"lines": [], "images": [], "slides": []})
+            group["slides"].append(slide_no)
+            for answer_line in answer_text.splitlines():
+                if answer_line not in group["lines"]:
+                    group["lines"].append(answer_line)
+            if images and not group["images"]:
+                group["images"] = images[:2]
+
+        imported = []
+        image_store_updates = {}
+        for title, group in grouped.items():
+            answer_text = "\n".join(group["lines"][:6])
+            if not answer_text:
+                skipped += 1
+                continue
+            work = chatbot_work_from_document_text(f"{title} {answer_text}")
+            image_key = ""
+            if group["images"]:
+                image_key = f"{file_name}:manual:{title}"
+                image_store_updates[image_key] = group["images"][:2]
+            imported.append(
+                {
+                    "회사": "고객사 공통",
+                    "업무": work,
+                    "운영구분": chatbot_operation_from_work(work),
+                    "질문": f"{title} 메뉴는 어떻게 사용하나요?",
+                    "답변요약": answer_text,
+                    "이미지키": image_key,
+                    "상태": f"사용자매뉴얼:{file_name}",
+                }
+            )
+        return imported, skipped, image_store_updates
+
     def build_chatbot_rows_from_monthly_performance(uploaded_file, file_name):
         imported = []
         skipped = 0
@@ -19947,6 +20066,16 @@ def show_cms_chatbot():
     def select_chatbot_answer(index):
         st.session_state.cms_chatbot_answer_index = index
 
+    def chatbot_history_question(history_item):
+        if isinstance(history_item, dict):
+            return str(history_item.get("question", "")).strip()
+        return str(history_item or "").strip()
+
+    def chatbot_history_time(history_item):
+        if isinstance(history_item, dict):
+            return str(history_item.get("searched_at", "")).strip()
+        return ""
+
     def save_chatbot_search_results(question_text, search_pool, filter_empty):
         matches = find_chatbot_answers(question_text, search_pool)
         st.session_state.cms_chatbot_last_filter_empty = filter_empty
@@ -19961,13 +20090,21 @@ def show_cms_chatbot():
         st.session_state.cms_chatbot_answer_index = 0
         clean_question = question_text.strip()
         st.session_state.cms_chatbot_last_question = clean_question
+        searched_at = _current_kst().strftime("%Y-%m-%d %H:%M")
+        st.session_state.cms_chatbot_answered_at = searched_at
         if clean_question:
             history_questions = [
-                str(item).strip()
+                {
+                    "question": chatbot_history_question(item),
+                    "searched_at": chatbot_history_time(item),
+                }
                 for item in st.session_state.get("cms_chatbot_question_history", [])
-                if str(item).strip() and str(item).strip() != clean_question
+                if chatbot_history_question(item) and chatbot_history_question(item) != clean_question
             ]
-            st.session_state.cms_chatbot_question_history = [clean_question, *history_questions][:10]
+            st.session_state.cms_chatbot_question_history = [
+                {"question": clean_question, "searched_at": searched_at},
+                *history_questions,
+            ][:10]
 
     def parse_chatbot_answer_parts(answer_text):
         source = str(answer_text or "").strip()
@@ -20320,6 +20457,11 @@ def show_cms_chatbot():
                 direct_answer = direct_chatbot_answer_for_question(last_question_text)
                 merged_answer = direct_answer or merged_chatbot_result_from_matches(saved_matches[:3], last_question_text) or display_answer
                 answer_html = html.escape(merged_answer).replace("\n", "<br>")
+                answered_at_text = str(st.session_state.get("cms_chatbot_answered_at", "")).strip()
+                if not answered_at_text:
+                    answered_at_text = _current_kst().strftime("%Y-%m-%d %H:%M")
+                    st.session_state.cms_chatbot_answered_at = answered_at_text
+                answered_at = html.escape(answered_at_text)
                 st.markdown(
                     f"""
                     <div class="hana-chat-window">
@@ -20332,6 +20474,7 @@ def show_cms_chatbot():
                                 <div style="font-size: 16px; line-height: 1.7; font-weight: 700;">
                                     {answer_html or "등록된 답변 내용이 없습니다."}
                                 </div>
+                                <div class="hana-chat-meta">답변일시 {answered_at}</div>
                             </div>
                         </div>
                     </div>
@@ -20402,18 +20545,29 @@ def show_cms_chatbot():
                                 st.rerun()
         with history_col:
             history_questions = [
-                str(item).strip()
+                {
+                    "question": chatbot_history_question(item),
+                    "searched_at": chatbot_history_time(item),
+                }
                 for item in st.session_state.get("cms_chatbot_question_history", [])
-                if str(item).strip()
+                if chatbot_history_question(item)
             ]
             last_question = str(st.session_state.get("cms_chatbot_last_question", "")).strip()
-            if last_question and last_question not in history_questions:
-                history_questions = [last_question, *history_questions][:10]
+            if last_question and all(item["question"] != last_question for item in history_questions):
+                history_questions = [
+                    {
+                        "question": last_question,
+                        "searched_at": str(st.session_state.get("cms_chatbot_answered_at", "")).strip(),
+                    },
+                    *history_questions,
+                ][:10]
                 st.session_state.cms_chatbot_question_history = history_questions
             with st.container(border=True):
                 st.markdown('<div class="hana-history-mini-title">과거 질문</div>', unsafe_allow_html=True)
                 if history_questions:
-                    for history_index, history_question in enumerate(history_questions[:10]):
+                    for history_index, history_item in enumerate(history_questions[:10]):
+                        history_question = history_item["question"]
+                        history_time = history_item.get("searched_at", "")
                         compact_question = history_question[:48]
                         if st.button(
                             compact_question,
@@ -20423,6 +20577,8 @@ def show_cms_chatbot():
                             st.session_state.cms_chatbot_pending_question_input = history_question
                             save_chatbot_search_results(history_question, rows, False)
                             st.rerun()
+                        if history_time:
+                            st.caption(f"질문일시 {history_time}")
                 else:
                     st.markdown('<div class="hana-history-mini-item muted">검색한 질문 없음</div>', unsafe_allow_html=True)
     st.markdown("##### 샘플 QNA 업로드")
@@ -20526,39 +20682,14 @@ def show_cms_chatbot():
                         file_name = uploaded_history_file.name
                         lower_name = file_name.lower()
                         if lower_name.endswith(".pptx"):
-                            from pptx import Presentation
-
-                            prs = Presentation(BytesIO(uploaded_history_file.getvalue()))
-                            for slide_no, slide in enumerate(prs.slides, 1):
-                                slide_texts = []
-                                slide_images = []
-                                for shape in slide.shapes:
-                                    if getattr(shape, "has_text_frame", False) and shape.text.strip():
-                                        slide_texts.append(re.sub(r"\s+", " ", shape.text).strip())
-                                    if shape.shape_type == 13:
-                                        slide_images.append(shape.image.blob)
-                                if not slide_texts:
-                                    skipped_count += 1
-                                    continue
-                                title = slide_texts[0]
-                                answer_text = "\n".join(slide_texts[:12])
-                                work = chatbot_work_from_document_text(answer_text)
-                                image_key = ""
-                                if slide_images:
-                                    image_key = f"{file_name}:p{slide_no}"
-                                    st.session_state.cms_chatbot_image_store[image_key] = slide_images[:4]
-                                imported_rows.append(
-                                    {
-                                        "회사": "고객사 공통",
-                                        "업무": work,
-                                        "운영구분": chatbot_operation_from_work(work),
-                                        "질문": f"{title} 관련 내용은?",
-                                        "답변요약": answer_text,
-                                        "이미지키": image_key,
-                                        "상태": f"문서:{file_name}:p{slide_no}",
-                                    }
-                                )
-                                continue
+                            file_rows, file_skipped, image_updates = build_chatbot_rows_from_manual_ppt(
+                                uploaded_history_file.getvalue(),
+                                file_name,
+                            )
+                            imported_rows.extend(file_rows)
+                            skipped_count += file_skipped
+                            st.session_state.cms_chatbot_image_store.update(image_updates)
+                            continue
                         uploaded_history_file.seek(0)
                         first_sheet_df = pd.read_excel(uploaded_history_file, dtype=str).fillna("")
                         if required_columns.issubset(set(first_sheet_df.columns)):
