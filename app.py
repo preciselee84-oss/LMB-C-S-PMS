@@ -19585,18 +19585,6 @@ def show_cms_chatbot():
             ]
         )
     )
-    company_candidates = sorted(
-        {
-            "고객사 공통",
-            "신풍제약(주)",
-            "주식회사 알팩",
-            "한전산업개발(주)",
-            "(주)라우드코퍼레이션",
-            "경희대학교",
-            *[str(row.get("회사", "")).strip() for row in rows if str(row.get("회사", "")).strip()],
-        }
-    )
-
     if "cms_chatbot_work_filter" not in st.session_state:
         st.session_state.cms_chatbot_work_filter = "전체"
     if "cms_chatbot_operation_filter" not in st.session_state:
@@ -19605,38 +19593,14 @@ def show_cms_chatbot():
         st.session_state.cms_chatbot_work_filter = "전체"
     if st.session_state.cms_chatbot_operation_filter not in operation_options:
         st.session_state.cms_chatbot_operation_filter = "전체"
-    if "cms_chatbot_company_query" not in st.session_state:
-        st.session_state.cms_chatbot_company_query = ""
-    if "cms_chatbot_company_match" not in st.session_state:
-        st.session_state.cms_chatbot_company_match = "입력값으로 검색"
 
-    company_query = str(st.session_state.cms_chatbot_company_query)
     selected_work = st.session_state.cms_chatbot_work_filter
     selected_operation = st.session_state.cms_chatbot_operation_filter
-    normalized_company_query = company_query.strip().lower()
-    matched_companies = [
-        company
-        for company in company_candidates
-        if normalized_company_query and normalized_company_query in company.lower()
-    ][:20]
-    company_match_options = ["입력값으로 검색"] + matched_companies
-    if st.session_state.cms_chatbot_company_match not in company_match_options:
-        st.session_state.cms_chatbot_company_match = "입력값으로 검색"
-    selected_company_match = st.session_state.cms_chatbot_company_match if matched_companies else ""
-    show_company_no_match = bool(normalized_company_query and not matched_companies)
-    show_company_matches = bool(matched_companies)
 
-    company_filter = (
-        selected_company_match
-        if selected_company_match and selected_company_match != "입력값으로 검색"
-        else company_query.strip()
-    )
-    normalized_company_filter = company_filter.lower()
     filtered_rows = [
         row
         for row in rows
-        if (not normalized_company_filter or normalized_company_filter in str(row["회사"]).lower())
-        and (selected_work == "전체" or row["업무"] == selected_work)
+        if (selected_work == "전체" or row["업무"] == selected_work)
         and (selected_operation == "전체" or row["운영구분"] == selected_operation)
     ]
 
@@ -19958,8 +19922,6 @@ def show_cms_chatbot():
                 score += 3
             if str(row.get("운영구분", "")) == selected_operation:
                 score += 3
-            if company_filter and company_filter.lower() in str(row.get("회사", "")).lower():
-                score += 5
             scored_rows.append((score, len(overlap), row, sorted(overlap)))
         scored_rows.sort(key=lambda item: (item[0], item[1]), reverse=True)
         return scored_rows[:5]
@@ -19980,7 +19942,6 @@ def show_cms_chatbot():
         ]
         st.session_state.cms_chatbot_answer_index = 0
         st.session_state.cms_chatbot_filter_summary = {
-            "회사": company_filter or "전체",
             "업무": selected_work,
             "운영구분": selected_operation,
         }
@@ -20212,6 +20173,11 @@ def show_cms_chatbot():
         nav_col, qna_col = st.columns([0.48, 0.52], gap="large")
         with nav_col:
             st.markdown('<div class="hana-side-panel">', unsafe_allow_html=True)
+            condition_col1, condition_col2 = st.columns(2)
+            with condition_col1:
+                st.selectbox("업무 범위", work_options, key="cms_chatbot_work_filter")
+            with condition_col2:
+                st.selectbox("처리 구분", operation_options, key="cms_chatbot_operation_filter")
             question = st.text_area(
                 "증상/질문 검색",
                 height=130,
@@ -20278,22 +20244,6 @@ def show_cms_chatbot():
                     st.caption("현재 필터 조건에 맞는 FAQ가 없어 전체 FAQ에서 검색했습니다.")
             elif st.session_state.get("cms_chatbot_matches") == [] and question.strip():
                 st.warning("유사한 FAQ 답변을 찾지 못했습니다. 업무/운영구분 필터를 전체로 바꾸거나 FAQ를 추가해주세요.")
-            st.markdown('<div class="hana-side-section">검색 조건</div>', unsafe_allow_html=True)
-            st.text_input("회사 검색", placeholder="회사명 일부 입력", key="cms_chatbot_company_query")
-            if show_company_matches:
-                st.selectbox(
-                    "회사 검색 결과",
-                    company_match_options,
-                    key="cms_chatbot_company_match",
-                    help="검색된 회사명을 선택하면 해당 회사 기준으로 FAQ가 필터링됩니다.",
-                )
-            elif show_company_no_match:
-                st.caption("일치하는 등록 회사가 없습니다. 입력한 회사명 포함 조건으로 검색합니다.")
-            condition_col1, condition_col2 = st.columns(2)
-            with condition_col1:
-                st.selectbox("업무 범위", work_options, key="cms_chatbot_work_filter")
-            with condition_col2:
-                st.selectbox("처리 구분", operation_options, key="cms_chatbot_operation_filter")
             st.markdown('<div class="hana-side-section">과거 대화내용</div>', unsafe_allow_html=True)
             last_question = st.session_state.get("cms_chatbot_last_question", "")
             if last_question:
