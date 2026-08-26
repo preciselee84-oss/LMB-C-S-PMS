@@ -19597,10 +19597,19 @@ def show_cms_chatbot():
         }
     )
 
+    if "cms_chatbot_work_filter" not in st.session_state:
+        st.session_state.cms_chatbot_work_filter = "전체"
+    if "cms_chatbot_operation_filter" not in st.session_state:
+        st.session_state.cms_chatbot_operation_filter = "전체"
+    if st.session_state.cms_chatbot_work_filter not in work_options:
+        st.session_state.cms_chatbot_work_filter = "전체"
+    if st.session_state.cms_chatbot_operation_filter not in operation_options:
+        st.session_state.cms_chatbot_operation_filter = "전체"
+
     filter_col1, filter_col2, filter_col3 = st.columns(3)
-    company_query = filter_col1.text_input("회사별", placeholder="회사명을 입력하면 자동 검색")
-    selected_work = filter_col2.selectbox("업무별", work_options)
-    selected_operation = filter_col3.selectbox("운영구분별", operation_options)
+    company_query = filter_col1.text_input("회사 검색", placeholder="회사명 일부 입력")
+    selected_work = filter_col2.selectbox("업무 범위", work_options, key="cms_chatbot_work_filter")
+    selected_operation = filter_col3.selectbox("처리 구분", operation_options, key="cms_chatbot_operation_filter")
     normalized_company_query = company_query.strip().lower()
     matched_companies = [
         company
@@ -19964,6 +19973,25 @@ def show_cms_chatbot():
     def select_chatbot_answer(index):
         st.session_state.cms_chatbot_answer_index = index
 
+    def save_chatbot_search_results(question_text, search_pool, filter_empty):
+        matches = find_chatbot_answers(question_text, search_pool)
+        st.session_state.cms_chatbot_last_filter_empty = filter_empty
+        st.session_state.cms_chatbot_matches = [
+            {
+                "score": score,
+                "row": dict(row),
+                "keywords": keywords,
+            }
+            for score, _, row, keywords in matches
+        ]
+        st.session_state.cms_chatbot_answer_index = 0
+        st.session_state.cms_chatbot_filter_summary = {
+            "회사": company_filter or "전체",
+            "업무": selected_work,
+            "운영구분": selected_operation,
+        }
+        st.session_state.cms_chatbot_last_question = question_text.strip()
+
     def parse_chatbot_answer_parts(answer_text):
         source = str(answer_text or "").strip()
         if "상세내용:" in source:
@@ -20089,9 +20117,22 @@ def show_cms_chatbot():
                     background: #FFFFFF;
                     border: 1px solid #D7E3E1;
                 }
+                .hana-workflow-note {
+                    width: 52%;
+                    min-width: 560px;
+                    max-width: 820px;
+                    margin: 10px 0 8px;
+                    padding: 12px 14px;
+                    border-radius: 12px;
+                    background: #EAF7F5;
+                    color: #006E66;
+                    font-weight: 800;
+                    border: 1px solid #C8E6E2;
+                }
                 @media (max-width: 1100px) {
                     .hana-chat-shell,
-                    .hana-chat-input-panel {
+                    .hana-chat-input-panel,
+                    .hana-workflow-note {
                         width: 100%;
                         min-width: 0;
                         max-width: none;
@@ -20101,36 +20142,53 @@ def show_cms_chatbot():
             """,
             unsafe_allow_html=True,
         )
+        quick_prompts = [
+            ("ERP 반영", "ERP에 데이터가 반영되지 않을 때 어떤 부분을 확인해야 하나요?"),
+            ("로그인/인증서", "통합CMS 로그인 또는 인증서 오류가 발생하면 무엇을 확인해야 하나요?"),
+            ("계좌/거래내역", "계좌 잔액이나 거래내역이 조회되지 않을 때 어떻게 처리하나요?"),
+            ("스크래핑", "스크래핑 오류가 발생하면 기본적으로 무엇을 점검해야 하나요?"),
+            ("Agent/서버", "Agent 또는 서버 점검 시 어떤 순서로 확인해야 하나요?"),
+            ("고객방문 질문", "고객 방문 시 어떤 질문을 하고 어떤 기능을 제안해야 하나요?"),
+        ]
+        st.markdown('<div class="hana-workflow-note">검색 순서: 업무 버튼 선택 → 증상/질문 입력 → 유사 질문 확인 → 답변 검색</div>', unsafe_allow_html=True)
+        quick_cols = st.columns(6)
+        for quick_index, (label, prompt) in enumerate(quick_prompts):
+            with quick_cols[quick_index]:
+                if st.button(label, key=f"cms_chatbot_quick_prompt_{quick_index}", use_container_width=True):
+                    st.session_state.cms_chatbot_question_input = prompt
+                    st.session_state.cms_chatbot_matches = []
+                    st.rerun()
+
         input_col, _ = st.columns([0.52, 0.48])
         with input_col:
             st.markdown('<div class="hana-chat-input-panel">', unsafe_allow_html=True)
             question = st.text_area(
-                "질문",
+                "증상/질문 검색",
                 height=110,
+                key="cms_chatbot_question_input",
                 placeholder="예: 고객사에서 통합CMS 로그인은 되지 않는데 DB 접속 테스트는 성공합니다. 무엇을 확인해야 하나요?",
             )
+            preview_matches = []
+            if question.strip():
+                preview_matches = find_chatbot_answers(question, filtered_rows or rows)
+            if preview_matches:
+                st.markdown("**유사 질문 후보**")
+                for preview_index, preview_match in enumerate(preview_matches[:3]):
+                    _, _, preview_row, _ = preview_match
+                    preview_question = str(preview_row.get("질문", "")).strip()
+                    if st.button(
+                        preview_question[:90],
+                        key=f"cms_chatbot_preview_question_{preview_index}",
+                        use_container_width=True,
+                    ):
+                        save_chatbot_search_results(preview_question, filtered_rows or rows, not bool(filtered_rows))
+                        st.rerun()
             if st.button("답변 검색", use_container_width=True, type="primary"):
                 if not question.strip():
                     st.warning("질문을 입력해주세요.")
                 else:
                     search_pool = filtered_rows or rows
-                    matches = find_chatbot_answers(question, search_pool)
-                    st.session_state.cms_chatbot_last_filter_empty = not bool(filtered_rows)
-                    st.session_state.cms_chatbot_matches = [
-                        {
-                            "score": score,
-                            "row": dict(row),
-                            "keywords": keywords,
-                        }
-                        for score, _, row, keywords in matches
-                    ]
-                    st.session_state.cms_chatbot_answer_index = 0
-                    st.session_state.cms_chatbot_filter_summary = {
-                        "회사": company_filter or "전체",
-                        "업무": selected_work,
-                        "운영구분": selected_operation,
-                    }
-                    st.session_state.cms_chatbot_last_question = question.strip()
+                    save_chatbot_search_results(question, search_pool, not bool(filtered_rows))
             st.markdown("</div>", unsafe_allow_html=True)
 
         saved_matches = st.session_state.get("cms_chatbot_matches", [])
