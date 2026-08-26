@@ -20201,7 +20201,7 @@ def show_cms_chatbot():
             """,
             unsafe_allow_html=True,
         )
-        nav_col, qna_col = st.columns([0.48, 0.52], gap="large")
+        nav_col, _ = st.columns([0.62, 0.38], gap="large")
         with nav_col:
             saved_matches = st.session_state.get("cms_chatbot_matches", [])
             if saved_matches:
@@ -20256,7 +20256,7 @@ def show_cms_chatbot():
                     if len(candidate_questions) >= 5:
                         break
                 if candidate_questions:
-                    st.markdown('<div class="hana-candidate-title">유사 질문</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="hana-candidate-title">많이 검색했던 질문들이에요!</div>', unsafe_allow_html=True)
                 for preview_index, preview_question in enumerate(candidate_questions):
                     if st.button(
                         f"{preview_index + 1}. {preview_question[:88]}",
@@ -20301,31 +20301,6 @@ def show_cms_chatbot():
                 )
             else:
                 st.markdown('<div class="hana-history-item">아직 검색한 질문이 없습니다.</div>', unsafe_allow_html=True)
-
-        with qna_col:
-            saved_matches = st.session_state.get("cms_chatbot_matches", [])
-            if saved_matches:
-                selected_index = min(
-                    int(st.session_state.get("cms_chatbot_answer_index", 0)),
-                    len(saved_matches) - 1,
-                )
-                st.markdown("##### 같이 질문했던 사례")
-                for idx, match in enumerate(saved_matches[:5]):
-                    row = match.get("row", {})
-                    case_answer, case_detail = parse_chatbot_answer_parts(str(row.get("답변요약", "")))
-                    case_question = str(row.get("질문", "")).strip() or "질문 내용 없음"
-                    case_company = str(row.get("회사", "-"))
-                    case_meta = f"{row.get('업무', '-')} / {row.get('운영구분', '-')} / 유사도 {match.get('score', 0)}점"
-                    with st.expander(f"{idx + 1}. {case_company} - {case_question[:70]}", expanded=(idx == selected_index)):
-                        st.markdown("**질문**")
-                        st.write(case_question)
-                        st.markdown("**처리결과**")
-                        st.write(case_answer)
-                        st.caption(case_meta)
-                        if case_detail:
-                            with st.expander("상세 원문"):
-                                st.write(case_detail)
-
     st.markdown("##### 샘플 QNA 업로드")
     st.caption("QNA 정리본 엑셀을 업로드하면 질문/답변을 FAQ 데이터로 변환해 챗봇 검색에 반영합니다. 원본 파일은 저장하지 않습니다.")
     sample_qna_file = st.file_uploader(
