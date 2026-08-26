@@ -20361,33 +20361,10 @@ def show_cms_chatbot():
                         if case_detail:
                             with st.expander("상세 원문"):
                                 st.write(case_detail)
-                meta_cols = st.columns(4)
-                meta_cols[0].metric("회사", best_row.get("회사", "-"))
-                meta_cols[1].metric("업무", best_row.get("업무", "-"))
-                meta_cols[2].metric("운영구분", best_row.get("운영구분", "-"))
-                meta_cols[3].metric("유사도", f"{best_score}점")
-                st.markdown("##### 유사 질문 선택")
-                st.caption("질문을 선택하면 해당 고객사 사례가 펼쳐집니다.")
-                for idx, match in enumerate(saved_matches[:5]):
-                    row = match.get("row", {})
-                    question_label = str(row.get("질문", "")).strip() or "질문 내용 없음"
-                    prefix = "현재" if idx == selected_index else "보기"
-                    st.button(
-                        f"{idx + 1}. {question_label[:110]}",
-                        key=f"cms_chatbot_similar_question_{idx}",
-                        on_click=select_chatbot_answer,
-                        args=(idx,),
-                    )
-                    st.caption(f"{prefix} · {row.get('회사', '-')} / {row.get('업무', '-')} / {row.get('운영구분', '-')} · 유사도 {match.get('score', 0)}점")
-                with st.expander("매칭 근거 보기"):
-                    st.markdown("**원본 질문**")
-                    st.write(best_row.get("질문", ""))
-                    st.markdown("**일치 키워드**")
-                    st.write(", ".join(best_keywords) if best_keywords else "-")
             elif st.session_state.get("cms_chatbot_matches") == [] and question.strip():
                 st.warning("유사한 FAQ 답변을 찾지 못했습니다. 업무/운영구분 필터를 전체로 바꾸거나 FAQ를 추가해주세요.")
 
-    with st.expander("FAQ 목록 / 보강 데이터 관리", expanded=False):
+    if st.session_state.get("cms_chatbot_show_admin_tools", False):
         st.markdown("##### 자주 받는 질문")
         store_col1, store_col2, store_col3, store_col4 = st.columns([0.18, 0.18, 0.18, 0.46])
         with store_col1:
@@ -20551,7 +20528,7 @@ def show_cms_chatbot():
                     st.success("FAQ 항목이 추가되고 로컬 저장소에 저장되었습니다.")
                     st.rerun()
 
-    with st.expander("분류 관리", expanded=False):
+    if st.session_state.get("cms_chatbot_show_admin_tools", False):
         st.markdown("##### 분류 체계")
         left, right = st.columns(2)
         with left:
