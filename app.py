@@ -20149,6 +20149,9 @@ def show_cms_chatbot():
                     text-align: left;
                     min-height: 38px;
                 }
+                div[data-testid="stButton"] > button * {
+                    color: #111827 !important;
+                }
                 div[data-testid="stButton"] > button:hover {
                     border-color: #00857A !important;
                     color: #111827 !important;
@@ -20161,6 +20164,10 @@ def show_cms_chatbot():
                     color: #FFFFFF !important;
                     justify-content: center;
                     text-align: center;
+                }
+                div[data-testid="stButton"] > button[kind="primary"] *,
+                div[data-testid="stButton"] > button[data-testid="baseButton-primary"] * {
+                    color: #FFFFFF !important;
                 }
                 div[data-testid="stButton"] > button[kind="primary"]:hover,
                 div[data-testid="stButton"] > button[data-testid="baseButton-primary"]:hover {
