@@ -20082,13 +20082,27 @@ def show_cms_chatbot():
                     color: #00796B;
                 }
                 .hana-chat-input-panel {
-                    margin-top: 12px;
-                    padding: 14px;
+                    margin: 14px 0 16px;
+                    padding: 16px;
                     width: 100%;
                     min-width: 0;
                     max-width: none;
-                    border-radius: 14px;
-                    background: #FFFFFF;
+                    border-radius: 12px;
+                    background: #F7FCFB;
+                    border: 1px solid #B8DAD6;
+                    box-shadow: 0 8px 20px rgba(0, 133, 122, 0.07);
+                }
+                .hana-input-title {
+                    margin-bottom: 8px;
+                    color: #00857A;
+                    font-size: 14px;
+                    font-weight: 900;
+                }
+                .hana-candidate-panel {
+                    margin: 14px 0 16px;
+                    padding: 14px 16px 16px;
+                    border-radius: 12px;
+                    background: #F7FCFB;
                     border: 1px solid #B8DAD6;
                 }
                 .hana-workflow-note {
@@ -20255,18 +20269,21 @@ def show_cms_chatbot():
                     """,
                     unsafe_allow_html=True,
                 )
-            question = st.text_area(
-                "증상/질문 검색",
-                height=130,
-                key="cms_chatbot_question_input",
-                placeholder="예: 고객사에서 통합CMS 로그인은 되지 않는데 DB 접속 테스트는 성공합니다. 무엇을 확인해야 하나요?",
-            )
-            if st.button("답변 검색", type="primary"):
-                if not question.strip():
-                    st.warning("질문을 입력해주세요.")
-                else:
-                    save_chatbot_search_results(question, rows, False)
-                    st.rerun()
+            with st.container(border=True):
+                st.markdown('<div class="hana-input-title">증상/질문 검색</div>', unsafe_allow_html=True)
+                question = st.text_area(
+                    "증상/질문 검색",
+                    height=130,
+                    key="cms_chatbot_question_input",
+                    placeholder="예: 고객사에서 통합CMS 로그인은 되지 않는데 DB 접속 테스트는 성공합니다. 무엇을 확인해야 하나요?",
+                    label_visibility="collapsed",
+                )
+                if st.button("답변 검색", type="primary"):
+                    if not question.strip():
+                        st.warning("질문을 입력해주세요.")
+                    else:
+                        save_chatbot_search_results(question, rows, False)
+                        st.rerun()
             if st.session_state.get("cms_chatbot_matches") == [] and question.strip():
                 st.warning("유사한 FAQ 답변을 찾지 못했습니다. 질문을 조금 더 구체적으로 입력하거나 FAQ를 추가해주세요.")
             if saved_matches:
@@ -20283,16 +20300,17 @@ def show_cms_chatbot():
                     if len(candidate_questions) >= 5:
                         break
                 if candidate_questions:
-                    st.markdown('<div class="hana-candidate-title">많이 검색했던 질문들이에요!</div>', unsafe_allow_html=True)
-                for preview_index, preview_question in enumerate(candidate_questions):
-                    if st.button(
-                        f"{preview_index + 1}. {preview_question[:88]}",
-                        key=f"cms_chatbot_answer_candidate_{preview_index}",
-                        use_container_width=True,
-                    ):
-                        st.session_state.cms_chatbot_question_input = preview_question
-                        save_chatbot_search_results(preview_question, rows, False)
-                        st.rerun()
+                    with st.container(border=True):
+                        st.markdown('<div class="hana-candidate-title">많이 검색했던 질문들이에요!</div>', unsafe_allow_html=True)
+                        for preview_index, preview_question in enumerate(candidate_questions):
+                            if st.button(
+                                f"{preview_index + 1}. {preview_question[:88]}",
+                                key=f"cms_chatbot_answer_candidate_{preview_index}",
+                                use_container_width=True,
+                            ):
+                                st.session_state.cms_chatbot_question_input = preview_question
+                                save_chatbot_search_results(preview_question, rows, False)
+                                st.rerun()
             st.markdown('<div class="hana-side-section">과거 대화내용</div>', unsafe_allow_html=True)
             last_question = st.session_state.get("cms_chatbot_last_question", "")
             if last_question:
