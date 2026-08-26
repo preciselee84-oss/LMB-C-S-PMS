@@ -19660,6 +19660,19 @@ def show_cms_chatbot():
         source = clean_chatbot_text(question_text)
         source_upper = source.upper()
         if (
+            any(keyword in source for keyword in ["거래내역조회", "거래내역 조회", "계좌거래내역", "계좌 거래내역"])
+            and any(keyword in source for keyword in ["가능", "하나은행", "타은행", "조회", "은행"])
+        ):
+            return "\n".join(
+                [
+                    "- 계좌거래내역조회는 통합CMS에 등록된 조회계좌 기준으로 확인",
+                    "- 하나은행 계좌는 통합CMS에서 거래내역 조회 가능 여부를 우선 확인",
+                    "- 타은행 계좌는 해당 은행의 조회 연동/스크래핑 등록 여부를 확인",
+                    "- 거래내역이 보이지 않으면 조회 기간, 계좌 선택, 거래 발생 여부를 먼저 확인",
+                    "- 최신정보가져오기 실행 후에도 조회되지 않으면 은행별 조회 가능 범위와 오류 메시지를 기록해 확인",
+                ]
+            )
+        if (
             "ERP" in source_upper
             and any(keyword in source for keyword in ["반영", "데이터", "내역", "조회"])
             and any(keyword in source for keyword in ["안되", "안 되", "미반영", "누락", "없", "실패"])
