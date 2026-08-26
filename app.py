@@ -19487,7 +19487,19 @@ def show_visit_voc_collection():
 
 
 def show_cms_chatbot():
-    st.markdown('<h4 style="margin:0 0 18px; color:#00857A; font-weight:900;">통합CMS 챗봇</h4>', unsafe_allow_html=True)
+    header_col, history_col = st.columns([0.55, 0.45], gap="large")
+    with header_col:
+        st.markdown('<h4 style="margin:0 0 18px; color:#00857A; font-weight:900;">통합CMS 챗봇</h4>', unsafe_allow_html=True)
+    with history_col:
+        st.markdown('<div class="hana-side-section" style="margin-top:0; padding-top:0; border-top:0;">과거 질문</div>', unsafe_allow_html=True)
+        last_question = st.session_state.get("cms_chatbot_last_question", "")
+        if last_question:
+            st.markdown(
+                f'<div class="hana-history-item">{html.escape(str(last_question))[:120]}</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown('<div class="hana-history-item">아직 검색한 질문이 없습니다.</div>', unsafe_allow_html=True)
 
     work_options = ["전체", "사용자 교육", "사후관리", "기타", "오류발생", "서버점검", "ERP연계", "설치", "설치등록", "추가설치", "재설치", "클레임"]
     operation_options = ["전체", "운영", "연계", "개설"]
@@ -20314,15 +20326,6 @@ def show_cms_chatbot():
                                 st.session_state.cms_chatbot_pending_question_input = preview_question
                                 save_chatbot_search_results(preview_question, rows, False)
                                 st.rerun()
-            st.markdown('<div class="hana-side-section">과거 대화내용</div>', unsafe_allow_html=True)
-            last_question = st.session_state.get("cms_chatbot_last_question", "")
-            if last_question:
-                st.markdown(
-                    f'<div class="hana-history-item">{html.escape(str(last_question))[:120]}</div>',
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.markdown('<div class="hana-history-item">아직 검색한 질문이 없습니다.</div>', unsafe_allow_html=True)
     st.markdown("##### 샘플 QNA 업로드")
     st.caption("QNA 정리본 엑셀을 업로드하면 질문/답변을 FAQ 데이터로 변환해 챗봇 검색에 반영합니다. 원본 파일은 저장하지 않습니다.")
     sample_qna_file = st.file_uploader(
