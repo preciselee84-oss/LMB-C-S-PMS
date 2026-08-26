@@ -20243,29 +20243,6 @@ def show_cms_chatbot():
                 )
                 if st.session_state.get("cms_chatbot_last_filter_empty"):
                     st.caption("현재 필터 조건에 맞는 FAQ가 없어 전체 FAQ에서 검색했습니다.")
-                candidate_questions = []
-                for preview_match in saved_matches:
-                    preview_row = preview_match.get("row", {})
-                    preview_question = str(preview_row.get("질문", "")).strip()
-                    if not preview_question or not is_chatbot_question_text(preview_question):
-                        continue
-                    if any(keyword in preview_question for keyword in ["경우에는", "경우가 있습니다", "다음과 같은 경우"]):
-                        continue
-                    if preview_question not in candidate_questions:
-                        candidate_questions.append(preview_question)
-                    if len(candidate_questions) >= 5:
-                        break
-                if candidate_questions:
-                    st.markdown('<div class="hana-candidate-title">많이 검색했던 질문들이에요!</div>', unsafe_allow_html=True)
-                for preview_index, preview_question in enumerate(candidate_questions):
-                    if st.button(
-                        f"{preview_index + 1}. {preview_question[:88]}",
-                        key=f"cms_chatbot_answer_candidate_{preview_index}",
-                        use_container_width=True,
-                    ):
-                        st.session_state.cms_chatbot_question_input = preview_question
-                        save_chatbot_search_results(preview_question, rows, False)
-                        st.rerun()
             else:
                 st.markdown(
                     """
@@ -20292,6 +20269,30 @@ def show_cms_chatbot():
                     st.rerun()
             if st.session_state.get("cms_chatbot_matches") == [] and question.strip():
                 st.warning("유사한 FAQ 답변을 찾지 못했습니다. 질문을 조금 더 구체적으로 입력하거나 FAQ를 추가해주세요.")
+            if saved_matches:
+                candidate_questions = []
+                for preview_match in saved_matches:
+                    preview_row = preview_match.get("row", {})
+                    preview_question = str(preview_row.get("질문", "")).strip()
+                    if not preview_question or not is_chatbot_question_text(preview_question):
+                        continue
+                    if any(keyword in preview_question for keyword in ["경우에는", "경우가 있습니다", "다음과 같은 경우"]):
+                        continue
+                    if preview_question not in candidate_questions:
+                        candidate_questions.append(preview_question)
+                    if len(candidate_questions) >= 5:
+                        break
+                if candidate_questions:
+                    st.markdown('<div class="hana-candidate-title">많이 검색했던 질문들이에요!</div>', unsafe_allow_html=True)
+                for preview_index, preview_question in enumerate(candidate_questions):
+                    if st.button(
+                        f"{preview_index + 1}. {preview_question[:88]}",
+                        key=f"cms_chatbot_answer_candidate_{preview_index}",
+                        use_container_width=True,
+                    ):
+                        st.session_state.cms_chatbot_question_input = preview_question
+                        save_chatbot_search_results(preview_question, rows, False)
+                        st.rerun()
             st.markdown('<div class="hana-side-section">과거 대화내용</div>', unsafe_allow_html=True)
             last_question = st.session_state.get("cms_chatbot_last_question", "")
             if last_question:
