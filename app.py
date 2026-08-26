@@ -19959,7 +19959,15 @@ def show_cms_chatbot():
             for score, _, row, keywords in matches
         ]
         st.session_state.cms_chatbot_answer_index = 0
-        st.session_state.cms_chatbot_last_question = question_text.strip()
+        clean_question = question_text.strip()
+        st.session_state.cms_chatbot_last_question = clean_question
+        if clean_question:
+            history_questions = [
+                str(item).strip()
+                for item in st.session_state.get("cms_chatbot_question_history", [])
+                if str(item).strip() and str(item).strip() != clean_question
+            ]
+            st.session_state.cms_chatbot_question_history = [clean_question, *history_questions][:10]
 
     def parse_chatbot_answer_parts(answer_text):
         source = str(answer_text or "").strip()
@@ -20393,19 +20401,24 @@ def show_cms_chatbot():
                                 save_chatbot_search_results(preview_question, rows, False)
                                 st.rerun()
         with history_col:
-            last_question = st.session_state.get("cms_chatbot_last_question", "")
+            history_questions = [
+                str(item).strip()
+                for item in st.session_state.get("cms_chatbot_question_history", [])
+                if str(item).strip()
+            ]
             st.markdown('<div class="hana-history-side">', unsafe_allow_html=True)
             st.markdown('<div class="hana-history-mini-title">과거 질문</div>', unsafe_allow_html=True)
-            if last_question:
-                compact_question = str(last_question)[:48]
-                if st.button(
-                    compact_question,
-                    key="cms_chatbot_history_question_button",
-                    use_container_width=True,
-                ):
-                    st.session_state.cms_chatbot_pending_question_input = str(last_question)
-                    save_chatbot_search_results(str(last_question), rows, False)
-                    st.rerun()
+            if history_questions:
+                for history_index, history_question in enumerate(history_questions[:10]):
+                    compact_question = history_question[:48]
+                    if st.button(
+                        compact_question,
+                        key=f"cms_chatbot_history_question_button_{history_index}",
+                        use_container_width=True,
+                    ):
+                        st.session_state.cms_chatbot_pending_question_input = history_question
+                        save_chatbot_search_results(history_question, rows, False)
+                        st.rerun()
             else:
                 st.markdown('<div class="hana-history-mini-item muted">검색한 질문 없음</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
