@@ -9,8 +9,10 @@ import html
 import re
 import base64
 import hashlib
+import struct
 import unicodedata
 import textwrap
+import zlib
 import requests as _requests
 import streamlit.components.v1 as components
 from io import BytesIO
@@ -19685,6 +19687,22 @@ def show_cms_chatbot():
     def direct_chatbot_answer_for_question(question_text):
         source = clean_chatbot_text(question_text)
         source_upper = source.upper()
+        if any(keyword in source for keyword in ["자동이체", "출금시간", "출금 시간", "이체 이용시간", "이체시간"]):
+            if "출금" in source or "자동이체" in source:
+                return "\n".join(
+                    [
+                        "- 자동이체 출금은 출금 우선순위와 서비스별 출금시간 기준으로 진행됩니다.",
+                        "- CMS 자동이체는 납부자 동의 하에 납부자 계좌에서 사업자가 지정한 계좌로 수납하는 서비스입니다.",
+                        "- 공과금 예약이체 결과는 23시 이후 조회 가능하며, 금융결제원 자금정산 시간(23:50~00:05)에는 이용이 제한될 수 있습니다.",
+                    ]
+                )
+            return "\n".join(
+                [
+                    "- 이체 이용시간은 출금은행/입금은행과 출금방식에 따라 달라집니다.",
+                    "- 하나은행 간 이체는 하나은행 이체한도 기준을 우선 확인합니다.",
+                    "- 타행 이체는 은행공동망 또는 지준망 처리시간과 은행별 이용 가능 시간을 확인해야 합니다.",
+                ]
+            )
         if any(keyword in source for keyword in ["대량이체", "급여이체", "단건출금대량이체", "2500", "2,500"]):
             if "급여" in source:
                 return "\n".join(
@@ -19983,6 +20001,115 @@ def show_cms_chatbot():
                 }
             )
         return imported, skipped, image_store_updates
+
+    def extract_chatbot_text_from_legacy_ppt(ppt_bytes):
+        texts = []
+        position = 0
+        while True:
+            header_at = ppt_bytes.find(b"PK\x03\x04", position)
+            if header_at < 0:
+                break
+            try:
+                _, _, _, compression, _, _, _, compressed_size, _, name_len, extra_len = struct.unpack_from(
+                    "<IHHHHHIIIHH",
+                    ppt_bytes,
+                    header_at,
+                )
+                name_start = header_at + 30
+                name = ppt_bytes[name_start : name_start + name_len].decode("utf-8", "ignore")
+                data_start = name_start + name_len + extra_len
+                data = ppt_bytes[data_start : data_start + compressed_size]
+                if name.endswith(".xml"):
+                    xml_bytes = zlib.decompress(data, -15) if compression == 8 else data
+                    xml_text = xml_bytes.decode("utf-8", "ignore")
+                    for match in re.finditer(r"<a:t>(.*?)</a:t>", xml_text, re.S):
+                        text = html.unescape(match.group(1))
+                        text = clean_chatbot_text(text)
+                        if text and not text.startswith("<"):
+                            texts.append(text)
+            except Exception:
+                pass
+            position = header_at + 4
+        deduped = []
+        for text in texts:
+            if text not in deduped:
+                deduped.append(text)
+        return deduped
+
+    def build_chatbot_rows_from_legacy_ppt(ppt_bytes, file_name):
+        lines = extract_chatbot_text_from_legacy_ppt(ppt_bytes)
+        if not lines:
+            return [], 1
+        text = " ".join(lines)
+        rows = []
+
+        def add_manual_faq(question, answer):
+            rows.append(
+                {
+                    "회사": "고객사 공통",
+                    "업무": "사용자 교육",
+                    "운영구분": "운영",
+                    "질문": question,
+                    "답변요약": answer,
+                    "상태": f"사용자매뉴얼:{file_name}",
+                    "이미지키": "",
+                }
+            )
+
+        if any(keyword in text for keyword in ["자동이체", "출금시간", "출금 우선순위"]):
+            add_manual_faq(
+                "자동이체 출금시간은 어떻게 확인하나요?",
+                "\n".join(
+                    [
+                        "- 자동이체 출금은 출금 우선순위와 서비스별 출금시간 기준으로 진행됩니다.",
+                        "- 공과금 예약이체 결과조회는 23시 이후 조회 가능합니다.",
+                        "- 금융결제원 자금정산 시간(23:50~00:05)에는 이용이 제한될 수 있습니다.",
+                    ]
+                ),
+            )
+            add_manual_faq(
+                "CMS 자동이체 서비스는 무엇인가요?",
+                "\n".join(
+                    [
+                        "- CMS 자동이체는 납부자 동의 하에 납부자 계좌에서 사업자가 지정한 계좌로 자금을 수납하는 서비스입니다.",
+                        "- 사회보험료, 개인보험료, 렌탈료 등 정기 수납 업무에 활용됩니다.",
+                        "- 요구불간 자동이체, 공과금 예약이체 등 서비스 구분에 따라 처리 기준이 다릅니다.",
+                    ]
+                ),
+            )
+        if any(keyword in text for keyword in ["이체 이용시간", "은행공동망", "지준망", "금융결제원"]):
+            add_manual_faq(
+                "이체 이용시간은 어떻게 확인하나요?",
+                "\n".join(
+                    [
+                        "- 이체 이용시간은 출금은행, 입금은행, 출금방식에 따라 달라집니다.",
+                        "- 하나은행 간 이체는 하나은행 이체한도 기준을 우선 확인합니다.",
+                        "- 타행 이체는 은행공동망 또는 지준망 처리시간과 은행별 이용 가능 시간을 확인합니다.",
+                    ]
+                ),
+            )
+            add_manual_faq(
+                "이체가 이용불가로 보이면 무엇을 확인해야 하나요?",
+                "\n".join(
+                    [
+                        "- 금융결제원 자금정산 시간(23:50~00:05)에는 이체 이용이 제한될 수 있습니다.",
+                        "- 토요일, 공휴일, 은행별 영업시간 기준에 따라 익영업일 처리될 수 있습니다.",
+                        "- 타행 또는 고액 이체는 은행별 처리 기준과 분리 출금 여부를 확인합니다.",
+                    ]
+                ),
+            )
+        if any(keyword in text for keyword in ["상신자", "결재선", "집금실행", "OTP", "인증서"]):
+            add_manual_faq(
+                "결재 단계별 이체 실행은 어떻게 처리되나요?",
+                "\n".join(
+                    [
+                        "- 단독 결재는 담당자가 직접 집금 또는 이체를 실행하는 방식입니다.",
+                        "- 결재선이 있는 경우 상신자, 중간결재, 최종결재 단계를 거쳐 실행됩니다.",
+                        "- 결재 시 설정에 따라 OTP 및 인증서 입력이 필요하지 않은 경우도 있습니다.",
+                    ]
+                ),
+            )
+        return rows, max(0, len(lines) - len(rows))
 
     def build_chatbot_rows_from_monthly_performance(uploaded_file, file_name):
         imported = []
@@ -20674,7 +20801,7 @@ def show_cms_chatbot():
             st.caption("QNA정리본은 질문/답변을, 활동이력은 요청사항/처리내용을, 월간활동실적은 상세 활동 사례를 FAQ 지식으로 반영합니다. PPT 문서는 슬라이드별 텍스트와 이미지를 함께 반영합니다.")
             history_file = st.file_uploader(
                 "FAQ 보강 파일 업로드",
-                type=["xls", "xlsx", "pptx"],
+                type=["xls", "xlsx", "ppt", "pptx"],
                 key="cms_chatbot_history_upload",
                 accept_multiple_files=True,
             )
@@ -20705,6 +20832,14 @@ def show_cms_chatbot():
                             imported_rows.extend(file_rows)
                             skipped_count += file_skipped
                             st.session_state.cms_chatbot_image_store.update(image_updates)
+                            continue
+                        if lower_name.endswith(".ppt"):
+                            file_rows, file_skipped = build_chatbot_rows_from_legacy_ppt(
+                                uploaded_history_file.getvalue(),
+                                file_name,
+                            )
+                            imported_rows.extend(file_rows)
+                            skipped_count += file_skipped
                             continue
                         uploaded_history_file.seek(0)
                         first_sheet_df = pd.read_excel(uploaded_history_file, dtype=str).fillna("")
