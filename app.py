@@ -20025,9 +20025,7 @@ def show_cms_chatbot():
 
         return "\n".join(f"- {item}" for item in merged_items[:max_items])
 
-    tab_chat, tab_faq, tab_setup = st.tabs(["질문하기", "FAQ 목록", "분류 관리"])
-
-    with tab_chat:
+    with st.container():
         st.markdown(
             """
             <style>
@@ -20350,7 +20348,7 @@ def show_cms_chatbot():
             elif st.session_state.get("cms_chatbot_matches") == [] and question.strip():
                 st.warning("유사한 FAQ 답변을 찾지 못했습니다. 업무/운영구분 필터를 전체로 바꾸거나 FAQ를 추가해주세요.")
 
-    with tab_faq:
+    with st.expander("FAQ 목록 / 보강 데이터 관리", expanded=False):
         st.markdown("##### 자주 받는 질문")
         store_col1, store_col2, store_col3, store_col4 = st.columns([0.18, 0.18, 0.18, 0.46])
         with store_col1:
@@ -20514,7 +20512,7 @@ def show_cms_chatbot():
                     st.success("FAQ 항목이 추가되고 로컬 저장소에 저장되었습니다.")
                     st.rerun()
 
-    with tab_setup:
+    with st.expander("분류 관리", expanded=False):
         st.markdown("##### 분류 체계")
         left, right = st.columns(2)
         with left:
