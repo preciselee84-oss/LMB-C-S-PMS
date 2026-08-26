@@ -19487,19 +19487,20 @@ def show_visit_voc_collection():
 
 
 def show_cms_chatbot():
-    header_col, history_col = st.columns([0.55, 0.45], gap="large")
+    header_col, history_col = st.columns([0.72, 0.28], gap="large")
     with header_col:
         st.markdown('<h4 style="margin:0 0 18px; color:#00857A; font-weight:900;">통합CMS 챗봇</h4>', unsafe_allow_html=True)
     with history_col:
-        st.markdown('<div class="hana-side-section" style="margin-top:0; padding-top:0; border-top:0;">과거 질문</div>', unsafe_allow_html=True)
+        st.markdown('<div class="hana-history-mini-title">과거 질문</div>', unsafe_allow_html=True)
         last_question = st.session_state.get("cms_chatbot_last_question", "")
         if last_question:
+            compact_question = html.escape(str(last_question))[:48]
             st.markdown(
-                f'<div class="hana-history-item">{html.escape(str(last_question))[:120]}</div>',
+                f'<div class="hana-history-mini-item">{compact_question}</div>',
                 unsafe_allow_html=True,
             )
         else:
-            st.markdown('<div class="hana-history-item">아직 검색한 질문이 없습니다.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="hana-history-mini-item muted">검색한 질문 없음</div>', unsafe_allow_html=True)
 
     work_options = ["전체", "사용자 교육", "사후관리", "기타", "오류발생", "서버점검", "ERP연계", "설치", "설치등록", "추가설치", "재설치", "클레임"]
     operation_options = ["전체", "운영", "연계", "개설"]
@@ -20152,6 +20153,31 @@ def show_cms_chatbot():
                     color: #334155;
                     font-size: 13px;
                     line-height: 1.45;
+                }
+                .hana-history-mini-title {
+                    margin: 2px 0 8px;
+                    color: #00857A;
+                    font-size: 13px;
+                    font-weight: 900;
+                    text-align: left;
+                }
+                .hana-history-mini-item {
+                    display: inline-block;
+                    width: auto;
+                    max-width: 320px;
+                    padding: 8px 12px;
+                    border-radius: 8px;
+                    background: #FFFFFF;
+                    border: 1px solid #D7E5E3;
+                    color: #334155;
+                    font-size: 13px;
+                    line-height: 1.35;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                .hana-history-mini-item.muted {
+                    color: #94A3B8;
                 }
                 div[data-testid="stButton"] > button {
                     border-radius: 8px;
