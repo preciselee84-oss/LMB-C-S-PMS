@@ -20236,7 +20236,6 @@ def show_cms_chatbot():
                     len(saved_matches) - 1,
                 )
                 selected_match = saved_matches[selected_index]
-                best_score = selected_match.get("score", 0)
                 best_row = selected_match.get("row", {})
                 last_question_text = str(st.session_state.get("cms_chatbot_last_question", "")).strip()
                 user_question = html.escape(last_question_text)
@@ -20252,14 +20251,11 @@ def show_cms_chatbot():
                             <div class="hana-bubble user">{user_question}</div>
                         </div>
                         <div class="hana-chat-row bot">
-                            <div class="hana-avatar">하나</div>
+                            <div class="hana-avatar">답변</div>
                             <div class="hana-bubble bot" style="border-color:#00857A;">
                                 <div style="font-size: 13px; font-weight: 900; color: #00857A; margin-bottom: 7px;">통합 처리결과</div>
                                 <div style="font-size: 16px; line-height: 1.7; font-weight: 700;">
                                     {answer_html or "등록된 답변 내용이 없습니다."}
-                                </div>
-                                <div class="hana-chat-meta">
-                                    유사 질문 {len(saved_matches[:5])}건 기준 · 대표 사례 {html.escape(str(best_row.get("회사", "-")))} · 유사도 {best_score}점
                                 </div>
                             </div>
                         </div>
@@ -20274,7 +20270,7 @@ def show_cms_chatbot():
                     """
                     <div class="hana-chat-window">
                         <div class="hana-chat-row bot">
-                            <div class="hana-avatar">하나</div>
+                            <div class="hana-avatar">답변</div>
                             <div class="hana-bubble bot">증상이나 질문을 입력하면 이곳에 검색 결과가 표시됩니다.</div>
                         </div>
                     </div>
