@@ -19487,7 +19487,7 @@ def show_visit_voc_collection():
 
 
 def show_cms_chatbot():
-    st.markdown("#### 통합CMS 챗봇")
+    st.markdown('<h4 style="margin:0 0 18px; color:#00857A; font-weight:900;">통합CMS 챗봇</h4>', unsafe_allow_html=True)
 
     work_options = ["전체", "사용자 교육", "사후관리", "기타", "오류발생", "서버점검", "ERP연계", "설치", "설치등록", "추가설치", "재설치", "클레임"]
     operation_options = ["전체", "운영", "연계", "개설"]
@@ -20163,12 +20163,14 @@ def show_cms_chatbot():
                     color: #006E66;
                     background: #E7F7F4;
                 }
-                div[data-testid="stButton"] > button[kind="primary"] {
+                div[data-testid="stButton"] > button[kind="primary"],
+                div[data-testid="stButton"] > button[data-testid="baseButton-primary"] {
                     background: #00857A;
                     border-color: #00857A;
                     color: #FFFFFF;
                 }
-                div[data-testid="stButton"] > button[kind="primary"]:hover {
+                div[data-testid="stButton"] > button[kind="primary"]:hover,
+                div[data-testid="stButton"] > button[data-testid="baseButton-primary"]:hover {
                     background: #00A88E;
                     border-color: #00A88E;
                     color: #FFFFFF;
@@ -20207,7 +20209,7 @@ def show_cms_chatbot():
             """,
             unsafe_allow_html=True,
         )
-        nav_col, qna_col = st.columns([0.32, 0.68], gap="large")
+        nav_col, qna_col = st.columns([0.48, 0.52], gap="large")
         with nav_col:
             st.markdown('<div class="hana-side-panel">', unsafe_allow_html=True)
             question = st.text_area(
@@ -20236,6 +20238,46 @@ def show_cms_chatbot():
                     st.warning("질문을 입력해주세요.")
                 else:
                     save_chatbot_search_results(question, filtered_rows or rows, not bool(filtered_rows))
+            saved_matches = st.session_state.get("cms_chatbot_matches", [])
+            if saved_matches:
+                selected_index = min(
+                    int(st.session_state.get("cms_chatbot_answer_index", 0)),
+                    len(saved_matches) - 1,
+                )
+                selected_match = saved_matches[selected_index]
+                best_score = selected_match.get("score", 0)
+                best_row = selected_match.get("row", {})
+                user_question = html.escape(str(st.session_state.get("cms_chatbot_last_question", question)).strip())
+                answer_text = str(best_row.get("답변요약", "")).strip()
+                display_answer, _detail_answer = parse_chatbot_answer_parts(answer_text)
+                merged_answer = merged_chatbot_result_from_matches(saved_matches[:5]) or display_answer
+                answer_html = html.escape(merged_answer).replace("\n", "<br>")
+                st.markdown(
+                    f"""
+                    <div class="hana-chat-shell">
+                        <div class="hana-chat-row user">
+                            <div class="hana-bubble user">{user_question}</div>
+                        </div>
+                        <div class="hana-chat-row bot">
+                            <div class="hana-avatar">하나</div>
+                            <div class="hana-bubble bot" style="border-color:#00857A;">
+                                <div style="font-size: 13px; font-weight: 900; color: #00857A; margin-bottom: 7px;">통합 처리결과</div>
+                                <div style="font-size: 16px; line-height: 1.7; font-weight: 700;">
+                                    {answer_html or "등록된 답변 내용이 없습니다."}
+                                </div>
+                                <div class="hana-chat-meta">
+                                    유사 질문 {len(saved_matches[:5])}건 기준 · 대표 사례 {html.escape(str(best_row.get("회사", "-")))} · 유사도 {best_score}점
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                if st.session_state.get("cms_chatbot_last_filter_empty"):
+                    st.caption("현재 필터 조건에 맞는 FAQ가 없어 전체 FAQ에서 검색했습니다.")
+            elif st.session_state.get("cms_chatbot_matches") == [] and question.strip():
+                st.warning("유사한 FAQ 답변을 찾지 못했습니다. 업무/운영구분 필터를 전체로 바꾸거나 FAQ를 추가해주세요.")
             st.markdown('<div class="hana-side-section">검색 조건</div>', unsafe_allow_html=True)
             st.text_input("회사 검색", placeholder="회사명 일부 입력", key="cms_chatbot_company_query")
             if show_company_matches:
@@ -20272,61 +20314,6 @@ def show_cms_chatbot():
                     int(st.session_state.get("cms_chatbot_answer_index", 0)),
                     len(saved_matches) - 1,
                 )
-                selected_match = saved_matches[selected_index]
-                best_score = selected_match.get("score", 0)
-                best_row = selected_match.get("row", {})
-                best_keywords = selected_match.get("keywords", [])
-                filter_summary = st.session_state.get(
-                    "cms_chatbot_filter_summary",
-                    {"회사": company_filter or "전체", "업무": selected_work, "운영구분": selected_operation},
-                )
-                user_question = html.escape(str(st.session_state.get("cms_chatbot_last_question", question)).strip())
-                st.markdown(
-                    f"""
-                    <div class="hana-chat-shell">
-                        <div class="hana-chat-row user">
-                            <div class="hana-bubble user">{user_question}</div>
-                        </div>
-                        <div class="hana-chat-row bot">
-                            <div class="hana-avatar">하나</div>
-                            <div class="hana-bubble bot">
-                                <strong>선택 분류</strong>
-                                <div class="hana-chip-wrap">
-                                    <span class="hana-chip">회사 · {html.escape(str(filter_summary.get("회사", "전체")))}</span>
-                                    <span class="hana-chip">업무 · {html.escape(str(filter_summary.get("업무", "전체")))}</span>
-                                    <span class="hana-chip">운영구분 · {html.escape(str(filter_summary.get("운영구분", "전체")))}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                if st.session_state.get("cms_chatbot_last_filter_empty"):
-                    st.caption("현재 필터 조건에 맞는 FAQ가 없어 전체 FAQ에서 검색했습니다.")
-                answer_text = str(best_row.get("답변요약", "")).strip()
-                display_answer, detail_answer = parse_chatbot_answer_parts(answer_text)
-                merged_answer = merged_chatbot_result_from_matches(saved_matches[:5]) or display_answer
-                answer_html = html.escape(merged_answer).replace("\n", "<br>")
-                st.markdown(
-                    f"""
-                    <div class="hana-chat-shell">
-                        <div class="hana-chat-row bot">
-                            <div class="hana-avatar">하나</div>
-                            <div class="hana-bubble bot" style="border-color:#00857A;">
-                                <div style="font-size: 13px; font-weight: 900; color: #00857A; margin-bottom: 7px;">통합 처리결과</div>
-                                <div style="font-size: 17px; line-height: 1.75; font-weight: 700;">
-                                    {answer_html or "등록된 답변 내용이 없습니다."}
-                                </div>
-                                <div class="hana-chat-meta">
-                                    유사 질문 {len(saved_matches[:5])}건 기준 · 대표 사례 {html.escape(str(best_row.get("회사", "-")))} · 유사도 {best_score}점
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
                 st.markdown("##### 최근 유사 고객사 사례")
                 for idx, match in enumerate(saved_matches[:5]):
                     row = match.get("row", {})
@@ -20343,8 +20330,6 @@ def show_cms_chatbot():
                         if case_detail:
                             with st.expander("상세 원문"):
                                 st.write(case_detail)
-            elif st.session_state.get("cms_chatbot_matches") == [] and question.strip():
-                st.warning("유사한 FAQ 답변을 찾지 못했습니다. 업무/운영구분 필터를 전체로 바꾸거나 FAQ를 추가해주세요.")
 
     if st.session_state.get("cms_chatbot_show_admin_tools", False):
         st.markdown("##### 자주 받는 질문")
