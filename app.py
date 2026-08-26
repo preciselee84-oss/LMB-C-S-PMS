@@ -19673,6 +19673,25 @@ def show_cms_chatbot():
 
         return result_items
 
+    def direct_chatbot_answer_for_question(question_text):
+        source = clean_chatbot_text(question_text)
+        source_upper = source.upper()
+        if (
+            "ERP" in source_upper
+            and any(keyword in source for keyword in ["반영", "데이터", "내역", "조회"])
+            and any(keyword in source for keyword in ["안되", "안 되", "미반영", "누락", "없", "실패"])
+        ):
+            return "\n".join(
+                [
+                    "- 통합CMS 프로그램에서 ERP에 반영하려는 데이터가 조회되어 있는지 확인",
+                    "- 데이터가 조회되지 않으면 최신정보가져오기가 정상 수행되었는지 확인",
+                    "- 조회 기간, 계좌 조건, 거래 발생 여부를 실제 거래내역 기준으로 재확인",
+                    "- 통합CMS에서 데이터 조회가 확인되면 ERP 내보내기 또는 수동 전송 후 ERP 화면 반영 여부 확인",
+                    "- 계속 미반영되면 조회 조건과 오류 화면을 기록해 기술지원팀 접수",
+                ]
+            )
+        return ""
+
     def summarize_chatbot_result(text, max_items=4):
         inferred_items = infer_chatbot_action_result(text)
         if inferred_items:
@@ -20178,10 +20197,12 @@ def show_cms_chatbot():
                 selected_match = saved_matches[selected_index]
                 best_score = selected_match.get("score", 0)
                 best_row = selected_match.get("row", {})
-                user_question = html.escape(str(st.session_state.get("cms_chatbot_last_question", "")).strip())
+                last_question_text = str(st.session_state.get("cms_chatbot_last_question", "")).strip()
+                user_question = html.escape(last_question_text)
                 answer_text = str(best_row.get("답변요약", "")).strip()
                 display_answer, _detail_answer = parse_chatbot_answer_parts(answer_text)
-                merged_answer = merged_chatbot_result_from_matches(saved_matches[:5]) or display_answer
+                direct_answer = direct_chatbot_answer_for_question(last_question_text)
+                merged_answer = direct_answer or merged_chatbot_result_from_matches(saved_matches[:5]) or display_answer
                 answer_html = html.escape(merged_answer).replace("\n", "<br>")
                 st.markdown(
                     f"""
