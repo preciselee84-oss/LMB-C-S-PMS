@@ -20271,6 +20271,9 @@ def show_cms_chatbot():
                 )
             with st.container(border=True):
                 st.markdown('<div class="hana-input-title">증상/질문 검색</div>', unsafe_allow_html=True)
+                pending_question = st.session_state.pop("cms_chatbot_pending_question_input", "")
+                if pending_question:
+                    st.session_state.cms_chatbot_question_input = pending_question
                 question = st.text_area(
                     "증상/질문 검색",
                     height=130,
@@ -20308,7 +20311,7 @@ def show_cms_chatbot():
                                 key=f"cms_chatbot_answer_candidate_{preview_index}",
                                 use_container_width=True,
                             ):
-                                st.session_state.cms_chatbot_question_input = preview_question
+                                st.session_state.cms_chatbot_pending_question_input = preview_question
                                 save_chatbot_search_results(preview_question, rows, False)
                                 st.rerun()
             st.markdown('<div class="hana-side-section">과거 대화내용</div>', unsafe_allow_html=True)
