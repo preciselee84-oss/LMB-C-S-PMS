@@ -19660,6 +19660,19 @@ def show_cms_chatbot():
         source = clean_chatbot_text(question_text)
         source_upper = source.upper()
         if (
+            any(keyword in source for keyword in ["이체", "출금계좌", "출금통장", "타행", "타은행", "다른은행", "다른 은행"])
+            and any(keyword in source for keyword in ["가능", "되나요", "조회", "출력", "지정", "사용"])
+        ):
+            return "\n".join(
+                [
+                    "- 통합CMS 이체는 등록된 출금계좌와 이체 서비스 권한 기준으로 가능 여부 확인",
+                    "- 하나은행 계좌는 통합CMS 출금계좌로 등록되어 있는지 먼저 확인",
+                    "- 타행 계좌는 해당 은행의 이체/조회 연동 또는 스크래핑 등록 여부 확인",
+                    "- 사업자번호나 법인번호가 다른 계좌는 동일 사업장 계좌인지 은행 등록정보 확인",
+                    "- 이체가 되지 않으면 출금계좌 등록상태, 이체권한, 결재선, 이체한도 설정을 순서대로 확인",
+                ]
+            )
+        if (
             any(keyword in source for keyword in ["거래내역조회", "거래내역 조회", "계좌거래내역", "계좌 거래내역"])
             and any(keyword in source for keyword in ["가능", "하나은행", "타은행", "조회", "은행"])
         ):
@@ -19965,9 +19978,46 @@ def show_cms_chatbot():
             detail_answer = source if clean_chatbot_text(display_answer) != clean_chatbot_text(source) else ""
         return display_answer, detail_answer
 
-    def merged_chatbot_result_from_matches(matches, max_items=5):
+    def chatbot_question_intent(question_text):
+        source = clean_chatbot_text(question_text)
+        if any(keyword in source for keyword in ["이체", "출금계좌", "출금통장", "타행", "타은행", "다른은행", "다른 은행"]):
+            return "transfer"
+        if "ERP" in source.upper() and any(keyword in source for keyword in ["반영", "내보내기", "데이터", "거래내역", "잔액"]):
+            return "erp"
+        if any(keyword in source for keyword in ["로그인", "접속", "인증서"]):
+            return "login"
+        if any(keyword in source for keyword in ["설치", "개설", "등록"]):
+            return "setup"
+        if any(keyword in source for keyword in ["거래내역조회", "거래내역 조회", "계좌거래내역", "계좌 거래내역"]):
+            return "account_history"
+        return ""
+
+    def chatbot_match_fits_intent(row, intent):
+        if not intent:
+            return True
+        text = clean_chatbot_text(
+            " ".join(
+                [
+                    str(row.get("질문", "")),
+                    str(row.get("답변요약", "")),
+                    str(row.get("업무", "")),
+                    str(row.get("운영구분", "")),
+                ]
+            )
+        )
+        intent_keywords = {
+            "transfer": ["이체", "출금계좌", "출금통장", "타행", "타은행", "다른은행", "다른 은행", "결재선", "이체한도"],
+            "erp": ["ERP", "반영", "내보내기", "데이터", "거래내역", "잔액"],
+            "login": ["로그인", "접속", "인증서", "DB"],
+            "setup": ["설치", "개설", "등록"],
+            "account_history": ["거래내역조회", "거래내역 조회", "계좌거래내역", "계좌 거래내역", "조회"],
+        }
+        return any(keyword in text for keyword in intent_keywords.get(intent, []))
+
+    def merged_chatbot_result_from_matches(matches, question_text="", max_items=5):
         merged_items = []
         fallback_items = []
+        intent = chatbot_question_intent(question_text)
 
         def add_item(item):
             cleaned = clean_chatbot_text(str(item).lstrip("-• "))
@@ -19976,6 +20026,8 @@ def show_cms_chatbot():
 
         for match in matches:
             row = match.get("row", {})
+            if not chatbot_match_fits_intent(row, intent):
+                continue
             answer_text = str(row.get("답변요약", ""))
             display_answer, detail_answer = parse_chatbot_answer_parts(answer_text)
             for item in re.split(r"\n+|<br\s*/?>", display_answer):
@@ -20264,7 +20316,7 @@ def show_cms_chatbot():
                 answer_text = str(best_row.get("답변요약", "")).strip()
                 display_answer, _detail_answer = parse_chatbot_answer_parts(answer_text)
                 direct_answer = direct_chatbot_answer_for_question(last_question_text)
-                merged_answer = direct_answer or merged_chatbot_result_from_matches(saved_matches[:5]) or display_answer
+                merged_answer = direct_answer or merged_chatbot_result_from_matches(saved_matches[:5], last_question_text) or display_answer
                 answer_html = html.escape(merged_answer).replace("\n", "<br>")
                 st.markdown(
                     f"""
@@ -20320,8 +20372,11 @@ def show_cms_chatbot():
                 st.warning("유사한 FAQ 답변을 찾지 못했습니다. 질문을 조금 더 구체적으로 입력하거나 FAQ를 추가해주세요.")
             if saved_matches:
                 candidate_questions = []
+                current_intent = chatbot_question_intent(question)
                 for preview_match in saved_matches:
                     preview_row = preview_match.get("row", {})
+                    if not chatbot_match_fits_intent(preview_row, current_intent):
+                        continue
                     preview_question = str(preview_row.get("질문", "")).strip()
                     if not preview_question or not is_chatbot_question_text(preview_question):
                         continue
