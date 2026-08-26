@@ -20001,7 +20001,7 @@ def show_cms_chatbot():
                     background: #F2FAF8;
                 }
                 .hana-chat-window {
-                    min-height: 300px;
+                    min-height: 260px;
                     margin: 0 0 18px;
                     padding: 18px 18px 28px;
                     border: 1px solid #9FD8D2;
@@ -20090,12 +20090,6 @@ def show_cms_chatbot():
                     font-weight: 800;
                     border: 1px solid #B8DAD6;
                 }
-                .hana-side-panel {
-                    min-height: 680px;
-                    padding: 18px 16px;
-                    border-right: 1px solid #B8DAD6;
-                    background: #F2FAF8;
-                }
                 .hana-side-title {
                     font-size: 20px;
                     font-weight: 900;
@@ -20151,12 +20145,6 @@ def show_cms_chatbot():
                     border-radius: 8px;
                 }
                 @media (max-width: 1100px) {
-                    .hana-side-panel {
-                        min-height: auto;
-                        border-right: 0;
-                        border-bottom: 1px solid #B8DAD6;
-                        padding: 14px 12px;
-                    }
                     .hana-side-title { font-size: 18px; }
                     .hana-bubble { max-width: 92%; }
                 }
@@ -20181,7 +20169,6 @@ def show_cms_chatbot():
         )
         nav_col, qna_col = st.columns([0.48, 0.52], gap="large")
         with nav_col:
-            st.markdown('<div class="hana-side-panel">', unsafe_allow_html=True)
             saved_matches = st.session_state.get("cms_chatbot_matches", [])
             if saved_matches:
                 selected_index = min(
@@ -20275,9 +20262,6 @@ def show_cms_chatbot():
                 )
             else:
                 st.markdown('<div class="hana-history-item">아직 검색한 질문이 없습니다.</div>', unsafe_allow_html=True)
-            st.markdown('<div class="hana-side-section">챗봇 구성</div>', unsafe_allow_html=True)
-            st.caption("오른쪽에서 증상이나 질문을 검색하면 처리결과와 유사 사례가 표시됩니다.")
-            st.markdown('</div>', unsafe_allow_html=True)
 
         with qna_col:
             saved_matches = st.session_state.get("cms_chatbot_matches", [])
