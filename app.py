@@ -20034,9 +20034,9 @@ def show_cms_chatbot():
                 .hana-chat-shell {
                     margin: 10px 0 18px;
                     padding: 18px;
-                    width: 52%;
-                    min-width: 560px;
-                    max-width: 820px;
+                    width: 100%;
+                    min-width: 0;
+                    max-width: none;
                     border: 1px solid #D7E3E1;
                     border-radius: 16px;
                     background: #F3F8F7;
@@ -20104,17 +20104,17 @@ def show_cms_chatbot():
                 .hana-chat-input-panel {
                     margin-top: 12px;
                     padding: 14px;
-                    width: 52%;
-                    min-width: 560px;
-                    max-width: 820px;
+                    width: 100%;
+                    min-width: 0;
+                    max-width: none;
                     border-radius: 14px;
                     background: #FFFFFF;
                     border: 1px solid #D7E3E1;
                 }
                 .hana-workflow-note {
-                    width: 52%;
-                    min-width: 560px;
-                    max-width: 820px;
+                    width: 100%;
+                    min-width: 0;
+                    max-width: none;
                     margin: 10px 0 8px;
                     padding: 12px 14px;
                     border-radius: 12px;
@@ -20123,196 +20123,243 @@ def show_cms_chatbot():
                     font-weight: 800;
                     border: 1px solid #C8E6E2;
                 }
+                .hana-side-panel {
+                    min-height: 640px;
+                    padding: 18px 14px;
+                    border-right: 1px solid #E2E8F0;
+                    background: #F8FAFC;
+                }
+                .hana-side-title {
+                    font-size: 18px;
+                    font-weight: 900;
+                    color: #00857A;
+                    margin-bottom: 14px;
+                }
+                .hana-side-section {
+                    margin: 18px 0 8px;
+                    padding-top: 14px;
+                    border-top: 1px solid #D8E3E1;
+                    color: #64748B;
+                    font-size: 13px;
+                    font-weight: 900;
+                }
+                .hana-history-item {
+                    margin: 8px 0;
+                    padding: 9px 10px;
+                    border-radius: 8px;
+                    background: #FFFFFF;
+                    border: 1px solid #E2E8F0;
+                    color: #334155;
+                    font-size: 13px;
+                    line-height: 1.45;
+                }
                 @media (max-width: 1100px) {
-                    .hana-chat-shell,
-                    .hana-chat-input-panel,
-                    .hana-workflow-note {
-                        width: 100%;
-                        min-width: 0;
-                        max-width: none;
-                    }
+                    .hana-side-panel { min-height: auto; border-right: 0; border-bottom: 1px solid #E2E8F0; }
                 }
             </style>
             """,
             unsafe_allow_html=True,
         )
-        quick_prompts = [
-            ("ERP 반영", "ERP에 데이터가 반영되지 않을 때 어떤 부분을 확인해야 하나요?"),
-            ("로그인/인증서", "통합CMS 로그인 또는 인증서 오류가 발생하면 무엇을 확인해야 하나요?"),
-            ("계좌/거래내역", "계좌 잔액이나 거래내역이 조회되지 않을 때 어떻게 처리하나요?"),
-            ("스크래핑", "스크래핑 오류가 발생하면 기본적으로 무엇을 점검해야 하나요?"),
-            ("Agent/서버", "Agent 또는 서버 점검 시 어떤 순서로 확인해야 하나요?"),
-            ("고객방문 질문", "고객 방문 시 어떤 질문을 하고 어떤 기능을 제안해야 하나요?"),
-        ]
-        st.markdown('<div class="hana-workflow-note">검색 순서: 업무 버튼 선택 → 증상/질문 입력 → 유사 질문 확인 → 답변 검색</div>', unsafe_allow_html=True)
-        quick_cols = st.columns(6)
-        for quick_index, (label, prompt) in enumerate(quick_prompts):
-            with quick_cols[quick_index]:
-                if st.button(label, key=f"cms_chatbot_quick_prompt_{quick_index}", use_container_width=True):
-                    st.session_state.cms_chatbot_question_input = prompt
-                    st.session_state.cms_chatbot_matches = []
-                    st.rerun()
-
-        input_col, _ = st.columns([0.52, 0.48])
-        with input_col:
-            st.markdown('<div class="hana-chat-input-panel">', unsafe_allow_html=True)
-            question = st.text_area(
-                "증상/질문 검색",
-                height=110,
-                key="cms_chatbot_question_input",
-                placeholder="예: 고객사에서 통합CMS 로그인은 되지 않는데 DB 접속 테스트는 성공합니다. 무엇을 확인해야 하나요?",
-            )
-            preview_matches = []
-            if question.strip():
-                preview_matches = find_chatbot_answers(question, filtered_rows or rows)
-            if preview_matches:
-                st.markdown("**유사 질문 후보**")
-                for preview_index, preview_match in enumerate(preview_matches[:3]):
-                    _, _, preview_row, _ = preview_match
-                    preview_question = str(preview_row.get("질문", "")).strip()
-                    if st.button(
-                        preview_question[:90],
-                        key=f"cms_chatbot_preview_question_{preview_index}",
-                        use_container_width=True,
-                    ):
-                        save_chatbot_search_results(preview_question, filtered_rows or rows, not bool(filtered_rows))
-                        st.rerun()
-            if st.button("답변 검색", use_container_width=True, type="primary"):
-                if not question.strip():
-                    st.warning("질문을 입력해주세요.")
-                else:
-                    search_pool = filtered_rows or rows
-                    save_chatbot_search_results(question, search_pool, not bool(filtered_rows))
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        saved_matches = st.session_state.get("cms_chatbot_matches", [])
-        if saved_matches:
-            selected_index = min(
-                int(st.session_state.get("cms_chatbot_answer_index", 0)),
-                len(saved_matches) - 1,
-            )
-            selected_match = saved_matches[selected_index]
-            best_score = selected_match.get("score", 0)
-            best_row = selected_match.get("row", {})
-            best_keywords = selected_match.get("keywords", [])
-            filter_summary = st.session_state.get(
-                "cms_chatbot_filter_summary",
-                {"회사": company_filter or "전체", "업무": selected_work, "운영구분": selected_operation},
-            )
-            user_question = html.escape(str(st.session_state.get("cms_chatbot_last_question", question)).strip())
-            st.markdown(
-                f"""
-                <div class="hana-chat-shell">
-                    <div class="hana-chat-row user">
-                        <div class="hana-bubble user">{user_question}</div>
-                    </div>
-                    <div class="hana-chat-row bot">
-                        <div class="hana-avatar">하나</div>
-                        <div class="hana-bubble bot">
-                            <strong>선택 분류</strong>
-                            <div class="hana-chip-wrap">
-                                <span class="hana-chip">회사 · {html.escape(str(filter_summary.get("회사", "전체")))}</span>
-                                <span class="hana-chip">업무 · {html.escape(str(filter_summary.get("업무", "전체")))}</span>
-                                <span class="hana-chip">운영구분 · {html.escape(str(filter_summary.get("운영구분", "전체")))}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            if st.session_state.get("cms_chatbot_last_filter_empty"):
-                st.caption("현재 필터 조건에 맞는 FAQ가 없어 전체 FAQ에서 검색했습니다.")
-            answer_text = str(best_row.get("답변요약", "")).strip()
-            display_answer, detail_answer = parse_chatbot_answer_parts(answer_text)
-            merged_answer = merged_chatbot_result_from_matches(saved_matches[:5]) or display_answer
-            answer_html = html.escape(merged_answer).replace("\n", "<br>")
-            st.markdown(
-                f"""
-                <div class="hana-chat-shell">
-                    <div class="hana-chat-row bot">
-                        <div class="hana-avatar">하나</div>
-                        <div class="hana-bubble bot" style="border-color:#00857A;">
-                            <div style="font-size: 13px; font-weight: 900; color: #00857A; margin-bottom: 7px;">통합 처리결과</div>
-                            <div style="font-size: 17px; line-height: 1.75; font-weight: 700;">
-                                {answer_html or "등록된 답변 내용이 없습니다."}
-                            </div>
-                            <div class="hana-chat-meta">
-                                유사 질문 {len(saved_matches[:5])}건 기준 · 대표 사례 {html.escape(str(best_row.get("회사", "-")))} · 유사도 {best_score}점
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.markdown("##### 최근 유사 고객사 사례")
-            for idx, match in enumerate(saved_matches[:5]):
-                row = match.get("row", {})
-                case_answer, case_detail = parse_chatbot_answer_parts(str(row.get("답변요약", "")))
-                case_question = str(row.get("질문", "")).strip() or "질문 내용 없음"
-                case_company = str(row.get("회사", "-"))
-                case_meta = f"{row.get('업무', '-')} / {row.get('운영구분', '-')} / 유사도 {match.get('score', 0)}점"
-                with st.expander(f"{idx + 1}. {case_company} - {case_question[:70]}", expanded=(idx == selected_index)):
-                    st.markdown("**질문**")
-                    st.write(case_question)
-                    st.markdown("**처리결과**")
-                    st.write(case_answer)
-                    st.caption(case_meta)
-                    if case_detail:
-                        with st.expander("상세 원문"):
-                            st.write(case_detail)
-            image_key = best_row.get("이미지키")
-            image_store = st.session_state.get("cms_chatbot_image_store", {})
-            answer_images = image_store.get(image_key, []) if image_key else []
-            if answer_images:
+        nav_col, qna_col = st.columns([0.22, 0.78], gap="large")
+        with nav_col:
+            st.markdown('<div class="hana-side-panel">', unsafe_allow_html=True)
+            st.markdown('<div class="hana-side-title">CMS 챗봇</div>', unsafe_allow_html=True)
+            if st.button("챗봇 시작", use_container_width=True, type="primary"):
+                st.session_state.cms_chatbot_matches = []
+                st.session_state.cms_chatbot_answer_index = 0
+                st.session_state.cms_chatbot_question_input = ""
+                st.rerun()
+            st.markdown('<div class="hana-side-section">과거 대화내용</div>', unsafe_allow_html=True)
+            last_question = st.session_state.get("cms_chatbot_last_question", "")
+            if last_question:
                 st.markdown(
-                    """
+                    f'<div class="hana-history-item">{html.escape(str(last_question))[:120]}</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown('<div class="hana-history-item">아직 검색한 질문이 없습니다.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="hana-side-section">챗봇 구성</div>', unsafe_allow_html=True)
+            st.caption("오른쪽에서 증상이나 질문을 검색하면 처리결과와 유사 사례가 표시됩니다.")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        with qna_col:
+            quick_prompts = [
+                ("ERP 반영", "ERP에 데이터가 반영되지 않을 때 어떤 부분을 확인해야 하나요?"),
+                ("로그인/인증서", "통합CMS 로그인 또는 인증서 오류가 발생하면 무엇을 확인해야 하나요?"),
+                ("계좌/거래내역", "계좌 잔액이나 거래내역이 조회되지 않을 때 어떻게 처리하나요?"),
+                ("스크래핑", "스크래핑 오류가 발생하면 기본적으로 무엇을 점검해야 하나요?"),
+                ("Agent/서버", "Agent 또는 서버 점검 시 어떤 순서로 확인해야 하나요?"),
+                ("고객방문 질문", "고객 방문 시 어떤 질문을 하고 어떤 기능을 제안해야 하나요?"),
+            ]
+            st.markdown('<div class="hana-workflow-note">검색 순서: 업무 버튼 선택 → 증상/질문 입력 → 유사 질문 확인 → 답변 검색</div>', unsafe_allow_html=True)
+            quick_cols = st.columns(6)
+            for quick_index, (label, prompt) in enumerate(quick_prompts):
+                with quick_cols[quick_index]:
+                    if st.button(label, key=f"cms_chatbot_quick_prompt_{quick_index}", use_container_width=True):
+                        st.session_state.cms_chatbot_question_input = prompt
+                        st.session_state.cms_chatbot_matches = []
+                        st.rerun()
+
+            input_col, _ = st.columns([0.52, 0.48])
+            with input_col:
+                st.markdown('<div class="hana-chat-input-panel">', unsafe_allow_html=True)
+                question = st.text_area(
+                    "증상/질문 검색",
+                    height=110,
+                    key="cms_chatbot_question_input",
+                    placeholder="예: 고객사에서 통합CMS 로그인은 되지 않는데 DB 접속 테스트는 성공합니다. 무엇을 확인해야 하나요?",
+                )
+                preview_matches = []
+                if question.strip():
+                    preview_matches = find_chatbot_answers(question, filtered_rows or rows)
+                if preview_matches:
+                    st.markdown("**유사 질문 후보**")
+                    for preview_index, preview_match in enumerate(preview_matches[:3]):
+                        _, _, preview_row, _ = preview_match
+                        preview_question = str(preview_row.get("질문", "")).strip()
+                        if st.button(
+                            preview_question[:90],
+                            key=f"cms_chatbot_preview_question_{preview_index}",
+                            use_container_width=True,
+                        ):
+                            save_chatbot_search_results(preview_question, filtered_rows or rows, not bool(filtered_rows))
+                            st.rerun()
+                if st.button("답변 검색", use_container_width=True, type="primary"):
+                    if not question.strip():
+                        st.warning("질문을 입력해주세요.")
+                    else:
+                        search_pool = filtered_rows or rows
+                        save_chatbot_search_results(question, search_pool, not bool(filtered_rows))
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            saved_matches = st.session_state.get("cms_chatbot_matches", [])
+            if saved_matches:
+                selected_index = min(
+                    int(st.session_state.get("cms_chatbot_answer_index", 0)),
+                    len(saved_matches) - 1,
+                )
+                selected_match = saved_matches[selected_index]
+                best_score = selected_match.get("score", 0)
+                best_row = selected_match.get("row", {})
+                best_keywords = selected_match.get("keywords", [])
+                filter_summary = st.session_state.get(
+                    "cms_chatbot_filter_summary",
+                    {"회사": company_filter or "전체", "업무": selected_work, "운영구분": selected_operation},
+                )
+                user_question = html.escape(str(st.session_state.get("cms_chatbot_last_question", question)).strip())
+                st.markdown(
+                    f"""
                     <div class="hana-chat-shell">
+                        <div class="hana-chat-row user">
+                            <div class="hana-bubble user">{user_question}</div>
+                        </div>
                         <div class="hana-chat-row bot">
                             <div class="hana-avatar">하나</div>
-                            <div class="hana-bubble bot" style="border-color:#00857A; max-width: 90%;">
-                                <div style="font-size: 13px; font-weight: 900; color: #00857A; margin-bottom: 7px;">관련 이미지</div>
+                            <div class="hana-bubble bot">
+                                <strong>선택 분류</strong>
+                                <div class="hana-chip-wrap">
+                                    <span class="hana-chip">회사 · {html.escape(str(filter_summary.get("회사", "전체")))}</span>
+                                    <span class="hana-chip">업무 · {html.escape(str(filter_summary.get("업무", "전체")))}</span>
+                                    <span class="hana-chip">운영구분 · {html.escape(str(filter_summary.get("운영구분", "전체")))}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
-                image_col, _ = st.columns([0.52, 0.48])
-                with image_col:
-                    if len(answer_images) == 1:
-                        st.image(BytesIO(answer_images[0]), use_container_width=True)
-                    else:
-                        cols = st.columns(min(len(answer_images), 2))
-                        for image_index, image_bytes in enumerate(answer_images[:4]):
-                            with cols[image_index % len(cols)]:
-                                st.image(BytesIO(image_bytes), use_container_width=True)
-            meta_cols = st.columns(4)
-            meta_cols[0].metric("회사", best_row.get("회사", "-"))
-            meta_cols[1].metric("업무", best_row.get("업무", "-"))
-            meta_cols[2].metric("운영구분", best_row.get("운영구분", "-"))
-            meta_cols[3].metric("유사도", f"{best_score}점")
-            st.markdown("##### 유사 질문 선택")
-            st.caption("질문을 선택하면 해당 고객사 사례가 펼쳐집니다.")
-            for idx, match in enumerate(saved_matches[:5]):
-                row = match.get("row", {})
-                question_label = str(row.get("질문", "")).strip() or "질문 내용 없음"
-                prefix = "현재" if idx == selected_index else "보기"
-                st.button(
-                    f"{idx + 1}. {question_label[:110]}",
-                    key=f"cms_chatbot_similar_question_{idx}",
-                    on_click=select_chatbot_answer,
-                    args=(idx,),
+                if st.session_state.get("cms_chatbot_last_filter_empty"):
+                    st.caption("현재 필터 조건에 맞는 FAQ가 없어 전체 FAQ에서 검색했습니다.")
+                answer_text = str(best_row.get("답변요약", "")).strip()
+                display_answer, detail_answer = parse_chatbot_answer_parts(answer_text)
+                merged_answer = merged_chatbot_result_from_matches(saved_matches[:5]) or display_answer
+                answer_html = html.escape(merged_answer).replace("\n", "<br>")
+                st.markdown(
+                    f"""
+                    <div class="hana-chat-shell">
+                        <div class="hana-chat-row bot">
+                            <div class="hana-avatar">하나</div>
+                            <div class="hana-bubble bot" style="border-color:#00857A;">
+                                <div style="font-size: 13px; font-weight: 900; color: #00857A; margin-bottom: 7px;">통합 처리결과</div>
+                                <div style="font-size: 17px; line-height: 1.75; font-weight: 700;">
+                                    {answer_html or "등록된 답변 내용이 없습니다."}
+                                </div>
+                                <div class="hana-chat-meta">
+                                    유사 질문 {len(saved_matches[:5])}건 기준 · 대표 사례 {html.escape(str(best_row.get("회사", "-")))} · 유사도 {best_score}점
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
-                st.caption(f"{prefix} · {row.get('회사', '-')} / {row.get('업무', '-')} / {row.get('운영구분', '-')} · 유사도 {match.get('score', 0)}점")
-            with st.expander("매칭 근거 보기"):
-                st.markdown("**원본 질문**")
-                st.write(best_row.get("질문", ""))
-                st.markdown("**일치 키워드**")
-                st.write(", ".join(best_keywords) if best_keywords else "-")
-        elif st.session_state.get("cms_chatbot_matches") == [] and question.strip():
-            st.warning("유사한 FAQ 답변을 찾지 못했습니다. 업무/운영구분 필터를 전체로 바꾸거나 FAQ를 추가해주세요.")
+                st.markdown("##### 최근 유사 고객사 사례")
+                for idx, match in enumerate(saved_matches[:5]):
+                    row = match.get("row", {})
+                    case_answer, case_detail = parse_chatbot_answer_parts(str(row.get("답변요약", "")))
+                    case_question = str(row.get("질문", "")).strip() or "질문 내용 없음"
+                    case_company = str(row.get("회사", "-"))
+                    case_meta = f"{row.get('업무', '-')} / {row.get('운영구분', '-')} / 유사도 {match.get('score', 0)}점"
+                    with st.expander(f"{idx + 1}. {case_company} - {case_question[:70]}", expanded=(idx == selected_index)):
+                        st.markdown("**질문**")
+                        st.write(case_question)
+                        st.markdown("**처리결과**")
+                        st.write(case_answer)
+                        st.caption(case_meta)
+                        if case_detail:
+                            with st.expander("상세 원문"):
+                                st.write(case_detail)
+                image_key = best_row.get("이미지키")
+                image_store = st.session_state.get("cms_chatbot_image_store", {})
+                answer_images = image_store.get(image_key, []) if image_key else []
+                if answer_images:
+                    st.markdown(
+                        """
+                        <div class="hana-chat-shell">
+                            <div class="hana-chat-row bot">
+                                <div class="hana-avatar">하나</div>
+                                <div class="hana-bubble bot" style="border-color:#00857A; max-width: 90%;">
+                                    <div style="font-size: 13px; font-weight: 900; color: #00857A; margin-bottom: 7px;">관련 이미지</div>
+                                </div>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    image_col, _ = st.columns([0.52, 0.48])
+                    with image_col:
+                        if len(answer_images) == 1:
+                            st.image(BytesIO(answer_images[0]), use_container_width=True)
+                        else:
+                            cols = st.columns(min(len(answer_images), 2))
+                            for image_index, image_bytes in enumerate(answer_images[:4]):
+                                with cols[image_index % len(cols)]:
+                                    st.image(BytesIO(image_bytes), use_container_width=True)
+                meta_cols = st.columns(4)
+                meta_cols[0].metric("회사", best_row.get("회사", "-"))
+                meta_cols[1].metric("업무", best_row.get("업무", "-"))
+                meta_cols[2].metric("운영구분", best_row.get("운영구분", "-"))
+                meta_cols[3].metric("유사도", f"{best_score}점")
+                st.markdown("##### 유사 질문 선택")
+                st.caption("질문을 선택하면 해당 고객사 사례가 펼쳐집니다.")
+                for idx, match in enumerate(saved_matches[:5]):
+                    row = match.get("row", {})
+                    question_label = str(row.get("질문", "")).strip() or "질문 내용 없음"
+                    prefix = "현재" if idx == selected_index else "보기"
+                    st.button(
+                        f"{idx + 1}. {question_label[:110]}",
+                        key=f"cms_chatbot_similar_question_{idx}",
+                        on_click=select_chatbot_answer,
+                        args=(idx,),
+                    )
+                    st.caption(f"{prefix} · {row.get('회사', '-')} / {row.get('업무', '-')} / {row.get('운영구분', '-')} · 유사도 {match.get('score', 0)}점")
+                with st.expander("매칭 근거 보기"):
+                    st.markdown("**원본 질문**")
+                    st.write(best_row.get("질문", ""))
+                    st.markdown("**일치 키워드**")
+                    st.write(", ".join(best_keywords) if best_keywords else "-")
+            elif st.session_state.get("cms_chatbot_matches") == [] and question.strip():
+                st.warning("유사한 FAQ 답변을 찾지 못했습니다. 업무/운영구분 필터를 전체로 바꾸거나 FAQ를 추가해주세요.")
 
     with tab_faq:
         st.markdown("##### 자주 받는 질문")
