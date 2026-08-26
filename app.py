@@ -20346,21 +20346,21 @@ def show_cms_chatbot():
                                 st.rerun()
         with history_col:
             last_question = st.session_state.get("cms_chatbot_last_question", "")
+            st.markdown('<div class="hana-history-side">', unsafe_allow_html=True)
+            st.markdown('<div class="hana-history-mini-title">과거 질문</div>', unsafe_allow_html=True)
             if last_question:
-                compact_question = html.escape(str(last_question))[:48]
-                history_item_class = "hana-history-mini-item"
+                compact_question = str(last_question)[:48]
+                if st.button(
+                    compact_question,
+                    key="cms_chatbot_history_question_button",
+                    use_container_width=True,
+                ):
+                    st.session_state.cms_chatbot_pending_question_input = str(last_question)
+                    save_chatbot_search_results(str(last_question), rows, False)
+                    st.rerun()
             else:
-                compact_question = "검색한 질문 없음"
-                history_item_class = "hana-history-mini-item muted"
-            st.markdown(
-                f"""
-                <div class="hana-history-side">
-                    <div class="hana-history-mini-title">과거 질문</div>
-                    <div class="{history_item_class}">{compact_question}</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+                st.markdown('<div class="hana-history-mini-item muted">검색한 질문 없음</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
     st.markdown("##### 샘플 QNA 업로드")
     st.caption("QNA 정리본 엑셀을 업로드하면 질문/답변을 FAQ 데이터로 변환해 챗봇 검색에 반영합니다. 원본 파일은 저장하지 않습니다.")
     sample_qna_file = st.file_uploader(
