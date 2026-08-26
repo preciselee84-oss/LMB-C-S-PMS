@@ -20073,6 +20073,12 @@ def show_cms_chatbot():
                     color: #64748B;
                     font-size: 12px;
                 }
+                .hana-candidate-title {
+                    margin: 12px 0 8px;
+                    color: #00857A;
+                    font-size: 14px;
+                    font-weight: 900;
+                }
                 .hana-chip-wrap {
                     display: flex;
                     flex-wrap: wrap;
@@ -20135,27 +20141,32 @@ def show_cms_chatbot():
                 }
                 div[data-testid="stButton"] > button {
                     border-radius: 8px;
-                    border: 1px solid #00857A;
-                    background: #FFFFFF;
-                    color: #00796B;
+                    border: 1px solid #B8DAD6 !important;
+                    background: #E7F7F4 !important;
+                    color: #006E66 !important;
                     font-weight: 800;
+                    justify-content: flex-start;
+                    text-align: left;
+                    min-height: 38px;
                 }
                 div[data-testid="stButton"] > button:hover {
-                    border-color: #00A88E;
-                    color: #006E66;
-                    background: #E7F7F4;
+                    border-color: #00857A !important;
+                    color: #005E56 !important;
+                    background: #D7F0ED !important;
                 }
                 div[data-testid="stButton"] > button[kind="primary"],
                 div[data-testid="stButton"] > button[data-testid="baseButton-primary"] {
-                    background: #00857A;
-                    border-color: #00857A;
-                    color: #FFFFFF;
+                    background: #00857A !important;
+                    border-color: #00857A !important;
+                    color: #FFFFFF !important;
+                    justify-content: center;
+                    text-align: center;
                 }
                 div[data-testid="stButton"] > button[kind="primary"]:hover,
                 div[data-testid="stButton"] > button[data-testid="baseButton-primary"]:hover {
-                    background: #00A88E;
-                    border-color: #00A88E;
-                    color: #FFFFFF;
+                    background: #00A88E !important;
+                    border-color: #00A88E !important;
+                    color: #FFFFFF !important;
                 }
                 div[data-testid="stTextArea"] textarea,
                 div[data-testid="stTextInput"] input,
@@ -20228,14 +20239,14 @@ def show_cms_chatbot():
                 )
                 if st.session_state.get("cms_chatbot_last_filter_empty"):
                     st.caption("현재 필터 조건에 맞는 FAQ가 없어 전체 FAQ에서 검색했습니다.")
-                st.markdown("**유사 질문 후보**")
+                st.markdown('<div class="hana-candidate-title">유사 질문 후보</div>', unsafe_allow_html=True)
                 for preview_index, preview_match in enumerate(saved_matches[:5]):
                     preview_row = preview_match.get("row", {})
                     preview_question = str(preview_row.get("질문", "")).strip()
                     if not preview_question:
                         continue
                     if st.button(
-                        preview_question[:90],
+                        f"{preview_index + 1}. {preview_question[:88]}",
                         key=f"cms_chatbot_answer_candidate_{preview_index}",
                         use_container_width=True,
                     ):
