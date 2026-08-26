@@ -20210,7 +20210,6 @@ def show_cms_chatbot():
         nav_col, qna_col = st.columns([0.32, 0.68], gap="large")
         with nav_col:
             st.markdown('<div class="hana-side-panel">', unsafe_allow_html=True)
-            st.markdown('<div class="hana-side-title">통합CMS 챗봇</div>', unsafe_allow_html=True)
             question = st.text_area(
                 "증상/질문 검색",
                 height=130,
