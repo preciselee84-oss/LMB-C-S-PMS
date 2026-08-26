@@ -20164,11 +20164,32 @@ def show_cms_chatbot():
         with nav_col:
             st.markdown('<div class="hana-side-panel">', unsafe_allow_html=True)
             st.markdown('<div class="hana-side-title">CMS 챗봇</div>', unsafe_allow_html=True)
-            if st.button("챗봇 시작", use_container_width=True, type="primary"):
-                st.session_state.cms_chatbot_matches = []
-                st.session_state.cms_chatbot_answer_index = 0
-                st.session_state.cms_chatbot_question_input = ""
-                st.rerun()
+            question = st.text_area(
+                "증상/질문 검색",
+                height=130,
+                key="cms_chatbot_question_input",
+                placeholder="예: 고객사에서 통합CMS 로그인은 되지 않는데 DB 접속 테스트는 성공합니다. 무엇을 확인해야 하나요?",
+            )
+            preview_matches = []
+            if question.strip():
+                preview_matches = find_chatbot_answers(question, filtered_rows or rows)
+            if preview_matches:
+                st.markdown("**유사 질문 후보**")
+                for preview_index, preview_match in enumerate(preview_matches[:3]):
+                    _, _, preview_row, _ = preview_match
+                    preview_question = str(preview_row.get("질문", "")).strip()
+                    if st.button(
+                        preview_question[:70],
+                        key=f"cms_chatbot_preview_question_{preview_index}",
+                        use_container_width=True,
+                    ):
+                        save_chatbot_search_results(preview_question, filtered_rows or rows, not bool(filtered_rows))
+                        st.rerun()
+            if st.button("답변 검색", use_container_width=True, type="primary"):
+                if not question.strip():
+                    st.warning("질문을 입력해주세요.")
+                else:
+                    save_chatbot_search_results(question, filtered_rows or rows, not bool(filtered_rows))
             st.markdown('<div class="hana-side-section">과거 대화내용</div>', unsafe_allow_html=True)
             last_question = st.session_state.get("cms_chatbot_last_question", "")
             if last_question:
@@ -20199,38 +20220,6 @@ def show_cms_chatbot():
                         st.session_state.cms_chatbot_question_input = prompt
                         st.session_state.cms_chatbot_matches = []
                         st.rerun()
-
-            input_col, _ = st.columns([0.52, 0.48])
-            with input_col:
-                st.markdown('<div class="hana-chat-input-panel">', unsafe_allow_html=True)
-                question = st.text_area(
-                    "증상/질문 검색",
-                    height=110,
-                    key="cms_chatbot_question_input",
-                    placeholder="예: 고객사에서 통합CMS 로그인은 되지 않는데 DB 접속 테스트는 성공합니다. 무엇을 확인해야 하나요?",
-                )
-                preview_matches = []
-                if question.strip():
-                    preview_matches = find_chatbot_answers(question, filtered_rows or rows)
-                if preview_matches:
-                    st.markdown("**유사 질문 후보**")
-                    for preview_index, preview_match in enumerate(preview_matches[:3]):
-                        _, _, preview_row, _ = preview_match
-                        preview_question = str(preview_row.get("질문", "")).strip()
-                        if st.button(
-                            preview_question[:90],
-                            key=f"cms_chatbot_preview_question_{preview_index}",
-                            use_container_width=True,
-                        ):
-                            save_chatbot_search_results(preview_question, filtered_rows or rows, not bool(filtered_rows))
-                            st.rerun()
-                if st.button("답변 검색", use_container_width=True, type="primary"):
-                    if not question.strip():
-                        st.warning("질문을 입력해주세요.")
-                    else:
-                        search_pool = filtered_rows or rows
-                        save_chatbot_search_results(question, search_pool, not bool(filtered_rows))
-                st.markdown("</div>", unsafe_allow_html=True)
 
             saved_matches = st.session_state.get("cms_chatbot_matches", [])
             if saved_matches:
