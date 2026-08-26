@@ -20313,6 +20313,59 @@ def show_cms_chatbot():
                             with st.expander("상세 원문"):
                                 st.write(case_detail)
 
+    st.markdown("##### 샘플 QNA 업로드")
+    st.caption("QNA 정리본 엑셀을 업로드하면 질문/답변을 FAQ 데이터로 변환해 챗봇 검색에 반영합니다. 원본 파일은 저장하지 않습니다.")
+    sample_qna_file = st.file_uploader(
+        "샘플 QNA 파일 업로드",
+        type=["xls", "xlsx"],
+        key="cms_chatbot_sample_qna_upload",
+    )
+    apply_sample_qna = st.button(
+        "샘플 QNA 반영",
+        use_container_width=True,
+        type="primary",
+        disabled=sample_qna_file is None,
+    )
+    if sample_qna_file is None:
+        st.info("질문/답변이 포함된 QNA 엑셀 파일을 업로드하면 반영 버튼이 활성화됩니다.")
+    if apply_sample_qna and sample_qna_file is not None:
+        try:
+            imported_rows, skipped_count = build_chatbot_rows_from_qna_workbook(sample_qna_file, sample_qna_file.name)
+            if not imported_rows:
+                st.warning("FAQ로 변환할 수 있는 질문/답변 데이터를 찾지 못했습니다. QNA 양식을 확인해주세요.")
+            else:
+                existing_keys = {
+                    (
+                        clean_chatbot_text(row.get("회사", "")),
+                        clean_chatbot_text(row.get("질문", "")),
+                        clean_chatbot_text(row.get("답변요약", "")),
+                    )
+                    for row in st.session_state.cms_chatbot_faq_rows
+                }
+                deduped_rows = []
+                duplicate_count = 0
+                for row in imported_rows:
+                    row_key = (
+                        clean_chatbot_text(row.get("회사", "")),
+                        clean_chatbot_text(row.get("질문", "")),
+                        clean_chatbot_text(row.get("답변요약", "")),
+                    )
+                    if row_key in existing_keys:
+                        duplicate_count += 1
+                        continue
+                    existing_keys.add(row_key)
+                    deduped_rows.append(row)
+                if deduped_rows:
+                    st.session_state.cms_chatbot_faq_rows = deduped_rows + st.session_state.cms_chatbot_faq_rows
+                    save_cms_chatbot_faq_store()
+                st.success(
+                    f"샘플 QNA {len(deduped_rows):,}건을 FAQ에 반영했습니다. "
+                    f"중복 {duplicate_count:,}건, 변환 제외 {skipped_count:,}건은 제외했습니다."
+                )
+                st.rerun()
+        except Exception as exc:
+            st.error(f"샘플 QNA 파일을 읽지 못했습니다: {exc}")
+
     if st.session_state.get("cms_chatbot_show_admin_tools", False):
         st.markdown("##### 자주 받는 질문")
         store_col1, store_col2, store_col3, store_col4 = st.columns([0.18, 0.18, 0.18, 0.46])
