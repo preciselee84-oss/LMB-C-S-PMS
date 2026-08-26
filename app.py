@@ -20275,7 +20275,6 @@ def show_cms_chatbot():
                         <div class="hana-chat-row bot">
                             <div class="hana-avatar">답변</div>
                             <div class="hana-bubble bot" style="border-color:#00857A;">
-                                <div style="font-size: 13px; font-weight: 900; color: #00857A; margin-bottom: 7px;">통합 처리결과</div>
                                 <div style="font-size: 16px; line-height: 1.7; font-weight: 700;">
                                     {answer_html or "등록된 답변 내용이 없습니다."}
                                 </div>
