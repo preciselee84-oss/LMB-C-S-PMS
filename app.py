@@ -19640,12 +19640,6 @@ def show_cms_chatbot():
         and (selected_operation == "전체" or row["운영구분"] == selected_operation)
     ]
 
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("등록 FAQ", f"{len(rows):,}건")
-    m2.metric("조회 결과", f"{len(filtered_rows):,}건")
-    m3.metric("업무 분류", f"{len(work_options) - 1:,}개")
-    m4.metric("운영구분", f"{len(operation_options) - 1:,}개")
-
     def chatbot_operation_from_work(work):
         if work == "설치등록":
             return "개설"
