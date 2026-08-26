@@ -20271,7 +20271,7 @@ def show_cms_chatbot():
                 key="cms_chatbot_question_input",
                 placeholder="예: 고객사에서 통합CMS 로그인은 되지 않는데 DB 접속 테스트는 성공합니다. 무엇을 확인해야 하나요?",
             )
-            if st.button("답변 검색", use_container_width=True, type="primary"):
+            if st.button("답변 검색", type="primary"):
                 if not question.strip():
                     st.warning("질문을 입력해주세요.")
                 else:
@@ -20322,7 +20322,6 @@ def show_cms_chatbot():
     )
     apply_sample_qna = st.button(
         "샘플 QNA 반영",
-        use_container_width=True,
         type="primary",
         disabled=sample_qna_file is None,
     )
