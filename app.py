@@ -19487,20 +19487,7 @@ def show_visit_voc_collection():
 
 
 def show_cms_chatbot():
-    header_col, history_col = st.columns([0.72, 0.28], gap="large")
-    with header_col:
-        st.markdown('<h4 style="margin:0 0 18px; color:#00857A; font-weight:900;">통합CMS 챗봇</h4>', unsafe_allow_html=True)
-    with history_col:
-        st.markdown('<div class="hana-history-mini-title">과거 질문</div>', unsafe_allow_html=True)
-        last_question = st.session_state.get("cms_chatbot_last_question", "")
-        if last_question:
-            compact_question = html.escape(str(last_question))[:48]
-            st.markdown(
-                f'<div class="hana-history-mini-item">{compact_question}</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown('<div class="hana-history-mini-item muted">검색한 질문 없음</div>', unsafe_allow_html=True)
+    st.markdown('<h4 style="margin:0 0 18px; color:#00857A; font-weight:900;">통합CMS 챗봇</h4>', unsafe_allow_html=True)
 
     work_options = ["전체", "사용자 교육", "사후관리", "기타", "오류발생", "서버점검", "ERP연계", "설치", "설치등록", "추가설치", "재설치", "클레임"]
     operation_options = ["전체", "운영", "연계", "개설"]
@@ -20155,16 +20142,25 @@ def show_cms_chatbot():
                     line-height: 1.45;
                 }
                 .hana-history-mini-title {
-                    margin: 2px 0 8px;
+                    margin: 0 0 8px;
                     color: #00857A;
                     font-size: 13px;
                     font-weight: 900;
                     text-align: left;
                 }
+                .hana-history-side {
+                    width: fit-content;
+                    min-width: 260px;
+                    max-width: 320px;
+                    margin: 0 0 0 18px;
+                    padding: 10px 12px 12px;
+                    border-radius: 8px;
+                    background: transparent;
+                }
                 .hana-history-mini-item {
                     display: inline-block;
-                    width: auto;
-                    max-width: 320px;
+                    width: 100%;
+                    max-width: 296px;
                     padding: 8px 12px;
                     border-radius: 8px;
                     background: #FFFFFF;
@@ -20253,7 +20249,7 @@ def show_cms_chatbot():
             """,
             unsafe_allow_html=True,
         )
-        nav_col, _ = st.columns([0.62, 0.38], gap="large")
+        nav_col, history_col = st.columns([0.62, 0.38], gap="large")
         with nav_col:
             saved_matches = st.session_state.get("cms_chatbot_matches", [])
             if saved_matches:
@@ -20348,6 +20344,23 @@ def show_cms_chatbot():
                                 st.session_state.cms_chatbot_pending_question_input = preview_question
                                 save_chatbot_search_results(preview_question, rows, False)
                                 st.rerun()
+        with history_col:
+            last_question = st.session_state.get("cms_chatbot_last_question", "")
+            if last_question:
+                compact_question = html.escape(str(last_question))[:48]
+                history_item_class = "hana-history-mini-item"
+            else:
+                compact_question = "검색한 질문 없음"
+                history_item_class = "hana-history-mini-item muted"
+            st.markdown(
+                f"""
+                <div class="hana-history-side">
+                    <div class="hana-history-mini-title">과거 질문</div>
+                    <div class="{history_item_class}">{compact_question}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
     st.markdown("##### 샘플 QNA 업로드")
     st.caption("QNA 정리본 엑셀을 업로드하면 질문/답변을 FAQ 데이터로 변환해 챗봇 검색에 반영합니다. 원본 파일은 저장하지 않습니다.")
     sample_qna_file = st.file_uploader(
