@@ -20267,23 +20267,6 @@ def show_cms_chatbot():
             st.markdown('</div>', unsafe_allow_html=True)
 
         with qna_col:
-            quick_prompts = [
-                ("ERP 반영", "ERP에 데이터가 반영되지 않을 때 어떤 부분을 확인해야 하나요?"),
-                ("로그인/인증서", "통합CMS 로그인 또는 인증서 오류가 발생하면 무엇을 확인해야 하나요?"),
-                ("계좌/거래내역", "계좌 잔액이나 거래내역이 조회되지 않을 때 어떻게 처리하나요?"),
-                ("스크래핑", "스크래핑 오류가 발생하면 기본적으로 무엇을 점검해야 하나요?"),
-                ("Agent/서버", "Agent 또는 서버 점검 시 어떤 순서로 확인해야 하나요?"),
-                ("고객방문 질문", "고객 방문 시 어떤 질문을 하고 어떤 기능을 제안해야 하나요?"),
-            ]
-            st.markdown('<div class="hana-workflow-note">검색 순서: 업무 버튼 선택 → 증상/질문 입력 → 유사 질문 확인 → 답변 검색</div>', unsafe_allow_html=True)
-            quick_cols = st.columns(6)
-            for quick_index, (label, prompt) in enumerate(quick_prompts):
-                with quick_cols[quick_index]:
-                    if st.button(label, key=f"cms_chatbot_quick_prompt_{quick_index}", use_container_width=True):
-                        st.session_state.cms_chatbot_question_input = prompt
-                        st.session_state.cms_chatbot_matches = []
-                        st.rerun()
-
             saved_matches = st.session_state.get("cms_chatbot_matches", [])
             if saved_matches:
                 selected_index = min(
