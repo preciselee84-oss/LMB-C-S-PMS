@@ -19685,6 +19685,22 @@ def show_cms_chatbot():
     def direct_chatbot_answer_for_question(question_text):
         source = clean_chatbot_text(question_text)
         source_upper = source.upper()
+        if any(keyword in source for keyword in ["대량이체", "급여이체", "단건출금대량이체", "2500", "2,500"]):
+            if "급여" in source:
+                return "\n".join(
+                    [
+                        "- 급여이체는 한 번에 최대 2,500건까지 가능합니다.",
+                        "- 2,500건을 초과하는 경우 파일을 나누어 등록해야 합니다.",
+                        "- 급여이체계좌는 영업점을 통해 사전 신청되어 있어야 사용할 수 있습니다.",
+                    ]
+                )
+            return "\n".join(
+                [
+                    "- 대량이체는 한 번에 최대 2,500건까지 가능합니다.",
+                    "- 한 번에 2,500건보다 많은 이체가 필요하면 단건출금대량이체 메뉴를 이용해야 합니다.",
+                    "- 단건출금대량이체 사용 가능 여부와 권한은 고객사 설정을 먼저 확인합니다.",
+                ]
+            )
         if (
             any(keyword in source for keyword in ["이체", "출금계좌", "출금통장", "타행", "타은행", "다른은행", "다른 은행"])
             and any(keyword in source for keyword in ["가능", "되나요", "조회", "출력", "지정", "사용"])
