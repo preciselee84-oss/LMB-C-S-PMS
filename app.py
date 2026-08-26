@@ -19488,7 +19488,6 @@ def show_visit_voc_collection():
 
 def show_cms_chatbot():
     st.markdown("#### 통합CMS 챗봇")
-    st.caption("하나은행 통합CMS 운영 중 자주 받는 질문을 회사별, 업무별, 운영구분별로 분류해 답변 기반을 구성하는 메뉴입니다.")
 
     work_options = ["전체", "사용자 교육", "사후관리", "기타", "오류발생", "서버점검", "ERP연계", "설치", "설치등록", "추가설치", "재설치", "클레임"]
     operation_options = ["전체", "운영", "연계", "개설"]
