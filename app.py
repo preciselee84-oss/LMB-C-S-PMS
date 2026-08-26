@@ -20228,6 +20228,20 @@ def show_cms_chatbot():
                 )
                 if st.session_state.get("cms_chatbot_last_filter_empty"):
                     st.caption("현재 필터 조건에 맞는 FAQ가 없어 전체 FAQ에서 검색했습니다.")
+                st.markdown("**유사 질문 후보**")
+                for preview_index, preview_match in enumerate(saved_matches[:5]):
+                    preview_row = preview_match.get("row", {})
+                    preview_question = str(preview_row.get("질문", "")).strip()
+                    if not preview_question:
+                        continue
+                    if st.button(
+                        preview_question[:90],
+                        key=f"cms_chatbot_answer_candidate_{preview_index}",
+                        use_container_width=True,
+                    ):
+                        st.session_state.cms_chatbot_question_input = preview_question
+                        save_chatbot_search_results(preview_question, filtered_rows or rows, not bool(filtered_rows))
+                        st.rerun()
             else:
                 st.markdown(
                     """
@@ -20251,21 +20265,6 @@ def show_cms_chatbot():
                 key="cms_chatbot_question_input",
                 placeholder="예: 고객사에서 통합CMS 로그인은 되지 않는데 DB 접속 테스트는 성공합니다. 무엇을 확인해야 하나요?",
             )
-            preview_matches = []
-            if question.strip():
-                preview_matches = find_chatbot_answers(question, filtered_rows or rows)
-            if preview_matches:
-                st.markdown("**유사 질문 후보**")
-                for preview_index, preview_match in enumerate(preview_matches[:3]):
-                    _, _, preview_row, _ = preview_match
-                    preview_question = str(preview_row.get("질문", "")).strip()
-                    if st.button(
-                        preview_question[:70],
-                        key=f"cms_chatbot_preview_question_{preview_index}",
-                        use_container_width=True,
-                    ):
-                        save_chatbot_search_results(preview_question, filtered_rows or rows, not bool(filtered_rows))
-                        st.rerun()
             if st.button("답변 검색", use_container_width=True, type="primary"):
                 if not question.strip():
                     st.warning("질문을 입력해주세요.")
