@@ -91,13 +91,13 @@ INTEGRATION_CONFIRM_MENU = "연계확인서 출력"
 ACTIVITY_TEMPLATE_CONVERT_MENU = "활동이력 템플릿 변환"
 OPERATION_TARGET_MENU = "운영관리 활동고객 선정"
 VISIT_VOC_MENU = "방문 VOC 수집"
-CMS_CHATBOT_MENU = "CMS 챗봇"
+CMS_CHATBOT_MENU = "통합CMS 챗봇"
 
 CRM_MENU_LABELS = {
     "대시보드": "홈 대시보드",
     "업로드 및 실적 확인": "활동 이력",
     VISIT_VOC_MENU: "방문 VOC 수집",
-    CMS_CHATBOT_MENU: "CMS 챗봇",
+    CMS_CHATBOT_MENU: "통합CMS 챗봇",
     "이번달 활동 대상고객 추천": "대상 고객 추천",
     OPERATION_TARGET_MENU: "운영관리 타깃",
     "주간보고 이력 작성": "주간 리포트",
@@ -740,6 +740,7 @@ def init_state():
         "사업장 관리": "위탁 사업장 관리",
         "이체 자료 생성": "이체 자료 확정",
         "사용품의서 보고": "전도금 사용 결의 보고",
+        "CMS 챗봇": CMS_CHATBOT_MENU,
     }
     if st.session_state.current_menu in RENAMED_MENUS:
         st.session_state.current_menu = RENAMED_MENUS[st.session_state.current_menu]
@@ -19486,7 +19487,7 @@ def show_visit_voc_collection():
 
 
 def show_cms_chatbot():
-    st.markdown("#### 통합CMS 운영 FAQ 챗봇")
+    st.markdown("#### 통합CMS 챗봇")
     st.caption("하나은행 통합CMS 운영 중 자주 받는 질문을 회사별, 업무별, 운영구분별로 분류해 답변 기반을 구성하는 메뉴입니다.")
 
     work_options = ["전체", "사용자 교육", "사후관리", "기타", "오류발생", "서버점검", "ERP연계", "설치", "설치등록", "추가설치", "재설치", "클레임"]
@@ -20210,7 +20211,7 @@ def show_cms_chatbot():
         nav_col, qna_col = st.columns([0.32, 0.68], gap="large")
         with nav_col:
             st.markdown('<div class="hana-side-panel">', unsafe_allow_html=True)
-            st.markdown('<div class="hana-side-title">CMS 챗봇</div>', unsafe_allow_html=True)
+            st.markdown('<div class="hana-side-title">통합CMS 챗봇</div>', unsafe_allow_html=True)
             question = st.text_area(
                 "증상/질문 검색",
                 height=130,
@@ -20345,32 +20346,6 @@ def show_cms_chatbot():
                         if case_detail:
                             with st.expander("상세 원문"):
                                 st.write(case_detail)
-                image_key = best_row.get("이미지키")
-                image_store = st.session_state.get("cms_chatbot_image_store", {})
-                answer_images = image_store.get(image_key, []) if image_key else []
-                if answer_images:
-                    st.markdown(
-                        """
-                        <div class="hana-chat-shell">
-                            <div class="hana-chat-row bot">
-                                <div class="hana-avatar">하나</div>
-                                <div class="hana-bubble bot" style="border-color:#00857A; max-width: 90%;">
-                                    <div style="font-size: 13px; font-weight: 900; color: #00857A; margin-bottom: 7px;">관련 이미지</div>
-                                </div>
-                            </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-                    image_col, _ = st.columns([0.52, 0.48])
-                    with image_col:
-                        if len(answer_images) == 1:
-                            st.image(BytesIO(answer_images[0]), use_container_width=True)
-                        else:
-                            cols = st.columns(min(len(answer_images), 2))
-                            for image_index, image_bytes in enumerate(answer_images[:4]):
-                                with cols[image_index % len(cols)]:
-                                    st.image(BytesIO(image_bytes), use_container_width=True)
                 meta_cols = st.columns(4)
                 meta_cols[0].metric("회사", best_row.get("회사", "-"))
                 meta_cols[1].metric("업무", best_row.get("업무", "-"))
