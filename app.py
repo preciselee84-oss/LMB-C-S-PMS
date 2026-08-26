@@ -20151,6 +20151,14 @@ def show_cms_chatbot():
                 }
                 div[data-testid="stButton"] > button * {
                     color: #111827 !important;
+                    -webkit-text-fill-color: #111827 !important;
+                    opacity: 1 !important;
+                }
+                body:has(#pms-d:checked) div[data-testid="stButton"] > button:not([kind="primary"]):not([data-testid="baseButton-primary"]) *,
+                body:has(#pms-s:checked) div[data-testid="stButton"] > button:not([kind="primary"]):not([data-testid="baseButton-primary"]) * {
+                    color: #111827 !important;
+                    -webkit-text-fill-color: #111827 !important;
+                    opacity: 1 !important;
                 }
                 div[data-testid="stButton"] > button:hover {
                     border-color: #00857A !important;
@@ -20168,6 +20176,7 @@ def show_cms_chatbot():
                 div[data-testid="stButton"] > button[kind="primary"] *,
                 div[data-testid="stButton"] > button[data-testid="baseButton-primary"] * {
                     color: #FFFFFF !important;
+                    -webkit-text-fill-color: #FFFFFF !important;
                 }
                 div[data-testid="stButton"] > button[kind="primary"]:hover,
                 div[data-testid="stButton"] > button[data-testid="baseButton-primary"]:hover {
