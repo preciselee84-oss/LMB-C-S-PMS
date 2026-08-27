@@ -19687,6 +19687,30 @@ def show_cms_chatbot():
     def direct_chatbot_answer_for_question(question_text):
         source = clean_chatbot_text(question_text)
         source_upper = source.upper()
+        if any(keyword in source for keyword in ["업무별 결재", "결재 가능 시간", "결재가능 시간", "결재가능시간"]):
+            return "\n".join(
+                [
+                    "기업뱅킹 업무별 결재 가능 시간은 아래 표를 확인해 주세요.",
+                    "",
+                    "| 업무 구분 | 대상 업무 | 결재 가능 시간 |",
+                    "| --- | --- | --- |",
+                    "| 이체 | 즉시이체, 대량이체(즉시), 하나은행으로 외화이체 | 다음날(영업일 기준) |",
+                    "| 이체 | 다른은행으로 외화이체 | 다음날(영업일 기준) 16시 30분 이전 |",
+                    "| 이체 | 10억 초과 다른은행 거액이체 | 신청 당일 9시~16시 50분 이전 |",
+                    "| 이체 | 예약이체(대량/급여이체 포함) | 예약일 실행시간 이전 |",
+                    "| 공과금 | 국세 조회/입력납부, 법원보관금, 법원송달료, 법원공탁금, 지역개발채권 | 신청 당일 |",
+                    "| 공과금 | 지방세, 공과금, 전기요금, 상하수도, 지로 등 | 다음날(영업일 기준) |",
+                    "| 외환 | 외화송금신청 | 다음날(영업일 기준) |",
+                    "| 외환 | 외화송금 예약신청 | 예약일 전일 |",
+                    "| B2B | 수출e구매론발행등록 | 신청 당일 |",
+                    "| B2B | 그 외 | 다음날(영업일 기준) |",
+                    "| 전자어음 | 발행, 배서, 할인, 전자어음만기전지급제시 | 신청 당일 |",
+                    "| 금융거래 | 펀드환매, MMT/CMT지급 | 신청 당일 |",
+                    "| 예적금 | 예적금신규 | 다음날(영업일 기준) |",
+                    "",
+                    "예약실행시간을 초과해 결재하면 돌아오는 정시에 이체가 실행됩니다.",
+                ]
+            )
         if any(keyword in source for keyword in ["이체한도", "이체 한도", "한도증액", "한도 증액"]):
             return "\n".join(
                 [
@@ -19796,6 +19820,8 @@ def show_cms_chatbot():
         return ""
 
     def summarize_chatbot_result(text, max_items=3):
+        if any(keyword in clean_chatbot_text(text) for keyword in ["업무별 결재가능 시간", "업무별 결재 가능 시간", "결재가능 시간은 아래 표"]):
+            return clean_chatbot_text(text)
         inferred_items = infer_chatbot_action_result(text)
         if inferred_items:
             return "\n".join(f"- {item}" for item in inferred_items[:max_items])
@@ -20309,6 +20335,43 @@ def show_cms_chatbot():
             detail_answer = source if clean_chatbot_text(display_answer) != clean_chatbot_text(source) else ""
         return display_answer, detail_answer
 
+    def format_chatbot_answer_html(answer_text):
+        lines = str(answer_text or "").splitlines()
+        html_parts = []
+        table_rows = []
+
+        def flush_table():
+            if not table_rows:
+                return
+            header = table_rows[0]
+            body = table_rows[2:] if len(table_rows) > 1 and all(cell.strip("- ") == "" for cell in table_rows[1]) else table_rows[1:]
+            html_parts.append("<table class=\"hana-chat-table\">")
+            html_parts.append("<thead><tr>")
+            for cell in header:
+                html_parts.append(f"<th>{html.escape(cell.strip())}</th>")
+            html_parts.append("</tr></thead><tbody>")
+            for row in body:
+                html_parts.append("<tr>")
+                for cell in row:
+                    html_parts.append(f"<td>{html.escape(cell.strip())}</td>")
+                html_parts.append("</tr>")
+            html_parts.append("</tbody></table>")
+            table_rows.clear()
+
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("|") and stripped.endswith("|"):
+                cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+                table_rows.append(cells)
+                continue
+            flush_table()
+            if stripped:
+                html_parts.append(html.escape(stripped))
+            else:
+                html_parts.append("")
+        flush_table()
+        return "<br>".join(part for part in html_parts if part != "")
+
     def chatbot_question_intent(question_text):
         source = clean_chatbot_text(question_text)
         if any(keyword in source for keyword in ["이체한도", "이체 한도", "한도증액", "한도 증액"]):
@@ -20464,6 +20527,35 @@ def show_cms_chatbot():
                     margin-top: 6px;
                     color: #64748B;
                     font-size: 12px;
+                }
+                .hana-chat-table {
+                    width: 100%;
+                    margin: 10px 0 8px;
+                    border-collapse: collapse;
+                    border: 1px solid #9FD8D2;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    font-size: 13px;
+                    line-height: 1.45;
+                }
+                .hana-chat-table th {
+                    background: #E3F5F2;
+                    color: #006B62;
+                    font-weight: 900;
+                    text-align: left;
+                    padding: 8px 10px;
+                    border-bottom: 1px solid #9FD8D2;
+                }
+                .hana-chat-table td {
+                    color: #061329;
+                    font-weight: 700;
+                    padding: 8px 10px;
+                    border-top: 1px solid #D4ECE9;
+                    vertical-align: top;
+                }
+                .hana-chat-table td + td,
+                .hana-chat-table th + th {
+                    border-left: 1px solid #D4ECE9;
                 }
                 .hana-candidate-title {
                     margin: 12px 0 8px;
@@ -20669,7 +20761,7 @@ def show_cms_chatbot():
                 display_answer, _detail_answer = parse_chatbot_answer_parts(answer_text)
                 direct_answer = direct_chatbot_answer_for_question(last_question_text)
                 merged_answer = direct_answer or merged_chatbot_result_from_matches(saved_matches[:3], last_question_text) or display_answer
-                answer_html = html.escape(merged_answer).replace("\n", "<br>")
+                answer_html = format_chatbot_answer_html(merged_answer)
                 answered_at_text = str(st.session_state.get("cms_chatbot_answered_at", "")).strip()
                 if not answered_at_text:
                     answered_at_text = _current_kst().strftime("%Y-%m-%d %H:%M")
