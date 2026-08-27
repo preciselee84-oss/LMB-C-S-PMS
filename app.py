@@ -19687,6 +19687,45 @@ def show_cms_chatbot():
     def direct_chatbot_answer_for_question(question_text):
         source = clean_chatbot_text(question_text)
         source_upper = source.upper()
+        if any(keyword in source for keyword in ["이체한도", "이체 한도", "한도증액", "한도 증액"]):
+            return "\n".join(
+                [
+                    "- 기업뱅킹 이체한도 증액은 사업자 유형에 따라 비대면 또는 영업점 방문으로 처리합니다.",
+                    "- 개인사업자는 하나원큐기업 앱의 개인사업자 비대면 은행업무에서 최대 5억원까지 변경 가능합니다.",
+                    "- 법인사업자는 하나원큐기업 앱 또는 기업인터넷뱅킹의 법인 비대면 은행업무에서 최대 50억원까지 변경 가능합니다.",
+                    "- 비대면 조건에 해당하지 않거나 한도 초과가 필요하면 필요서류를 준비해 영업점에서 신청합니다.",
+                ]
+            )
+        if any(keyword in source for keyword in ["장기미사용", "이체거래정지", "이체 거래정지", "거래정지"]):
+            return "\n".join(
+                [
+                    "- 기업뱅킹에서 12개월 이상 이체성 거래 또는 보안매체 제출거래가 없으면 장기미사용으로 이체성 거래가 정지될 수 있습니다.",
+                    "- 조회서비스는 이용 가능하지만, 이체/송금/정보변경 등 OTP 제출 거래는 제한됩니다.",
+                    "- 해제는 가까운 영업점에서 이체성거래정지 해제를 신청하거나, 유효한 은행용 인증서와 OTP가 있으면 기업뱅킹에서 해제합니다.",
+                    "- 다른은행/기관 인증서도 하나은행에 등록되어 있으면 이체성거래정지 해제에 사용할 수 있습니다.",
+                ]
+            )
+        if (
+            any(keyword in source for keyword in ["타기관", "다른 은행", "다른은행", "다른 기관", "다른기관"])
+            and any(keyword in source for keyword in ["인증서", "공동인증서"])
+        ):
+            return "\n".join(
+                [
+                    "- 다른 은행 또는 기관에서 발급받은 공동인증서도 하나은행 기업뱅킹에서 사용할 수 있습니다.",
+                    "- 사용 전 [인증센터 > 다른은행 · 기관 인증서 등록/해제 > 다른은행/기관 인증서 등록] 메뉴에서 등록해야 합니다.",
+                    "- 등록 시 사업자 유형이 법인사업자/개인사업자 중 올바르게 선택되어 있는지 확인합니다.",
+                    "- 등록 후에도 본인확인 오류가 계속되면 고객센터(1599-1111) 또는 영업점 확인이 필요합니다.",
+                ]
+            )
+        if any(keyword in source for keyword in ["은행공동망", "공동망", "이체 이용시간", "이체이용시간", "이체시간", "이체 시간"]):
+            return "\n".join(
+                [
+                    "- 이체 이용시간은 출금은행, 입금은행, 출금방식에 따라 다르게 적용됩니다.",
+                    "- 하나은행 간 이체는 하나은행 이체한도와 이용 가능 시간을 먼저 확인합니다.",
+                    "- 타행 이체는 은행공동망 또는 지준망 처리시간과 상대 은행 이용 가능 시간을 함께 확인해야 합니다.",
+                    "- 금융결제원 자금정산 시간(23:50~00:05)에는 이체 이용이 제한될 수 있습니다.",
+                ]
+            )
         if any(keyword in source for keyword in ["자동이체", "출금시간", "출금 시간", "이체 이용시간", "이체시간"]):
             if "출금" in source or "자동이체" in source:
                 return "\n".join(
@@ -19720,7 +19759,8 @@ def show_cms_chatbot():
                 ]
             )
         if (
-            any(keyword in source for keyword in ["이체", "출금계좌", "출금통장", "타행", "타은행", "다른은행", "다른 은행"])
+            any(keyword in source for keyword in ["타행", "타은행", "다른은행", "다른 은행"])
+            and any(keyword in source for keyword in ["이체", "출금계좌", "출금통장", "계좌"])
             and any(keyword in source for keyword in ["가능", "되나요", "조회", "출력", "지정", "사용"])
         ):
             return "\n".join(
@@ -20193,6 +20233,7 @@ def show_cms_chatbot():
         question_tokens = chatbot_text_tokens(question_text)
         if not question_tokens:
             return []
+        intent = chatbot_question_intent(question_text)
         scored_rows = []
         for row in candidates:
             faq_question = str(row.get("질문", ""))
@@ -20202,6 +20243,14 @@ def show_cms_chatbot():
             if not overlap:
                 continue
             score = len(overlap) * 10
+            if chatbot_match_fits_intent(row, intent):
+                score += 25
+            else:
+                score -= 30
+            question_overlap = question_tokens & chatbot_text_tokens(faq_question)
+            score += len(question_overlap) * 12
+            if clean_chatbot_text(question_text) and clean_chatbot_text(question_text) in clean_chatbot_text(faq_question):
+                score += 80
             scored_rows.append((score, len(overlap), row, sorted(overlap)))
         scored_rows.sort(key=lambda item: (item[0], item[1]), reverse=True)
         return scored_rows[:5]
@@ -20262,8 +20311,19 @@ def show_cms_chatbot():
 
     def chatbot_question_intent(question_text):
         source = clean_chatbot_text(question_text)
-        if any(keyword in source for keyword in ["이체", "출금계좌", "출금통장", "타행", "타은행", "다른은행", "다른 은행"]):
-            return "transfer"
+        if any(keyword in source for keyword in ["이체한도", "이체 한도", "한도증액", "한도 증액"]):
+            return "transfer_limit"
+        if any(keyword in source for keyword in ["장기미사용", "이체거래정지", "이체 거래정지", "거래정지"]):
+            return "transfer_suspend"
+        if (
+            any(keyword in source for keyword in ["타기관", "다른 은행", "다른은행", "다른 기관", "다른기관"])
+            and any(keyword in source for keyword in ["인증서", "공동인증서"])
+        ):
+            return "certificate_external"
+        if any(keyword in source for keyword in ["은행공동망", "공동망", "이체 이용시간", "이체이용시간", "이체시간", "이체 시간"]):
+            return "transfer_time"
+        if any(keyword in source for keyword in ["대량이체", "급여이체", "단건출금대량이체", "2500", "2,500"]):
+            return "bulk_transfer"
         if "ERP" in source.upper() and any(keyword in source for keyword in ["반영", "내보내기", "데이터", "거래내역", "잔액"]):
             return "erp"
         if any(keyword in source for keyword in ["로그인", "접속", "인증서"]):
@@ -20272,6 +20332,10 @@ def show_cms_chatbot():
             return "setup"
         if any(keyword in source for keyword in ["거래내역조회", "거래내역 조회", "계좌거래내역", "계좌 거래내역"]):
             return "account_history"
+        if any(keyword in source for keyword in ["타행", "타은행", "다른은행", "다른 은행"]):
+            return "other_bank_transfer"
+        if any(keyword in source for keyword in ["이체", "출금계좌", "출금통장"]):
+            return "transfer"
         return ""
 
     def chatbot_match_fits_intent(row, intent):
@@ -20288,7 +20352,13 @@ def show_cms_chatbot():
             )
         )
         intent_keywords = {
-            "transfer": ["이체", "출금계좌", "출금통장", "타행", "타은행", "다른은행", "다른 은행", "결재선", "이체한도"],
+            "transfer_limit": ["이체한도", "이체 한도", "한도증액", "한도 증액", "총/개별 이체한도", "최대 5억원", "최대 50억원"],
+            "transfer_suspend": ["장기미사용", "이체거래정지", "이체 거래정지", "거래정지", "12개월", "이체성거래"],
+            "certificate_external": ["다른은행", "다른 은행", "다른은행/기관", "타기관", "인증서 등록", "공동인증서"],
+            "transfer_time": ["이체 이용시간", "이체이용시간", "이체시간", "이체 시간", "은행공동망", "지준망", "금융결제원", "자금정산"],
+            "bulk_transfer": ["대량이체", "급여이체", "단건출금대량이체", "2,500", "2500"],
+            "other_bank_transfer": ["타행계좌", "타행 계좌", "타은행", "타행", "다른은행", "다른 은행"],
+            "transfer": ["이체", "출금계좌", "출금통장", "결재선"],
             "erp": ["ERP", "반영", "내보내기", "데이터", "거래내역", "잔액"],
             "login": ["로그인", "접속", "인증서", "DB"],
             "setup": ["설치", "개설", "등록"],
