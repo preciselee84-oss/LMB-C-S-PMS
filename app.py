@@ -20345,17 +20345,17 @@ def show_cms_chatbot():
                 return
             header = table_rows[0]
             body = table_rows[2:] if len(table_rows) > 1 and all(cell.strip("- ") == "" for cell in table_rows[1]) else table_rows[1:]
-            html_parts.append("<table class=\"hana-chat-table\">")
-            html_parts.append("<thead><tr>")
+            table_html = ["<table class=\"hana-chat-table\">", "<thead><tr>"]
             for cell in header:
-                html_parts.append(f"<th>{html.escape(cell.strip())}</th>")
-            html_parts.append("</tr></thead><tbody>")
+                table_html.append(f"<th>{html.escape(cell.strip())}</th>")
+            table_html.append("</tr></thead><tbody>")
             for row in body:
-                html_parts.append("<tr>")
+                table_html.append("<tr>")
                 for cell in row:
-                    html_parts.append(f"<td>{html.escape(cell.strip())}</td>")
-                html_parts.append("</tr>")
-            html_parts.append("</tbody></table>")
+                    table_html.append(f"<td>{html.escape(cell.strip())}</td>")
+                table_html.append("</tr>")
+            table_html.append("</tbody></table>")
+            html_parts.append("".join(table_html))
             table_rows.clear()
 
         for line in lines:
@@ -20366,11 +20366,9 @@ def show_cms_chatbot():
                 continue
             flush_table()
             if stripped:
-                html_parts.append(html.escape(stripped))
-            else:
-                html_parts.append("")
+                html_parts.append(f"<div class=\"hana-answer-line\">{html.escape(stripped)}</div>")
         flush_table()
-        return "<br>".join(part for part in html_parts if part != "")
+        return "".join(html_parts)
 
     def chatbot_question_intent(question_text):
         source = clean_chatbot_text(question_text)
@@ -20565,6 +20563,12 @@ def show_cms_chatbot():
                     font-size: 15px;
                     line-height: 1.5;
                     font-weight: 700;
+                }
+                .hana-answer-line {
+                    margin: 0 0 6px;
+                }
+                .hana-answer-line + .hana-chat-table {
+                    margin-top: 4px;
                 }
                 .hana-chat-table td + td,
                 .hana-chat-table th + th {
