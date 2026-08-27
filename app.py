@@ -20475,18 +20475,23 @@ def show_cms_chatbot():
                     background: #F2FAF8;
                 }
                 .hana-chat-window {
-                    min-height: 260px;
+                    min-height: 0;
+                    height: auto;
                     margin: 0 0 18px;
                     padding: 18px 18px 28px;
                     border: 1px solid #9FD8D2;
                     border-radius: 16px;
                     background: #F2FAF8;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: flex-start;
+                    gap: 12px;
                 }
                 .hana-chat-row {
                     display: flex;
                     align-items: flex-end;
                     gap: 10px;
-                    margin: 12px 0;
+                    margin: 0;
                 }
                 .hana-chat-row.bot { justify-content: flex-start; }
                 .hana-chat-row.user { justify-content: flex-end; }
@@ -20517,6 +20522,9 @@ def show_cms_chatbot():
                     color: #0F172A;
                     border-bottom-left-radius: 5px;
                 }
+                .hana-bubble.bot.has-table {
+                    max-width: 94%;
+                }
                 .hana-bubble.user {
                     background: #00A88E;
                     color: #FFFFFF;
@@ -20530,7 +20538,7 @@ def show_cms_chatbot():
                 }
                 .hana-chat-table {
                     width: 100%;
-                    margin: 10px 0 8px;
+                    margin: 8px 0 6px;
                     border-collapse: collapse;
                     border: 1px solid #9FD8D2;
                     border-radius: 8px;
@@ -20543,15 +20551,20 @@ def show_cms_chatbot():
                     color: #006B62;
                     font-weight: 900;
                     text-align: left;
-                    padding: 8px 10px;
+                    padding: 6px 8px;
                     border-bottom: 1px solid #9FD8D2;
                 }
                 .hana-chat-table td {
                     color: #061329;
                     font-weight: 700;
-                    padding: 8px 10px;
+                    padding: 6px 8px;
                     border-top: 1px solid #D4ECE9;
                     vertical-align: top;
+                }
+                .hana-answer-content {
+                    font-size: 15px;
+                    line-height: 1.5;
+                    font-weight: 700;
                 }
                 .hana-chat-table td + td,
                 .hana-chat-table th + th {
@@ -20725,6 +20738,7 @@ def show_cms_chatbot():
                 @media (max-width: 1100px) {
                     .hana-side-title { font-size: 18px; }
                     .hana-bubble { max-width: 92%; }
+                    .hana-bubble.bot.has-table { max-width: 100%; }
                 }
                 @media (max-width: 640px) {
                     .hana-workflow-note {
@@ -20775,8 +20789,8 @@ def show_cms_chatbot():
                         </div>
                         <div class="hana-chat-row bot">
                             <div class="hana-avatar">답변</div>
-                            <div class="hana-bubble bot" style="border-color:#00857A;">
-                                <div style="font-size: 16px; line-height: 1.7; font-weight: 700;">
+                            <div class="hana-bubble bot {'has-table' if '<table' in answer_html else ''}" style="border-color:#00857A;">
+                                <div class="hana-answer-content">
                                     {answer_html or "등록된 답변 내용이 없습니다."}
                                 </div>
                                 <div class="hana-chat-meta">답변일시 {answered_at}</div>
