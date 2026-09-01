@@ -1,5 +1,5 @@
 {
-  "source": "통합CMS 사용자매뉴얼_2024.pptx + 자동이체/이체시간 메뉴얼_v1.0.ppt + 하나은행 기업인터넷뱅킹 FAQ",
+  "source": "통합CMS 사용자매뉴얼_2024.pptx + 자동이체/이체시간 메뉴얼_v1.0.ppt + 하나은행 기업인터넷뱅킹 FAQ + 통합CMS_ERP연계 테이블레이아웃 (3).xlsx",
   "rows": [
     {
       "회사": "고객사 공통",
@@ -1655,6 +1655,294 @@
       "질문": "종교단체, 협회, 조합 등 비영리 법인의 해외직접투자가 가능한가요?",
       "답변요약": "비영리 법인도 아래 2가지 조건에 모두 해당하면 허용된 범위 내에서는 수익사업을 경영할 수 있습니다.\n1. 정관에 해당 사업의 표시가 있고\n2. 관련 법령에서 인정하고 있는 경우\n※ 단, 비영리 법인의 해외 비영리 법인에 대한 해외투자는 할 수 없습니다.\n예) 학교법인이 해외직접투자를 한다면 수익사업을 할 수 있도록 규정한 사립 학교법령과 학교법인 정관을 제출해야 합니다.",
       "상태": "하나은행 기업인터넷뱅킹 FAQ:외환",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "입출금거래내역 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 입출금거래내역 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_ACCT_TRSC_PTCL\n- 레이아웃: HCMS_ACCT_TRSC_PTCL | 입출금거래내역(보통예금기준)\n- 주요 키: INST_DV_NO, CMSV_CUR_CD, CRYP_CMSV_ACCT_NO, TRSC_DT, CMSV_ACCT_TRSC_SEQ_NO\n- 필수 컬럼: RCV_WDRW_DV_CD\n- 주요 컬럼:\n  - INST_DV_NO (PK): VARCHAR 8 - 은행코드\n  - CMSV_CUR_CD (PK): VARCHAR 3 - 통화코드\n  - CRYP_CMSV_ACCT_NO (PK): VARCHAR 20 - 계좌번호\n  - TRSC_DT (PK): VARCHAR 8 - 거래일자\n  - CMSV_ACCT_TRSC_SEQ_NO (PK): DECIMAL 10,0 - 일련번호 / 계좌,거래일자별 순번\n  - TRSC_DRTM: VARCHAR 6 - 거래시간\n  - RCV_WDRW_DV_CD: CHAR 1 - 입출금구분 / 1 : 입금, 2 : 출금\n  - TX_AMT: DECIMAL 18,3 - 거래금액\n- 전체 컬럼 수: 15개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:1.입출금거래내역",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "이체내역 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 이체내역 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_ACCT_TRNS_PTCL\n- 레이아웃: 이체내역 : HCMS_ACCT_TRNS_PTCL\n- 주요 키: CRYP_WDRW_ACCT_NO, TRSC_DT, TRNS_SEQ_NO\n- 주요 컬럼:\n  - CRYP_WDRW_ACCT_NO (PK): VARCHAR 20 - 출금계좌\n  - TRSC_DT (PK): VARCHAR 8 - 거래일자\n  - TRNS_SEQ_NO (PK): DECIMAL 10,0 - 일련번호\n  - CRYP_RCV_ACCT_NO: VARCHAR 160 - 입금계좌 / 대량이체(압축기장)의 경우 빈값\n  - RCV_INST_DV_NO: VARCHAR 8 - 입금은행코드\n  - WDRW_INST_DV_NO: VARCHAR 8 - 출금은행코드\n  - TRNS_TM: VARCHAR 6 - 거래시간\n  - TRNS_AMT: DECIMAL 18,3 - 이체금액\n- 전체 컬럼 수: 15개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:2.이체내역",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "계좌원장 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 계좌원장 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_ACCT_BASE\n- 레이아웃: HCMS_ACCT_BASE 계좌 원장\n- 주요 키: INST_DV_NO, CMSV_CUR_CD, CRYP_CMSV_ACCT_NO\n- 주요 컬럼:\n  - INST_DV_NO (PK): VARCHAR 8 - 은행코드\n  - CMSV_CUR_CD (PK): VARCHAR 3 - 통화코드\n  - CRYP_CMSV_ACCT_NO (PK): VARCHAR 20 - 계좌번호\n  - ACCT_BAL: DECIMAL 18,3 - 잔액\n  - WDRW_POSS_AMT: DECIMAL 18,3 - 출금가능잔액\n  - BAL_INQ_DTM: DATETIME - 잔액조회일시\n  - ACCT_ALNM: VARCHAR 100 - 계좌별칭\n  - CMSV_ACCT_KIND_DV_CD: VARCHAR 4 - 계좌종류 / B01 : 입출금계좌 B02 : MMDA / MMF B03 : 당좌계좌 B04 : 적립 / 거치식계좌 B05 : 투자 / 신탁상품 B06 : 보관어음 B07 : 외화예금 B08 : 기타예금 B09 : 일반대출 B10 : 할인어음 B11 : 지급보증 B12 : 회사채 B13 : 기타대출 GCMS : GCMS SWFT : SWIFT\n- 전체 컬럼 수: 12개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:3. 계좌원장",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "집금내역 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 집금내역 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_ACCT_CLTM_PTCL\n- 레이아웃: 집금내역 : HCMS_ACCT_CLTM_PTCL\n- 주요 키: CLTM_DT, DD_BY_SEQ_NO\n- 주요 컬럼:\n  - CLTM_DT (PK): VARCHAR 8 - 집금일자\n  - DD_BY_SEQ_NO (PK): DECIMAL 10,0 - 일별일련번호\n  - CLTM_TM: VARCHAR 6 - 집금시각\n  - RCV_INST_DV_NO: VARCHAR 8 - 입금은행코드\n  - CRYP_RCV_ACCT_NO: VARCHAR 16 - 입금계좌\n  - WDRW_INST_DV_NO: VARCHAR 8 - 출금은행코드\n  - CRYP_WDRW_ACCT_NO: VARCHAR 20 - 출금계좌\n  - TRNS_AMT: DECIMAL 18,3 - 이체금액\n- 전체 컬럼 수: 15개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:4.집금내역",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "환율 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 환율 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_EXHG_RT_BASE\n- 레이아웃: 일자별고시환율(HCMS_EXHG_RT_BASE)\n- 주요 키: PBLD_DT, SQN, EXHG_RT_CUR_CD\n- 주요 컬럼:\n  - PBLD_DT (PK): VARCHAR 8 - 고시일자\n  - SQN (PK): DECIMAL 5,0 - 회차\n  - EXHG_RT_CUR_CD (PK): VARCHAR 3 - 통화코드\n  - PBLD_TM: VARCHAR 6 - 고시시간\n  - TT_BUY_RT: DECIMAL 16,10 - 전신환매입율\n  - TT_SLL_RT: DECIMAL 16,10 - 전신환매도율\n  - ACMN_SLL_RT: DECIMAL 16,10 - 현찰매도율\n  - ACMN_BUY_RT: DECIMAL 16,10 - 현찰매입율\n- 전체 컬럼 수: 14개\n- 테이블명: HCMS_NPBL_EXHG_RT_BASE\n- 레이아웃: 비고시 환율 : HCMS_NPBL_EXHG_RT_BASE\n- 주요 키: PBLD_DT, SQN, EXHG_RT_CUR_CD\n- 주요 컬럼:\n  - PBLD_DT (PK): VARCHAR 8 - 기준일\n  - SQN (PK): DECIMAL 5,0 - 순번\n  - EXHG_RT_CUR_CD (PK): VARCHAR 3 - 통화명\n  - CNTY_ENG_NM: VARCHAR 40 - 통화명칭\n  - CUR_ENG_NM: VARCHAR 40 - 국가명\n  - DEAL_BASC_RT: DECIMAL 16,10 - 매매기준율\n  - USD_BASC_EXHG_RT: DECIMAL 16,10 - 미화기준환율\n  - CUR_NM: VARCHAR 20 - 국가명_한글\n- 전체 컬럼 수: 10개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:5.환율",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "법인카드 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 법인카드 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_CRD_APV_PTCL\n- 레이아웃: 법인카드 승인내역 : HCMS_CRD_APV_PTCL\n- 주요 키: INST_DV_NO, CRYP_CRD_NO, APV_DT, CMSV_CRD_APV_SEQ_NO\n- 주요 컬럼:\n  - INST_DV_NO (PK): CHAR 8 - 카드사코드\n  - CRYP_CRD_NO (PK): VARCHAR 16 - 카드번호\n  - APV_DT (PK): CHAR 8 - 승인일\n  - CMSV_CRD_APV_SEQ_NO (PK): DECIMAL 10,0 - 승인일련번호\n  - APV_NO: VARCHAR 14 - 승인번호\n  - APV_DRTM: VARCHAR 6 - 승인시간\n  - APV_AMT: DECIMAL 18,3 - 승인금액\n  - SPLY_PRC: DECIMAL 18,3 - 공급가액\n- 전체 컬럼 수: 34개\n- 테이블명: HCMS_CRD_UTLZ_PTCL\n- 레이아웃: 이용(매입)내역조회 : HCMS_CRD_UTLZ_PTCL\n- 주요 키: INST_DV_NO, CRYP_CRD_NO, BUY_DT, CMSV_CRD_UTLZ_SEQ_NO\n- 주요 컬럼:\n  - INST_DV_NO (PK): CHAR 8 - 카드사코드\n  - CRYP_CRD_NO (PK): VARCHAR 16 - 카드번호\n  - BUY_DT (PK): CHAR 8 - 매입일자\n  - CMSV_CRD_UTLZ_SEQ_NO (PK): DECIMAL 10,0 - 매입일련번호\n  - APV_NO: CHAR 14 - 승인번호\n  - APV_AMT: DECIMAL 18,3 - 승인금액\n  - APV_DT: CHAR 8 - 승인일자\n  - CLM_DT: CHAR 8 - 청구일자\n- 전체 컬럼 수: 46개\n- 테이블명: HCMS_CRD_CLM_PTCL\n- 레이아웃: 법인카드 청구내역 : HCMS_CRD_CLM_PTCL\n- 주요 키: INST_DV_NO, CRYP_CRD_NO, CLM_YM, CMSV_CRD_CLM_SEQ_NO\n- 주요 컬럼:\n  - INST_DV_NO (PK): CHAR 8 - 카드사코드\n  - CRYP_CRD_NO (PK): VARCHAR 16 - 카드번호\n  - CLM_YM (PK): CHAR 6 - 청구월\n  - CMSV_CRD_CLM_SEQ_NO (PK): DECIMAL 10,0 - 일련번호\n  - UTLZ_DT: CHAR 8 - 사용일\n  - CLM_AMT: DECIMAL 18,3 - 청구금액\n  - APV_NO: CHAR 10 - 승인번호\n  - CMSV_MEST_NM: VARCHAR 100 - 가맹점명\n- 전체 컬럼 수: 31개\n- 시트 내 추가 레이아웃 2건은 원본 파일에서 함께 확인합니다.",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:6.법인카드",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "즉시이체 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 즉시이체 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_E2C_IMDT_TRNS_PTCL\n- 레이아웃: 즉시(거액)이체 등록/결과 : HCMS_E2C_IMDT_TRNS_PTCL\n- 주요 키: TRNS_NM, SEQ_NO\n- 필수 컬럼: REG_DT, REG_TM, RCV_INST_DV_NO, CRYP_RCV_ACCT_NO, TRSC_AMT, ERP_LNK_CTT\n- 주요 컬럼:\n  - TRNS_NM (PK): VARCHAR 50 - 이체명\n  - SEQ_NO (PK): DECIMAL 10 - 일련번호 / 일련번호 셋팅:1부터 시작 / 이체명,등록일자별 순번 최대건수 : 30건\n  - REG_DT: VARCHAR 8 - 등록일자\n  - REG_TM: VARCHAR 6 - 등록시간\n  - RCV_INST_DV_NO: VARCHAR 8 - 입금은행코드 / 은행코드 3자리 / [코드] sheet 참조\n  - CRYP_RCV_ACCT_NO: VARCHAR 20 - 입금계좌번호 / 숫자만 입력('-' 없이)\n  - TRSC_AMT: DECIMAL 18,3 - 거래금액\n  - CMSV_RMTE_NM: VARCHAR 300 - 수취인명 / 받는사람\n- 전체 컬럼 수: 23개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:7.즉시이체",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "대량_급여이체 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 대량_급여이체 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_E2C_EVLM_TRNS_PTCL\n- 레이아웃: 대량/급여이체 등록/결과 : HCMS_E2C_EVLM_TRNS_PTCL\n- 주요 키: APNX_FILE_NM, REMT_SEQ_NO\n- 주요 컬럼:\n  - APNX_FILE_NM (PK): VARCHAR 50 - 이체명 / 대량이체파일명 / 동일한 파일명 재생성 X\n  - REMT_SEQ_NO (PK): DECIMAL 5 - 일련번호 / 파일별 시퀀스 : +1씩 증가\n  - REG_DT: VARCHAR 8 - 등록일자\n  - REG_TM: VARCHAR 6 - 등록시간\n  - RCV_INST_DV_NO: VARCHAR 8 - 입금은행코드 / 은행코드 3자리 / [코드] sheet 참조\n  - CRYP_RCV_ACCT_NO: VARCHAR 20 - 입금계좌번호 / 숫자만 입력('-' 없이)\n  - TRSC_AMT: DECIMAL 18,3 - 금액 / (* 타행으로 이체시 10억까지 이체 가능)\n  - ACCT_EPCT_OWAC_NM: VARCHAR 100 - 등록한예금주 / 받는사람\n- 전체 컬럼 수: 28개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:8.대량_급여이체",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "휴폐업조회 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 휴폐업조회 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_CORP_SQBN_BASE\n- 레이아웃: 휴폐업조회 : HCMS_CORP_SQBN_BASE\n- 주요 키: CRYP_BZ_REG_NO\n- 주요 컬럼:\n  - CRYP_BZ_REG_NO (PK): VARCHAR 10 - 사업자번호\n  - ENTR_NM: VARCHAR 100 - 사업자명\n  - REG_DTM: DATETIME - 조회일자\n  - BUSS_DV_CD: VARCHAR 5 - 영업구분 / Y: 영업 N: 휴(폐)업 E: 미확인 NULL : 조회전\n  - TAXT_DV_CD: VARCHAR 1 - 과세구분 / 1:일반 2:간이(세금계산서미발급) 3:면세 4:비영리 5:폐업 7:간이(세금계산서발급)\n  - VAT_YN: CHAR 1 - 부가가치세여부 / Y: 대상, N: 미대상\n  - PROC_MEMO: VARCHAR 400 - 조회내용\n  - INDATE: VARCHAR 8 - 데이터이관일자\n- 전체 컬럼 수: 9개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:9.휴폐업조회",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "예금주조회 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 예금주조회 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_E2C_OWAC_DTLS\n- 레이아웃: 예금주조회 : HCMS_E2C_OWAC_DTLS\n- 주요 키: INST_DV_NO, CRYP_CMSV_ACCT_NO, REG_DT, SEQ_NO\n- 필수 컬럼: ACCT_EPCT_OWAC_NM\n- 주요 컬럼:\n  - INST_DV_NO (PK): VARCHAR 8 - 은행코드 / 은행코드 3자리 / [코드] sheet 참조\n  - CRYP_CMSV_ACCT_NO (PK): VARCHAR 160 - 계좌번호 / 숫자만 '-' 제외\n  - REG_DT (PK): VARCHAR 8 - 등록일\n  - SEQ_NO (PK): DECIMAL 10 - 순번\n  - ACCT_EPCT_OWAC_NM: VARCHAR 100 - 등록한 예금주명\n  - TRNS_AMT: DECIMAL 18,3 - 이체금액 / 가상계좌의 경우 금액입력\n  - CMSV_CD: VARCHAR 20 - CMS코드 / CMS코드 필요시 입력\n  - OWAC_NM: VARCHAR 60 - 조회된 예금주명\n- 전체 컬럼 수: 15개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:10.예금주조회",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "가상계좌 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 가상계좌 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_VRTL_ACCT_SCHE_PTCL\n- 레이아웃: 하나가상계좌 원장 : HCMS_VRTL_ACCT_SCHE_PTCL\n- 주요 키: PRD_PROC_DV_CD, SCHE_UPD_DT, INST_CD, VRTL_ACCT_NO\n- 주요 컬럼:\n  - PRD_PROC_DV_CD (PK): CHAR 1 - 구분코드 / 2: 등록, 3: 변경, 5: 농수산식품공사 전용\n  - SCHE_UPD_DT (PK): VARCHAR 8 - 변경 예정일자 / 당일 이후 일자만 가능\n  - INST_CD (PK): VARCHAR 8 - 기관코드 / 가상계좌 신청시 받은 기관코드\n  - VRTL_ACCT_NO (PK): VARCHAR 20 - 가상계좌번호\n  - CUR_CD: CHAR 3 - 통화코드 / KRW,USD\n  - ITIL_RCV_AMT: DECIMAL 18 - 입금금액\n  - VRTL_ACCT_RMRK: VARCHAR 20 - 가상계좌적요 / 실시간 정산 시 모계좌에 입력되는 내용 (실시간 정산 시에만 사용)\n  - RCV_PAYM_TRCN_DV_CD: CHAR 1 - 입금지급조건구분코드 / 0 : 미지정 , 1 : 지정\n- 전체 컬럼 수: 15개\n- 테이블명: HCMS_HNBK_RCV_PTCL\n- 레이아웃: 하나은행 가상계좌 입금내역 : HCMS_HNBK_RCV_PTCL\n- 주요 키: CRYP_RCV_ACCT_NO, VRTL_ACCT_SEL_INST_NO, RCV_SEQ_NO, VRTL_ACCT_RCV_DT\n- 주요 컬럼:\n  - CRYP_RCV_ACCT_NO (PK): VARCHAR 20 - 가상계좌번호\n  - VRTL_ACCT_SEL_INST_NO (PK): VARCHAR 10 - 기관코드\n  - RCV_SEQ_NO (PK): DECIMAL 10,0 - 입금일련번호\n  - VRTL_ACCT_RCV_DT (PK): VARCHAR 8 - 입금일자\n  - RCV_DTM: VARCHAR 6 - 입금시간\n  - CMSV_CUR_CD: VARCHAR 3 - 통화코드 / KRW, USD, JPY, EUR, GBP …\n  - VRTL_ACCT_INST_NO: VARCHAR 8 - 출금은행코드\n  - RCV_WDRW_DV_CD: CHAR 1 - 처리상태코드 / 1: 정상 2: 취소\n- 전체 컬럼 수: 13개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:11.가상계좌",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "세틀뱅크 가상계좌 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 세틀뱅크 가상계좌 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_VRTL_ACCT_BASE\n- 레이아웃: 세틀뱅크 가상계좌 원장 : HCMS_VRTL_ACCT_BASE\n- 주요 키: VRTL_ACCT_ID_NO, CRYP_VRTL_ACCT_NO, WDRW_INST_DV_NO\n- 주요 컬럼:\n  - VRTL_ACCT_ID_NO (PK): VARCHAR 36 - 가상계좌ID번호\n  - CRYP_VRTL_ACCT_NO (PK): VARCHAR 20 - 가상계좌번호\n  - WDRW_INST_DV_NO (PK): VARCHAR 8 - 출금은행코드\n  - VRTL_ACCT_ALNM: VARCHAR 20 - 가상계좌 별칭\n  - VRTL_ACCT_UNQ_NO: VARCHAR 20 - 가상계좌 고유번호\n  - ERP_MGNT_NM: VARCHAR 50 - ERP관리명\n  - ERP_LNK_DV_CD: VARCHAR 1 - ERP연계 구분코드\n  - DEL_YN: CHAR 1 - 삭제여부\n- 전체 컬럼 수: 10개\n- 테이블명: HCMS_VRTL_ACCT_TRSC_PTCL\n- 레이아웃: 세틀뱅크 가상계좌 입금내역 : HCMS_VRTL_ACCT_TRSC_PTCL\n- 주요 키: CRYP_VRTL_ACCT_NO, INST_DV_NO, TRSC_DT, TRSC_DRTM, SEQ_NO\n- 주요 컬럼:\n  - VRTL_ACCT_ID_NO: VARCHAR 36 - 가상계좌ID번호\n  - TRSC_PTCL_ID_NO: VARCHAR 36 - 거래내역ID번호\n  - CRYP_VRTL_ACCT_NO (PK): VARCHAR 20 - 가상계좌번호\n  - INST_DV_NO (PK): VARCHAR 8 - 은행코드\n  - TRSC_DT (PK): VARCHAR 8 - 거래일자\n  - TRSC_DRTM (PK): VARCHAR 6 - 거래시간\n  - TRSC_AMT: DECIMAL 18,3 - 거래금액\n  - TRSC_UNQ_NO: DECIMAL 12,0 - 거래고유번호\n- 전체 컬럼 수: 21개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:12.세틀뱅크 가상계좌",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "현금영수증 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 현금영수증 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_CASH_VOU_PTCL\n- 레이아웃: 현금영수증 매입내역 : HCMS_CASH_VOU_PTCL\n- 주요 키: USE_DTM, APV_NO, SEQ_NO\n- 주요 컬럼:\n  - USE_DTM (PK): VARCHAR 16 - 사용일시\n  - APV_NO (PK): VARCHAR 14 - 승인번호\n  - SEQ_NO (PK): DECIMAL 10,0 - 날짜별순번 / 카드코드,작업코드,날짜별\n  - CASH_VOU_CRD_CD: VARCHAR 4 - 카드코드 / T1:현금영수증코드\n  - CASH_VOU_JOB_CD: VARCHAR 2 - 작업코드 / 4.가맹점 5.개인, 6.법인\n  - USR_NM: VARCHAR 40 - 사용자명\n  - SPLY_PRC: DECIMAL 18,3 - 공급가액\n  - VAT: DECIMAL 18,3 - 부가세\n- 전체 컬럼 수: 22개\n- 테이블명: HCMS_CASH_VOU_SBTR_PTCL\n- 레이아웃: 현금영수증 매입세공제내역 : HCMS_CASH_VOU_SBTR_PTCL\n- 주요 키: CASH_VOU_ID_NO\n- 주요 컬럼:\n  - CASH_VOU_ID_NO (PK): VARCHAR 36 - 현금영수증ID번호\n  - CERT_INFO_ID_NO: VARCHAR 36 - 인증정보ID번호\n  - CRYP_BZ_REG_NO: VARCHAR 50 - 사업자등록번호\n  - INST_DV_NO: VARCHAR 8 - 은행코드\n  - APV_NO: VARCHAR 14 - 승인번호\n  - USE_DTM: VARCHAR 16 - 사용일시\n  - USR_NM: VARCHAR 40 - 사용자명\n  - CMSV_MEST_NM: VARCHAR 300 - CMS가맹점명\n- 전체 컬럼 수: 21개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:13.현금영수증",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "전자세금계산서 매입매출내역 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 전자세금계산서 매입매출내역 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_CMSV_ELEC_TXBL_PTCL, CREATE, TABLE\n- 레이아웃: 전자세금계산서 마스터 : HCMS_CMSV_ELEC_TXBL_PTCL CREATE TABLE [dbo].[HCMS_CMSV_ELEC_TXBL_PTCL]( [ELEC_TXBL_NTS_APV_NO] [VARCHAR] (24) NOT NULL, [BUY_S\n- 주요 키: ELEC_TXBL_NTS_APV_NO, BUY_SEL_DV_CD\n- 필수 컬럼: WRTG_DT, ISS_DT, TRMS_DT\n- 주요 컬럼:\n  - ELEC_TXBL_NTS_APV_NO (PK): VARCHAR 24 - 전자세금계산서국세청승인번호\n  - BUY_SEL_DV_CD (PK): CHAR 1 - 매입매출구분코드 / 1: 전자세금계산서 매출 2: 전자세금계산서 매입 3: 전자계산서 매출 4: 전자계산서 매입\n  - WRTG_DT: VARCHAR 8 - 작성일자\n  - ISS_DT: VARCHAR 8 - 발행일자\n  - TRMS_DT: VARCHAR 8 - 전송일자\n  - CRYP_SPLR_BZ_REG_NO: VARCHAR 50 - 공급자사업자등록번호\n  - ELEC_TXBL_SPLR_CO_NM: VARCHAR 600 - 전자세금계산서공급자회사명\n  - ELEC_TXBL_SPLR_REPR_NM: VARCHAR 300 - 전자세금계산서공급자대표자명\n- 전체 컬럼 수: 42개\n- 테이블명: INTIME, VARCHAR, HCMS_CMSV_ELEC_TXBL_DTLS\n- 레이아웃: 42 INTIME VARCHAR 6 데이터이관시간 전자세금계산서 상세 : HCMS_CMSV_ELEC_TXBL_DTLS\n- 주요 키: ELEC_TXBL_NTS_APV_NO, BUY_SEL_DV_CD, SEQ_NO\n- 필수 컬럼: WRTG_DT, ISS_DT, TRMS_DT\n- 주요 컬럼:\n  - ELEC_TXBL_NTS_APV_NO (PK): VARCHAR 24 - 전자세금계산서국세청승인번호\n  - BUY_SEL_DV_CD (PK): CHAR 1 - 매입매출구분코드 / 1: 전자세금계산서 매출 2: 전자세금계산서 매입 3: 전자계산서 매출 4: 전자계산서 매입\n  - SEQ_NO (PK): DECIMAL 10,0 - 일련번호\n  - WRTG_DT: VARCHAR 8 - 작성일자\n  - ISS_DT: VARCHAR 8 - 발행일자\n  - TRMS_DT: VARCHAR 8 - 전송일자\n  - ELEC_TXBL_MITM_MMDD: VARCHAR 4 - 전자세금계산서품목월일\n  - ELEC_TXBL_MITM_NM: VARCHAR 150 - 전자세금계산서품목명\n- 전체 컬럼 수: 16개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:14.전자세금계산서 매입매출내역",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "B2B매출 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- B2B매출 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_B2B_PRD_SEL_BASE\n- 레이아웃: HCMS_B2B_PRD_SEL_BASE : B2B상품기본\n- 주요 키: INST_DV_NO, B2B_PRD_ID_NO\n- 주요 컬럼:\n  - INST_DV_NO (PK): VARCHAR 8 - 기관구분번호\n  - B2B_PRD_ID_NO (PK): VARCHAR 36 - B2B상품ID번호\n  - B2B_NAME: VARCHAR 100 - B2B 상품명\n  - PCH_ENTR_NM: VARCHAR 50 - 구매업체명\n  - SB_COTR_CUST_NO: VARCHAR 100 - 부계약자사업자번호\n  - MAN_COTR_CUST_NO: VARCHAR 100 - 주계약자사업자번호\n  - BRN_REG_NO: VARCHAR 100 - 지사사업자번호\n  - ACCT_NO: VARCHAR 20 - 계좌번호\n- 전체 컬럼 수: 12개\n- 테이블명: HCMS_B2B_PRD_SEL_PTCL\n- 레이아웃: HCMS_B2B_PRD_SEL_PTCL : B2B상품상세\n- 주요 키: INST_DV_NO, B2B_PRD_ID_NO, PCH_ENTR_SEL_NO, ACPT_DT\n- 주요 컬럼:\n  - INST_DV_NO (PK): VARCHAR 8 - 기관구분번호\n  - B2B_PRD_ID_NO (PK): VARCHAR 36 - B2B상품ID번호\n  - B2B_PRD_SVC_DV_CD: VARCHAR 5 - 상품구분\n  - PCH_ENTR_NM: VARCHAR 50 - 구매업체명\n  - PCH_ENTR_SEL_NO (PK): VARCHAR 50 - 매출번호\n  - INQ_NO: VARCHAR 8 - 조회번호\n  - ACPT_DT (PK): VARCHAR 8 - 접수일자\n  - SEL_DT: VARCHAR 8 - 매출일자\n- 전체 컬럼 수: 27개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:15.B2B매출",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "B2B매입 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- B2B매입 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: IEBK_B2B_PRD_BUY_BASE\n- 레이아웃: IEBK_B2B_PRD_BUY_BASE : B2B매입내역기본\n- 주요 키: INST_DV_NO, B2B_PRD_SVC_DV_CD\n- 주요 컬럼:\n  - INST_DV_NO (PK): VARCHAR 8 - 기관구분번호\n  - B2B_PRD_SVC_DV_CD (PK): VARCHAR 5 - B2B상품코드\n  - B2B_NAME: VARCHAR 100 - B2B상품명 / 존재하지 않는 컬럼(상품명 필요 시 CMS사용자가 MEMO 컬럼에 기입 하도록 유도)\n  - MMB_RSBZ_REG_NO: VARCHAR 50 - 회원고유번호 (계좌번호)\n  - CARD_NO: VARCHAR 100 - 카드번호\n  - CNTR_NO: VARCHAR 100 - 계약번호\n  - MEMO: VARCHAR 200 - 비고\n  - DEL_YN: VARCHAR 1 - 삭제여부\n- 전체 컬럼 수: 10개\n- 테이블명: IEBK_B2B_PRD_BUY_PTCL\n- 레이아웃: IEBK_B2B_PRD_BUY_PTCL : B2B매입내역상세\n- 주요 키: INST_DV_NO, B2B_PRD_SVC_DV_CD, SETL_DT\n- 주요 컬럼:\n  - INST_DV_NO (PK): VARCHAR 8 - 기관구분번호\n  - B2B_PRD_SVC_DV_CD (PK): VARCHAR 5 - B2B상품코드\n  - SETL_DT (PK): VARCHAR 8 - 결제일자\n  - INQ_NO: VARCHAR 8 - 분할번호\n  - SEL_REG_DT: VARCHAR 8 - 매출등록일\n  - SEL_DT: VARCHAR 8 - 매입일\n  - SEL_AMT: DECIMAL 18,0 - 매입금액\n  - PPAYM_AMT: DECIMAL 18,0 - 선지급액\n- 전체 컬럼 수: 17개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:16.B2B매입",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "매담대 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 매담대 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_E2C_CRVLON_PTCL\n- 레이아웃: HCMS_E2C_CRVLON_PTCL : 매담대 등록\n- 주요 키: FILE_NM, SEQ_NO, REG_DT, ERP_LNK_CTT\n- 필수 컬럼: ENTR_CD, EXPI_DT, BOND_AMT, CRYP_SALE_CORP_BZ_REG_NO\n- 주요 컬럼:\n  - FILE_NM (PK): VARCHAR 200 - 파일명\n  - SEQ_NO (PK): DECIMAL 10 - 일련번호\n  - REG_DT (PK): VARCHAR 8 - 등록일자\n  - REG_TM: VARCHAR 6 - 등록시각\n  - ENTR_CD: VARCHAR 6 - 업체코드\n  - SALE_CORP_CMSV_NO: VARCHAR 10 - 판매기업CMS번호\n  - EXPI_DT: VARCHAR 8 - 만기일자\n  - BOND_AMT: DECIMAL 18,3 - 채권금액\n- 전체 컬럼 수: 24개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:17.매담대",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "전자어음 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 전자어음 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_E2C_ELEC_DRFT_PTCL\n- 레이아웃: HCMS_E2C_ELEC_DRFT_PTCL : 전자어음 등록\n- 주요 키: FILE_NM, SEQ_NO, REG_DT, ERP_LNK_CTT\n- 필수 컬럼: ODER_PHBT_DV_CD, DRFT_AMT, EXPI_DT, CRYP_RMTE_BZ_REG_NO, RMTE_INST_DV_NO, CRYP_RMTE_ACCT_NO, GUR_YN\n- 주요 컬럼:\n  - FILE_NM (PK): VARCHAR 200 - 파일명\n  - SEQ_NO (PK): DECIMAL 10 - 일련번호\n  - REG_DT (PK): VARCHAR 8 - 등록일자\n  - REG_TM: VARCHAR 6 - 등록시각\n  - TRMS_ST_CTT: VARCHAR 2 - 전송상태내용\n  - CRYP_ISSR_CUAC_ACCT_NO: VARCHAR 160 - 발행인당좌계좌번호\n  - ODER_PHBT_DV_CD: CHAR 1 - 지시금지구분코드 / N: 배서양도허용(분할배서금지) P: 배서양도허용(분할배서허용) Y: 배서양도금지\n  - DRFT_AMT: DECIMAL 18 - 어음금액\n- 전체 컬럼 수: 27개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:18.전자어음",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "보관어음내역 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 보관어음내역 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_CSTD_DRFT_PTCL\n- 레이아웃: HCMS_CSTD_DRFT_PTCL : 보관어음내역\n- 주요 키: CRYP_CMSV_ACCT_NO, DRFT_NO\n- 주요 컬럼:\n  - INST_DV_NO: VARCHAR 8 - 기관구분번호\n  - CRYP_CMSV_ACCT_NO (PK): VARCHAR 160 - 계좌번호\n  - DRFT_NO (PK): VARCHAR 20 - 어음번호\n  - CUST_MGNT_NO: VARCHAR 20 - 고객관리번호\n  - TRUS_DT: VARCHAR 8 - 수탁일자\n  - EXPI_DT: VARCHAR 8 - 만기일자\n  - OPEN_BR_ST_CTT: VARCHAR 50 - 개설점상태내용\n  - CSTD_DRFT_KIND_DV_CD: CHAR 1 - 보관어음종류구분코드 / 1: 수표 3:전자어음\n- 전체 컬럼 수: 17개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:19.보관어음내역",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "외화대량송금 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 외화대량송금 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_E2C_DMST_REMT_PTCL\n- 레이아웃: 국내대량송금 : HCMS_E2C_DMST_REMT_PTCL\n- 주요 키: FILE_NM, SEQ_NO, ERP_LNK_CTT\n- 필수 컬럼: CMSV_CUR_CD, REMT_AMT, RMTE_NM1, RMTE_ADR3, CRYP_RMTE_ACCT_NO, BIC_CD\n- 주요 컬럼:\n  - FILE_NM (PK): VARCHAR 200 - 파일명\n  - SEQ_NO (PK): DECIMAL 10 - 순번\n  - REG_DT: VARCHAR 8 - 등록일자\n  - REG_TM: VARCHAR 6 - 등록시간\n  - CMSV_CUR_CD: VARCHAR 3 - 통화구분 / USD : 미국 달러 JPY : 일본 엔 EUR : 유로화 GBP : 영국 파운드 CHF : 스위스 프랑 CAD : 캐나다 달러 AUD : 호주 달러 SEK : 스웨덴 크로나 DKK : 덴마크 크로나 NOK : 노르웨이 크로나 NZD : 뉴질랜드 달러 HKD : 홍콩 달러 THB : 태국 바트 SGD : 싱가포르 달러 IDR : 인도네시아 루피아 AED : 아랍에미레이트 디르함 KWD : 쿠웨이트 디나르 BHD : 바레인 디나르 CNY : 중국 위안 ZAR : 남아공화국 랜드 RUB : 러시아 루블 VND : 베트남 동 PHP : 필리핀 페소 MXN : 멕시코 페소 HUF : 헝가리 포린트 PLN : 폴란드 즈워티 TRY : 터어키 리라 CZK : 체코 코루나 AED : UAE 디르함 SAR : 사우디 리얄 *기타 송금사유 코드는 영업점 문의\n  - REMT_AMT: DECIMAL 18,3 - 송금액\n  - KRW_EQV_AMT: DECIMAL 18,3 - 원화통장출금액\n  - FRC_WDRW_AMT: DECIMAL 18,3 - 외화통장출금액\n- 전체 컬럼 수: 20개\n- 테이블명: INTIME, VARCHAR, HCMS_E2C_OVRS_REMT_PTCL\n- 레이아웃: 20 INTIME VARCHAR 6 데이터이관시간 해외대량송금 : HCMS_E2C_OVRS_REMT_PTCL\n- 주요 키: FILE_NM, SEQ_NO, ERP_LNK_CTT\n- 필수 컬럼: REMT_RSN, CNTY_CD, CMSV_CUR_CD, REMT_AMT, KRW_EQV_AMT, FRC_WDRW_AMT, RMTE_NM1, RMTE_ADR3\n- 주요 컬럼:\n  - FILE_NM (PK): VARCHAR 200 - 파일명\n  - SEQ_NO (PK): DECIMAL 10 - 순번\n  - REG_DT: VARCHAR 8 - 등록일자\n  - REG_TM: VARCHAR 6 - 등록시간\n  - REMT_RSN: VARCHAR 100 - 송금사유 / 10101: 사전송금방식 수입대금 송금 10103: 사후송금방식 수입대금 송금 10201: 사전송금방식 무통관수입(중계무역)대금 송금 10202: 사후송금방식 무통관수입(중계무역)대금 송금 10203: 사전송금방식 무통관수입(외국인수수입)대금 송금 10204: 사후송금방식 무통관수입(외국인수수입)대금 송금 10205: 사전송금방식 무통관수입(국내인수수입)대금 송금 10206: 사후송금방식 무통관수출(국내인수수입)대금 송금 30101: 유학 및 연수(6개월이상 체재) 30207: 일반 해외체재자 여행경비(유학 및 연수생 제외) 30208: 유학 및 연수 관련 해외체재자 여행경비 31101: 항공화물운임 31102: 해상화물운임 31303: 해상운항경비 31304: 항공운항경비 35701: 특허권 사용료 35702: 상표권 사용료 35703: 영업권,판매권(프랜차이즈) 사용료 36015: 기타사업서비스 36016: 계열사간의 서비스 대가 35301: Offer 수수료 35302: 중개수수료, 대행수수료 등 35303: 임가공료 35799: 기타 지적 재산권 사용료 35801: 컴퓨터 관련 서비스 35803: 컴퓨터 프로그램 매입대금 및 사용료 37210: 영리법인의 이전거래 *기타 송금사유 코드는 영업점 문의\n  - CNTY_CD: VARCHAR 2 - 수취은행국가코드 / NL: 네덜란드 NZ: 뉴질랜드 TW: 대만 DK: 덴마크 DE: 독일 RU: 러시아 MY: 말레이지아 US: 미국 VN: 베트남 BE: 벨기에 CH: 스위스 SG: 싱가폴 ES: 스페인 GB: 영국 IT: 이탈리아 IN: 인도 ID: 인도네시아 JP: 일본 CN: 중국 CA: 캐나다 TH: 태국 TR: 터어키 FR: 프랑스 PH: 필리핀 AU: 호주 HK: 홍콩 NO: 노르웨이 SE: 스웨덴 SA : 사우디 * 기타 국가 코드는 영업점 문의\n  - CMSV_CUR_CD: VARCHAR 3 - 통화구분 / USD : 미국 달러 JPY : 일본 엔 EUR : 유로화 GBP : 영국 파운드 CHF : 스위스 프랑 CAD : 캐나다 달러 AUD : 호주 달러 SEK : 스웨덴 크로나 DKK : 덴마크 크로나 NOK : 노르웨이 크로나 NZD : 뉴질랜드 달러 HKD : 홍콩 달러 THB : 태국 바트 SGD : 싱가포르 달러 IDR : 인도네시아 루피아 AED : 아랍에미레이트 디르함 KWD : 쿠웨이트 디나르 BHD : 바레인 디나르 CNY : 중국 위안 ZAR : 남아공화국 랜드 RUB : 러시아 루블 VND : 베트남 동 PHP : 필리핀 페소 MXN : 멕시코 페소 HUF : 헝가리 포린트 PLN : 폴란드 즈워티 TRY : 터어키 리라 CZK : 체코 코루나 AED : UAE 디르함 SAR : 사우디 리얄 *기타 송금사유 코드는 영업점 문의\n  - REMT_AMT: DECIMAL 18,3 - 송금액 / (원화통장출금액 + 외화통장출금액)\n- 전체 컬럼 수: 44개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:20.외화대량송금",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "당행외화송금 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 당행외화송금 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: IEBK_E2C_DMST_REMT_PTCL\n- 레이아웃: 당행외화송금 : IEBK_E2C_DMST_REMT_PTCL (등록)\n- 주요 키: CUST_NO, FILE_NM, SEQ_NO\n- 필수 컬럼: REG_DT, REG_TM, ICHE_GB, CRYP_WDRW_ACCT_NO, RCV_INST_DV_NO, CRYP_RCV_ACCT_NO, TRSC_AMT, ERP_LNK_CTT\n- 주요 컬럼:\n  - CUST_NO (PK): VARCHAR 9 - 고객번호\n  - FILE_NM (PK): VARCHAR 200 - 파일명\n  - SEQ_NO (PK): DECIMAL 10 - 순번\n  - REG_DT: VARCHAR 8 - 등록일자\n  - REG_TM: VARCHAR 6 - 등록시간\n  - ICHE_GB: VARCHAR 1 - 이체구분 / 1. 외화 → 외화 2. 외화 → 원화 3. 원화 → 외화\n  - CRYP_WDRW_ACCT_NO: VARCHAR 200 - 출금계좌번호\n  - WDRW_CMSV_CUR_CD: 3 - 출금계좌통화 / USD : 미국 달러 JPY : 일본 엔 EUR : 유로화 GBP : 영국 파운드 CHF : 스위스 프랑 CAD : 캐나다 달러 AUD : 호주 달러 SEK : 스웨덴 크로나 DKK : 덴마크 크로나 NOK : 노르웨이 크로나 NZD : 뉴질랜드 달러 HKD : 홍콩 달러 THB : 태국 바트 SGD : 싱가포르 달러 IDR : 인도네시아 루피아 AED : 아랍에미레이트 디르함 KWD : 쿠웨이트 디나르 BHD : 바레인 디나르 CNY : 중국 위안 ZAR : 남아공화국 랜드 RUB : 러시아 루블 VND : 베트남 동 PHP : 필리핀 페소 MXN : 멕시코 페소 HUF : 헝가리 포린트 PLN : 폴란드 즈워티 TRY : 터어키 리라 CZK : 체코 코루나 AED : UAE 디르함 SAR : 사우디 리얄 *기타 송금사유 코드는 영업점 문의 이체구분이 1. 외화 → 외화 , 2. 외화 → 원화 일때 필수\n- 전체 컬럼 수: 21개\n- 테이블명: IEBK_C2E_DMST_REMT_PTCL\n- 레이아웃: 당행외화송금 : IEBK_C2E_DMST_REMT_PTCL (결과)\n- 주요 키: CUST_NO, FILE_NM, SEQ_NO\n- 필수 컬럼: REG_DTM, ICHE_GB, CRYP_WDRW_ACCT_NO, RCV_INST_DV_NO, CRYP_RCV_ACCT_NO, TRSC_AMT, ERP_LNK_CTT\n- 주요 컬럼:\n  - CUST_NO (PK): VARCHAR 9 - 고객번호\n  - FILE_NM (PK): VARCHAR 200 - 파일명\n  - SEQ_NO (PK): DECIMAL 10 - 순번\n  - REG_DTM: VARCHAR 8 - 이체일자 / 시간\n  - ICHE_GB: VARCHAR 1 - 이체구분 / 1. 외화 → 외화 2. 외화 → 원화 3. 원화 → 외화\n  - CRYP_WDRW_ACCT_NO: VARCHAR 200 - 출금계좌번호\n  - WDRW_CMSV_CUR_CD: 3 - 출금계좌통화 / USD : 미국 달러 JPY : 일본 엔 EUR : 유로화 GBP : 영국 파운드 CHF : 스위스 프랑 CAD : 캐나다 달러 AUD : 호주 달러 SEK : 스웨덴 크로나 DKK : 덴마크 크로나 NOK : 노르웨이 크로나 NZD : 뉴질랜드 달러 HKD : 홍콩 달러 THB : 태국 바트 SGD : 싱가포르 달러 IDR : 인도네시아 루피아 AED : 아랍에미레이트 디르함 KWD : 쿠웨이트 디나르 BHD : 바레인 디나르 CNY : 중국 위안 ZAR : 남아공화국 랜드 RUB : 러시아 루블 VND : 베트남 동 PHP : 필리핀 페소 MXN : 멕시코 페소 HUF : 헝가리 포린트 PLN : 폴란드 즈워티 TRY : 터어키 리라 CZK : 체코 코루나 AED : UAE 디르함 SAR : 사우디 리얄 *기타 송금사유 코드는 영업점 문의 이체구분이 1. 외화 → 외화 , 2. 외화 → 원화 일때 필수\n  - RCV_INST_DV_NO: VARCHAR 8 - 입금은행 / 하나은행 고정 '081'\n- 전체 컬럼 수: 23개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:21. 당행외화송금",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "등록금수납(대상자등록, 등록금수납내역) ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 등록금수납(대상자등록, 등록금수납내역) 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_REG_AMT_TGT_DTLS\n- 레이아웃: 등록금대상상세 : HCMS_REG_AMT_TGT_DTLS\n- 주요 키: CUST_NO, REG_AMT_ID_NO, REG_AMT_SEQ_NO, MRPT_YY, MRPT_TERM, CAMPS_DV_CD, STUD_DV_CD, NTFC_TYP_CD\n- 주요 컬럼:\n  - CUST_NO (PK): VARCHAR 9 - 고객번호 / 035451811\n  - REG_AMT_ID_NO (PK): VARCHAR 36 - 등록금ID번호 / ERP KEY- 학생별 KEY값\n  - REG_AMT_SEQ_NO (PK): DECIMAL 10 - 등록금일련번호\n  - MRPT_YY (PK): VARCHAR 4 - 수납년(기준년) / 해당 년도 / 2018\n  - MRPT_TERM (PK): DECIMAL 1 - 수납학기 / 1/2 학기 / 2\n  - CAMPS_DV_CD (PK): CHAR 1 - 캠퍼스구분코드 / 1: 본교 / 1\n  - STUD_DV_CD (PK): CHAR 1 - 학생구분코드 / 1: 학부, 2: 대학원 / 1\n  - NTFC_TYP_CD (PK): VARCHAR 2 - 고지유형코드 / 01: 신입생 02: 재학생 03: 편입생 04: 계절학기 / 01\n- 전체 컬럼 수: 66개\n- 테이블명: HCMS_REG_AMT_MRPT_PTCL\n- 레이아웃: 등록금수납내역 : HCMS_REG_AMT_MRPT_PTCL\n- 주요 키: CUST_NO, BASC_YY, MRPT_TERM, CAMPS_DV_CD, STUD_DV_CD, NTFC_TYP_CD, NTFC_ETC_DV_CD, SQN\n- 주요 컬럼:\n  - CUST_NO (PK): VARCHAR 9 - 고객번호\n  - BASC_YY (PK): VARCHAR 4 - 수납년도\n  - MRPT_TERM (PK): DECIMAL 1 - 수납학기\n  - CAMPS_DV_CD (PK): VARCHAR 1 - 캠퍼스구분코드 / 1 : 본교\n  - STUD_DV_CD (PK): VARCHAR 1 - 학생구분코드 / 1: 학부 2: 대학원\n  - NTFC_TYP_CD (PK): VARCHAR 2 - 고지유형코드 / 01: 신입생 02: 재학생 03: 편입생 04: 계절학기\n  - NTFC_ETC_DV_CD (PK): VARCHAR 3 - 고지기타구분코드\n  - SQN (PK): DECIMAL 5 - 회차\n- 전체 컬럼 수: 52개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:21.등록금수납(대상자등록, 등록금수납내역)",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "구매론 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 구매론 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_E2C_PUL_PTCL\n- 레이아웃: 구매론 등록 : HCMS_E2C_PUL_PTCL\n- 주요 키: APNX_FILE_NM, SEQ_NO, ERP_LNK_CTT\n- 필수 컬럼: ENTR_CD, PCH_CORP_CMTM_NO, SALE_CORP_CMTM_NO, BOND_AMT, ISRP_MMS_CNT, ISRP_INT_ALOT_TGT_CD, DFRM_TRM_INT_ALOT_TGT_CD, PCH_CORP_SETL_DT\n- 주요 컬럼:\n  - APNX_FILE_NM (PK): VARCHAR 200 - 첨부파일명\n  - SEQ_NO (PK): DECIMAL 10 - 일련번호\n  - REG_DT: VARCHAR 8 - 등록일자\n  - REG_TM: VARCHAR 6 - 등록시각\n  - ENTR_CD: VARCHAR 6 - 업체코드\n  - PCH_CORP_CMTM_NO: VARCHAR 30 - 구매기업약정번호\n  - SALE_CORP_CMTM_NO: VARCHAR 30 - 판매기업약정번호\n  - BOND_AMT: DECIMAL 18 - 채권금액\n- 전체 컬럼 수: 32개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:22. 구매론",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "(UNOTE)수취어음 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- (UNOTE)수취어음 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_RCVG_DRFT_BASE\n- 레이아웃: HCMS_RCVG_DRFT_BASE : 수취어음기본\n- 주요 키: CUST_NO, ELEC_DRFT_NO\n- 주요 컬럼:\n  - CUST_NO (PK): VARCHAR 9 - 고객번호\n  - ELEC_DRFT_NO (PK): VARCHAR 20 - 전자어음번호\n  - KFTC_DRFT_KIND_CD: CHAR 1 - 금융결제원어음종류코드 / 1 : 약속어음 2 : 당좌수표 3 : 가계수표 4 : 국공채 5 : 기타\n  - KFTC_DRFT_KIND_CTT: VARCHAR 100 - 금융결제원어음종류내용\n  - ELEC_DRFT_PROC_SUMM_ST_CD: VARCHAR 2 - 전자어음처리요약상태코드 / 0 : 유통중 1 : 지급필 2 : 지급필 3 : 지급거절 4 : 지급거절확인 10 : 지급거절 11 : 지급거절확인 12 : 지급거절확인 13 : 지급필 20 : 지급거절 21 : 지급거절확인 22 : 지급필 23 : 지급거절 24 : 지급거절확인 25 : 지급거절확인 26 : 지급필 30 : 지급거절 31 : 지급거절확인 32 : 지급필 33 : 지급거절 34 : 지급거절확인 35 : 지급거절확인 36 : 지급필 40 : 지급거절확인 41 : 지급거절확인 42 : 지급거절확인 43 : 지급거절확인 44 : 지급거절확인 45 : 지급거절확인 46 : 지급필 47 : 수령거부(발행취소) 48 : 반환(발행취소) 49 : 유통중 50 : 유통중 51 : 발행전보증요청 52 : 발행전보증거부(발행취소) 53 : 유통중(보증승인) 54 : 유통중(보증요청) 55 : 유통중(보증거부) 56 : 유통중(보증승인) 57 : 유통중(압류) 58 : 수령거부(분할어음) 59 : 반환(분할어음) 90 : 분할후유통중 91 : 분할후결제 93 : 분할후부도(부도사유동일) 94 : 분할후부도(부도사유상이) 95 : 분할후복수상태 97 : 분할후발행취소(수령거부또는반환)\n  - ELEC_DRFT_PROC_SUMM_ST_NM: VARCHAR 20 - 전자어음처리요약상태명\n  - ISS_DT: VARCHAR 8 - 발행일자\n  - ADR: VARCHAR 100 - 주소\n- 전체 컬럼 수: 60개\n- 테이블명: HCMS_RCVG_DRFT_DTLS\n- 레이아웃: HCMS_RCVG_DRFT_DTLS : 수취어음상세\n- 주요 키: CUST_NO, ELEC_DRFT_NO, PAT_NO, EDS_NO\n- 주요 컬럼:\n  - CUST_NO (PK): VARCHAR 9 - 고객번호\n  - ELEC_DRFT_NO (PK): VARCHAR 20 - 전자어음번호\n  - EDSR_PSNL_CRPN_DV_CD: CHAR 1 - 배서인개인법인구분코드 / 1 : 법인 2 : 개인사업자 3 : 개인\n  - EDSR_PSNL_CRPN_DV_NM: VARCHAR 20 - 배서인개인법인구분명\n  - CRYP_EDSR_RSBZ_REG_NO: VARCHAR 50 - 암호화배서인주민사업자등록번호\n  - EDSR_CRPN_NM: VARCHAR 40 - 배서인법인명\n  - CMSV_EDSR_REPR_NM: VARCHAR 300 - CMS배서인대표자명\n  - EDSR_ADR: VARCHAR 100 - 배서인주소\n- 전체 컬럼 수: 23개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:23. (UNOTE)수취어음",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "원천징수영수증발행내역 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 원천징수영수증발행내역 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_WTHDG_VOU_ISS_PTCL\n- 레이아웃: 원천징수영수증발행내역 : HCMS_WTHDG_VOU_ISS_PTCL\n- 주요 키: PAYM_DT, CUST_UNQ_ID_NO, WTHDG_ID_NO, CRYP_CMSV_ACCT_NO\n- 주요 컬럼:\n  - PAYM_DT (PK): VARCHAR 8 - 지급일자\n  - CUST_UNQ_ID_NO (PK): VARCHAR 36 - 고객고유ID번호\n  - WTHDG_ID_NO (PK): VARCHAR 36 - 원천징수ID번호\n  - CRYP_CMSV_ACCT_NO (PK): VARCHAR 160 - 암호화CMS계좌번호\n  - INCR_NM: VARCHAR 100 - 소득자명\n  - CRYP_RES_REG_NO: VARCHAR 50 - 암호화주민(사업자)등록번호\n  - INCR_BTDY: VARCHAR 8 - 소득자생일\n  - INCR_ADR: VARCHAR 100 - 소득자주소\n- 전체 컬럼 수: 37개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:25.원천징수영수증발행내역",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "시재보고서(일일마감) ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 시재보고서(일일마감) 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_FNDS_AAIH_PTCL\n- 레이아웃: 시재보고서(일일마감) : HCMS_FNDS_AAIH_PTCL\n- 주요 키: INST_DV_NO, CRYP_ACCT_NO, AAIH_TYP_CD, CMSV_CUR_CD, BASC_DT\n- 주요 컬럼:\n  - INST_DV_NO (PK): VARCHAR 8 - 기관구분번호(은행코드)\n  - CRYP_ACCT_NO (PK): VARCHAR 20 - 계좌번호\n  - AAIH_TYP_CD (PK): VARCHAR 1 - 시재유형코드 / 1 : 은행 , 2 : 마감\n  - CMSV_CUR_CD (PK): VARCHAR 3 - CMS통화코드\n  - BASC_DT (PK): VARCHAR 8 - 기준일자\n  - YSTD_BAL: DECIMAL 18,3 - 전일잔액\n  - RCV_NCNT: DECIMAL 10 - 입금건수\n  - RCV_AMT: DECIMAL 18,3 - 입금금액\n- 전체 컬럼 수: 14개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:26.시재보고서(일일마감)",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "판매업체약정정보 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 판매업체약정정보 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_CRVLON_CORP_DTLS\n- 레이아웃: 판매업체약정정보 : HCMS_CRVLON_CORP_DTLS\n- 주요 키: CRYP_SLLR_BZ_REG_NO\n- 주요 컬럼:\n  - CRYP_SLLR_BZ_REG_NO (PK): VARCHAR 50 - 판매자사업자번호\n  - SALE_ENTR_NM: VARCHAR 100 - 판매업체명\n  - LIM_AMT: DECIMAL 18,3 - 한도금액\n  - LIM_BAL: DECIMAL 18,3 - 한도잔액\n  - CMTM_PRGR_ST_DV_CD: CHAR 1 - 해지여부 / N:정상, C:취소(해지)\n  - INDATE: VARCHAR 8 - 데이터이관일자\n  - INTIME: VARCHAR 6 - 데이터이관시간",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:27.판매업체약정정보",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "신용카드 매출조회 ERP 연계 테이블레이아웃은 어떻게 확인하나요?",
+      "답변요약": "- 신용카드 매출조회 업무의 ERP 연계 테이블레이아웃 기준입니다.\n- ERP 연계 개발/점검 시 테이블명, PK, 필수 컬럼, 데이터 타입을 우선 확인합니다.\n- 테이블명: HCMS_MEST_SEL_PTCL\n- 레이아웃: 신용카드 매출조회 : HCMS_MEST_SEL_PTCL\n- 주요 키: INST_DV_NO, CRYP_CRD_NO, TRSC_DT, APV_NO\n- 주요 컬럼:\n  - INST_DV_NO (PK): CHAR 8 - 카드사코드\n  - CRYP_CRD_NO (PK): VARCHAR 16 - 카드번호\n  - TRSC_DT (PK): CHAR 8 - 승인일자\n  - APV_NO (PK): CHAR 10 - 승인번호\n  - BUY_DT: CHAR 8 - 입금(예정)일\n  - BUY_AMT: DECIMAL 18,3 - 승인금액\n  - RCV_SCHE_AMT: DECIMAL 18,3 - 입금(예정)액\n  - COMM: DECIMAL 18,3 - 수수료\n- 전체 컬럼 수: 12개",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:28.신용카드 매출조회",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "해외송금(주의사항) ERP 연계 참고정보는 어떻게 확인하나요?",
+      "답변요약": "- ERP 연계 테이블레이아웃의 참고 코드/주의사항 시트입니다.\n- 주요 내용:\n  - 송금통화(3) / 송금금액(15) / 수취인명(35) / 수취인 주소1(35) / 수취인 주소 2(35) / 수취인 주소 3(35) / 수취인 이메일1(50) / 수취인 이메일2(50) / 수취인 앞 지시사항1(35) / 수취인 앞 지시사항2(35) / 수취인계좌번호(35) / 수취은행BIC(11) / 수취은행 국가코드(2) / 수취은행명(35) / 수취은행주소1(35) / 수취은행주소2(35) / 수취은행주소3(35) / 송금경유은행1(11) / 송금경유은행2(11) / 송금사유코드(5) / 가격조건(3) / H.S CODE(10) / 수입신고서번호(22) / 수입용도(1) / 송금인과의관계(1) / 지정민주민등록번호(13)\n  - USD / 45000 / DEF CO.,LTD / 4 CHASE METROTECH CENTER 8TH FLOOR, / BROOKLYN NY 11245 / U. S. A. / INV NO.1234 / 1244456789 / CHASUS33 / US / 10101\n  - JPY / 1000000 / ABC CO.,LTD / 105-1 SINAKAGWGU MEGURO TOKYO / JAPAN / 5688999 / JP / AICHI BANK, LTD., / 4-10,NIHOMBASHI MUROMACHI 4-CHOME / TOKYO,JAPAN / 10103 / FOB / 1234567890 / 123456585111 / E\n- 실제 연계 시 코드값은 해당 시트의 최신 표 기준으로 확인합니다.",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:해외송금(주의사항)",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "국가코드 ERP 연계 참고정보는 어떻게 확인하나요?",
+      "답변요약": "- ERP 연계 테이블레이아웃의 참고 코드/주의사항 시트입니다.\n- 주요 내용:\n  - 국가명 / 코드 / 국가명 / 코드 / 국가명 / 코드 / [국가별은행코드] / [수취인 국가 주]\n  - 가나 / GH / 브라질 / BR / 인도 / IN\n  - 과테말라 / GT / 브루네이 / BN / 인도네시아 / ID / MT전문 / 국가명 / 주명(state) / 코드\n  - 괌 / GU / 사우디아라비아 / SA / 일본 / JP / 국가 / 코드체계 / 캐나다 / ALBERTA CANADA / AB\n  - 그리이스 / GR / 사이프러스 / CY / 자마이카 / JM / 남아공 / //ZA+6자리 / BRITISH COLUMBIA CANADA / BC\n  - 나미비아 / 세네갈 / SN / 잠비아 / ZM / 뉴질랜드 / //NA+6자리 / MANITOBA CANADA / MB\n  - 나이지리아 / NG / 세르비아.몬테네르고 / YU / 저어니지 / GG / 독일 / //BL+8자리 / NEW BRUNSWICK CANADA / NB\n  - 남아프리카공화국 / ZA / 솔로몬 / SB / 중국 / CN / 러시아 / //RU+9자리 / NEWFOUNDLAND AND LABRADOR CANADA / NL\n- 실제 연계 시 코드값은 해당 시트의 최신 표 기준으로 확인합니다.",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:국가코드",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "참고사항 ERP 연계 참고정보는 어떻게 확인하나요?",
+      "답변요약": "- ERP 연계 테이블레이아웃의 참고 코드/주의사항 시트입니다.\n- 주요 내용:\n  - [통화코드] / [주요 지급사유코드] / [수입용도] / [수출계약 체결여부]\n  - 통화코드 / 통화명(한글) / 형식 / 사유코드 / 사유명 / 코드 / 용도명 / 코드 / 계약\n  - USD / 미국달러 / 100 / 10101 / 사전송금방식 수입대금 송금 / A / 군납용 원자재 / Y / 체결\n  - JPY / 일본 엔 / 100 / 10103 / 사후송금방식 수입대금송금 ※[가격조건,HS CODE,수입신고서번호,수입용도] 항목 투입 필수 / B / 가공무역용 / N / 미체결\n  - EUR / 유로화 / 100 / 10201 / 사전송금방식 무통관수입(중계무역수입)대금 지급 / E / 수출용원자재\n  - GBP / 영국 파운드 / 100 / 10202 / 사후송금방식 무통관수입(중계무역수입)대금 지급 / G / 정부용\n  - CHF / 스위스 프랑 / 100 / 10203 / 사전송금방식 무통관수입(외국인수수입)대금 지급 / L / 임대차방식\n  - CAD / 캐나다 달러 / 100 / 10204 / 사후송금방식 무통관수입(외국인수수입)대금 지급 / N / 내수용(수출산업용 시설기계 포함)\n- 실제 연계 시 코드값은 해당 시트의 최신 표 기준으로 확인합니다.",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:참고사항",
+      "이미지키": ""
+    },
+    {
+      "회사": "고객사 공통",
+      "업무": "ERP연계",
+      "운영구분": "연계",
+      "질문": "관련업무코드 ERP 연계 참고정보는 어떻게 확인하나요?",
+      "답변요약": "- ERP 연계 테이블레이아웃의 참고 코드/주의사항 시트입니다.\n- 주요 내용:\n  - 관련업무:거래내역,집금내역,대량이체 / 관련업무:법인카드 코드 / 관련업무:환율 / 관련업무:국가별 코드 / 관련업무: DB 내 환율 테이블 국가코드 매칭본\n  - 은행코드 / 은행명 / 증권사코드 / 증권사명 / 코드 / 카드사 / 코드 / 카드별칭 / 통화 / 코드 / 번호 / AED / 아랍에미레이트 디람\n  - 001 / 한국은행 / 209 / 유안타증권 / 30000001 / KB카드 / USD / 미국 / 볼리비아노 / BOB / 68 / AED / UAE 디르함\n  - 002 / 한국산업은행 / 218 / KB증권 / 30000002 / 현대카드 / JPY / 일본 / Mvdol / BOV / 984 / AUD / 호주 달러\n  - 003 / 중소기업은행 / 224 / BNK투자증권 / 30000003 / 삼성카드 / EUR / 유로 / 가나 세디 / GHS / 936 / BDT / 방글라데시 타카\n  - 004 / 국민은행 / 225 / IBK투자증권 / 30000006 / 비씨카드 / GBP / 영국 / CFA 프랑 BEAC / XAF / 950 / BHD / 바레인 디나르\n  - 007 / 수산업협동조합 / 227 / 케이티비투자증권 / 30000008 / 신한카드 / TWD / 대만 / 가이아나 달러 / GYD / 328 / BND / 브루나이 달러\n  - 008 / 한국수출입은행 / 238 / 미래에셋대우 / 30000009 / 씨티카드 / VND / 베트남 / 달라시 / GMD / 270 / BRL / 브라질 리얼\n- 실제 연계 시 코드값은 해당 시트의 최신 표 기준으로 확인합니다.",
+      "상태": "ERP테이블레이아웃:통합CMS_ERP연계 테이블레이아웃 (3).xlsx:관련업무코드",
       "이미지키": ""
     }
   ]
