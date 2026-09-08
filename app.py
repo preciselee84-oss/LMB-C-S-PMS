@@ -17751,11 +17751,86 @@ def billing_template_df(source_df, column_specs):
     return result
 
 
+def apply_billing_template_sheet_style(ws, title, row_count, col_count):
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.worksheet.table import Table, TableStyleInfo
+    from openpyxl.utils import get_column_letter
+
+    if col_count <= 0:
+        return
+
+    title_fill = PatternFill("solid", fgColor="00857A")
+    header_fill = PatternFill("solid", fgColor="DFF3F0")
+    header_font = Font(name="맑은 고딕", size=10, bold=True, color="003B35")
+    title_font = Font(name="맑은 고딕", size=12, bold=True, color="FFFFFF")
+    body_font = Font(name="맑은 고딕", size=10, color="111827")
+    thin_side = Side(style="thin", color="9EDBD4")
+    border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left = Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+    last_col_letter = get_column_letter(col_count)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=col_count)
+    title_cell = ws.cell(row=1, column=1, value=title)
+    title_cell.fill = title_fill
+    title_cell.font = title_font
+    title_cell.alignment = left
+    ws.row_dimensions[1].height = 24
+
+    header_row = 3
+    last_row = max(header_row, header_row + row_count)
+    for col_idx in range(1, col_count + 1):
+        cell = ws.cell(row=header_row, column=col_idx)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = border
+        cell.alignment = center
+
+    for row_idx in range(header_row + 1, last_row + 1):
+        ws.row_dimensions[row_idx].height = 22
+        for col_idx in range(1, col_count + 1):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            cell.font = body_font
+            cell.border = border
+            header = str(ws.cell(row=header_row, column=col_idx).value or "")
+            cell.alignment = left if header in {"업체명", "실적파일 고객명", "청구원본 고객명", "비고"} else center
+
+    for col_idx in range(1, col_count + 1):
+        header = str(ws.cell(row=header_row, column=col_idx).value or "")
+        values = [
+            str(ws.cell(row=row_idx, column=col_idx).value or "")
+            for row_idx in range(header_row + 1, min(last_row, header_row + 30) + 1)
+        ]
+        longest = max([len(header), *[len(value) for value in values]], default=10)
+        width = min(max(longest + 4, 10), 38)
+        if header in {"업체명", "실적파일 고객명", "청구원본 고객명"}:
+            width = max(width, 24)
+        if header == "비고":
+            width = max(width, 30)
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+    table_ref = f"A{header_row}:{last_col_letter}{last_row}"
+    ws.auto_filter.ref = table_ref
+    ws.freeze_panes = "A4"
+    if row_count > 0:
+        table_name = re.sub(r"[^A-Za-z0-9_]", "_", f"Billing_{ws.title}")[:40].strip("_") or "BillingTable"
+        table = Table(displayName=table_name, ref=table_ref)
+        table.tableStyleInfo = TableStyleInfo(
+            name="TableStyleMedium4",
+            showFirstColumn=False,
+            showLastColumn=False,
+            showRowStripes=True,
+            showColumnStripes=False,
+        )
+        ws.add_table(table)
+
+
 def append_billing_template_sheet(writer, sheet_name, title, df):
     safe_name = str(sheet_name)[:31] or "Sheet"
     sheet_df = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
     pd.DataFrame([[title]]).to_excel(writer, index=False, header=False, sheet_name=safe_name, startrow=0)
     sheet_df.to_excel(writer, index=False, sheet_name=safe_name, startrow=2)
+    apply_billing_template_sheet_style(writer.sheets[safe_name], title, len(sheet_df), len(sheet_df.columns))
 
 
 def billing_sections_excel_bytes(open_sections, erp_sections):
@@ -17801,7 +17876,7 @@ def billing_template_excel_bytes(open_df, education_df, erp_df):
         ("구축일", ["구축일", "구축일자"]),
         ("연계시작일자", ["연계시작일자"]),
         ("은행연계완료일자", ["은행연계완료일자"]),
-        ("비고", ["수령여부"]),
+        ("수령여부", ["수령여부"]),
         ("비고", ["비고"]),
     ]
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
