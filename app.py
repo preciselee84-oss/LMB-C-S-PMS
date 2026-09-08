@@ -17928,6 +17928,37 @@ def billing_open_download_df(title, source_df, login_df, reference_lookup):
     return display_df
 
 
+def prepare_billing_education_df(education_sections, moved_rows, edu_columns, login_df, reference_lookup):
+    frames = [
+        df.copy()
+        for _, df in education_sections
+        if isinstance(df, pd.DataFrame) and not df.empty
+    ]
+    if moved_rows:
+        frames.append(pd.DataFrame(moved_rows))
+
+    if frames:
+        education_df = pd.concat(frames, ignore_index=True)
+    else:
+        education_df = pd.DataFrame(columns=edu_columns or None)
+    if edu_columns:
+        for col in edu_columns:
+            if col not in education_df.columns:
+                education_df[col] = ""
+
+    education_title = education_sections[0][0] if education_sections else "사용자교육(방문)대기 고객사"
+    if not education_df.empty and {"최근로그인일자", "로그인횟수", "청구원본 고객명"}.intersection(education_df.columns):
+        result = education_df.copy()
+    else:
+        result = billing_open_download_df(education_title, education_df, login_df, reference_lookup)
+    if "최종로그인일자" in result.columns:
+        result = result.drop(columns=["최종로그인일자"], errors="ignore")
+    if "방문일자" in result.columns:
+        result["방문일자"] = ""
+    result.attrs["billing_title"] = education_title
+    return result
+
+
 def build_billing_download_sections(parsed_open_sections, parsed_erp_sections, open_count, link_count, login_df, reference_lookup=None):
     reference_lookup = reference_lookup or {}
     prepared_open_sections = [
@@ -17969,15 +18000,19 @@ def build_billing_download_sections(parsed_open_sections, parsed_erp_sections, o
             if has_billing_login_history(login_lookup, customer_no, biz_no):
                 moved_rows.append(row.to_dict())
 
-    moved_df = pd.DataFrame(moved_rows)
-    if edu_columns:
-        moved_df = moved_df.reindex(columns=edu_columns, fill_value="")
     education_title = education_sections[0][0] if education_sections else "사용자교육(방문)대기 고객사"
+    education_df = prepare_billing_education_df(
+        education_sections,
+        moved_rows,
+        edu_columns,
+        login_df,
+        reference_lookup,
+    )
     final_open_sections = [
         (title, billing_open_download_df(title, df, login_df, reference_lookup))
         for title, df in selected_open
     ]
-    final_open_sections.append((education_title, billing_open_download_df(education_title, moved_df, login_df, reference_lookup)))
+    final_open_sections.append((education_title, education_df))
     final_open_sections = clear_education_visit_dates(final_open_sections)
     final_erp_sections = [
         (title, build_erp_billing_table(df, login_df, reference_lookup))
@@ -18034,12 +18069,13 @@ def build_billing_template_download_dfs(parsed_open_sections, parsed_erp_section
     if selected_open:
         open_df.attrs["billing_title"] = selected_open[0][0]
 
-    education_df = pd.DataFrame(moved_rows)
-    if edu_columns:
-        education_df = education_df.reindex(columns=edu_columns, fill_value="")
-    education_title = education_sections[0][0] if education_sections else "사용자교육(방문)대기 고객사"
-    education_df = billing_open_download_df(education_title, education_df, login_df, reference_lookup)
-    education_df.attrs["billing_title"] = education_title
+    education_df = prepare_billing_education_df(
+        education_sections,
+        moved_rows,
+        edu_columns,
+        login_df,
+        reference_lookup,
+    )
 
     erp_tables = [
         build_erp_billing_table(df, login_df, reference_lookup)
