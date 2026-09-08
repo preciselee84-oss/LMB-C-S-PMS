@@ -17378,14 +17378,17 @@ def normalize_billing_login_df(df):
     customer_col = find_exact_col(source, ["고객번호"]) or find_col(source, ["고객번호"])
     biz_col = find_exact_col(source, ["사업자번호", "사업자등록번호"]) or find_col(source, ["사업자번호", "사업자등록번호"])
     company_col = find_exact_col(source, ["고객명", "고객사명"]) or find_col(source, ["고객명", "고객사명"])
-    latest_login_col = find_exact_col(source, ["최근로그인", "최종로그인일자", "최종로그인"]) or find_col(
+    latest_login_col = find_exact_col(source, ["최근로그인", "최근로그인일자", "최종로그인일자", "최종로그인", "로그인일자"]) or find_col(
         source,
-        ["최근로그인", "최종로그인일자", "최종로그인"],
+        ["최근로그인", "최종로그인일자", "최종로그인", "로그인일자"],
     )
-    first_login_col = find_exact_col(source, ["신규일자"]) or find_col(source, ["신규일자"])
-    login_count_col = find_exact_col(source, ["로그인", "로그인횟수", "로그인수"]) or find_col(
+    first_login_col = find_exact_col(source, ["신규일자", "최초로그인", "최초로그인일자"]) or find_col(
         source,
-        ["로그인횟수", "로그인수"],
+        ["신규일자", "최초로그인"],
+    )
+    login_count_col = find_exact_col(source, ["로그인", "로그인횟수", "로그인건수", "로그인수"]) or find_col(
+        source,
+        ["로그인횟수", "로그인건수", "로그인수"],
     )
     is_reference_only = not login_count_col
 
@@ -17418,7 +17421,7 @@ def normalize_billing_login_df(df):
             "사업자번호": source[biz_col].apply(normalize_biz_no) if biz_col and biz_col in source.columns else "",
             "고객명": source[company_col].astype(str).str.strip(),
             "최초로그인": source[first_login_col].astype(str).str.strip() if first_login_col else "",
-            "최근로그인": source[latest_login_col].astype(str).str.strip() if latest_login_col and login_count_col else "",
+            "최근로그인": source[latest_login_col].astype(str).str.strip() if latest_login_col else "",
             "로그인": pd.to_numeric(source[login_count_col].astype(str).str.replace(",", "", regex=False), errors="coerce")
             .fillna(0)
             .astype(int)
@@ -17558,6 +17561,25 @@ def login_lookup_from_df(login_df):
     if login_df is None or login_df.empty:
         return {}
     lookup = {}
+    def login_score(info):
+        try:
+            count = int(float(str(info.get("로그인", 0)).replace(",", "") or 0))
+        except Exception:
+            count = 0
+        score = count
+        if str(info.get("최근로그인", "")).strip():
+            score += 1000000
+        if str(info.get("최초로그인", "")).strip():
+            score += 1000
+        return score
+
+    def set_best_lookup(key, info):
+        if not key:
+            return
+        current = lookup.get(key)
+        if not current or login_score(info) >= login_score(current):
+            lookup[key] = info
+
     for _, row in login_df.iterrows():
         customer_keys = billing_customer_keys(row.get("고객번호", ""))
         login_info = {
@@ -17569,10 +17591,13 @@ def login_lookup_from_df(login_df):
             "로그인": row.get("로그인", 0),
         }
         for customer_key in customer_keys:
-            lookup.setdefault(customer_key, login_info)
+            set_best_lookup(customer_key, login_info)
         biz_key = normalize_biz_no(row.get("사업자번호", ""))
         if biz_key:
-            lookup.setdefault(f"biz:{biz_key}", login_info)
+            set_best_lookup(f"biz:{biz_key}", login_info)
+        company_key = billing_company_key(row.get("고객명", ""))
+        if company_key:
+            set_best_lookup(f"company:{company_key}", login_info)
     return lookup
 
 
@@ -18218,15 +18243,37 @@ def billing_reference_info(reference_lookup, customer_no):
     return {}
 
 
-def billing_login_info_from_row(login_lookup, customer_no="", biz_no=""):
+def billing_login_info_from_row(login_lookup, customer_no="", biz_no="", company=""):
+    candidates = []
     for customer_key in billing_customer_keys(customer_no):
         info = login_lookup.get(customer_key)
         if info:
-            return info
+            candidates.append(info)
     biz_key = normalize_biz_no(biz_no)
     if biz_key:
-        return login_lookup.get(f"biz:{biz_key}", {})
-    return {}
+        info = login_lookup.get(f"biz:{biz_key}", {})
+        if info:
+            candidates.append(info)
+    company_key = billing_company_key(company)
+    if company_key:
+        info = login_lookup.get(f"company:{company_key}", {})
+        if info:
+            candidates.append(info)
+    if not candidates:
+        return {}
+
+    def score(info):
+        try:
+            count = int(float(str(info.get("로그인", 0)).replace(",", "") or 0))
+        except Exception:
+            count = 0
+        return (
+            1 if str(info.get("최근로그인", "")).strip() else 0,
+            count,
+            1 if str(info.get("최초로그인", "")).strip() else 0,
+        )
+
+    return max(candidates, key=score)
 
 
 def billing_reference_info_from_row(reference_lookup, row):
@@ -18293,7 +18340,12 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
         reference_info = billing_reference_info_from_row(reference_lookup, row)
         customer_no = billing_fill_blank(customer_no, reference_info, "고객번호")
         biz_no = normalize_biz_no(billing_fill_blank(raw_biz_no, reference_info, "사업자번호"))
-        login_info = billing_login_info_from_row(login_lookup, customer_no, biz_no)
+        company_name = billing_fill_blank(
+            billing_value(row, ["업체명", "고객명", "업체명(당월)", "고객명(당월)"]),
+            reference_info,
+            "업체명",
+        )
+        login_info = billing_login_info_from_row(login_lookup, customer_no, biz_no, company_name)
         if not customer_no:
             customer_no = login_info.get("고객번호", "")
         customer_no = normalize_customer_no(customer_no)
@@ -18308,11 +18360,7 @@ def build_open_billing_table(source_df, login_df=None, reference_lookup=None):
                 "순번": billing_value(row, ["순번"]) or str(idx + 1),
                 "고객번호": customer_no,
                 "사업자번호": biz_no,
-                "업체명": billing_fill_blank(
-                    billing_value(row, ["업체명", "고객명", "업체명(당월)", "고객명(당월)"]),
-                    reference_info,
-                    "업체명",
-                ),
+                "업체명": company_name,
                 "ERP연계 여부": _map_erp_type(billing_fill_blank(billing_value(row, ["ERP연계 여부", "ERP연계여부"]), reference_info, "ERP연계 여부")),
                 "해지체크": billing_termination_text(reference_info),
                 "접수일자": billing_fill_blank(billing_value(row, ["접수일자"]), reference_info, "접수일자"),
@@ -18374,7 +18422,8 @@ def build_erp_billing_table(source_df, login_df=None, reference_lookup=None):
         reference_info = billing_reference_info_from_row(reference_lookup, row)
         customer_no = billing_fill_blank(customer_no, reference_info, "고객번호")
         biz_no = normalize_biz_no(billing_fill_blank(raw_biz_no, reference_info, "사업자번호"))
-        login_info = billing_login_info_from_row(login_lookup, customer_no, biz_no)
+        company_name = billing_fill_blank(billing_value(row, ["업체명", "고객명"]), reference_info, "업체명")
+        login_info = billing_login_info_from_row(login_lookup, customer_no, biz_no, company_name)
         if not customer_no:
             customer_no = login_info.get("고객번호", "")
         customer_no = normalize_customer_no(customer_no)
@@ -18394,7 +18443,7 @@ def build_erp_billing_table(source_df, login_df=None, reference_lookup=None):
                 "순서": billing_value(row, ["순서", "순번"]) or str(idx + 1),
                 "고객번호": customer_no,
                 "사업자번호": biz_no,
-                "업체명": billing_fill_blank(billing_value(row, ["업체명", "고객명"]), reference_info, "업체명"),
+                "업체명": company_name,
                 "해지체크": billing_termination_text(reference_info),
                 "구분": billing_value(row, ["구분"]),
                 "추가연계신청일자": extra_link_date,
