@@ -17745,7 +17745,19 @@ def billing_template_df(source_df, column_specs):
     for _, row in source.iterrows():
         rows.append([billing_template_value(source, row, candidates) for _, candidates in column_specs])
     result = pd.DataFrame(rows, columns=[label for label, _ in column_specs])
-    for col in ("접수일자", "구축일자", "방문일자", "로그인일자", "추가연계신청일자", "구축일", "연계시작일자", "은행연계완료일자"):
+    for col in (
+        "접수일자",
+        "구축일자",
+        "방문일자",
+        "로그인일자",
+        "최초로그인",
+        "최근로그인일자",
+        "최종로그인일자",
+        "추가연계신청일자",
+        "구축일",
+        "연계시작일자",
+        "은행연계완료일자",
+    ):
         if col in result.columns:
             result[col] = result[col].apply(billing_format_date)
     return result
@@ -17824,6 +17836,11 @@ def append_billing_template_sheet(writer, sheet_name, title, df):
     apply_billing_template_sheet_style(writer.sheets[safe_name], title, len(sheet_df), len(sheet_df.columns))
 
 
+def billing_month_sheet_name(title, fallback):
+    match = re.search(r"(\d{1,2})월", str(title))
+    return f"{match.group(1)}월" if match else fallback
+
+
 def billing_sections_excel_bytes(open_sections, erp_sections):
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
@@ -17835,32 +17852,52 @@ def billing_sections_excel_bytes(open_sections, erp_sections):
 
 def billing_template_excel_bytes(open_df, education_df, erp_df):
     output = BytesIO()
+    open_title = open_df.attrs.get("billing_title", "구축 실적") if isinstance(open_df, pd.DataFrame) else "구축 실적"
+    education_title = (
+        education_df.attrs.get("billing_title", "이행로그인")
+        if isinstance(education_df, pd.DataFrame)
+        else "이행로그인"
+    )
+    erp_title = erp_df.attrs.get("billing_title", "당월 ERP연계 청구 고객사") if isinstance(erp_df, pd.DataFrame) else "당월 ERP연계 청구 고객사"
     open_specs = [
         ("순번", ["순번", "순서"]),
         ("고객번호", ["고객번호", "고객번호(당월)"]),
         ("사업자번호", ["사업자번호", "사업자등록번호", "사업자번호(당월)", "사업자등록번호(당월)"]),
-        ("업체명", ["업체명", "고객명", "업체명(당월)", "고객명(당월)"]),
+        ("실적파일 고객명", ["실적파일 고객명", "업체명", "고객명", "업체명(당월)", "고객명(당월)"]),
         ("ERP연계 여부", ["ERP연계 여부", "ERP연계여부"]),
         ("접수일자", ["접수일자"]),
-        ("구축일자", ["구축일자", "구축일"]),
         ("방문일자", ["방문일자", "방문일"]),
         ("담당자", ["담당자", "담당자(당월)"]),
         ("비고", ["비고"]),
+        ("최초로그인", ["최초로그인"]),
+        ("최근로그인일자", ["최근로그인일자", "최종로그인일자", "최근로그인", "최종로그인"]),
+        ("로그인횟수", ["로그인횟수", "로그인건수", "로그인"]),
+        ("청구원본 고객명", ["청구원본 고객명"]),
+        ("해지체크", ["해지체크"]),
+        ("청구구분", ["청구구분", "청구 구분"]),
     ]
     education_specs = [
         ("순번", ["순번", "순서"]),
-        ("고객번호(당월)", ["고객번호(당월)", "고객번호"]),
+        ("고객번호", ["고객번호", "고객번호(당월)"]),
         ("사업자번호", ["사업자번호", "사업자등록번호", "사업자번호(당월)", "사업자등록번호(당월)"]),
-        ("업체명", ["업체명", "고객명", "업체명(당월)", "고객명(당월)"]),
-        ("로그인일자", ["로그인일자", "최초로그인", "최근로그인일자"]),
+        ("실적파일 고객명", ["실적파일 고객명", "업체명", "고객명", "업체명(당월)", "고객명(당월)"]),
+        ("ERP연계 여부", ["ERP연계 여부", "ERP연계여부"]),
+        ("접수일자", ["접수일자"]),
+        ("방문일자", ["방문일자", "방문일"]),
         ("담당자", ["담당자", "담당자(당월)"]),
         ("비고", ["비고"]),
+        ("최초로그인", ["최초로그인"]),
+        ("최근로그인일자", ["최근로그인일자", "최종로그인일자", "최근로그인", "최종로그인"]),
+        ("로그인횟수", ["로그인횟수", "로그인건수", "로그인"]),
+        ("청구원본 고객명", ["청구원본 고객명"]),
+        ("해지체크", ["해지체크"]),
+        ("청구구분", ["청구구분", "청구 구분"]),
     ]
     erp_specs = [
         ("순서", ["순서", "순번"]),
         ("고객번호", ["고객번호", "고객번호(당월)"]),
         ("사업자번호", ["사업자번호", "사업자등록번호", "사업자번호(당월)", "사업자등록번호(당월)"]),
-        ("업체명", ["업체명", "고객명", "업체명(당월)", "고객명(당월)"]),
+        ("실적파일 고객명", ["실적파일 고객명", "업체명", "고객명", "업체명(당월)", "고객명(당월)"]),
         ("구분", ["구분"]),
         ("추가연계신청일자", ["추가연계신청일자"]),
         ("담당자", ["담당자", "담당자(당월)"]),
@@ -17869,11 +17906,17 @@ def billing_template_excel_bytes(open_df, education_df, erp_df):
         ("은행연계완료일자", ["은행연계완료일자"]),
         ("수령여부", ["수령여부"]),
         ("비고", ["비고"]),
+        ("최초로그인", ["최초로그인"]),
+        ("최종로그인일자", ["최종로그인일자", "최근로그인일자", "최근로그인", "최종로그인"]),
+        ("로그인횟수", ["로그인횟수", "로그인건수", "로그인"]),
+        ("청구원본 고객명", ["청구원본 고객명"]),
+        ("해지체크", ["해지체크"]),
+        ("청구구분", ["청구구분", "청구 구분"]),
     ]
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        append_billing_template_sheet(writer, "7월", "2026년 7월 구축 실적", billing_template_df(open_df, open_specs))
-        append_billing_template_sheet(writer, "이행로그인", "이행로그인", billing_template_df(education_df, education_specs))
-        append_billing_template_sheet(writer, "연계확인서 수령완료", "당월 ERP연계 청구 고객사", billing_template_df(erp_df, erp_specs))
+        append_billing_template_sheet(writer, billing_month_sheet_name(open_title, "구축실적"), open_title, billing_template_df(open_df, open_specs))
+        append_billing_template_sheet(writer, "이행로그인", education_title, billing_template_df(education_df, education_specs))
+        append_billing_template_sheet(writer, "연계확인서 수령완료", erp_title, billing_template_df(erp_df, erp_specs))
     output.seek(0)
     return output.getvalue()
 
@@ -17983,11 +18026,28 @@ def build_billing_template_download_dfs(parsed_open_sections, parsed_erp_section
             if has_billing_login_history(login_lookup, customer_no, biz_no):
                 moved_rows.append(row.to_dict())
 
-    open_df = pd.concat([df for _, df in selected_open if isinstance(df, pd.DataFrame)], ignore_index=True) if selected_open else pd.DataFrame()
-    erp_df = pd.concat([df for _, df in selected_erp if isinstance(df, pd.DataFrame)], ignore_index=True) if selected_erp else pd.DataFrame()
+    open_tables = [
+        billing_open_download_df(title, df, login_df, reference_lookup)
+        for title, df in selected_open
+    ]
+    open_df = pd.concat(open_tables, ignore_index=True) if open_tables else pd.DataFrame()
+    if selected_open:
+        open_df.attrs["billing_title"] = selected_open[0][0]
+
     education_df = pd.DataFrame(moved_rows)
     if edu_columns:
         education_df = education_df.reindex(columns=edu_columns, fill_value="")
+    education_title = education_sections[0][0] if education_sections else "사용자교육(방문)대기 고객사"
+    education_df = billing_open_download_df(education_title, education_df, login_df, reference_lookup)
+    education_df.attrs["billing_title"] = education_title
+
+    erp_tables = [
+        build_erp_billing_table(df, login_df, reference_lookup)
+        for _, df in selected_erp
+    ]
+    erp_df = pd.concat(erp_tables, ignore_index=True) if erp_tables else pd.DataFrame()
+    if selected_erp:
+        erp_df.attrs["billing_title"] = selected_erp[0][0]
     return open_df, education_df, erp_df
 
 
