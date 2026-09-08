@@ -17776,6 +17776,7 @@ def apply_billing_template_sheet_style(ws, title, row_count, col_count):
     title_cell.font = title_font
     title_cell.alignment = left
     ws.row_dimensions[1].height = 24
+    ws.sheet_view.showGridLines = False
 
     header_row = 3
     last_row = max(header_row, header_row + row_count)
@@ -17792,6 +17793,8 @@ def apply_billing_template_sheet_style(ws, title, row_count, col_count):
             cell = ws.cell(row=row_idx, column=col_idx)
             cell.font = body_font
             cell.border = border
+            if (row_idx - header_row) % 2 == 0:
+                cell.fill = PatternFill("solid", fgColor="F5FBFA")
             header = str(ws.cell(row=header_row, column=col_idx).value or "")
             cell.alignment = left if header in {"업체명", "실적파일 고객명", "청구원본 고객명", "비고"} else center
 
