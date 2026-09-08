@@ -17753,7 +17753,6 @@ def billing_template_df(source_df, column_specs):
 
 def apply_billing_template_sheet_style(ws, title, row_count, col_count):
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-    from openpyxl.worksheet.table import Table, TableStyleInfo
     from openpyxl.utils import get_column_letter
 
     if col_count <= 0:
@@ -17815,17 +17814,6 @@ def apply_billing_template_sheet_style(ws, title, row_count, col_count):
     table_ref = f"A{header_row}:{last_col_letter}{last_row}"
     ws.auto_filter.ref = table_ref
     ws.freeze_panes = "A4"
-    if row_count > 0:
-        table_name = re.sub(r"[^A-Za-z0-9_]", "_", f"Billing_{ws.title}")[:40].strip("_") or "BillingTable"
-        table = Table(displayName=table_name, ref=table_ref)
-        table.tableStyleInfo = TableStyleInfo(
-            name="TableStyleMedium4",
-            showFirstColumn=False,
-            showLastColumn=False,
-            showRowStripes=True,
-            showColumnStripes=False,
-        )
-        ws.add_table(table)
 
 
 def append_billing_template_sheet(writer, sheet_name, title, df):
@@ -17910,6 +17898,10 @@ def build_billing_download_sections(parsed_open_sections, parsed_erp_sections, o
     open_main_sections = [(title, df) for title, df in prepared_open_sections if "사용자교육" not in title]
     education_sections = [(title, df) for title, df in prepared_open_sections if "사용자교육" in title]
 
+    if open_count <= 0:
+        open_count = sum(len(df) for _, df in open_main_sections if isinstance(df, pd.DataFrame))
+    if link_count <= 0:
+        link_count = sum(len(df) for _, df in prepared_erp_sections if isinstance(df, pd.DataFrame))
     selected_open, remaining_open = slice_billing_sections_by_count(open_main_sections, open_count)
     selected_erp, _ = slice_billing_sections_by_count(prepared_erp_sections, link_count)
 
@@ -17963,6 +17955,10 @@ def build_billing_template_download_dfs(parsed_open_sections, parsed_erp_section
     ]
     open_main_sections = [(title, df) for title, df in prepared_open_sections if "사용자교육" not in title]
     education_sections = [(title, df) for title, df in prepared_open_sections if "사용자교육" in title]
+    if open_count <= 0:
+        open_count = sum(len(df) for _, df in open_main_sections if isinstance(df, pd.DataFrame))
+    if link_count <= 0:
+        link_count = sum(len(df) for _, df in prepared_erp_sections if isinstance(df, pd.DataFrame))
     selected_open, remaining_open = slice_billing_sections_by_count(open_main_sections, open_count)
     selected_erp, _ = slice_billing_sections_by_count(prepared_erp_sections, link_count)
 
